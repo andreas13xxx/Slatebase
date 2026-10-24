@@ -38,23 +38,24 @@ function renderSection(apiClient: IApiClient, storeEnabled: boolean) {
 }
 
 describe('ThemesSection', () => {
-  it('shows only the installed themes, without tabs, while the store feature is off', async () => {
+  it('offers only "Installiert" and "Importieren", without the catalog, while the store feature is off', async () => {
     const apiClient = createMockApiClient()
     renderSection(apiClient, false)
 
     expect(await screen.findByLabelText('Slatebase (Standard)')).toBeInTheDocument()
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Installiert', 'Importieren'])
     expect(screen.queryByRole('tab', { name: 'Entdecken' })).not.toBeInTheDocument()
     expect(apiClient.listStoreThemes).not.toHaveBeenCalled() // no catalog request, nothing leaves the server
   })
 
-  it('offers "Installiert" and "Entdecken" when the store feature is on, starting on the installed themes', async () => {
+  it('offers "Installiert", "Entdecken" and "Importieren" when the store feature is on, starting on the installed themes', async () => {
     const apiClient = createMockApiClient()
     renderSection(apiClient, true)
 
     expect(await screen.findByLabelText('Slatebase (Standard)')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Installiert' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Entdecken' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Installiert', 'Entdecken', 'Importieren'])
     expect(apiClient.listStoreThemes).not.toHaveBeenCalled() // the catalog loads only when its tab is opened
   })
 
@@ -91,8 +92,19 @@ describe('ThemesSection', () => {
     fireEvent.keyDown(discover, { key: 'Home' })
     expect(installed).toHaveAttribute('aria-selected', 'true')
     fireEvent.keyDown(installed, { key: 'End' })
-    expect(discover).toHaveAttribute('aria-selected', 'true')
-    fireEvent.keyDown(discover, { key: 'ArrowRight' }) // wraps around
+    const importTab = screen.getByRole('tab', { name: 'Importieren' })
+    expect(importTab).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(importTab, { key: 'ArrowRight' }) // wraps around
     expect(installed).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows the import drop zone on its own tab, not on "Installiert"', async () => {
+    renderSection(createMockApiClient(), false)
+    await screen.findByLabelText('Slatebase (Standard)')
+    expect(screen.queryByTestId('theme-file-input')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Importieren' }))
+    expect(await screen.findByTestId('theme-file-input')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Slatebase (Standard)')).not.toBeInTheDocument()
   })
 })

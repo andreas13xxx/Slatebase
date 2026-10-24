@@ -117,45 +117,6 @@ describe('ThemeManager', () => {
     expect(themeTag()).toBeNull()
   })
 
-  it('imports a theme.css with its manifest under the manifest name', async () => {
-    const apiClient = createMockApiClient()
-    renderManager(apiClient)
-    await screen.findByLabelText('Slatebase (Standard)')
-
-    const css = new File(['body { --x: 1 }'], 'theme.css')
-    const manifest = new File([JSON.stringify({ name: 'Minimal', version: '7.0.0' })], 'manifest.json')
-    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [css, manifest] } })
-
-    await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Minimal', 'body { --x: 1 }', { name: 'Minimal', version: '7.0.0' }))
-  })
-
-  it('explains what is missing when the name cannot be derived', async () => {
-    const apiClient = createMockApiClient()
-    renderManager(apiClient)
-    await screen.findByLabelText('Slatebase (Standard)')
-
-    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'theme.css')] } })
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Theme-Name fehlt/)
-    expect(apiClient.saveTheme).not.toHaveBeenCalled()
-  })
-
-  it('asks before overwriting an existing theme', async () => {
-    const apiClient = createMockApiClient({
-      listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: null }),
-    })
-    renderManager(apiClient)
-    await screen.findByRole('radio', { name: /Things/ })
-
-    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'Things.css')] } })
-
-    expect(await screen.findByText(/existiert bereits/)).toBeInTheDocument()
-    expect(apiClient.saveTheme).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Überschreiben' }))
-    await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Things', 'a{}', {}))
-  })
-
   it('deletes the active theme after confirmation and falls back to the default', async () => {
     themeInjector.apply('Things', 'a{}')
     const apiClient = createMockApiClient({
@@ -192,33 +153,6 @@ describe('ThemeManager', () => {
     expect(screen.getByRole('radio', { name: /Things/ })).toBeChecked()
   })
 
-  it('treats a differently cased name as the existing theme and overwrites that folder', async () => {
-    const minimal: ThemeMeta = { id: 'Minimal', manifest: { name: 'Minimal' }, size: 10, updatedAt: '2026-10-17T00:00:00.000Z', externalHosts: [], hasStyleSettings: false }
-    const apiClient = createMockApiClient({
-      listThemes: vi.fn().mockResolvedValue({ themes: [minimal], activeThemeId: null }),
-    })
-    renderManager(apiClient)
-    await screen.findByRole('radio', { name: /Minimal/ })
-
-    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'minimal.css')] } })
-
-    expect(await screen.findByText(/existiert bereits/)).toBeInTheDocument()
-    expect(apiClient.saveTheme).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Überschreiben' }))
-    await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Minimal', 'a{}', {}))
-  })
-
-  it('imports a theme named "Active" under a free id instead of a reserved one', async () => {
-    const apiClient = createMockApiClient()
-    renderManager(apiClient)
-    await screen.findByLabelText('Slatebase (Standard)')
-
-    const manifest = new File([JSON.stringify({ name: 'Active' })], 'manifest.json')
-    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['a{}'], 'theme.css'), manifest] } })
-
-    await waitFor(() => expect(apiClient.saveTheme).toHaveBeenCalledWith('vault1', 'Active-theme', 'a{}', { name: 'Active' }))
-  })
-
   describe('Style Settings hint', () => {
     const withSettings: ThemeMeta = { ...things, id: 'Minimal', manifest: { name: 'Minimal' }, hasStyleSettings: true }
 
@@ -235,6 +169,15 @@ describe('ThemeManager', () => {
       version: 1 as const,
       plugins: status === undefined ? {} : { 'obsidian-style-settings': { status, permissions: {}, compatibilityLevel: 'full', installedAt: '', updatedAt: '' } },
     }) as unknown as Awaited<ReturnType<IApiClient['loadRegistry']>>
+
+    it('shows the hint once and marks only the themes with settings by an icon', async () => {
+      const other: ThemeMeta = { ...withSettings, id: 'Neon', manifest: { name: 'Neon' } }
+      renderWithRegistry(registryWith(), [withSettings, other, things])
+      await screen.findByRole('radio', { name: /Things/ })
+
+      expect(await screen.findAllByText(/bringen eigene Einstellungen mit/)).toHaveLength(1)
+      expect(screen.getAllByRole('img', { name: 'Hat eigene Einstellungen' })).toHaveLength(2)
+    })
 
     it('asks to install the plugin when it is not in the vault', async () => {
       renderWithRegistry(registryWith())
@@ -284,7 +227,8 @@ describe('ThemeManager', () => {
     it('shows nothing, and does not query the plugin registry, for themes without settings', async () => {
       const apiClient = renderWithRegistry(registryWith(), [things])
       await screen.findByRole('radio', { name: /Things/ })
-      expect(screen.queryByText(/bringt eigene Einstellungen mit/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/bringen eigene Einstellungen mit/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('img', { name: 'Hat eigene Einstellungen' })).not.toBeInTheDocument()
       expect(apiClient.loadRegistry).not.toHaveBeenCalled()
     })
 

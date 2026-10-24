@@ -774,8 +774,9 @@ src/
 │   │   ├── ServerRestartSection.tsx   — Server restart with confirmation
 │   │   ├── VaultConfigSection.tsx     — Per-vault config split into two SettingSection cards — "Anzeige" ("Aktive Datei im Explorer verfolgen", client-only `workspaceStore.explorerFollowActiveFile`, applies instantly, no save button) and "Verzeichnisse" (templates dir, daily notes dir, attachments dir, server-persisted, save button)
 │   │   ├── CssSnippetsSection.tsx      — Per-vault CSS snippets; sits under the Vault category because snippets are vault data (`<vault>/.obsidian/snippets/`), not account data
-│   │   ├── ThemesSection.tsx           — Per-vault Obsidian themes (Vault category); wraps ThemeManager
-│   │   ├── ThemeManager.tsx            — Theme list (radio selection, delete with ConfirmModal), import via file picker / drag & drop, external-host warning; applies the choice locally because `vault:change` excludes the acting user
+│   │   ├── ThemesSection.tsx           — Per-vault Obsidian themes (Vault category); tabs Installiert / Entdecken (store feature) / Importieren
+│   │   ├── ThemeManager.tsx            — Theme list (radio selection, delete with ConfirmModal), external-host warning, one Style Settings hint plus an icon per theme with settings; applies the choice locally because `vault:change` excludes the acting user
+│   │   ├── ThemeImport.tsx             — Import tab: theme.css (+ optional manifest.json) via file picker / drag & drop; checks for an existing theme right before saving
 │   │   ├── themeImport.ts              — Pure import helpers (pick theme.css/manifest.json, derive a safe theme id, read manifest fields)
 │   │   ├── GitSyncSection.tsx          — Per-vault git-sync: shared local branch + one or more remotes (URL, auth method, interval, SSH deploy key, sync-now, last-run line). Owner only, gated on the `git-sync` toggle
 │   │   ├── MailImportSection.tsx       — Per-vault IMAP mailboxes polled server-side and imported as Markdown notes (host/port/credentials, mailbox tree picker, target folder, interval, import-now). Owner only, gated on `mail-import`
