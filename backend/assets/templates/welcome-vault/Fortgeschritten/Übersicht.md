@@ -87,6 +87,7 @@ Detaillierte Anleitungen für einzelne Obsidian-Plugins:
 | [[Fortgeschritten/Plugins/Outliner\|Outliner]] | Listen als echter Outline-Editor |
 | [[Fortgeschritten/Plugins/Paste URL into Selection\|Paste URL into Selection]] | Markierten Text per Einfügen zum Link machen |
 | [[Fortgeschritten/Plugins/Recent Files\|Recent Files]] | Seitenleiste mit zuletzt geöffneten Notizen |
+| [[Fortgeschritten/Plugins/Style Settings\|Style Settings]] | Einstellungen von Themes und Snippets in einer Oberfläche |
 | [[Fortgeschritten/Plugins/Tasks\|Tasks]] | Checkbox-Zeilen als Aufgabenverwaltung mit Query-Blöcken |
 | [[Fortgeschritten/Plugins/Templater\|Templater]] | Dynamische Vorlagen |
 
