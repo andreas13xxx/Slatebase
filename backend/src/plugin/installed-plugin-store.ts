@@ -18,7 +18,7 @@ import {
   PluginSettingsTooLargeError,
   PluginVaultUnavailableError,
 } from './errors.js'
-import { isValidPluginId } from './validation.js'
+import { PLUGIN_ID_PATTERN, isValidPluginId } from './validation.js'
 import { KeyedMutex } from '../shared/async-mutex.js'
 import { isNodeError } from '../shared/fs-utils.js'
 import { KeyedJsonFileStore, writeJsonFileAtomic } from '../shared/json-file-store.js'
@@ -329,7 +329,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
 
   private assertValidPluginId(pluginId: string): void {
     if (!isValidPluginId(pluginId)) {
-      throw new Error(`Invalid plugin ID: "${pluginId}" — must match /^[a-z0-9][a-z0-9-]{0,63}$/`)
+      throw new Error(`Invalid plugin ID: "${pluginId}" — must match ${PLUGIN_ID_PATTERN}`)
     }
   }
 

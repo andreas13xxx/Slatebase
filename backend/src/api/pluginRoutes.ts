@@ -13,7 +13,7 @@ import {
   PluginSettingsTooLargeError,
 } from '../plugin/errors.js'
 import { PluginInstallError } from '../plugin/plugin-installer.js'
-import { pluginRegistrySchema } from '../plugin/validation.js'
+import { PLUGIN_ID_PATTERN, pluginRegistrySchema } from '../plugin/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
@@ -57,7 +57,7 @@ const pluginIdParamSchema = z.object({
   pluginId: z.string()
     .min(1, 'pluginId must not be empty')
     .max(64, 'pluginId must not exceed 64 characters')
-    .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'),
+    .regex(PLUGIN_ID_PATTERN, 'Invalid plugin ID: must contain only letters, digits, ".", "_" and "-", start with a letter or digit, and not end with "." (1-64 chars)'),
 })
 
 /**

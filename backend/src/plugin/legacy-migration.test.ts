@@ -152,7 +152,7 @@ describe('migrateLegacyPlugins', () => {
   it('ignores folders that are not plugins (only secrets, invalid names)', async () => {
     await fs.mkdir(path.join(legacyDir(), 'only-secrets'), { recursive: true })
     await fs.writeFile(path.join(legacyDir(), 'only-secrets', 'secrets.json'), '{}')
-    await writeLegacyPlugin('Bad_Name')
+    await writeLegacyPlugin('_bad-name')
 
     await run()
 

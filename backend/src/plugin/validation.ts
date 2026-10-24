@@ -3,15 +3,21 @@ import { z } from 'zod'
 // ─── Plugin ID Validation ────────────────────────────────────────────────────
 
 /**
- * Strict regex for plugin IDs. Matches Obsidian community plugin conventions:
- * - Starts with a lowercase letter or digit
- * - Contains only lowercase letters, digits, and hyphens
+ * Regex for plugin IDs. Plugins live in Obsidian's `.obsidian/plugins/<id>/`, and Obsidian
+ * itself only requires the id to be unique, so the pattern has to accept every id that exists
+ * in the community catalog (checked against all 9,410 entries: besides lowercase ids there are
+ * e.g. `ObsidianAnkiSync`, `scrybble.ink`, `waka_time_box`, `3d_embeds`):
+ * - Starts with a letter or digit (so it can never be `.`, `..`, or collide with `_registry.json`
+ *   and other service files next to the plugin folders)
+ * - Contains only letters, digits, `.`, `_` and `-`; does not end with a dot (Windows drops it)
  * - Max 64 characters
- * - No path separators, dots, or special characters
+ * - No path separators or other special characters
  *
  * This prevents path traversal attacks when the ID is used in filesystem paths.
+ * Note: ids that differ only in case share a folder on case-insensitive filesystems
+ * (Windows, macOS), exactly as in Obsidian.
  */
-export const PLUGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/
+export const PLUGIN_ID_PATTERN = /^(?!.*\.$)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
 
 /**
  * Validates a plugin ID string against the safe pattern.
@@ -35,7 +41,7 @@ export const pluginManifestSchema = z.object({
   id: z.string()
     .min(1, 'Plugin ID must not be empty')
     .max(64, 'Plugin ID must not exceed 64 characters')
-    .regex(PLUGIN_ID_PATTERN, 'Plugin ID must contain only lowercase letters, digits, and hyphens, and start with a letter or digit'),
+    .regex(PLUGIN_ID_PATTERN, 'Plugin ID must contain only letters, digits, ".", "_" and "-", start with a letter or digit, and not end with "."'),
   name: z.string().min(1, 'Plugin name must not be empty'),
   version: z.string().regex(/^\d+\.\d+\.\d+$/, 'Version must be in MAJOR.MINOR.PATCH format'),
   minAppVersion: z.string().regex(/^\d+\.\d+\.\d+$/, 'minAppVersion must be in MAJOR.MINOR.PATCH format').optional(),

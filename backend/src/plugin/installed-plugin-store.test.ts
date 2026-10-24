@@ -96,9 +96,20 @@ describe('InstalledPluginStore', () => {
       await expect(store.savePlugin('vault-1', 'big', { manifest: testFiles.manifest, bundle: 'x', styles: big })).rejects.toThrow(PluginFileTooLargeError)
     })
 
+    it('accepts the ids Obsidian plugins really have, including uppercase, dots and underscores', async () => {
+      const ids = ['3d_embeds', 'ObsidianAnkiSync', 'scrybble.ink', 'waka_time_box']
+      for (const id of ids) {
+        await store.savePlugin('vault-1', id, { manifest: JSON.stringify({ ...testManifest, id }), bundle: id })
+        expect(await store.loadBundle('vault-1', id)).toBe(id)
+      }
+
+      expect((await store.listPlugins('vault-1')).map((m) => m.id).sort()).toEqual(ids)
+    })
+
     it('rejects invalid plugin ids', async () => {
       await expect(store.savePlugin('vault-1', '../escape', testFiles)).rejects.toThrow()
-      await expect(store.savePlugin('vault-1', 'Upper', testFiles)).rejects.toThrow()
+      await expect(store.savePlugin('vault-1', '_registry.json', testFiles)).rejects.toThrow()
+      await expect(store.savePlugin('vault-1', 'trailing.', testFiles)).rejects.toThrow()
     })
 
     it('throws for an unknown vault', async () => {
@@ -264,8 +275,8 @@ describe('InstalledPluginStore', () => {
       await store.savePlugin('vault-1', 'good', { manifest: JSON.stringify({ ...testManifest, id: 'good' }), bundle: 'g' })
       await fs.mkdir(pluginDir('no-manifest'), { recursive: true })
       await fs.writeFile(path.join(pluginDir('no-manifest'), 'main.js'), 'x')
-      await fs.mkdir(pluginDir('Has_Upper'), { recursive: true })
-      await fs.writeFile(path.join(pluginDir('Has_Upper'), 'manifest.json'), JSON.stringify(testManifest))
+      await fs.mkdir(pluginDir('_hidden'), { recursive: true })
+      await fs.writeFile(path.join(pluginDir('_hidden'), 'manifest.json'), JSON.stringify(testManifest))
       await fs.writeFile(path.join(vaultPath, '.obsidian', 'plugins', 'stray.txt'), 'x')
 
       expect((await store.listPlugins('vault-1')).map((m) => m.id)).toEqual(['good'])
