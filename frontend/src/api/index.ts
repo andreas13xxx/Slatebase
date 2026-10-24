@@ -2,6 +2,7 @@ import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, C
 import type { PublicUserInfo } from '../state/authState'
 import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
 import type { BaseQuerySpecWire, BaseQueryResultWire } from '@slatebase/shared-contracts'
+import type { CreatedPublicShare, EmbedPreviewEntry, PublicShareSummary } from '../public-share/types'
 
 /**
  * Login response returned by the backend on successful authentication.
@@ -266,6 +267,20 @@ export interface CommunityTheme {
 export interface CommunityThemeCatalog {
   themes: CommunityTheme[]
   stale: boolean
+}
+
+/** Body of `POST /vaults/:vaultId/public-shares`. */
+export interface CreatePublicShareInput {
+  path: string
+  /** ISO timestamp in the future. */
+  expiresAt?: string
+  password?: string
+}
+
+/** Body of `PUT /vaults/:vaultId/public-shares/:id`; `null` removes the value, a missing key leaves it. */
+export interface UpdatePublicShareInput {
+  expiresAt?: string | null
+  password?: string | null
 }
 
 /** An installed theme with a newer version in the catalog. */
@@ -802,6 +817,24 @@ export interface IApiClient {
   installStoreTheme(vaultId: string, repo: string, options?: InstallStoreThemeOptions): Promise<ThemeMeta>
   /** Compare the vault's installed themes with the catalog. */
   checkStoreThemeUpdates(vaultId: string): Promise<ThemeUpdateCheck>
+
+  // --- Public share links (read-only links for people without an account) ---
+  /** Create a link for a note. The token in the result is shown only once. */
+  createPublicShare(vaultId: string, input: CreatePublicShareInput): Promise<CreatedPublicShare>
+  /** Links of a vault (writers only). */
+  listPublicShares(vaultId: string): Promise<PublicShareSummary[]>
+  /** The caller's own links across all vaults. */
+  listMyPublicShares(): Promise<PublicShareSummary[]>
+  /** What a link for this note would include (embedded notes and files). */
+  previewPublicShare(vaultId: string, path: string): Promise<EmbedPreviewEntry[]>
+  /** Change expiry and/or password; `null` removes the value. */
+  updatePublicShare(vaultId: string, id: string, input: UpdatePublicShareInput): Promise<PublicShareSummary>
+  /** Give a link a new URL, keeping its password and expiry. The token in the result is shown only once. */
+  regeneratePublicShare(vaultId: string, id: string): Promise<CreatedPublicShare>
+  /** Revoke a link of a vault. */
+  revokePublicShare(vaultId: string, id: string): Promise<void>
+  /** Revoke one of the caller's own links without needing access to its vault. */
+  revokeMyPublicShare(id: string): Promise<void>
 
   // --- Git-Sync methods ---
   /** Load a vault's git-sync branch + remotes (no credentials). */
@@ -1557,6 +1590,49 @@ export class ApiClient implements IApiClient {
   /** Compare the vault's installed themes with the catalog. */
   async checkStoreThemeUpdates(vaultId: string): Promise<ThemeUpdateCheck> {
     return this.request<ThemeUpdateCheck>('GET', `/api/v1/vaults/${vaultId}/theme-store/updates`)
+  }
+
+  // --- Public share links ---
+
+  /** Create a public link for a note. */
+  async createPublicShare(vaultId: string, input: CreatePublicShareInput): Promise<CreatedPublicShare> {
+    return this.request<CreatedPublicShare>('POST', `/api/v1/vaults/${vaultId}/public-shares`, input)
+  }
+
+  /** Public links of a vault. */
+  async listPublicShares(vaultId: string): Promise<PublicShareSummary[]> {
+    return (await this.request<{ shares: PublicShareSummary[] }>('GET', `/api/v1/vaults/${vaultId}/public-shares`)).shares
+  }
+
+  /** The caller's own public links across vaults. */
+  async listMyPublicShares(): Promise<PublicShareSummary[]> {
+    return (await this.request<{ shares: PublicShareSummary[] }>('GET', '/api/v1/public-shares')).shares
+  }
+
+  /** Embeds a public link for the note would include. */
+  async previewPublicShare(vaultId: string, path: string): Promise<EmbedPreviewEntry[]> {
+    const url = `/api/v1/vaults/${vaultId}/public-shares/preview?path=${encodeURIComponent(path)}`
+    return (await this.request<{ embeds: EmbedPreviewEntry[] }>('GET', url)).embeds
+  }
+
+  /** Change expiry and/or password of a public link. */
+  async updatePublicShare(vaultId: string, id: string, input: UpdatePublicShareInput): Promise<PublicShareSummary> {
+    return (await this.request<{ share: PublicShareSummary }>('PUT', `/api/v1/vaults/${vaultId}/public-shares/${id}`, input)).share
+  }
+
+  /** Give a public link a new URL, keeping its password and expiry. */
+  async regeneratePublicShare(vaultId: string, id: string): Promise<CreatedPublicShare> {
+    return this.request<CreatedPublicShare>('POST', `/api/v1/vaults/${vaultId}/public-shares/${id}/regenerate`, {})
+  }
+
+  /** Revoke a public link of a vault. */
+  async revokePublicShare(vaultId: string, id: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/public-shares/${id}`)
+  }
+
+  /** Revoke one of the caller's own public links. */
+  async revokeMyPublicShare(id: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/public-shares/${id}`)
   }
 
   // --- Git-Sync methods ---

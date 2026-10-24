@@ -1,0 +1,52 @@
+/* Standalone page for public share links. Uses the app's design tokens, so light/dark follows the system. */
+.public-share {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+  background: var(--bg-base, #fff);
+  color: var(--text-primary, #1a1a1a);
+}
+
+.public-share-note {
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.public-share-title {
+  margin: 0 0 1.5rem;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.public-share-status {
+  text-align: center;
+  color: var(--text-subtle, #666);
+}
+
+.public-share-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin: 4rem auto 0;
+}
+
+.public-share-message h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.public-share-message p {
+  margin: 0;
+  color: var(--text-subtle, #666);
+}
+
+.public-share-message input,
+.public-share-message button {
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+}
+
+.public-share-error {
+  color: var(--danger, #b3261e) !important;
+}

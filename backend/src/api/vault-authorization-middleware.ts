@@ -58,6 +58,12 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   { method: 'POST', pathPattern: '/plugins/update-all', level: 'read' },
   { method: 'POST', pathPattern: '/plugins/:pluginId/update', level: 'read' },
 
+  // --- write instead of the read default ---
+  // publicShareRoutes.ts — a public link exposes note content outside the server, so even listing
+  // the links of a vault and previewing what one would include is reserved for writers.
+  { method: 'GET', pathPattern: '/public-shares', level: 'write' },
+  { method: 'GET', pathPattern: '/public-shares/preview', level: 'write' },
+
   // --- owner instead of the read/write default ---
   // vaultShareRoutes.ts — share management is owner-only, including the GET listing.
   { method: 'GET', pathPattern: '/shares', level: 'owner' },

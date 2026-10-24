@@ -22,7 +22,7 @@ interface PublicShare {
   tokenHash: string      // SHA-256 des Tokens; der Klartext wird nur einmal angezeigt
   tokenHint: string      // letzte 4 Zeichen, für die Verwaltung
   vaultId: string
-  fileId: string         // folgt der Datei bei Umbenennen/Verschieben (siehe unten)
+  filePath: string       // wird über die Link-Index-Hooks bei Umbenennen/Verschieben umgeschrieben (siehe unten)
   createdBy: string
   createdAt: string
   expiresAt?: string
@@ -35,10 +35,9 @@ Der Token wird nur gehasht gespeichert: Ein Leck von `public-shares.json` gibt k
 
 ### „Token folgt der Datei“
 
-Der Link-Index kennt Umbenennen/Verschieben bereits (Link-Integrität). `PublicShareService` hört auf dieselben
-Vault-Ereignisse und schreibt `filePath` um. Ist der Rewrite unzuverlässig (Datei außerhalb von Slatebase bewegt),
-liefert der Link 404 — nie eine andere Datei. **Offen für die Umsetzung:** Prüfen, ob der Link-Index eine stabile
-Datei-ID liefert oder ob der Rewrite über die Ereignisse laufen muss.
+Es gibt keine stabile Datei-ID (Phase 0.1). `PublicShareService` hängt sich an `ILinkIndexHook` (`onFileRenamed`,
+`onFileDeleted`; gleiche Quelle für API und MCP) und schreibt `filePath` um, bei Ordnerverschiebung per Präfix. Wird die
+Datei außerhalb von Slatebase bewegt, findet `resolve()` sie nicht mehr und liefert 404 — nie eine andere Datei.
 
 ### Routen
 
@@ -66,8 +65,9 @@ liefert nur, was in der transitiven Einbettungsmenge der Notiz steht (frisch pro
 
 ### Einbettungen im Rendering
 
-Die Pipeline bekommt im `publicMode` einen Embed-Resolver, der aus der `embeds`-Map der Antwort liest statt aus dem
-Vault. So nutzen Notiz-, Bild- und Mediendarstellung denselben Code wie im Editor. Der Resolver behandelt vier Fälle:
+`ViewMode` ist heute an `AppContext.apiClient` und den `directoryTree` gekoppelt (Phase 0.2). Deshalb bekommt es eine
+austauschbare **Embed-Quelle** (`resolveTarget`, `loadNote`, `assetUrl`); der Standard bleibt das heutige Verhalten, die
+öffentliche Seite übergibt eine Quelle, die aus der `embeds`-Map der Antwort liest statt aus dem Vault. So nutzen Notiz-, Bild- und Mediendarstellung denselben Code wie im Editor. Der Resolver behandelt vier Fälle:
 `note` (Inhalt rekursiv rendern, Frontmatter bereits entfernt), `asset` (URL der Asset-Route mit `ref`),
 `unavailable` (Hinweisbox „Eingebetteter Inhalt nicht verfügbar“, ohne Pfad), und `.base`/`.canvas`/Abfrageblöcke, die
 der Server immer als `unavailable` meldet. Wikilinks und Markdown-Links auf Notizen werden im `publicMode` zu Text.

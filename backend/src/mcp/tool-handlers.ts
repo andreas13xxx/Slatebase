@@ -160,7 +160,7 @@ export interface ToolHandlerDeps {
    */
   linkIndexHook?: {
     onFileSaved(vaultId: string, filePath: string, content: string): void
-    onFileDeleted(vaultId: string, filePath: string): void
+    onFileDeleted(vaultId: string, filePath: string): void | Promise<void>
     onFileRenamed(vaultId: string, oldPath: string, newPath: string): void | Promise<void>
   }
   /**
@@ -771,7 +771,7 @@ function registerDeleteFile(server: McpServer, deps: ToolHandlerDeps): void {
 
         // Not restricted to `.md`: deleting a folder removes every note inside
         // it, and that path carries no extension.
-        deps.linkIndexHook?.onFileDeleted(args.vaultId, args.path)
+        await deps.linkIndexHook?.onFileDeleted(args.vaultId, args.path)
 
         await deps.publishVaultChange?.(args.vaultId, 'deleted', args.path, userId)
 

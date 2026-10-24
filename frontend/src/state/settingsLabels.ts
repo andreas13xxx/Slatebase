@@ -12,6 +12,7 @@ export const SECTION_LABELS: Record<SettingsSection, string> = {
   'password': 'Passwort ändern',
   'sessions': 'Sitzungen',
   'mcp-tokens': 'MCP-Tokens',
+  'public-shares': 'Öffentliche Links',
   'keybindings': 'Tastaturkürzel',
   'appearance': 'Darstellung',
   'my-vaults': 'Meine Vaults',

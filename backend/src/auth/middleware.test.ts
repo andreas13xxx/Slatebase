@@ -9,6 +9,7 @@ import {
   createCsrfMiddleware,
   createRateLimitMiddleware,
   createMustChangePasswordMiddleware,
+  isPublicSharePath,
 } from './middleware.js'
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
@@ -593,5 +594,55 @@ describe('createMustChangePasswordMiddleware', () => {
     expect(res.status).toBe(401)
     const body = await res.json() as { code: string }
     expect(body.code).toBe('UNAUTHORIZED')
+  })
+})
+
+// ─── Public share bypass ─────────────────────────────────────────────────────
+
+describe('isPublicSharePath', () => {
+  it.each([
+    ['GET', '/api/v1/public/s/abcDEF_-123'],
+    ['GET', '/api/v1/public/s/abcDEF_-123/asset'],
+    ['POST', '/api/v1/public/s/abcDEF_-123/unlock'],
+  ])('allows %s %s', (method, path) => {
+    expect(isPublicSharePath(method, path)).toBe(true)
+  })
+
+  it.each([
+    ['POST', '/api/v1/public/s/abc'],
+    ['POST', '/api/v1/public/s/abc/asset'],
+    ['PUT', '/api/v1/public/s/abc'],
+    ['DELETE', '/api/v1/public/s/abc'],
+    ['GET', '/api/v1/public/s/'],
+    ['GET', '/api/v1/public/s'],
+    ['GET', '/api/v1/public/s/../vaults'],
+    ['GET', '/api/v1/public/s/abc/../../vaults'],
+    ['GET', '/api/v1/public/s/abc/other'],
+    ['GET', '/api/v1/public/s/abc/asset/extra'],
+    ['GET', '/api/v1/public/s/abc%2F..%2Fvaults'],
+    ['GET', '/api/v1/public/s/ab.c'],
+    ['GET', '/api/v1/public-s/abc'],
+    ['GET', '/api/v1/public/x/abc'],
+    ['GET', '/api/v1/vaults/v1/public-shares'],
+    ['GET', '/x/api/v1/public/s/abc'],
+  ])('rejects %s %s', (method, path) => {
+    expect(isPublicSharePath(method, path)).toBe(false)
+  })
+
+  it('lets the auth and CSRF middleware pass public routes without a session, and nothing else', async () => {
+    const app = new Hono()
+    const authService = createMockAuthService()
+    app.use('/api/v1/*', createAuthMiddleware(authService))
+    app.use('/api/v1/*', createCsrfMiddleware(authService))
+    app.all('/api/v1/*', (c) => c.text('ok'))
+
+    expect((await app.request('/api/v1/public/s/abc')).status).toBe(200)
+    expect((await app.request('/api/v1/public/s/abc/asset?ref=x')).status).toBe(200)
+    expect((await app.request('/api/v1/public/s/abc/unlock', { method: 'POST' })).status).toBe(200)
+
+    expect((await app.request('/api/v1/vaults')).status).toBe(401)
+    expect((await app.request('/api/v1/public/s/abc', { method: 'POST' })).status).toBe(401)
+    expect((await app.request('/api/v1/public/s/abc', { method: 'DELETE' })).status).toBe(401)
+    expect((await app.request('/api/v1/public/other')).status).toBe(401)
   })
 })

@@ -86,8 +86,12 @@ export const renameRequestSchema = z.object({
 export interface LinkIndexHook {
   /** Called after a markdown file is saved (created or updated). */
   onFileSaved(vaultId: string, filePath: string, content: string): void
-  /** Called after a file or folder is deleted. */
-  onFileDeleted(vaultId: string, filePath: string): void
+  /**
+   * Called after a file or folder is deleted. Awaited, so that anything keyed by the path (public
+   * share links) is gone before the response returns and cannot attach to a note created there later;
+   * implementations report their own failures rather than rejecting.
+   */
+  onFileDeleted(vaultId: string, filePath: string): void | Promise<void>
   /**
    * Called after a file or folder is renamed/moved (content may not be
    * available). Awaited before Link-Migration runs so the migration queries an
@@ -530,11 +534,11 @@ export class VaultController implements IVaultController {
     try {
       await this.vaultService.deleteContent(vaultId, decodedPath)
 
-      // Notify link index hook (fire-and-forget). Not restricted to `.md`:
-      // deleting a folder removes every note inside it, and that path carries
-      // no extension. The hook is a no-op for paths that aren't indexed.
+      // Notify link index hook. Not restricted to `.md`: deleting a folder
+      // removes every note inside it, and that path carries no extension. The
+      // hook is a no-op for paths that aren't indexed.
       if (this.linkIndexHook) {
-        this.linkIndexHook.onFileDeleted(vaultId, decodedPath)
+        await this.linkIndexHook.onFileDeleted(vaultId, decodedPath)
       }
 
       // Publish vault:change event (exclude triggering user)

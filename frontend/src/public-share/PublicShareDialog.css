@@ -1,0 +1,92 @@
+.public-share-dialog {
+  max-width: 520px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.public-share-dialog label {
+  display: block;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.public-share-dialog input:not([type='checkbox']) {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.public-share-dialog__hint {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-subtle);
+}
+
+.public-share-dialog__error {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--danger-text);
+}
+
+.public-share-dialog__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.public-share-dialog__row input {
+  flex: 1;
+}
+
+.public-share-dialog__embeds {
+  margin: 12px 0;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+
+.public-share-dialog__embeds h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.public-share-dialog__embeds ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.public-share-dialog__kind {
+  color: var(--text-subtle);
+}
+
+.public-share-dialog__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.public-share-dialog__facts dt {
+  color: var(--text-subtle);
+}
+
+.public-share-dialog__facts dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.public-share-dialog .confirm-modal-actions {
+  margin-top: 16px;
+}

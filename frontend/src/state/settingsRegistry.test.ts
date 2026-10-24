@@ -10,8 +10,8 @@ describe('settingsRegistry', () => {
   })
 
   describe('SETTINGS_SECTIONS', () => {
-    it('contains exactly 19 section definitions', () => {
-      expect(SETTINGS_SECTIONS).toHaveLength(19)
+    it('contains exactly 20 section definitions', () => {
+      expect(SETTINGS_SECTIONS).toHaveLength(20)
     })
 
     it('has unique ids across all sections', () => {
@@ -45,11 +45,11 @@ describe('settingsRegistry', () => {
   })
 
   describe('getSections', () => {
-    it('returns 8 account sections', () => {
+    it('returns 9 account sections', () => {
       const sections = registry.getSections('account', false)
-      expect(sections).toHaveLength(8)
+      expect(sections).toHaveLength(9)
       expect(sections.map((s) => s.id)).toEqual([
-        'profile', 'password', 'sessions', 'mcp-tokens', 'keybindings', 'appearance', 'my-vaults', 'delete-account',
+        'profile', 'password', 'sessions', 'mcp-tokens', 'public-shares', 'keybindings', 'appearance', 'my-vaults', 'delete-account',
       ])
     })
 
@@ -89,14 +89,14 @@ describe('settingsRegistry', () => {
   })
 
   describe('getAllSections', () => {
-    it('returns 14 sections for non-admin (account + vault)', () => {
+    it('returns 15 sections for non-admin (account + vault)', () => {
       const sections = registry.getAllSections(false)
-      expect(sections).toHaveLength(14)
+      expect(sections).toHaveLength(15)
     })
 
-    it('returns all 19 sections for admin', () => {
+    it('returns all 20 sections for admin', () => {
       const sections = registry.getAllSections(true)
-      expect(sections).toHaveLength(19)
+      expect(sections).toHaveLength(20)
     })
 
     it('does not include admin sections for non-admin', () => {
@@ -144,6 +144,7 @@ describe('settingsRegistry', () => {
     it.each([
       ['plugins', 'obsidian-plugin-compat'],
       ['mcp-tokens', 'mcp'],
+      ['public-shares', 'public-shares'],
       ['git-sync', 'git-sync'],
       ['mail-import', 'mail-import'],
     ] as const)('gates %s behind the %s feature', (sectionId, featureName) => {

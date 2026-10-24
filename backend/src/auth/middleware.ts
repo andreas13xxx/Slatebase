@@ -27,6 +27,24 @@ const PASSWORD_CHANGE_PATH = '/api/v1/users/me/password'
 /** The session-probe endpoint path allowed during mustChangePassword. */
 const SESSION_PATH = '/api/v1/auth/session'
 
+/**
+ * Public share reader routes: `/api/v1/public/s/<token>` plus the `unlock` and `asset` sub-routes.
+ * Matched strictly (token = base64url characters only, no dot segments), so this bypass cannot be
+ * widened by crafting a path such as `/api/v1/public/s/../vaults`.
+ */
+const PUBLIC_SHARE_PATH = /^\/api\/v1\/public\/s\/[A-Za-z0-9_-]+(?:\/(?:unlock|asset))?$/
+
+/**
+ * True for the unauthenticated public share reader routes. Only GET and POST are public, and
+ * only `unlock` accepts POST. These requests carry no session, so no CSRF token either: they
+ * change no session state and the unlock cookie is scoped to a single link.
+ */
+export function isPublicSharePath(method: string, path: string): boolean {
+  if (!PUBLIC_SHARE_PATH.test(path)) return false
+  if (method === 'GET') return true
+  return method === 'POST' && path.endsWith('/unlock')
+}
+
 /** HTTP methods that require CSRF validation. */
 const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -102,6 +120,11 @@ export function createAuthMiddleware(
       return next()
     }
 
+    // Skip auth for public share links (the link token is the credential; see isPublicSharePath)
+    if (isPublicSharePath(c.req.method, c.req.path)) {
+      return next()
+    }
+
     const token = extractBearerToken(c)
     if (token === null) {
       return createErrorResponse(c, 401, 'UNAUTHORIZED', 'Missing or invalid authorization token')
@@ -145,6 +168,11 @@ export function createCsrfMiddleware(
 
     // Skip CSRF for MCP transport endpoint (uses its own auth)
     if (c.req.path === MCP_TRANSPORT_PATH) {
+      return next()
+    }
+
+    // Skip CSRF for the public share unlock (no session; see isPublicSharePath)
+    if (isPublicSharePath(c.req.method, c.req.path)) {
       return next()
     }
 
