@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.63.0](https://github.com/andreas13xxx/Slatebase/compare/v0.62.0...v0.63.0) (2026-10-24)
+
+
+### Features
+
+* **panes:** Kopfzeile pro Pane beim Splitten ([3225561](https://github.com/andreas13xxx/Slatebase/commit/3225561ef611612367e426a96428b530b6bff05d))
+* **panes:** Kopfzeile pro Pane beim Splitten ([0d19843](https://github.com/andreas13xxx/Slatebase/commit/0d19843f6f4507f5b1d32b82ab262e4d26f8720f))
+* **statusbar:** Aktives Theme in der Statusleiste anzeigen ([8cdaea1](https://github.com/andreas13xxx/Slatebase/commit/8cdaea178c5898cfa445a3ae453d1e3a8a9f29e4))
+* **statusbar:** Aktives Theme in der Statusleiste anzeigen ([9c3e7bb](https://github.com/andreas13xxx/Slatebase/commit/9c3e7bb02f237d23a18de76799005373b06645d6))
+
 ## [0.62.0](https://github.com/andreas13xxx/Slatebase/compare/v0.61.0...v0.62.0) (2026-10-24)
 
 
