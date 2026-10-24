@@ -51,7 +51,7 @@ import { LinkIndexCache, LinkMigrationService } from './link-index/index.js'
 import type { ILinkIndex } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
-import { InstalledPluginStore, PluginInstaller, PluginService, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
+import { InstalledPluginStore, PluginInstaller, PluginService, migrateLegacyPlugins, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore, migrateLegacySnippets } from './snippets/index.js'
 import { ThemeService } from './themes/index.js'
@@ -434,7 +434,7 @@ const linkIndexCache = new LinkIndexCache({
 })
 
 // 4e. Plugin Module
-const pluginStore = new InstalledPluginStore(serverConfig.dataDir)
+const pluginStore = new InstalledPluginStore(serverConfig.dataDir, (vaultId) => vaultRegistry.findById(vaultId)?.storagePath ?? null)
 const pluginInstaller = new PluginInstaller(pluginStore)
 
 // 4e2. CSS Snippet Module
@@ -743,6 +743,7 @@ const pluginRoutes = createPluginRoutes({
   pluginService,
   accessControl: vaultAccessControl,
   vaultRegistry,
+  eventBus,
   logger,
   secretStore: pluginSecretStore,
 })
@@ -795,8 +796,8 @@ if (featureToggleService.isEnabled('obsidian-theme-store')) {
 }
 
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
-const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
-const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
+const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger })
+const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger })
 app.route('/api/v1/plugin-store', pluginStoreRoutes)
 app.route('/api/v1/vaults/:vaultId/plugins', vaultPluginStoreRoutes)
 
@@ -1121,6 +1122,8 @@ vaultRegistryReady = true
 
 // Snippets used to live in data/snippets/<vaultId>/; Obsidian keeps them in the vault's .obsidian/snippets/.
 await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
+// Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
+await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
 
 // Set up link index hook on VaultController for incremental updates.
 // Held in a named const because the MCP tool handlers (4c above) reuse it via

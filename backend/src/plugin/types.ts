@@ -54,9 +54,10 @@ export interface PluginFiles {
 
 /**
  * Interface for the installed-plugin filesystem store.
- * Manages plugin files, settings, and registry data for plugins installed
- * into a vault. Not to be confused with the `plugin-store/` module, which
- * manages the marketplace of plugins available to install.
+ * Plugin files and settings live in the vault (`.obsidian/plugins/<id>/`), the enabled ids in
+ * `.obsidian/community-plugins.json`; the registry (permissions, compatibility, approval) stays
+ * on the server. Not to be confused with the `plugin-store/` module, which manages the
+ * marketplace of plugins available to install.
  */
 export interface IInstalledPluginStore {
   /** Save plugin files (manifest, bundle, styles) */
@@ -89,4 +90,11 @@ export interface IInstalledPluginStore {
    * stale registry and have one's update silently overwrite the other's.
    */
   mutateRegistry(vaultId: string, fn: (current: PluginRegistryData | null) => PluginRegistryData): Promise<PluginRegistryData>;
+  /** Ids listed in the vault's `.obsidian/community-plugins.json` (empty if missing or invalid). */
+  loadEnabledIds(vaultId: string): Promise<string[]>;
+  /**
+   * Read-modify-write of `.obsidian/community-plugins.json` inside a per-vault lock.
+   * @throws CommunityPluginsFileInvalidError if the file exists but is not a JSON array.
+   */
+  updateEnabledIds(vaultId: string, fn: (current: string[]) => string[]): Promise<void>;
 }

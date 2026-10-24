@@ -7,6 +7,7 @@ import type { ILogger } from '../logger/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 
 import type { IVaultRegistry } from '../vault/registry.js'
+import type { IEventBus, PublishOptions } from '../realtime/types.js'
 import type { IPluginStoreService } from '../plugin-store/plugin-store-service.js'
 import type { CommunityPluginEntry, UpdateCheckResult, PluginInstallResult, BulkUpdateResult, RemotePluginManifest } from '../plugin-store/types.js'
 import {
@@ -64,6 +65,10 @@ function createMockPluginStoreService(overrides: Partial<IPluginStoreService> = 
   }
 }
 
+function createMockEventBus(published: PublishOptions[]): IEventBus {
+  return { publish: (options: PublishOptions) => { published.push(options) } } as unknown as IEventBus
+}
+
 function createMockVaultAccessControl(overrides: Partial<IVaultAccessControl> = {}): IVaultAccessControl {
   return {
     checkReadAccess: async () => {},
@@ -104,6 +109,7 @@ function createTestApp(options: {
   accessControl?: IVaultAccessControl
   vaultRegistry?: IVaultRegistry
   session?: SessionContext | null
+  published?: PublishOptions[]
 } = {}) {
   const logger = createMockLogger()
   const pluginStoreService = options.pluginStoreService ?? createMockPluginStoreService()
@@ -121,7 +127,7 @@ function createTestApp(options: {
     })
   }
 
-  const deps = { pluginStoreService, accessControl, vaultRegistry, logger }
+  const deps = { pluginStoreService, accessControl, vaultRegistry, eventBus: createMockEventBus(options.published ?? []), logger }
   const storeRoutes = createPluginStoreRoutes(deps)
   const vaultStoreRoutes = createVaultPluginStoreRoutes(deps)
 
@@ -182,6 +188,76 @@ describe('Plugin Store Routes', () => {
       expect(body.pluginId).toBe('calendar')
       expect(body.manifest.version).toBe('1.5.1')
       expect(body.isUpgrade).toBe(false)
+    })
+  })
+
+  describe('vault:change events', () => {
+    const post = (app: Hono, path: string, body?: unknown) => app.request(`/api/v1/vaults/vault-1/plugins/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+    const result = (pluginId: string): PluginInstallResult => ({
+      pluginId,
+      manifest: { id: pluginId, name: pluginId, version: '2.0.0' },
+      isUpgrade: true,
+      warnings: [],
+    })
+    const paths = (published: PublishOptions[]) =>
+      published.map((e) => [(e.payload as { path: string }).path, (e.payload as { action: string }).action])
+
+    it('announces an installed plugin to the other clients of the vault', async () => {
+      const published: PublishOptions[] = []
+      const app = createTestApp({ published, pluginStoreService: createMockPluginStoreService({ installFromStore: async () => result('calendar') }) })
+
+      await post(app, 'store-install', { pluginId: 'calendar', repo: 'liamcain/obsidian-calendar-plugin' })
+
+      expect(paths(published)).toEqual([['.obsidian/plugins/calendar/manifest.json', 'saved']])
+      expect(published[0]?.excludeUserId).toBe(defaultSession.userId)
+    })
+
+    it('announces an update, and a bulk update with a single event', async () => {
+      const published: PublishOptions[] = []
+      const app = createTestApp({
+        published,
+        pluginStoreService: createMockPluginStoreService({
+          updatePlugin: async () => result('dataview'),
+          updateAll: async () => ({ updated: [result('a'), result('b')], failed: [{ pluginId: 'c', reason: 'x' }] }),
+        }),
+      })
+
+      await post(app, 'dataview/update')
+      await post(app, 'update-all')
+
+      expect(paths(published)).toEqual([
+        ['.obsidian/plugins/dataview/manifest.json', 'saved'],
+        ['.obsidian/plugins/', 'saved'],
+      ])
+    })
+
+    it('stays silent when a bulk update changed nothing', async () => {
+      const published: PublishOptions[] = []
+      const app = createTestApp({
+        published,
+        pluginStoreService: createMockPluginStoreService({ updateAll: async () => ({ updated: [], failed: [{ pluginId: 'c', reason: 'x' }] }) }),
+      })
+
+      await post(app, 'update-all')
+
+      expect(published).toEqual([])
+    })
+
+    it('stays silent when nothing changed: update check, failed install', async () => {
+      const published: PublishOptions[] = []
+      const app = createTestApp({
+        published,
+        pluginStoreService: createMockPluginStoreService({ installFromStore: async () => { throw new Error('boom') } }),
+      })
+
+      await post(app, 'check-updates')
+      await post(app, 'store-install', { pluginId: 'calendar', repo: 'liamcain/obsidian-calendar-plugin' })
+
+      expect(published).toEqual([])
     })
   })
 

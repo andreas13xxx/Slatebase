@@ -15,6 +15,12 @@ describe('isValidPluginId', () => {
       'plugin-123',
       'abc-def-ghi-jkl',
       'a'.repeat(64),
+      // ids from the Obsidian community catalog that are not lowercase-with-hyphens
+      'ObsidianAnkiSync',
+      'DEVONlink-obsidian',
+      'scrybble.ink',
+      'waka_time_box',
+      '3d_embeds',
     ]
 
     for (const id of validIds) {
@@ -44,13 +50,14 @@ describe('isValidPluginId', () => {
 
   describe('rejects IDs with forbidden characters', () => {
     const invalidIds = [
-      'Plugin-Name',       // uppercase
-      'my_plugin',         // underscore
       'my plugin',         // space
       'my/plugin',         // forward slash
       'my\\plugin',        // backslash
-      'plugin.name',       // dot
+      'trailing.',         // trailing dot (dropped by Windows)
       '-starts-with-dash', // starts with dash
+      '_registry.json',    // would collide with the service files next to the plugin folders
+      '.hidden',           // starts with a dot
+      '_leading-underscore',
       '',                  // empty
       'a'.repeat(65),      // exceeds 64 chars
       'plugin@name',       // at sign
@@ -105,12 +112,16 @@ describe('pluginManifestSchema — ID validation', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects manifest with uppercase in ID', () => {
-    const result = pluginManifestSchema.safeParse({
-      ...validManifest,
-      id: 'MyPlugin',
-    })
-    expect(result.success).toBe(false)
+  it('accepts a manifest whose ID has uppercase letters, dots or underscores', () => {
+    for (const id of ['MyPlugin', 'scrybble.ink', 'waka_time_box']) {
+      expect(pluginManifestSchema.safeParse({ ...validManifest, id }).success).toBe(true)
+    }
+  })
+
+  it('rejects a manifest whose ID could escape the plugin folder or hit a service file', () => {
+    for (const id of ['../evil', 'a/b', '_registry.json', 'trailing.']) {
+      expect(pluginManifestSchema.safeParse({ ...validManifest, id }).success).toBe(false)
+    }
   })
 
   it('rejects manifest with ID exceeding 64 characters', () => {
@@ -152,6 +163,8 @@ describe('PluginInstaller — manifest ID path traversal', () => {
       saveRegistry: async () => {},
       loadRegistry: async () => null,
       mutateRegistry: async (_v: string, fn: (current: PluginRegistryData | null) => PluginRegistryData) => fn(null),
+      loadEnabledIds: async () => [],
+      updateEnabledIds: async () => {},
     }
 
     const installer = new PluginInstaller(mockStore)

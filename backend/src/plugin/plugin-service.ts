@@ -3,35 +3,17 @@
 // layering used by vault/chat/user. Routes stay responsible for auth checks
 // and HTTP status mapping; this service owns everything else.
 
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import type { IInstalledPluginStore, PluginManifest, PluginRegistryData } from './types.js'
 import type { IPluginInstaller, PluginInstallResult } from './plugin-installer.js'
-import { isNodeError } from '../shared/fs-utils.js'
 import type { IEventBus } from '../realtime/types.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** Detected plugin from .obsidian/plugins/ directory. */
-export interface DetectedPluginInfo {
-  /** Plugin folder name (used as plugin ID). */
-  id: string
-  /** Whether a manifest.json was found. */
-  hasManifest: boolean
-  /** Whether a main.js was found. */
-  hasMainJs: boolean
-}
-
 /**
- * Business logic for managing plugins installed into a vault: browsing
- * detected/installed plugins, installing (from ZIP or from a detected
- * `.obsidian/plugins/` folder), and reading/writing per-plugin data.
+ * Business logic for managing the plugins of a vault: listing them (they live in the
+ * vault's `.obsidian/plugins/` folder), installing from a ZIP, and reading/writing per-plugin data.
  */
 export interface IPluginService {
-  /** Scans `.obsidian/plugins/` inside the given vault storage path. */
-  listDetected(vaultStoragePath: string): Promise<DetectedPluginInfo[]>
-  /** Installs a plugin detected under `.obsidian/plugins/<pluginId>/`. */
-  installDetected(vaultId: string, pluginId: string, vaultStoragePath: string): Promise<PluginInstallResult>
   /** Installs a plugin from an uploaded ZIP buffer. */
   installFromZip(vaultId: string, zipBuffer: Buffer): Promise<PluginInstallResult>
   /** Saves the plugin registry (activation status, permissions). */
@@ -65,24 +47,62 @@ export class PluginService implements IPluginService {
     private readonly eventBus?: IEventBus,
   ) {}
 
-  async listDetected(vaultStoragePath: string): Promise<DetectedPluginInfo[]> {
-    return scanObsidianPlugins(vaultStoragePath)
-  }
-
-  async installDetected(vaultId: string, pluginId: string, vaultStoragePath: string): Promise<PluginInstallResult> {
-    return this.pluginInstaller.installFromDetected(vaultId, pluginId, vaultStoragePath)
-  }
-
   async installFromZip(vaultId: string, zipBuffer: Buffer): Promise<PluginInstallResult> {
     return this.pluginInstaller.installFromZip(vaultId, zipBuffer)
   }
 
+  /**
+   * Saves the registry and mirrors *changes* of the activation into the vault's
+   * `community-plugins.json` (the list Obsidian uses). The client sends a snapshot of every
+   * plugin it knows, most of them unchanged — so only a plugin whose state differs from what
+   * is in effect now is touched: switched on → added, switched off → removed. A plugin that is
+   * `inactive` in the snapshot but enabled in the list stays enabled; it may have been enabled
+   * in Obsidian since the client last looked, and removing it would switch it off there.
+   * A plugin in `error` state keeps its place in the list — a failure to load it here says
+   * nothing about Obsidian — and plugins the registry does not mention are left alone.
+   * The list is updated first, so an invalid `community-plugins.json` rejects the save
+   * (CommunityPluginsFileInvalidError) before anything is written.
+   */
   async saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void> {
+    // Only plugins that are really in the vault may be listed: the keys come from the request body.
+    const installed = new Set((await this.pluginStore.listPlugins(vaultId)).map((manifest) => manifest.id))
+    const stored = await this.pluginStore.loadRegistry(vaultId)
+    const isOn = (status: string | undefined): boolean => status === 'active' || status === 'loading'
+
+    await this.pluginStore.updateEnabledIds(vaultId, (current) => {
+      const next = new Set(current)
+      for (const [pluginId, entry] of Object.entries(registry.plugins)) {
+        // In effect now = approved here AND listed (see loadRegistry).
+        const wasOn = isOn(stored?.plugins[pluginId]?.status) && current.includes(pluginId)
+        if (isOn(entry.status)) {
+          if (!wasOn && installed.has(pluginId)) next.add(pluginId)
+        } else if (entry.status === 'inactive' && wasOn) {
+          next.delete(pluginId)
+        }
+      }
+      return [...next]
+    })
     await this.pluginStore.saveRegistry(vaultId, registry)
   }
 
+  /**
+   * Loads the registry. The server's approval (`status: active`) only counts while the plugin is
+   * also listed in the vault's `community-plugins.json`: disabling a plugin in Obsidian switches
+   * it off here, and a plugin that merely arrives in the vault (sync, file API) or is enabled
+   * only in Obsidian never starts here on its own — activating it in Slatebase is a separate,
+   * explicit step.
+   */
   async loadRegistry(vaultId: string): Promise<PluginRegistryData | null> {
-    return this.pluginStore.loadRegistry(vaultId)
+    const registry = await this.pluginStore.loadRegistry(vaultId)
+    if (registry === null) return null
+
+    const enabled = new Set(await this.pluginStore.loadEnabledIds(vaultId))
+    const plugins: PluginRegistryData['plugins'] = {}
+    for (const [pluginId, entry] of Object.entries(registry.plugins)) {
+      const switchedOff = (entry.status === 'active' || entry.status === 'loading') && !enabled.has(pluginId)
+      plugins[pluginId] = switchedOff ? { ...entry, status: 'inactive' } : entry
+    }
+    return { ...registry, plugins }
   }
 
   async mutateRegistry(
@@ -128,62 +148,4 @@ export class PluginService implements IPluginService {
       target: { kind: 'broadcast' },
     })
   }
-}
-
-// ─── Detected Plugin Scanner ─────────────────────────────────────────────────
-
-/**
- * Scans the .obsidian/plugins/ directory inside a vault's storage path
- * and returns information about detected plugins (folder name, presence of manifest/bundle).
- * Returns empty array if .obsidian/plugins/ does not exist.
- */
-async function scanObsidianPlugins(vaultStoragePath: string): Promise<DetectedPluginInfo[]> {
-  const pluginsDir = path.join(vaultStoragePath, '.obsidian', 'plugins')
-
-  let entries: string[]
-  try {
-    entries = await fs.readdir(pluginsDir)
-  } catch (error: unknown) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      return []
-    }
-    throw error
-  }
-
-  const detected: DetectedPluginInfo[] = []
-
-  for (const entry of entries) {
-    const entryPath = path.join(pluginsDir, entry)
-
-    let stat: import('node:fs').Stats
-    try {
-      stat = await fs.stat(entryPath)
-    } catch {
-      continue
-    }
-
-    if (!stat.isDirectory()) continue
-
-    // Check for manifest.json and main.js
-    let hasManifest = false
-    let hasMainJs = false
-
-    try {
-      await fs.access(path.join(entryPath, 'manifest.json'))
-      hasManifest = true
-    } catch {
-      // not found
-    }
-
-    try {
-      await fs.access(path.join(entryPath, 'main.js'))
-      hasMainJs = true
-    } catch {
-      // not found
-    }
-
-    detected.push({ id: entry, hasManifest, hasMainJs })
-  }
-
-  return detected
 }

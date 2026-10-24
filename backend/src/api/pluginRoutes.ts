@@ -6,12 +6,19 @@ import { z } from 'zod'
 import type { PluginRegistryData } from '../plugin/types.js'
 import type { IPluginService } from '../plugin/plugin-service.js'
 import type { PluginInstallResult } from '../plugin/plugin-installer.js'
-import { PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError } from '../plugin/errors.js'
+import {
+  CommunityPluginsFileInvalidError,
+  PluginNotFoundError,
+  PluginFileTooLargeError,
+  PluginSettingsTooLargeError,
+} from '../plugin/errors.js'
 import { PluginInstallError } from '../plugin/plugin-installer.js'
-import { pluginRegistrySchema } from '../plugin/validation.js'
+import { PLUGIN_ID_PATTERN, pluginRegistrySchema } from '../plugin/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
+import type { IEventBus } from '../realtime/types.js'
+import { COMMUNITY_PLUGINS_PATH, pluginManifestPath, publishVaultChange } from './vaultChangeEvents.js'
 import type { IPluginSecretStore } from '../plugin/secret-store.js'
 import { SecretLimitExceededError, SecretTooLargeError } from '../plugin/secret-store.js'
 
@@ -52,7 +59,7 @@ const pluginIdParamSchema = z.object({
   pluginId: z.string()
     .min(1, 'pluginId must not be empty')
     .max(64, 'pluginId must not exceed 64 characters')
-    .regex(/^[a-z0-9][a-z0-9-]{0,63}$/, 'Invalid plugin ID: must contain only lowercase letters, digits, and hyphens (1-64 chars)'),
+    .regex(PLUGIN_ID_PATTERN, 'Invalid plugin ID: must contain only letters, digits, ".", "_" and "-", start with a letter or digit, and not end with "." (1-64 chars)'),
 })
 
 /**
@@ -96,6 +103,7 @@ export interface PluginRouteDependencies {
   pluginService: IPluginService
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
+  eventBus: IEventBus
   logger: ILogger
   secretStore?: IPluginSecretStore
 }
@@ -111,90 +119,10 @@ export interface PluginRouteDependencies {
  * @returns A Hono instance with plugin management routes registered.
  */
 export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
-  const { pluginService, vaultRegistry, logger, secretStore } = deps
+  const { pluginService, accessControl, eventBus, logger, secretStore } = deps
+  const publish = (c: Context, vaultId: string, path: string, action: 'saved' | 'deleted'): Promise<void> =>
+    publishVaultChange({ eventBus, accessControl, logger }, c, vaultId, path, action)
   const app = new Hono()
-
-  // ─── Detected plugins route (scans .obsidian/plugins/ inside vault filesystem) ───
-
-  // GET /detected — List plugins detected in .obsidian/plugins/ directory
-  app.get('/detected', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
-
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
-
-    try {
-      const entry = vaultRegistry.findById(vaultId)
-      if (entry === null) {
-        return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
-      }
-
-      const detected = await pluginService.listDetected(entry.storagePath)
-      return c.json({ plugins: detected }, 200)
-    } catch (error) {
-      return handlePluginError(c, error, logger)
-    }
-  })
-
-  // POST /detected/:pluginId/install — Install a detected plugin from .obsidian/plugins/
-  app.post('/detected/:pluginId/install', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
-    const pluginId = c.req.param('pluginId') as string
-
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
-
-    // Validate plugin ID with zod schema
-    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
-    if (!pluginIdParsed.success) {
-      const firstIssue = pluginIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    try {
-      const entry = vaultRegistry.findById(vaultId)
-      if (entry === null) {
-        return c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404)
-      }
-
-      const result = await pluginService.installDetected(vaultId, pluginId, entry.storagePath)
-
-      // Persist hasEvalUsage in registry if eval/Function patterns were detected
-      if (result.warnings.length > 0) {
-        const hasEvalUsage = result.warnings.some((w) => w.includes('eval(') || w.includes('new Function('))
-        if (hasEvalUsage) {
-          await pluginService.mutateRegistry(vaultId, (registry) => {
-            const now = new Date().toISOString()
-            const existingEntry = registry?.plugins?.[result.pluginId]
-            return {
-              version: 1 as const,
-              plugins: {
-                ...(registry?.plugins ?? {}),
-                [result.pluginId]: {
-                  status: existingEntry?.status ?? ('inactive' as const),
-                  permissions: existingEntry?.permissions ?? {
-                    network: false,
-                    networkAllowlist: [],
-                    filesystemWrite: false,
-                    domManipulation: false,
-                  },
-                  compatibilityLevel: existingEntry?.compatibilityLevel ?? ('unknown' as const),
-                  installedAt: existingEntry?.installedAt ?? now,
-                  updatedAt: now,
-                  hasEvalUsage: true,
-                },
-              },
-            }
-          })
-        }
-      }
-
-      return c.json(result, 201)
-    } catch (error) {
-      return handlePluginError(c, error, logger)
-    }
-  })
 
   // ─── Registry Routes (BEFORE :pluginId to avoid "registry" being parsed as param) ───
 
@@ -221,6 +149,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
 
     try {
       await pluginService.saveRegistry(vaultId, parsed.data as PluginRegistryData)
+      await publish(c, vaultId, COMMUNITY_PLUGINS_PATH, 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -289,6 +218,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       const result: PluginInstallResult = await pluginService.installFromZip(vaultId, buffer)
+      await publish(c, vaultId, pluginManifestPath(result.pluginId), 'saved')
 
       // Persist hasEvalUsage in registry if eval/Function patterns were detected
       if (result.warnings.length > 0) {
@@ -379,6 +309,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       }
 
       await pluginService.deletePlugin(vaultId, pluginId)
+      await publish(c, vaultId, pluginManifestPath(pluginId), 'deleted')
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -524,6 +455,13 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         JSON.parse(rawBody)
       } catch {
         return c.json(createApiError('VALIDATION_ERROR', 'Request body must be valid JSON'), 400)
+      }
+
+      // Settings are a file in the vault, and this route is open to read-only collaborators (see
+      // the access table): without this check they could create plugin folders for any id.
+      const manifest = await pluginService.getManifest(vaultId, pluginId)
+      if (manifest === null) {
+        return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" not found in vault "${vaultId}"`), 404)
       }
 
       await pluginService.saveSettings(vaultId, pluginId, rawBody)
@@ -706,6 +644,10 @@ function handlePluginError(c: Context, error: unknown, logger: ILogger): Respons
   if (error instanceof PluginSettingsTooLargeError) {
     logger.warn('Plugin settings too large', { pluginId: error.pluginId })
     return c.json(createApiError('SETTINGS_TOO_LARGE', error.message), 413)
+  }
+
+  if (error instanceof CommunityPluginsFileInvalidError) {
+    return c.json(createApiError('COMMUNITY_PLUGINS_FILE_INVALID', error.message), 409)
   }
 
   if (error instanceof PluginInstallError) {

@@ -775,10 +775,6 @@ export interface IApiClient {
   loadRegistry(vaultId: string): Promise<PluginRegistryData>
   /** Save the plugin registry for a vault. */
   saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void>
-  /** Get detected plugins from .obsidian/plugins/ in the vault filesystem. */
-  getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }>
-  /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
-  installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult>
 
   // --- CSS Snippet methods ---
   /** List all CSS snippets for a vault. */
@@ -979,18 +975,6 @@ export interface IApiClient {
   // --- Welcome Vault methods ---
   /** Creates a welcome vault for the current user. */
   createWelcomeVault(): Promise<{ vaultId: string; vaultName: string }>
-}
-
-/**
- * Detected plugin from .obsidian/plugins/ directory (returned by backend).
- */
-export interface DetectedPluginInfo {
-  /** Plugin folder name (used as plugin ID). */
-  id: string
-  /** Whether a manifest.json was found. */
-  hasManifest: boolean
-  /** Whether a main.js was found. */
-  hasMainJs: boolean
 }
 
 /**
@@ -1476,16 +1460,6 @@ export class ApiClient implements IApiClient {
   /** Save the plugin registry for a vault. */
   async saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/registry`, registry)
-  }
-
-  /** Get detected plugins from .obsidian/plugins/ in the vault filesystem. */
-  async getDetectedPlugins(vaultId: string): Promise<{ plugins: DetectedPluginInfo[] }> {
-    return this.request<{ plugins: DetectedPluginInfo[] }>('GET', `/api/v1/vaults/${vaultId}/plugins/detected`)
-  }
-
-  /** Install a detected plugin from .obsidian/plugins/ into the plugin store. */
-  async installDetectedPlugin(vaultId: string, pluginId: string): Promise<PluginInstallResult> {
-    return this.request<PluginInstallResult>('POST', `/api/v1/vaults/${vaultId}/plugins/detected/${pluginId}/install`)
   }
 
   // --- CSS Snippet methods ---

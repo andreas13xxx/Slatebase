@@ -173,7 +173,7 @@ Implementierung eines Compatibility Layers für Obsidian Community Plugins in Sl
 - [x] 17. Backend Plugin Store
   - [x] 17.1 Implement PluginStore (filesystem persistence)
     - Create `backend/src/plugin/plugin-store.ts` implementing IPluginStore
-    - Save/load plugin files (manifest, bundle, styles) under `data/plugins/<vaultId>/<pluginId>/`
+    - Save/load plugin files (manifest, bundle, styles) in the vault under `.obsidian/plugins/<pluginId>/` (originally `data/plugins/<vaultId>/<pluginId>/`; moved into the vault later)
     - Save/load plugin settings (data.json, max 1 MB)
     - Save/load plugin registry (_registry.json with status, permissions, compatibility)
     - List plugins for a vault, delete plugin, delete all for vault

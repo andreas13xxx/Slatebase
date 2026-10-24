@@ -51,7 +51,7 @@ Container einhängen, dann `display()`; `PluginManagementPage` nutzt beides.
 
 **Live bestätigt:** Die Seite rendert sofort (Suchfeld, „Minimal", „Minimal Cards", „Minimal Advanced Settings"), bis hinunter
 zu „Tables" mit fünf Schaltern. „Row lines" und „Striped rows" setzen per Klick `row-lines` und `row-alt` auf `<body>`;
-die Werte bleiben nach einem Neuladen erhalten (`data/plugins/<vaultId>/obsidian-style-settings/data.json`, gilt für alle
+die Werte bleiben nach einem Neuladen erhalten (damals `data/plugins/<vaultId>/obsidian-style-settings/data.json`, inzwischen `<vault>/.obsidian/plugins/obsidian-style-settings/data.json`; gilt für alle
 Nutzer des Vaults).
 
 ## Befund 2: Variablen wirken (Ende zu Ende)

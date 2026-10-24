@@ -17,6 +17,8 @@ import { VaultAccessDeniedError } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
+import type { IEventBus } from '../realtime/types.js'
+import { PLUGINS_FOLDER_PATH, pluginManifestPath, publishVaultChange } from './vaultChangeEvents.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,7 @@ export interface PluginStoreRouteDependencies {
   pluginStoreService: IPluginStoreService
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
+  eventBus: IEventBus
   logger: ILogger
 }
 
@@ -144,8 +147,10 @@ export function createPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hon
  * @returns A Hono instance with vault-specific plugin store routes registered.
  */
 export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies): Hono {
-  const { pluginStoreService, logger } = deps
+  const { pluginStoreService, accessControl, eventBus, logger } = deps
   const app = new Hono()
+  const publishSaved = (c: Context, vaultId: string, pluginId: string): Promise<void> =>
+    publishVaultChange({ eventBus, accessControl, logger }, c, vaultId, pluginManifestPath(pluginId), 'saved')
 
   // POST /store-install — Install a plugin from the community store
   app.post('/store-install', async (c: Context): Promise<Response> => {
@@ -169,6 +174,7 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
 
     try {
       const result = await pluginStoreService.installFromStore(vaultId, pluginId, repo)
+      await publishSaved(c, vaultId, result.pluginId)
       return c.json(result, 201)
     } catch (error) {
       return handleStoreError(c, error, logger)
@@ -193,6 +199,10 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
 
     try {
       const result = await pluginStoreService.updateAll(vaultId)
+      if (result.updated.length > 0) {
+        // One event for the whole batch: every client reloads its file tree per event received.
+        await publishVaultChange({ eventBus, accessControl, logger }, c, vaultId, PLUGINS_FOLDER_PATH, 'saved')
+      }
       return c.json(result, 200)
     } catch (error) {
       return handleStoreError(c, error, logger)
@@ -206,6 +216,7 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
 
     try {
       const result = await pluginStoreService.updatePlugin(vaultId, pluginId)
+      await publishSaved(c, vaultId, result.pluginId)
       return c.json(result, 200)
     } catch (error) {
       return handleStoreError(c, error, logger)

@@ -75,6 +75,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
 - `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `features.json`
+- About `plugins/<vaultId>/` — server-side plugin data only: `_registry.json` (permissions, compatibility, approval) and `<pluginId>/secrets.json`. The plugins themselves are vault content like themes: `<vault>/.obsidian/plugins/<id>/` (files + `data.json`), enabled ones in `<vault>/.obsidian/community-plugins.json`. A plugin runs only while approved in `_registry.json` **and** listed there; never make a plugin that merely appears in the vault start on its own. The old plugin files under `plugins/<vaultId>/<id>/` are migrated at startup and no longer read
 - `server-config.json` — admin overrides from `PUT /admin/config`. Precedence: `config/default.json` < this file < `SLATEBASE_*` env
 - `users/<userId>-preferences.json` — recent files, bookmarks (`favorites`), keybindings, `uiSettings` (account-wide), `vaultSettings[vaultId]` (per user *and* vault)
 - Encrypted secrets, AES-256-GCM per value: plugins in `plugins/<vaultId>/<pluginId>/secrets.json` (key from `SLATEBASE_PLUGIN_SECRET_KEY`, else `data/.plugin-secret-key`); git-sync and mail-import credentials in `module-secrets/<vaultId>/<moduleId>/secrets.json`
