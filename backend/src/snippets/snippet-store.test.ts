@@ -7,6 +7,7 @@ import { SnippetStore } from './snippet-store.js'
 import { SnippetTooLargeError } from './errors.js'
 import { MAX_SNIPPET_SIZE, isValidSnippetFilename } from './validation.js'
 import { AppearanceFileInvalidError } from '../shared/appearance-file.js'
+import { ThemeService } from '../themes/index.js'
 
 let vault: string
 let store: SnippetStore
@@ -150,6 +151,23 @@ describe('SnippetStore', () => {
       const parsed = JSON.parse(await fs.readFile(appearancePath(), 'utf-8')) as Record<string, unknown>
       expect(parsed['cssTheme']).toBe('Minimal')
       expect(Array.isArray(parsed['enabledCssSnippets'])).toBe(true)
+    })
+  })
+
+  describe('shared appearance.json lock with the theme service', () => {
+    it('keeps both the active theme and the enabled snippets when they are changed at the same time', async () => {
+      const themes = new ThemeService()
+      await themes.saveTheme(vault, 'T', 'a {}')
+
+      for (let round = 0; round < 15; round += 1) {
+        await Promise.all([
+          themes.setActiveThemeId(vault, round % 2 === 0 ? 'T' : null),
+          store.saveEnabledIds(vault, [`s${round}`]),
+        ])
+        const parsed = JSON.parse(await fs.readFile(appearancePath(), 'utf-8')) as Record<string, unknown>
+        expect(parsed['enabledCssSnippets']).toEqual([`s${round}`])
+        expect(parsed['cssTheme']).toBe(round % 2 === 0 ? 'T' : '')
+      }
     })
   })
 

@@ -753,6 +753,7 @@ const snippetRoutes = createSnippetRoutes({
   snippetStore,
   accessControl: vaultAccessControl,
   vaultRegistry,
+  eventBus,
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)

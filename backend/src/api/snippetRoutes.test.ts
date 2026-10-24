@@ -9,6 +9,7 @@ import { SnippetTooLargeError } from '../snippets/errors.js'
 import { AppearanceFileInvalidError } from '../shared/appearance-file.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
+import type { IEventBus, PublishOptions } from '../realtime/types.js'
 import { createSnippetRoutes } from './snippetRoutes.js'
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
@@ -27,6 +28,10 @@ function createMockSnippetStore(overrides: Partial<ISnippetStore> = {}): ISnippe
     saveEnabledIds: async () => {},
     ...overrides,
   }
+}
+
+function createMockEventBus(published: PublishOptions[]): IEventBus {
+  return { publish: (options: PublishOptions) => { published.push(options) } } as unknown as IEventBus
 }
 
 function createMockAccessControl(overrides: Partial<IVaultAccessControl> = {}): IVaultAccessControl {
@@ -67,6 +72,7 @@ function createTestApp(options: {
   accessControl?: IVaultAccessControl
   entry?: VaultRegistryEntry | null
   session?: SessionContext
+  published?: PublishOptions[]
 } = {}) {
   const logger = createMockLogger()
   const snippetStore = options.snippetStore ?? createMockSnippetStore()
@@ -80,7 +86,7 @@ function createTestApp(options: {
     return next()
   })
 
-  const routes = createSnippetRoutes({ snippetStore, accessControl, vaultRegistry, logger })
+  const routes = createSnippetRoutes({ snippetStore, accessControl, vaultRegistry, eventBus: createMockEventBus(options.published ?? []), logger })
   app.route('/api/v1/vaults/:vaultId/snippets', routes)
   return app
 }
@@ -271,6 +277,49 @@ describe('Snippet Routes', () => {
 
       expect(res.status).toBe(204)
       expect(saved).toEqual(['a', 'with space'])
+    })
+
+    it('PUT /registry keeps enabled ids that Slatebase cannot address', async () => {
+      let saved: string[] | undefined
+      const app = createTestApp({
+        snippetStore: createMockSnippetStore({
+          loadEnabledIds: async () => ['a', 'weird:name', '50%'],
+          saveEnabledIds: async (_v, ids) => { saved = ids },
+        }),
+      })
+
+      const res = await app.request('/api/v1/vaults/vault-1/snippets/registry', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: 1, snippets: { b: { enabled: true, updatedAt: '' } } }),
+      })
+
+      expect(res.status).toBe(204)
+      expect(saved).toEqual(['b', 'weird:name', '50%'])
+    })
+
+    it('publishes vault:change events for other clients', async () => {
+      const published: PublishOptions[] = []
+      const app = createTestApp({
+        published,
+        snippetStore: createMockSnippetStore({ loadSnippet: async (_v, id) => (id === 'dark' ? 'a {}' : null) }),
+      })
+      const json = { 'Content-Type': 'application/json' }
+
+      await app.request('/api/v1/vaults/vault-1/snippets', { method: 'POST', headers: json, body: JSON.stringify({ filename: 'new one.css', content: 'a {}' }) })
+      await app.request('/api/v1/vaults/vault-1/snippets/dark', { method: 'PUT', headers: json, body: JSON.stringify({ content: 'b {}' }) })
+      await app.request('/api/v1/vaults/vault-1/snippets/registry', { method: 'PUT', headers: json, body: JSON.stringify({ version: 1, snippets: {} }) })
+      await app.request('/api/v1/vaults/vault-1/snippets/dark', { method: 'DELETE' })
+
+      const events = published.map((e) => [(e.payload as { path: string }).path, (e.payload as { action: string }).action])
+      expect(events).toEqual([
+        ['.obsidian/snippets/new one.css', 'saved'],
+        ['.obsidian/snippets/dark.css', 'saved'],
+        ['.obsidian/appearance.json', 'saved'],
+        ['.obsidian/snippets/dark.css', 'deleted'],
+        ['.obsidian/appearance.json', 'saved'],
+      ])
+      expect(published.every((e) => e.excludeUserId === 'owner-1')).toBe(true)
     })
 
     it('maps an invalid appearance.json to 409', async () => {

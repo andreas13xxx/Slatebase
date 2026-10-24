@@ -109,6 +109,22 @@ describe('migrateLegacySnippets', () => {
     expect(await store.loadSnippet(vaultPath, 'a')).toBeNull()
   })
 
+  it('postpones an unreachable vault: no phantom directory, no marker, migrated once it is back', async () => {
+    await fs.rm(vaultPath, { recursive: true, force: true })
+    await writeLegacy({ 'a.css': 'a {}' }, ['a'])
+
+    await run()
+
+    await expect(fs.access(vaultPath)).rejects.toThrow()
+    await expect(fs.access(path.join(legacyDir(), LEGACY_MIGRATED_MARKER))).rejects.toThrow()
+
+    await fs.mkdir(vaultPath, { recursive: true })
+    await run()
+
+    expect(await store.loadSnippet(vaultPath, 'a')).toBe('a {}')
+    expect(await store.loadEnabledIds(vaultPath)).toEqual(['a'])
+  })
+
   it('does nothing for a vault without legacy snippets', async () => {
     await run()
 

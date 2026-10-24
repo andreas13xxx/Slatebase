@@ -153,12 +153,14 @@ Der ursprüngliche Roadmap-Eintrag (`.kiro/specs/implementation-plan.md`, Prio 3
 
 #### Acceptance Criteria
 
-1. THE Snippet_Store (Backend) SHALL CSS-Snippet-Dateien unter `data/snippets/<vaultId>/<snippetId>.css` mittels atomarer Schreiboperationen (Temp-Datei → rename) speichern
-2. THE Snippet_Store (Backend) SHALL den Aktivierungsstatus aller Snippets eines Vaults in einer Registry-Datei `data/snippets/<vaultId>/_registry.json` speichern
+1. THE Snippet_Store (Backend) SHALL CSS-Snippet-Dateien im Vault unter `.obsidian/snippets/<snippetId>.css` (wie Obsidian) mittels atomarer Schreiboperationen (Temp-Datei → rename) speichern
+2. THE Snippet_Store (Backend) SHALL den Aktivierungsstatus als Liste `enabledCssSnippets` in `.obsidian/appearance.json` des Vaults speichern, ohne andere Felder der Datei zu verändern und ohne eine ungültige JSON-Datei zu überschreiben
 3. THE Slatebase_Backend SHALL einzelne Snippet-Dateien auf eine maximale Größe von 512 KB begrenzen und Uploads darüber mit einer Fehlermeldung ablehnen, die auf die Größenbeschränkung hinweist
 4. IF ein nicht-authentifizierter oder nicht-berechtigter Benutzer auf Snippet-Daten eines Vaults zugreift, THEN THE Slatebase_Backend SHALL den Zugriff mit derselben Zugriffskontrolle wie bei Vault-Dateien ablehnen (nur Vault-Besitzer und Benutzer mit Vault-Freigabe erhalten Zugriff)
-5. WHEN ein Vault gelöscht wird, THE Slatebase_Backend SHALL alle zugehörigen Snippet-Dateien und die Registry unter `data/snippets/<vaultId>/` vollständig entfernen
-6. THE Snippet_Store (Backend) SHALL Snippet-Dateinamen auf das Muster `[a-zA-Z0-9_-]+\.css` validieren und Namen mit Pfadtrennzeichen oder `..`-Sequenzen ablehnen
+5. WHEN ein Vault gelöscht wird, THE Slatebase_Backend SHALL die Snippets nicht gesondert entfernen: sie sind Teil des Vaults und werden mit ihm gelöscht
+6. THE Snippet_Store (Backend) SHALL Snippet-Dateinamen Obsidian-kompatibel validieren (Leerzeichen und Punkte erlaubt, Endung `.css`) und Namen mit Pfadtrennzeichen, `%`, Windows-reservierten Zeichen, Steuerzeichen oder führendem Punkt ablehnen
+7. WHEN beim Start Snippets unter `data/snippets/<vaultId>/` vorhanden sind, THE Slatebase_Backend SHALL sie ohne Überschreiben in den Vault kopieren (die Vault-Version gewinnt), den Aktivierungsstatus in `enabledCssSnippets` übernehmen und danach die Datei `.migrated-to-vault` im alten Ordner anlegen. IF der Vault-Ordner nicht erreichbar oder `appearance.json` kein gültiges JSON ist, THEN SHALL die Migration ohne Marker verschoben und beim nächsten Start wiederholt werden
+8. WHEN ein Snippet oder die Aktivierungsliste geändert wird, THE Slatebase_Backend SHALL ein `vault:change`-Ereignis veröffentlichen, damit andere Clients die Snippets neu laden
 
 ### Requirement 11: Überschriften-Lesezeichen
 

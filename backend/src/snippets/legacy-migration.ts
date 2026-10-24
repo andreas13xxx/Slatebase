@@ -30,6 +30,16 @@ async function exists(target: string): Promise<boolean> {
   }
 }
 
+/** True if the path is an existing directory. Only a definite "missing" counts as no; other I/O errors propagate. */
+async function isDirectory(target: string): Promise<boolean> {
+  try {
+    return (await withRetry(() => fs.stat(target))).isDirectory()
+  } catch (error: unknown) {
+    if (isMissing(error)) return false
+    throw error
+  }
+}
+
 /** Reads ids marked enabled in the old `_registry.json`. A missing or unparsable file yields []. */
 async function readLegacyEnabledIds(legacyDir: string): Promise<string[]> {
   let raw: string
@@ -105,6 +115,13 @@ export async function migrateLegacySnippets(deps: {
     const legacyDir = path.join(dataDir, 'snippets', vault.id)
     try {
       if (!(await exists(legacyDir)) || (await exists(path.join(legacyDir, LEGACY_MIGRATED_MARKER)))) continue
+
+      // An unreachable vault (unmounted drive, offline OneDrive folder) must not get a phantom
+      // directory tree created for it, nor be marked as migrated: its snippets would be stranded.
+      if (!(await isDirectory(vault.storagePath))) {
+        logger.warn('Snippet migration postponed: vault folder is not available', { vaultId: vault.id })
+        continue
+      }
 
       const copied = await migrateVault(legacyDir, vault.storagePath, snippetStore, logger, vault.id)
       await fs.writeFile(path.join(legacyDir, LEGACY_MIGRATED_MARKER), new Date().toISOString(), 'utf-8')

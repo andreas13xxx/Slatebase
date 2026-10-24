@@ -7,6 +7,8 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import type { SessionContext } from '../auth/index.js'
+import type { IEventBus } from '../realtime/types.js'
 import type { ISnippetStore, SnippetRegistryData } from '../snippets/types.js'
 import { AppearanceFileInvalidError } from '../shared/appearance-file.js'
 import { SnippetTooLargeError } from '../snippets/errors.js'
@@ -82,7 +84,14 @@ export interface SnippetRouteDependencies {
   snippetStore: ISnippetStore
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
+  eventBus: IEventBus
   logger: ILogger
+}
+
+const APPEARANCE_PATH = '.obsidian/appearance.json'
+
+function snippetPath(snippetId: string): string {
+  return `.obsidian/snippets/${snippetId}.css`
 }
 
 // ─── Factory Function ────────────────────────────────────────────────────────
@@ -92,11 +101,31 @@ export interface SnippetRouteDependencies {
  * All routes are nested under /vaults/:vaultId/snippets.
  */
 export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
-  const { snippetStore, vaultRegistry, logger } = deps
+  const { snippetStore, accessControl, vaultRegistry, eventBus, logger } = deps
   const app = new Hono()
 
   function vaultPathOf(vaultId: string): string | null {
     return vaultRegistry.findById(vaultId)?.storagePath ?? null
+  }
+
+  /** Tells other clients of the vault that a snippet file or the enabled list changed. */
+  async function publishChange(c: Context, path: string, action: 'saved' | 'deleted'): Promise<void> {
+    const session = c.get('session') as SessionContext | undefined
+    if (session === undefined) return
+    const vaultId = c.req.param('vaultId') as string
+    try {
+      eventBus.publish({
+        type: 'vault:change',
+        payload: { vaultId, action, path, userId: session.userId, username: session.username },
+        target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
+        excludeUserId: session.userId,
+      })
+    } catch (error) {
+      // Live refresh is best-effort; the write itself already succeeded.
+      logger.warn('Failed to publish snippet change event', {
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   /** Validates the vault id and resolves its storage path; returns the error response on failure. */
@@ -137,7 +166,11 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
       .map(([id]) => id)
 
     try {
-      await snippetStore.saveEnabledIds(vault.vaultPath, enabledIds)
+      // Obsidian may list snippets Slatebase cannot address (names with ":" or "%"). The client
+      // never sees them as snippets, so they are carried over instead of silently switched off.
+      const unaddressable = (await snippetStore.loadEnabledIds(vault.vaultPath)).filter((id) => !SNIPPET_ID_PATTERN.test(id))
+      await snippetStore.saveEnabledIds(vault.vaultPath, [...enabledIds, ...unaddressable])
+      await publishChange(c, APPEARANCE_PATH, 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handleSnippetError(c, error, logger)
@@ -210,6 +243,7 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
       await snippetStore.saveSnippet(vault.vaultPath, snippetId, content)
       const [meta] = (await snippetStore.listSnippets(vault.vaultPath)).filter((m) => m.id === snippetId)
+      await publishChange(c, snippetPath(snippetId), 'saved')
       return c.json(meta, 201)
     } catch (error) {
       return handleSnippetError(c, error, logger)
@@ -264,6 +298,7 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
     try {
       await snippetStore.saveSnippet(vault.vaultPath, snippetId, parsed.data.content)
+      await publishChange(c, snippetPath(snippetId), 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handleSnippetError(c, error, logger)
@@ -285,6 +320,8 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
       }
 
       await snippetStore.deleteSnippet(vault.vaultPath, snippetId)
+      await publishChange(c, snippetPath(snippetId), 'deleted')
+      await publishChange(c, APPEARANCE_PATH, 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handleSnippetError(c, error, logger)
