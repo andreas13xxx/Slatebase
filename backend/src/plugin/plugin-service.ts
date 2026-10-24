@@ -52,22 +52,31 @@ export class PluginService implements IPluginService {
   }
 
   /**
-   * Saves the registry and mirrors the activation into the vault's `community-plugins.json`
-   * (the list Obsidian uses): active/loading plugins are added, inactive ones removed. A plugin
-   * in `error` state keeps its place in the list — a failure to load it here says nothing about
-   * Obsidian — and plugins the registry does not mention are left alone.
+   * Saves the registry and mirrors *changes* of the activation into the vault's
+   * `community-plugins.json` (the list Obsidian uses). The client sends a snapshot of every
+   * plugin it knows, most of them unchanged — so only a plugin whose state differs from what
+   * is in effect now is touched: switched on → added, switched off → removed. A plugin that is
+   * `inactive` in the snapshot but enabled in the list stays enabled; it may have been enabled
+   * in Obsidian since the client last looked, and removing it would switch it off there.
+   * A plugin in `error` state keeps its place in the list — a failure to load it here says
+   * nothing about Obsidian — and plugins the registry does not mention are left alone.
    * The list is updated first, so an invalid `community-plugins.json` rejects the save
    * (CommunityPluginsFileInvalidError) before anything is written.
    */
   async saveRegistry(vaultId: string, registry: PluginRegistryData): Promise<void> {
     // Only plugins that are really in the vault may be listed: the keys come from the request body.
     const installed = new Set((await this.pluginStore.listPlugins(vaultId)).map((manifest) => manifest.id))
+    const stored = await this.pluginStore.loadRegistry(vaultId)
+    const isOn = (status: string | undefined): boolean => status === 'active' || status === 'loading'
+
     await this.pluginStore.updateEnabledIds(vaultId, (current) => {
       const next = new Set(current)
       for (const [pluginId, entry] of Object.entries(registry.plugins)) {
-        if (entry.status === 'active' || entry.status === 'loading') {
-          if (installed.has(pluginId)) next.add(pluginId)
-        } else if (entry.status === 'inactive') {
+        // In effect now = approved here AND listed (see loadRegistry).
+        const wasOn = isOn(stored?.plugins[pluginId]?.status) && current.includes(pluginId)
+        if (isOn(entry.status)) {
+          if (!wasOn && installed.has(pluginId)) next.add(pluginId)
+        } else if (entry.status === 'inactive' && wasOn) {
           next.delete(pluginId)
         }
       }

@@ -112,8 +112,11 @@ function makeRegistryStore(initialEnabled: string[], registry: PluginRegistryDat
 }
 
 describe('PluginService.saveRegistry', () => {
-  it('adds active and loading plugins to the enabled list and removes inactive ones', async () => {
-    const { store, state } = makeRegistryStore(['keep', 'turn-off'])
+  it('adds plugins that were switched on and removes plugins that were switched off', async () => {
+    const { store, state } = makeRegistryStore(['keep', 'turn-off'], {
+      version: 1,
+      plugins: { keep: entry('active'), 'turn-off': entry('active'), 'turn-on': entry('inactive'), loading: entry('inactive') },
+    })
     const service = new PluginService(store, makeInstaller())
 
     await service.saveRegistry('vault-1', {
@@ -122,6 +125,32 @@ describe('PluginService.saveRegistry', () => {
     })
 
     expect(state.enabled.sort()).toEqual(['keep', 'loading', 'turn-on'])
+  })
+
+  it('leaves alone a plugin that is inactive in the snapshot but was enabled in Obsidian meanwhile', async () => {
+    // The client knows `enabled-in-obsidian` as inactive and sends it back unchanged whenever it
+    // saves something else; removing it would switch it off in Obsidian too.
+    const { store, state } = makeRegistryStore(['enabled-in-obsidian', 'turn-off'], {
+      version: 1,
+      plugins: { 'enabled-in-obsidian': entry('inactive'), 'turn-off': entry('active'), other: entry('inactive') },
+    }, ['enabled-in-obsidian', 'turn-off', 'other'])
+    const service = new PluginService(store, makeInstaller())
+
+    await service.saveRegistry('vault-1', {
+      version: 1,
+      plugins: { 'enabled-in-obsidian': entry('inactive'), 'turn-off': entry('inactive'), other: entry('inactive') },
+    })
+
+    expect(state.enabled).toEqual(['enabled-in-obsidian'])
+  })
+
+  it('switches a plugin on again that Obsidian had switched off, although the registry still says active', async () => {
+    const { store, state } = makeRegistryStore([], { version: 1, plugins: { a: entry('active') } })
+    const service = new PluginService(store, makeInstaller())
+
+    await service.saveRegistry('vault-1', { version: 1, plugins: { a: entry('active') } })
+
+    expect(state.enabled).toEqual(['a'])
   })
 
   it('leaves a plugin in error state where it is, so a load failure here does not switch it off in Obsidian', async () => {

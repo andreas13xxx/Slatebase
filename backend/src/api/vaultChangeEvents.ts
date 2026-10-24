@@ -47,5 +47,11 @@ export function pluginManifestPath(pluginId: string): string {
   return `.obsidian/plugins/${pluginId}/manifest.json`
 }
 
+/**
+ * The plugins folder as a whole, for changes to several plugins at once (bulk update): one event
+ * instead of one per plugin, since every client reloads its file tree for each event it gets.
+ */
+export const PLUGINS_FOLDER_PATH = '.obsidian/plugins/'
+
 /** The list of enabled plugins, which the registry mirrors. */
 export const COMMUNITY_PLUGINS_PATH = '.obsidian/community-plugins.json'

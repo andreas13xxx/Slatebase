@@ -216,7 +216,7 @@ describe('Plugin Store Routes', () => {
       expect(published[0]?.excludeUserId).toBe(defaultSession.userId)
     })
 
-    it('announces an update, and every plugin of a bulk update', async () => {
+    it('announces an update, and a bulk update with a single event', async () => {
       const published: PublishOptions[] = []
       const app = createTestApp({
         published,
@@ -231,9 +231,20 @@ describe('Plugin Store Routes', () => {
 
       expect(paths(published)).toEqual([
         ['.obsidian/plugins/dataview/manifest.json', 'saved'],
-        ['.obsidian/plugins/a/manifest.json', 'saved'],
-        ['.obsidian/plugins/b/manifest.json', 'saved'],
+        ['.obsidian/plugins/', 'saved'],
       ])
+    })
+
+    it('stays silent when a bulk update changed nothing', async () => {
+      const published: PublishOptions[] = []
+      const app = createTestApp({
+        published,
+        pluginStoreService: createMockPluginStoreService({ updateAll: async () => ({ updated: [], failed: [{ pluginId: 'c', reason: 'x' }] }) }),
+      })
+
+      await post(app, 'update-all')
+
+      expect(published).toEqual([])
     })
 
     it('stays silent when nothing changed: update check, failed install', async () => {

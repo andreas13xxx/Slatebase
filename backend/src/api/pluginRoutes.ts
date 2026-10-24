@@ -457,6 +457,13 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         return c.json(createApiError('VALIDATION_ERROR', 'Request body must be valid JSON'), 400)
       }
 
+      // Settings are a file in the vault, and this route is open to read-only collaborators (see
+      // the access table): without this check they could create plugin folders for any id.
+      const manifest = await pluginService.getManifest(vaultId, pluginId)
+      if (manifest === null) {
+        return c.json(createApiError('PLUGIN_NOT_FOUND', `Plugin "${pluginId}" not found in vault "${vaultId}"`), 404)
+      }
+
       await pluginService.saveSettings(vaultId, pluginId, rawBody)
       return c.body(null, 204)
     } catch (error) {

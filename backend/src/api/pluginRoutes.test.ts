@@ -121,12 +121,25 @@ describe('pluginRoutes vault:change events', () => {
 
   it('does not announce plugin settings: they have their own plugin-settings:change event', async () => {
     const published: PublishOptions[] = []
-    const app = createApp(createService(), published)
+    const service = createService()
+    const app = createApp(service, published)
 
     const res = await app.request('/api/v1/vaults/vault-1/plugins/dataview/settings', { method: 'PUT', body: '{"a":1}' })
 
     expect(res.status).toBe(204)
+    expect(service.saveSettings).toHaveBeenCalledWith('vault-1', 'dataview', '{"a":1}')
     expect(published).toEqual([])
+  })
+
+  it('refuses settings for a plugin that is not installed, so no folder is created for an arbitrary id', async () => {
+    const service = createService({ getManifest: vi.fn(async () => null) })
+    const app = createApp(service, [])
+
+    const res = await app.request('/api/v1/vaults/vault-1/plugins/not-installed/settings', { method: 'PUT', body: '{"a":1}' })
+
+    expect(res.status).toBe(404)
+    expect(((await res.json()) as { code: string }).code).toBe('PLUGIN_NOT_FOUND')
+    expect(service.saveSettings).not.toHaveBeenCalled()
   })
 
   it('still answers when publishing fails', async () => {

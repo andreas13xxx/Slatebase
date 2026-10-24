@@ -18,7 +18,7 @@ import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IEventBus } from '../realtime/types.js'
-import { pluginManifestPath, publishVaultChange } from './vaultChangeEvents.js'
+import { PLUGINS_FOLDER_PATH, pluginManifestPath, publishVaultChange } from './vaultChangeEvents.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -199,7 +199,10 @@ export function createVaultPluginStoreRoutes(deps: PluginStoreRouteDependencies)
 
     try {
       const result = await pluginStoreService.updateAll(vaultId)
-      for (const updated of result.updated) await publishSaved(c, vaultId, updated.pluginId)
+      if (result.updated.length > 0) {
+        // One event for the whole batch: every client reloads its file tree per event received.
+        await publishVaultChange({ eventBus, accessControl, logger }, c, vaultId, PLUGINS_FOLDER_PATH, 'saved')
+      }
       return c.json(result, 200)
     } catch (error) {
       return handleStoreError(c, error, logger)
