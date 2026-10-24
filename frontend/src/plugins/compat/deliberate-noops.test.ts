@@ -62,19 +62,6 @@ describe('deliberate no-op stubs log rather than fail silently', () => {
     })
   })
 
-  describe('HTMLElement.onNodeInserted', () => {
-    it('warns — deferred plugin layout code silently never runs', () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const el = document.createElement('div') as HTMLElement & {
-        onNodeInserted(cb: () => void): () => void
-      }
-      const unsubscribe = el.onNodeInserted(() => {})
-      expect(warn).toHaveBeenCalledTimes(1)
-      // The unsubscribe is real in shape, so callers can still clean up.
-      expect(typeof unsubscribe).toBe('function')
-    })
-  })
-
   describe('HTMLElement.onWindowMigrated', () => {
     it('logs at debug — a single-window app has nothing to report', () => {
       const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})

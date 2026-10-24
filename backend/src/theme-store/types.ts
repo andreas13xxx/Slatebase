@@ -17,6 +17,8 @@ export interface CommunityThemeEntry {
   modes: ThemeMode[]
   /** Old-style theme (`obsidian.css`); mostly has no `theme.css`/`manifest.json` to install. */
   legacy: boolean
+  /** Download count from Obsidian's theme statistics; absent when unknown (never `0` for "not loaded"). */
+  downloads?: number | undefined
 }
 
 /** Files of one theme repo, fetched from its default branch. */
@@ -46,6 +48,8 @@ export interface IThemeStoreConfig {
 export interface IThemeStoreClient {
   /** Downloads and validates the community catalog; malformed entries are skipped. */
   fetchCatalog(): Promise<CommunityThemeEntry[]>
+  /** Downloads Obsidian's per-theme download counts, keyed by lower-cased theme name. */
+  fetchDownloadCounts(): Promise<Map<string, number>>
   /** Downloads `theme.css` and `manifest.json` of a theme repo. */
   fetchThemeFiles(repo: string): Promise<RemoteThemeFiles>
   /** Downloads only the remote manifest (for update checks). */

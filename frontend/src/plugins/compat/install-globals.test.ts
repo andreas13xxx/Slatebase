@@ -17,7 +17,7 @@
  * as the install call — no microtask gap. Anything registered via a deferred
  * import is therefore absent from it.
  */
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { installObsidianGlobals } from './install-globals'
@@ -460,6 +460,44 @@ describe('installObsidianGlobals', () => {
       expect(returned).toBe(el)
       el.dispatchEvent(new MouseEvent('click'))
       expect(clicked).toBe(true)
+    })
+  })
+
+  describe('HTMLElement.onNodeInserted', () => {
+    type El = HTMLElement & { onNodeInserted(cb: () => void, once?: boolean): () => void }
+
+    it('fires when the element is inserted into the document', async () => {
+      const el = document.createElement('div') as El
+      const cb = vi.fn()
+      el.onNodeInserted(cb)
+      document.body.appendChild(el)
+      await Promise.resolve()
+      expect(cb).toHaveBeenCalledTimes(1)
+      el.remove()
+    })
+
+    it('stops after the unsubscribe is called', async () => {
+      const el = document.createElement('div') as El
+      const cb = vi.fn()
+      el.onNodeInserted(cb)()
+      document.body.appendChild(el)
+      await Promise.resolve()
+      expect(cb).not.toHaveBeenCalled()
+      el.remove()
+    })
+
+    it('fires only once on re-insertion when `once` is set', async () => {
+      const el = document.createElement('div') as El
+      const cb = vi.fn()
+      el.onNodeInserted(cb, true)
+      document.body.appendChild(el)
+      await Promise.resolve()
+      el.remove()
+      await Promise.resolve()
+      document.body.appendChild(el)
+      await Promise.resolve()
+      expect(cb).toHaveBeenCalledTimes(1)
+      el.remove()
     })
   })
 })

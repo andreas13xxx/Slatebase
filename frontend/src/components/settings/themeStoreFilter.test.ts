@@ -4,6 +4,7 @@ import {
   DEFAULT_FILTERS,
   currentColorMode,
   filterCatalog,
+  formatDownloads,
   storeErrorMessage,
   updateNameSet,
   type StoreFilters,
@@ -27,8 +28,14 @@ const withFilters = (patch: Partial<StoreFilters>): StoreFilters => ({ ...DEFAUL
 const none = new Set<string>()
 
 describe('filterCatalog', () => {
+  it('sorts by downloads by default, themes without a count last and by name', () => {
+    const counted = [theme('B', { downloads: 5 }), theme('Z'), theme('A', { downloads: 5 }), theme('C', { downloads: 900 }), theme('Y', { downloads: 0 })]
+    expect(names(filterCatalog(counted, DEFAULT_FILTERS, none, none))).toEqual(['C', 'A', 'B', 'Y', 'Z'])
+    expect(names(filterCatalog(counted, withFilters({ sort: 'name' }), none, none))).toEqual(['A', 'B', 'C', 'Y', 'Z'])
+  })
+
   it('hides legacy themes by default, sorts by name and shows legacy on request', () => {
-    expect(names(filterCatalog(catalog, DEFAULT_FILTERS, none, none))).toEqual(['Minimal', 'Mystery', 'Night Owl', 'Paper', 'Things'])
+    expect(names(filterCatalog(catalog, withFilters({ sort: 'name' }), none, none))).toEqual(['Minimal', 'Mystery', 'Night Owl', 'Paper', 'Things'])
     expect(names(filterCatalog(catalog, withFilters({ showLegacy: true }), none, none))).toContain('Amethyst')
   })
 
@@ -97,5 +104,15 @@ describe('storeErrorMessage', () => {
     expect(storeErrorMessage({ code: 'FORBIDDEN', message: 'Kein Zugriff' }, 'fallback')).toBe('Kein Zugriff')
     expect(storeErrorMessage(undefined, 'fallback')).toBe('fallback')
     expect(storeErrorMessage('boom', 'fallback')).toBe('fallback')
+  })
+})
+
+describe('formatDownloads', () => {
+  it('abbreviates large counts in German', () => {
+    expect(formatDownloads(842)).toBe('842')
+    expect(formatDownloads(1234)).toBe('1.234')
+    expect(formatDownloads(567_524)).toBe('567,5 Tsd.')
+    expect(formatDownloads(999_960)).toBe('1 Mio.')
+    expect(formatDownloads(1_250_000)).toBe('1,3 Mio.')
   })
 })

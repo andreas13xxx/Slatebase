@@ -31,6 +31,9 @@ function respond(req: IncomingMessage, res: ServerResponse): void {
     res.end(body)
   }
   if (url.endsWith('/community-css-themes.json')) return send(200, JSON.stringify(CATALOG), 'application/json')
+  if (url === '/stats/theme') return send(200, JSON.stringify({ Good: { id: 'Good', download: 1500 }, Odd: { id: 'Odd' }, Neg: { id: 'Neg', download: -1 } }), 'application/json')
+  if (url === '/stats-array/theme') return send(200, '[]', 'application/json')
+  if (url === '/stats-broken/theme') return send(503)
   if (url === '/o/good/HEAD/manifest.json') return send(200, '\uFEFF' + JSON.stringify({ name: 'Good', version: '1.2.0' }), 'application/json')
   if (url === '/o/good/HEAD/theme.css') return send(200, 'body { --x: 1 }')
   if (url === '/o/good/HEAD/screenshot.png') return send(200, PNG, 'image/png')
@@ -69,7 +72,20 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()))
 })
 
-const client = () => new ThemeStoreClient(logger, { rawBaseUrl: base })
+const client = () => new ThemeStoreClient(logger, { rawBaseUrl: base, statsUrl: `${base}/stats/theme` })
+
+describe('fetchDownloadCounts', () => {
+  it('maps lower-cased theme names to counts and skips entries without a valid count', async () => {
+    const counts = await client().fetchDownloadCounts()
+    expect([...counts]).toEqual([['good', 1500]])
+  })
+
+  it('treats a non-object body and an error status as a fetch failure', async () => {
+    const at = (path: string) => new ThemeStoreClient(logger, { rawBaseUrl: base, statsUrl: `${base}${path}` })
+    await expect(at('/stats-array/theme').fetchDownloadCounts()).rejects.toBeInstanceOf(ThemeStoreFetchError)
+    await expect(at('/stats-broken/theme').fetchDownloadCounts()).rejects.toBeInstanceOf(ThemeStoreFetchError)
+  })
+})
 
 describe('fetchCatalog', () => {
   it('returns valid entries and skips malformed ones with a warning', async () => {

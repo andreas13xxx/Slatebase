@@ -22,6 +22,7 @@ import {
   storeErrorMessage,
   updateNameSet,
   type ModeFilter,
+  type SortOrder,
   type StoreFilters,
 } from './themeStoreFilter'
 import './ThemeStoreBrowser.css'
@@ -285,6 +286,15 @@ export function ThemeStoreBrowser() {
                 <option value="dark">Dunkel</option>
               </select>
             </label>
+            {catalog.themes.some((t) => t.downloads !== undefined) && (
+            <label className="theme-store__field">
+              <span>Sortieren nach</span>
+              <select value={filters.sort} onChange={(e) => changeFilters({ sort: e.target.value as SortOrder })}>
+                <option value="downloads">Beliebtheit (Downloads)</option>
+                <option value="name">Name</option>
+              </select>
+            </label>
+            )}
             <label className="theme-store__check">
               <input type="checkbox" checked={filters.installedOnly} onChange={(e) => changeFilters({ installedOnly: e.target.checked })} />
               Installiert
@@ -331,7 +341,7 @@ export function ThemeStoreBrowser() {
               : `${visible.length} von ${filtered.length} angezeigt (Katalog: ${catalog.themes.length})`}
           </p>
           {filtered.length === 0 && (
-            <Button size="sm" onClick={() => { setQueryInput(''); appliedQueryRef.current = ''; setFilters({ ...DEFAULT_FILTERS, mode: 'all' }); setVisibleCount(PAGE_SIZE) }}>
+            <Button size="sm" onClick={() => { setQueryInput(''); appliedQueryRef.current = ''; setFilters({ ...DEFAULT_FILTERS, mode: 'all', sort: filters.sort }); setVisibleCount(PAGE_SIZE) }}>
               Filter zurücksetzen
             </Button>
           )}

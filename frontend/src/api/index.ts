@@ -261,6 +261,8 @@ export interface CommunityTheme {
   modes: Array<'dark' | 'light'>
   /** Old-style theme (mostly without installable files). */
   legacy: boolean
+  /** Download count from Obsidian's statistics; missing when unknown. */
+  downloads?: number
 }
 
 /** The community catalog. `stale` means GitHub could not be reached and the last known list is shown. */

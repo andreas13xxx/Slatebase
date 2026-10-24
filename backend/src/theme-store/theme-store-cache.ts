@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import { JsonFileStore } from '../shared/json-file-store.js'
 import type { CommunityThemeEntry, IThemeStoreConfig } from './types.js'
-import { communityThemeEntrySchema } from './validation.js'
+import { cachedThemeEntrySchema } from './validation.js'
 
 /** A cached value with its expiry time (epoch ms). */
 interface CacheEntry<T> {
@@ -31,7 +31,7 @@ function parsePersisted(raw: unknown): PersistedState | null {
   if (!catalog || !Array.isArray(catalog.data) || typeof catalog.expiresAt !== 'number') return null
   const entries: CommunityThemeEntry[] = []
   for (const item of catalog.data) {
-    const parsed = communityThemeEntrySchema.safeParse(item)
+    const parsed = cachedThemeEntrySchema.safeParse(item)
     if (parsed.success) entries.push(parsed.data)
   }
   return { version: 1, catalog: { data: entries, expiresAt: catalog.expiresAt } }
@@ -50,7 +50,8 @@ export interface IThemeStoreCache {
   load(): Promise<void>
   getCatalog(): CommunityThemeEntry[] | null
   getCatalogStale(): CommunityThemeEntry[] | null
-  setCatalog(entries: CommunityThemeEntry[]): void
+  /** `ttlMs` overrides the configured catalog TTL (used to retry sooner when the download counts are missing). */
+  setCatalog(entries: CommunityThemeEntry[], ttlMs?: number): void
   getManifest(repo: string): Record<string, unknown> | null
   setManifest(repo: string, manifest: Record<string, unknown>): void
   getUpdateCheck<T>(vaultId: string): T | null
@@ -91,8 +92,8 @@ export class ThemeStoreCache implements IThemeStoreCache {
     return this.catalog?.data ?? null
   }
 
-  setCatalog(entries: CommunityThemeEntry[]): void {
-    this.catalog = { data: entries, expiresAt: this.now() + this.config.cacheTtlCatalog }
+  setCatalog(entries: CommunityThemeEntry[], ttlMs?: number): void {
+    this.catalog = { data: entries, expiresAt: this.now() + (ttlMs ?? this.config.cacheTtlCatalog) }
     this.persist()
   }
 

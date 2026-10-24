@@ -44,6 +44,9 @@ function pickManifest(raw: Record<string, unknown>): ThemeManifestInput {
   return out
 }
 
+/** How long a catalog without download counts is cached before the next refresh tries the statistics again. */
+const INCOMPLETE_CATALOG_TTL_MS = 5 * 60 * 1000
+
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -247,16 +250,41 @@ export class ThemeStoreService implements IThemeStoreService {
 
   private refreshCatalog(): Promise<CommunityThemeEntry[]> {
     if (this.catalogInFlight === null) {
-      this.catalogInFlight = this.client
-        .fetchCatalog()
-        .then((entries) => {
-          this.cache.setCatalog(entries)
-          return entries
+      this.catalogInFlight = Promise.all([this.client.fetchCatalog(), this.fetchCountsOrNull()])
+        .then(([entries, counts]) => {
+          const merged = this.withDownloads(entries, counts)
+          // A catalog without any count is retried sooner than a complete one.
+          const complete = merged.some((e) => e.downloads !== undefined) || counts !== null
+          this.cache.setCatalog(merged, complete ? undefined : INCOMPLETE_CATALOG_TTL_MS)
+          return merged
         })
         .finally(() => {
           this.catalogInFlight = null
         })
     }
     return this.catalogInFlight
+  }
+
+  /** Download counts, or null when they cannot be loaded: the statistics are a nicety and never block the catalog. */
+  private async fetchCountsOrNull(): Promise<Map<string, number> | null> {
+    try {
+      return await this.client.fetchDownloadCounts()
+    } catch (error: unknown) {
+      this.logger.warn('Theme download statistics unavailable', { error: describeError(error) })
+      return null
+    }
+  }
+
+  /**
+   * Adds `downloads` to the entries. Without fresh counts the last known ones are kept, so a failed statistics
+   * request does not wipe the numbers; a theme without any count simply has none ("unknown", not 0).
+   */
+  private withDownloads(entries: CommunityThemeEntry[], counts: Map<string, number> | null): CommunityThemeEntry[] {
+    const known = counts ?? new Map((this.cache.getCatalogStale() ?? []).flatMap((e) => (e.downloads === undefined ? [] : [[e.name.toLowerCase(), e.downloads] as const])))
+    return entries.map((entry) => {
+      const downloads = known.get(entry.name.toLowerCase())
+      const { downloads: _drop, ...rest } = entry
+      return downloads === undefined ? rest : { ...rest, downloads }
+    })
   }
 }

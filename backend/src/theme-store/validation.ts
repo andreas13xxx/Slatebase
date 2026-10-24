@@ -31,6 +31,15 @@ export const communityThemeEntrySchema = z.object({
   legacy: z.boolean().default(false),
 })
 
+/** An entry as persisted in the local cache: the catalog entry plus the download count merged in by the service. */
+export const cachedThemeEntrySchema = communityThemeEntrySchema.extend({ downloads: z.number().int().nonnegative().optional() })
+
+/** Upper bound on the download statistics (~75 KB upstream today). */
+export const MAX_STATS_BYTES = 1024 * 1024
+
+/** One entry of Obsidian's theme statistics; only the count is used. */
+export const themeStatsEntrySchema = z.object({ download: z.number().int().nonnegative() })
+
 // ─── Screenshot ───────────────────────────────────────────────────────────────
 
 /** Screenshots above this size are not proxied (the card shows a placeholder). */

@@ -8,6 +8,7 @@ import { Check, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { storeThemeScreenshotUrl } from '../../api'
 import type { CommunityTheme, ThemeStoreUpdate } from '../../api'
 import { Button } from './ui'
+import { formatDownloads } from './themeStoreFilter'
 
 export interface ThemeStoreCardProps {
   theme: CommunityTheme
@@ -51,6 +52,7 @@ export function ThemeStoreCard({ theme, installedVersion, update, busy, error, o
         <h4 className="theme-store-card__name">{theme.name}</h4>
         <p className="theme-store-card__meta">
           {theme.author !== '' ? `von ${theme.author} · ` : ''}{modes}
+          {theme.downloads !== undefined && ` · ${formatDownloads(theme.downloads)} Downloads`}
           {theme.legacy && <span className="theme-store-card__legacy"> · Veraltet</span>}
         </p>
 
