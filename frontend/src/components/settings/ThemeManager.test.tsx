@@ -176,7 +176,10 @@ describe('ThemeManager', () => {
       await screen.findByRole('radio', { name: /Things/ })
 
       expect(await screen.findAllByText(/bringen eigene Einstellungen mit/)).toHaveLength(1)
-      expect(screen.getAllByRole('img', { name: 'Hat eigene Einstellungen' })).toHaveLength(2)
+      expect(screen.getAllByTitle('Hat eigene Einstellungen')).toHaveLength(2)
+      // The radio is described by it, but its name stays the theme name.
+      expect(screen.getByRole('radio', { name: /Minimal/ })).toHaveAccessibleDescription('Hat eigene Einstellungen')
+      expect(screen.getByRole('radio', { name: /Minimal/ })).not.toHaveAccessibleName(/eigene Einstellungen/)
     })
 
     it('asks to install the plugin when it is not in the vault', async () => {
@@ -228,7 +231,7 @@ describe('ThemeManager', () => {
       const apiClient = renderWithRegistry(registryWith(), [things])
       await screen.findByRole('radio', { name: /Things/ })
       expect(screen.queryByText(/bringen eigene Einstellungen mit/)).not.toBeInTheDocument()
-      expect(screen.queryByRole('img', { name: 'Hat eigene Einstellungen' })).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Hat eigene Einstellungen')).not.toBeInTheDocument()
       expect(apiClient.loadRegistry).not.toHaveBeenCalled()
     })
 

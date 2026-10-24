@@ -140,5 +140,32 @@ describe('ThemeImport', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }))
 
     await waitFor(() => expect(document.head.querySelector('style[data-slatebase-theme]')?.textContent).toBe('b{}'))
+    expect(screen.getByText(/wurde überschrieben/)).toBeInTheDocument()
+  })
+
+  it('does not re-apply an overwritten theme that is not active any more by the time the overwrite is confirmed', async () => {
+    const listThemes = vi.fn()
+      .mockResolvedValueOnce({ themes: [things], activeThemeId: 'Things' }) // when the file is picked
+      .mockResolvedValue({ themes: [things], activeThemeId: null }) // after the save
+    renderImport(createMockApiClient({ listThemes }))
+    await screen.findByTestId('theme-file-input')
+
+    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [new File(['b{}'], 'Things.css')] } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }))
+
+    await screen.findByText(/wurde überschrieben/)
+    await waitFor(() => expect(listThemes).toHaveBeenCalledTimes(2))
+    expect(document.head.querySelector('style[data-slatebase-theme]')).toBeNull()
+  })
+
+  it('shows an error when the dropped files cannot be read', async () => {
+    renderImport(createMockApiClient())
+    await screen.findByTestId('theme-file-input')
+    const broken = new File(['a{}'], 'theme.css')
+    Object.defineProperty(broken, 'text', { value: () => Promise.reject(new Error('Lesefehler')) })
+
+    fireEvent.change(screen.getByTestId('theme-file-input'), { target: { files: [broken] } })
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
   })
 })
