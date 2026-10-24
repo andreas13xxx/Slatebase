@@ -87,7 +87,7 @@ Vault installiert, aktiviert und gewechselt werden und färben die **gesamte Sla
     `""`/fehlend = Standard). Andere Felder der Datei (`theme`, `enabledCssSnippets`, …) bleiben beim
     Schreiben **unverändert erhalten** (Read-Modify-Write unter Mutex; unbekannte Felder durchreichen).
 3.7 Sync-Verhalten (geprüft): `sync-engine.ts` synchronisiert Obsidian-Config und -Themes ausdrücklich
-    (`MANAGED_GITIGNORE_LINES` ignoriert nur `.obsidian/workspace*.json` und `.obsidian/plugins/*/data.json`).
+    (`MANAGED_GITIGNORE_LINES` ignoriert nur `.obsidian/workspace*.json`; Plugin-`data.json` wird mitsynchronisiert).
     `.obsidian/themes/**` und `appearance.json` werden daher mitsynchronisiert; keine Änderung am Ignore-Block nötig.
 
 ### R4 — Aktivierung und Injection (Frontend)
