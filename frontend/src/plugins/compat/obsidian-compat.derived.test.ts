@@ -31,6 +31,12 @@ describe('obsidian-compat derived aliases', () => {
     '--bases-table-text-size',
     '--dropdown-background',
     '--dropdown-background-hover',
+    '--h1-color',
+    '--h2-color',
+    '--h3-color',
+    '--h4-color',
+    '--h5-color',
+    '--h6-color',
   ])('declares %s on body', (name) => {
     expect(block).toContain(`${name}:`)
   })
