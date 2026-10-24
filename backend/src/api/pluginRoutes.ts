@@ -17,6 +17,8 @@ import { PLUGIN_ID_PATTERN, pluginRegistrySchema } from '../plugin/validation.js
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
+import type { IEventBus } from '../realtime/types.js'
+import { COMMUNITY_PLUGINS_PATH, pluginManifestPath, publishVaultChange } from './vaultChangeEvents.js'
 import type { IPluginSecretStore } from '../plugin/secret-store.js'
 import { SecretLimitExceededError, SecretTooLargeError } from '../plugin/secret-store.js'
 
@@ -101,6 +103,7 @@ export interface PluginRouteDependencies {
   pluginService: IPluginService
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
+  eventBus: IEventBus
   logger: ILogger
   secretStore?: IPluginSecretStore
 }
@@ -116,7 +119,9 @@ export interface PluginRouteDependencies {
  * @returns A Hono instance with plugin management routes registered.
  */
 export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
-  const { pluginService, logger, secretStore } = deps
+  const { pluginService, accessControl, eventBus, logger, secretStore } = deps
+  const publish = (c: Context, vaultId: string, path: string, action: 'saved' | 'deleted'): Promise<void> =>
+    publishVaultChange({ eventBus, accessControl, logger }, c, vaultId, path, action)
   const app = new Hono()
 
   // ─── Registry Routes (BEFORE :pluginId to avoid "registry" being parsed as param) ───
@@ -144,6 +149,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
 
     try {
       await pluginService.saveRegistry(vaultId, parsed.data as PluginRegistryData)
+      await publish(c, vaultId, COMMUNITY_PLUGINS_PATH, 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)
@@ -212,6 +218,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       const result: PluginInstallResult = await pluginService.installFromZip(vaultId, buffer)
+      await publish(c, vaultId, pluginManifestPath(result.pluginId), 'saved')
 
       // Persist hasEvalUsage in registry if eval/Function patterns were detected
       if (result.warnings.length > 0) {
@@ -302,6 +309,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       }
 
       await pluginService.deletePlugin(vaultId, pluginId)
+      await publish(c, vaultId, pluginManifestPath(pluginId), 'deleted')
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)

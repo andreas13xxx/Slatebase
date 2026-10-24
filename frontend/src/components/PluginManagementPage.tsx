@@ -14,6 +14,7 @@ import { extractErrorMessage } from '../utils/error'
 import { useTranslation } from '../i18n'
 import { PluginStoreBrowser } from './plugin-store'
 import { mountSettingTab, waitForElement } from '../plugins/compat/setting-tab-mount'
+import { useVaultPluginChanges } from '../hooks/useVaultPluginChanges'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -155,9 +156,16 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
   // ─── Load plugins ──────────────────────────────────────────────────────
 
-  const loadPlugins = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  /**
+   * Loads the plugin list and the registry. `silent` is for background refreshes (another user or
+   * a sync changed the vault): no loading state, no error banner, so the list does not flicker and
+   * a failed refresh keeps what is shown. Running plugins are never touched by this.
+   */
+  const loadPlugins = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const [manifestsResult, registry] = await Promise.all([
         apiClient.listPlugins(vaultId),
@@ -192,11 +200,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Background: Analyze compatibility and detect settings for each plugin
       void analyzeAndDetectSettings(manifests, registry)
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Fehler beim Laden der Plugins'))
+      if (!silent) setError(extractErrorMessage(err, 'Fehler beim Laden der Plugins'))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [apiClient, vaultId, analyzeAndDetectSettings])
+
+  // Another user, tab or a sync installed, updated, deleted or (de)activated a plugin
+  useVaultPluginChanges(vaultId, () => void loadPlugins(true))
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

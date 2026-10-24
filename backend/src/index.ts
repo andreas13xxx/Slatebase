@@ -743,6 +743,7 @@ const pluginRoutes = createPluginRoutes({
   pluginService,
   accessControl: vaultAccessControl,
   vaultRegistry,
+  eventBus,
   logger,
   secretStore: pluginSecretStore,
 })
@@ -795,8 +796,8 @@ if (featureToggleService.isEnabled('obsidian-theme-store')) {
 }
 
 // Plugin Store route registration (auth middleware applies via /api/v1/* pattern)
-const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
-const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, logger })
+const pluginStoreRoutes = createPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger })
+const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger })
 app.route('/api/v1/plugin-store', pluginStoreRoutes)
 app.route('/api/v1/vaults/:vaultId/plugins', vaultPluginStoreRoutes)
 

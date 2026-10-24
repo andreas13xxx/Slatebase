@@ -90,7 +90,8 @@ src/
 │   ├── basesRoutes.test.ts  — Integration tests for the Bases query route
 │   ├── activityRoutes.ts    — Activity timeline read route (GET /vaults/:vaultId/activity — cursor-paginated, type/time filters; feature-gated `activity-timeline`, vault auth via shared middleware). Recording happens as a side effect of vault mutations (VaultController, trashRoutes, MCP tool-handlers); this route only reads back what ActivityStore wrote
 │   ├── activityRoutes.test.ts — Integration tests for the activity read route
-│   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts)
+│   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts); install/update publish `vault:change`
+│   ├── vaultChangeEvents.ts — `publishVaultChange()` helper for routes that change vault files outside the file API (plugins; excludes the writer, best-effort) + the `.obsidian` paths plugin events use
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
 │   ├── types.ts          — Chat data models (Conversation, Message, etc.)
@@ -580,6 +581,7 @@ src/
 │   ├── useWordStats.ts   — Word/character count (+ selection) for the active file. Polls `getActiveEditorView()` (300ms) rather than subscribing to CM6 transactions directly — no reactive content/selection stream exists without extending the core editor's extension pipeline
 │   ├── useCursorPosition.ts — Cursor line/column (100ms poll, same rationale as useWordStats.ts) + `goToLine()` helper
 │   ├── useLinkCounts.ts       — Subscribes to the counts published via `state/linkCountsBridge.ts`
+│   ├── useVaultPluginChanges.ts — Calls back (debounced) when `vault:change` reports a change to the plugin list or `community-plugins.json`; `data.json` is ignored. Refreshes what is shown only — never reloads a running plugin
 │   ├── useVersionInfo.ts — Server version info hook (installed vs. latest, GitHub API check)
 │   ├── useGlobalShortcuts.ts — App-wide keyboard shortcuts (vault search, mode toggle, settings panel, daily note, navigate back/forward); extracted from AppContent. Next/previous tab is registered in `CommandPaletteContainer.tsx` instead — it needs `commandRegistry` from `usePluginContext()`, unreachable from this hook (see App.tsx note)
 │   ├── useWorkspaceRestore.ts — Session-persistence lifecycle: restores vault/pane-tree layout from workspaceStore on mount, persists changes back; extracted from AppContent. `getInitialPaneTree()` (module-level) seeds `PaneTreeProvider`'s `initialTree` synchronously before first render — an explicit persisted `paneTree` wins, else the legacy flat `tabs` blob is migrated into a single pane. Per-pane tab content is fetched post-mount via `PANE_TAB_ACTION` with a `cancelled` guard

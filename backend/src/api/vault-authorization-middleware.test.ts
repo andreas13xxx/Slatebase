@@ -202,13 +202,13 @@ const routeModules = [
 const router = createRouter(routeModules)
 app.route('/api/v1', router)
 
-const pluginRoutes = createPluginRoutes({ pluginService: stub<IPluginService>('pluginService'), accessControl, vaultRegistry, logger: silentLogger, secretStore: stub<IPluginSecretStore>('pluginSecretStore') })
+const pluginRoutes = createPluginRoutes({ pluginService: stub<IPluginService>('pluginService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger, secretStore: stub<IPluginSecretStore>('pluginSecretStore') })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 
 const snippetRoutes = createSnippetRoutes({ snippetStore: stub<ISnippetStore>('snippetStore'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
 
-const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService: stub<IPluginStoreService>('pluginStoreService'), accessControl, vaultRegistry, logger: silentLogger })
+const vaultPluginStoreRoutes = createVaultPluginStoreRoutes({ pluginStoreService: stub<IPluginStoreService>('pluginStoreService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/plugins', vaultPluginStoreRoutes)
 
 const searchRoutes = createSearchRoutes({ searchService: stub<ISearchService>('searchService'), replaceService: stub<IReplaceService>('replaceService'), vaultAccessControl: accessControl, logger: silentLogger })
