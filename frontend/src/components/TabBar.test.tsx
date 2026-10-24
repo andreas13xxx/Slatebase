@@ -109,8 +109,8 @@ describe('TabBar app-level row (showFileTabs=false)', () => {
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
   })
 
-  it('still renders the (empty) bar so the row keeps its full width', () => {
+  it('collapses to nothing when split and no settings page is open', () => {
     const { container } = renderAppBar([makeTab('v1', 'a.md')])
-    expect(container.querySelector('.tab-bar')).not.toBeNull()
+    expect(container.querySelector('.tab-bar')).toBeNull()
   })
 })
