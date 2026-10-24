@@ -24,13 +24,4 @@ export class InvalidThemeIdError extends Error {
   }
 }
 
-/**
- * Thrown when `.obsidian/appearance.json` exists but is not a JSON object.
- * The file is never overwritten in that case — it may be mid-sync or hand-edited.
- */
-export class AppearanceFileInvalidError extends Error {
-  constructor() {
-    super('.obsidian/appearance.json is not a valid JSON object; leaving it untouched')
-    this.name = 'AppearanceFileInvalidError'
-  }
-}
+export { AppearanceFileInvalidError } from '../shared/appearance-file.js'

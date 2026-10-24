@@ -53,7 +53,7 @@ import { createGraphRoutes } from './api/graphRoutes.js'
 import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
 import { InstalledPluginStore, PluginInstaller, PluginService, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
-import { SnippetStore } from './snippets/index.js'
+import { SnippetStore, migrateLegacySnippets } from './snippets/index.js'
 import { ThemeService } from './themes/index.js'
 import { createThemeRoutes } from './api/themeRoutes.js'
 import { ThemeStoreCache, ThemeStoreClient, ThemeStoreService, warmThemeStoreCatalog } from './theme-store/index.js'
@@ -438,7 +438,7 @@ const pluginStore = new InstalledPluginStore(serverConfig.dataDir)
 const pluginInstaller = new PluginInstaller(pluginStore)
 
 // 4e2. CSS Snippet Module
-const snippetStore = new SnippetStore(serverConfig.dataDir)
+const snippetStore = new SnippetStore()
 
 // 4f. Plugin Store Module (Community Plugin Store)
 const pluginStoreConfig: IPluginStoreConfig = {
@@ -753,6 +753,7 @@ const snippetRoutes = createSnippetRoutes({
   snippetStore,
   accessControl: vaultAccessControl,
   vaultRegistry,
+  eventBus,
   logger,
 })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
@@ -1118,6 +1119,9 @@ await vaultService.initializeVaults()
 await vaultRegistry.load()
 vaultRegistryReady = true
 
+// Snippets used to live in data/snippets/<vaultId>/; Obsidian keeps them in the vault's .obsidian/snippets/.
+await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
+
 // Set up link index hook on VaultController for incremental updates.
 // Held in a named const because the MCP tool handlers (4c above) reuse it via
 // closure — an MCP write/delete has to keep the index in sync just like a REST
@@ -1210,19 +1214,13 @@ const linkIndexHook = {
 
 vaultController.setLinkIndexHook(linkIndexHook)
 
-// Set up vault deletion hook for resource cleanup (plugin data, link index)
+// Set up vault deletion hook for resource cleanup (plugin data, link index). Snippets live in the vault itself and go with it.
 vaultController.setVaultDeletionHook({
   onVaultDeleted(vaultId: string): void {
     // Clean up plugin data for the deleted vault (fire-and-forget)
     pluginStore.deleteAllForVault(vaultId).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Plugin cleanup failed after vault deletion', { vaultId, error: message })
-    })
-
-    // Clean up CSS snippet data for the deleted vault (fire-and-forget)
-    snippetStore.deleteAllForVault(vaultId).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      logger.error('Snippet cleanup failed after vault deletion', { vaultId, error: message })
     })
 
     // Clean up link index for the deleted vault

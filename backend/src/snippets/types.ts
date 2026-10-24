@@ -13,8 +13,9 @@ export interface SnippetMeta {
 }
 
 /**
- * Registry data model for `_registry.json`.
- * Stores activation status per snippet.
+ * Activation status as exposed by the API. Backed by `enabledCssSnippets` in
+ * `.obsidian/appearance.json`, which lists enabled snippets only: `updatedAt` is the
+ * snippet file's modification time (empty if the file is gone).
  */
 export interface SnippetRegistryData {
   version: 1;
@@ -25,29 +26,24 @@ export interface SnippetRegistryData {
 }
 
 /**
- * Interface for the CSS snippet filesystem store.
- * Manages snippet files and their activation registry, per vault.
+ * Interface for the CSS snippet store. Snippets live in the vault's
+ * `.obsidian/snippets/` folder, activation is `enabledCssSnippets` in
+ * `.obsidian/appearance.json`. All methods take the vault's absolute path.
  */
 export interface ISnippetStore {
   /** Save (create or overwrite) a snippet's CSS content. */
-  saveSnippet(vaultId: string, snippetId: string, content: string): Promise<void>;
+  saveSnippet(vaultPath: string, snippetId: string, content: string): Promise<void>;
   /** Load a snippet's CSS content. Returns null if it does not exist. */
-  loadSnippet(vaultId: string, snippetId: string): Promise<string | null>;
-  /** Delete a snippet. Does nothing if it does not exist. */
-  deleteSnippet(vaultId: string, snippetId: string): Promise<void>;
+  loadSnippet(vaultPath: string, snippetId: string): Promise<string | null>;
+  /** Delete a snippet and remove it from the enabled list. Does nothing if it does not exist. */
+  deleteSnippet(vaultPath: string, snippetId: string): Promise<void>;
   /** List metadata for all snippets in a vault. */
-  listSnippets(vaultId: string): Promise<SnippetMeta[]>;
-  /** Save the snippet activation registry for a vault. */
-  saveRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void>;
-  /** Load the snippet activation registry for a vault. Returns null if it does not exist. */
-  loadRegistry(vaultId: string): Promise<SnippetRegistryData | null>;
+  listSnippets(vaultPath: string): Promise<SnippetMeta[]>;
+  /** Ids of the enabled snippets (`enabledCssSnippets`). */
+  loadEnabledIds(vaultPath: string): Promise<string[]>;
   /**
-   * Atomically read-modify-write the registry: `fn` receives the current
-   * registry (`null` if none exists yet) and returns the value to persist.
-   * Runs inside the registry's per-vault mutex, so a delete's registry-entry
-   * cleanup can't lose a concurrent delete of a different snippet.
+   * Replace the enabled snippets, preserving all other appearance.json fields.
+   * @throws AppearanceFileInvalidError if the file exists but is not a JSON object.
    */
-  mutateRegistry(vaultId: string, fn: (current: SnippetRegistryData | null) => SnippetRegistryData): Promise<SnippetRegistryData>;
-  /** Delete all snippet data for a vault (files + registry). */
-  deleteAllForVault(vaultId: string): Promise<void>;
+  saveEnabledIds(vaultPath: string, ids: string[]): Promise<void>;
 }

@@ -423,8 +423,8 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | GET | `/vaults/:vaultId/snippets` | List snippets |
 | POST | `/vaults/:vaultId/snippets` | Create snippet |
 | GET/PUT | `/vaults/:vaultId/snippets/:snippetId` | Read / write snippet content |
-| DELETE | `/vaults/:vaultId/snippets/:snippetId` | Delete snippet (also prunes its registry entry) |
-| GET/PUT | `/vaults/:vaultId/snippets/registry` | Enabled/disabled state |
+| DELETE | `/vaults/:vaultId/snippets/:snippetId` | Delete snippet (also removes it from `enabledCssSnippets`) |
+| GET/PUT | `/vaults/:vaultId/snippets/registry` | Enabled state, stored as `enabledCssSnippets` in `.obsidian/appearance.json` |
 
 ### Themes
 

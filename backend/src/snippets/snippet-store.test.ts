@@ -1,159 +1,226 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { SnippetStore } from './snippet-store.js'
 import { SnippetTooLargeError } from './errors.js'
-import { MAX_SNIPPET_SIZE } from './validation.js'
-import type { SnippetRegistryData } from './types.js'
+import { MAX_SNIPPET_SIZE, isValidSnippetFilename } from './validation.js'
+import { AppearanceFileInvalidError } from '../shared/appearance-file.js'
+import { ThemeService } from '../themes/index.js'
 
-let tmpDir: string
+let vault: string
 let store: SnippetStore
 
-beforeAll(async () => {
-  tmpDir = path.join(os.tmpdir(), `snippet-store-test-${crypto.randomBytes(8).toString('hex')}`)
-  await fs.mkdir(tmpDir, { recursive: true })
-  store = new SnippetStore(tmpDir)
+const snippetsDir = (): string => path.join(vault, '.obsidian', 'snippets')
+const appearancePath = (): string => path.join(vault, '.obsidian', 'appearance.json')
+
+beforeEach(async () => {
+  vault = path.join(os.tmpdir(), `snippet-store-test-${crypto.randomBytes(8).toString('hex')}`)
+  await fs.mkdir(vault, { recursive: true })
+  store = new SnippetStore()
 })
 
-afterAll(async () => {
-  await fs.rm(tmpDir, { recursive: true, force: true })
+afterEach(async () => {
+  await fs.rm(vault, { recursive: true, force: true })
 })
 
 describe('SnippetStore', () => {
   describe('saveSnippet / loadSnippet', () => {
-    it('saves and loads a snippet', async () => {
-      await store.saveSnippet('vault-1', 'dark-accent', 'body { color: red; }')
+    it('stores a snippet at .obsidian/snippets/<id>.css in the vault', async () => {
+      await store.saveSnippet(vault, 'dark-accent', 'body { color: red; }')
 
-      const content = await store.loadSnippet('vault-1', 'dark-accent')
-      expect(content).toBe('body { color: red; }')
+      expect(await fs.readFile(path.join(snippetsDir(), 'dark-accent.css'), 'utf-8')).toBe('body { color: red; }')
+      expect(await store.loadSnippet(vault, 'dark-accent')).toBe('body { color: red; }')
     })
 
     it('overwrites an existing snippet', async () => {
-      await store.saveSnippet('vault-1', 'overwrite-me', 'a { color: red; }')
-      await store.saveSnippet('vault-1', 'overwrite-me', 'a { color: blue; }')
+      await store.saveSnippet(vault, 'overwrite-me', 'a { color: red; }')
+      await store.saveSnippet(vault, 'overwrite-me', 'a { color: blue; }')
 
-      expect(await store.loadSnippet('vault-1', 'overwrite-me')).toBe('a { color: blue; }')
+      expect(await store.loadSnippet(vault, 'overwrite-me')).toBe('a { color: blue; }')
     })
 
     it('returns null for a snippet that does not exist', async () => {
-      expect(await store.loadSnippet('vault-1', 'nonexistent')).toBeNull()
+      expect(await store.loadSnippet(vault, 'nonexistent')).toBeNull()
     })
 
     it('rejects snippets exceeding 512 KB', async () => {
       const large = 'x'.repeat(MAX_SNIPPET_SIZE + 1)
-      await expect(store.saveSnippet('vault-1', 'too-large', large)).rejects.toThrow(SnippetTooLargeError)
+      await expect(store.saveSnippet(vault, 'too-large', large)).rejects.toThrow(SnippetTooLargeError)
     })
 
-    it('rejects a snippet id that would path-traverse out of the vault directory', async () => {
-      await expect(store.saveSnippet('vault-1', '../../etc/passwd', 'a {}')).rejects.toThrow()
-    })
-  })
-
-  describe('deleteSnippet', () => {
-    it('deletes a snippet', async () => {
-      await store.saveSnippet('vault-1', 'to-delete', 'a {}')
-      await store.deleteSnippet('vault-1', 'to-delete')
-
-      expect(await store.loadSnippet('vault-1', 'to-delete')).toBeNull()
+    it('rejects ids that would path-traverse out of the snippets folder', async () => {
+      await expect(store.saveSnippet(vault, '../../etc/passwd', 'a {}')).rejects.toThrow()
+      await expect(store.saveSnippet(vault, '..%2f..%2fx', 'a {}')).rejects.toThrow()
     })
 
-    it('does nothing when the snippet does not exist', async () => {
-      await expect(store.deleteSnippet('vault-1', 'never-existed')).resolves.toBeUndefined()
+    it('supports Obsidian-style names with spaces and dots', async () => {
+      await store.saveSnippet(vault, 'my snippet v2.0', 'a {}')
+
+      expect(await store.loadSnippet(vault, 'my snippet v2.0')).toBe('a {}')
+    })
+
+    it('does not follow a symlinked snippet', async () => {
+      const outside = path.join(vault, 'secret.txt')
+      await fs.writeFile(outside, 'secret')
+      await fs.mkdir(snippetsDir(), { recursive: true })
+      try {
+        await fs.symlink(outside, path.join(snippetsDir(), 'link.css'))
+      } catch {
+        return // symlinks unavailable (e.g. Windows without privileges)
+      }
+
+      expect(await store.loadSnippet(vault, 'link')).toBeNull()
+      expect((await store.listSnippets(vault)).map((m) => m.id)).not.toContain('link')
     })
   })
 
   describe('listSnippets', () => {
     it('lists metadata for all snippets in a vault', async () => {
-      const vaultId = 'vault-list-test'
-      await store.saveSnippet(vaultId, 'one', 'a {}')
-      await store.saveSnippet(vaultId, 'two', 'b { color: red; }')
+      await store.saveSnippet(vault, 'one', 'a {}')
+      await store.saveSnippet(vault, 'two', 'b { color: red; }')
 
-      const metas = await store.listSnippets(vaultId)
-      const ids = metas.map(m => m.id).sort()
-      expect(ids).toEqual(['one', 'two'])
-      expect(metas.every(m => m.filename.endsWith('.css'))).toBe(true)
-      expect(metas.every(m => m.size > 0)).toBe(true)
-      expect(metas.every(m => typeof m.updatedAt === 'string')).toBe(true)
+      const metas = await store.listSnippets(vault)
+      expect(metas.map((m) => m.id).sort()).toEqual(['one', 'two'])
+      expect(metas.every((m) => m.filename.endsWith('.css'))).toBe(true)
+      expect(metas.every((m) => m.size > 0)).toBe(true)
+      expect(metas.every((m) => typeof m.updatedAt === 'string')).toBe(true)
     })
 
-    it('returns an empty array for a vault with no snippets', async () => {
-      expect(await store.listSnippets('vault-never-used')).toEqual([])
+    it('returns an empty array for a vault without a snippets folder', async () => {
+      expect(await store.listSnippets(vault)).toEqual([])
     })
 
-    it('ignores the registry file and non-css files', async () => {
-      const vaultId = 'vault-ignore-test'
-      await store.saveSnippet(vaultId, 'valid', 'a {}')
-      await store.saveRegistry(vaultId, { version: 1, snippets: {} })
+    it('picks up snippets that Obsidian created and ignores other files', async () => {
+      await fs.mkdir(snippetsDir(), { recursive: true })
+      await fs.writeFile(path.join(snippetsDir(), 'from obsidian.css'), 'a {}')
+      await fs.writeFile(path.join(snippetsDir(), 'notes.txt'), 'x')
+      await fs.writeFile(path.join(snippetsDir(), '.hidden.css'), 'x')
 
-      const metas = await store.listSnippets(vaultId)
-      expect(metas.map(m => m.id)).toEqual(['valid'])
+      expect((await store.listSnippets(vault)).map((m) => m.id)).toEqual(['from obsidian'])
     })
   })
 
-  describe('saveRegistry / loadRegistry', () => {
-    it('saves and loads the registry', async () => {
-      const vaultId = 'vault-registry-test'
-      const registry: SnippetRegistryData = {
-        version: 1,
-        snippets: { 'dark-accent': { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' } },
+  describe('enabled snippets (appearance.json)', () => {
+    it('returns an empty list when appearance.json does not exist', async () => {
+      expect(await store.loadEnabledIds(vault)).toEqual([])
+    })
+
+    it('reads enabledCssSnippets written by Obsidian', async () => {
+      await fs.mkdir(path.dirname(appearancePath()), { recursive: true })
+      await fs.writeFile(appearancePath(), JSON.stringify({ enabledCssSnippets: ['a', 'b c'], cssTheme: 'Minimal' }))
+
+      expect(await store.loadEnabledIds(vault)).toEqual(['a', 'b c'])
+    })
+
+    it('saves enabledCssSnippets and keeps the other appearance fields', async () => {
+      await fs.mkdir(path.dirname(appearancePath()), { recursive: true })
+      await fs.writeFile(appearancePath(), JSON.stringify({ cssTheme: 'Minimal', baseFontSize: 18 }))
+
+      await store.saveEnabledIds(vault, ['dark-accent'])
+
+      expect(JSON.parse(await fs.readFile(appearancePath(), 'utf-8'))).toEqual({
+        cssTheme: 'Minimal',
+        baseFontSize: 18,
+        enabledCssSnippets: ['dark-accent'],
+      })
+    })
+
+    it('creates appearance.json when none exists', async () => {
+      await store.saveEnabledIds(vault, ['x'])
+
+      expect(JSON.parse(await fs.readFile(appearancePath(), 'utf-8'))).toEqual({ enabledCssSnippets: ['x'] })
+    })
+
+    it('never overwrites an appearance.json that is not valid JSON', async () => {
+      await fs.mkdir(path.dirname(appearancePath()), { recursive: true })
+      await fs.writeFile(appearancePath(), '{ broken')
+
+      await expect(store.saveEnabledIds(vault, ['x'])).rejects.toThrow(AppearanceFileInvalidError)
+      expect(await fs.readFile(appearancePath(), 'utf-8')).toBe('{ broken')
+      expect(await store.loadEnabledIds(vault)).toEqual([])
+    })
+
+    it('does not lose either update when two saves race on different fields', async () => {
+      await fs.mkdir(path.dirname(appearancePath()), { recursive: true })
+      await fs.writeFile(appearancePath(), JSON.stringify({ cssTheme: 'Minimal' }))
+
+      await Promise.all([store.saveEnabledIds(vault, ['a']), store.saveEnabledIds(vault, ['a', 'b'])])
+
+      const parsed = JSON.parse(await fs.readFile(appearancePath(), 'utf-8')) as Record<string, unknown>
+      expect(parsed['cssTheme']).toBe('Minimal')
+      expect(Array.isArray(parsed['enabledCssSnippets'])).toBe(true)
+    })
+  })
+
+  describe('shared appearance.json lock with the theme service', () => {
+    it('keeps both the active theme and the enabled snippets when they are changed at the same time', async () => {
+      const themes = new ThemeService()
+      await themes.saveTheme(vault, 'T', 'a {}')
+
+      for (let round = 0; round < 15; round += 1) {
+        await Promise.all([
+          themes.setActiveThemeId(vault, round % 2 === 0 ? 'T' : null),
+          store.saveEnabledIds(vault, [`s${round}`]),
+        ])
+        const parsed = JSON.parse(await fs.readFile(appearancePath(), 'utf-8')) as Record<string, unknown>
+        expect(parsed['enabledCssSnippets']).toEqual([`s${round}`])
+        expect(parsed['cssTheme']).toBe(round % 2 === 0 ? 'T' : '')
       }
-
-      await store.saveRegistry(vaultId, registry)
-
-      expect(await store.loadRegistry(vaultId)).toEqual(registry)
-    })
-
-    it('returns null when no registry exists', async () => {
-      expect(await store.loadRegistry('vault-no-registry')).toBeNull()
     })
   })
 
-  describe('mutateRegistry (AP9: concurrent registry updates must not lose either entry)', () => {
-    it('does not lose either snippet entry when two mutateRegistry calls race', async () => {
-      const vaultId = 'vault-registry-race'
+  describe('deleteSnippet', () => {
+    it('deletes the file and removes it from enabledCssSnippets', async () => {
+      await store.saveSnippet(vault, 'to-delete', 'a {}')
+      await store.saveSnippet(vault, 'keep', 'b {}')
+      await store.saveEnabledIds(vault, ['to-delete', 'keep'])
 
-      await Promise.all([
-        store.mutateRegistry(vaultId, (current) => ({
-          version: 1,
-          snippets: { ...(current?.snippets ?? {}), 'snippet-a': { enabled: true, updatedAt: '2026-01-01T00:00:00.000Z' } },
-        })),
-        store.mutateRegistry(vaultId, (current) => ({
-          version: 1,
-          snippets: { ...(current?.snippets ?? {}), 'snippet-b': { enabled: false, updatedAt: '2026-01-01T00:00:00.000Z' } },
-        })),
-      ])
+      await store.deleteSnippet(vault, 'to-delete')
 
-      const registry = await store.loadRegistry(vaultId)
-      expect(Object.keys(registry?.snippets ?? {}).sort()).toEqual(['snippet-a', 'snippet-b'])
-    })
-  })
-
-  describe('deleteAllForVault', () => {
-    it('removes all snippet files and the registry for a vault', async () => {
-      const vaultId = 'vault-delete-all-test'
-      await store.saveSnippet(vaultId, 'one', 'a {}')
-      await store.saveRegistry(vaultId, { version: 1, snippets: {} })
-
-      await store.deleteAllForVault(vaultId)
-
-      expect(await store.listSnippets(vaultId)).toEqual([])
-      expect(await store.loadRegistry(vaultId)).toBeNull()
+      expect(await store.loadSnippet(vault, 'to-delete')).toBeNull()
+      expect(await store.loadEnabledIds(vault)).toEqual(['keep'])
     })
 
-    it('does nothing when the vault has no snippet directory', async () => {
-      await expect(store.deleteAllForVault('vault-never-had-snippets')).resolves.toBeUndefined()
+    it('does nothing when the snippet does not exist', async () => {
+      await expect(store.deleteSnippet(vault, 'never-existed')).resolves.toBeUndefined()
+    })
+
+    it('still deletes the file when appearance.json is invalid, and leaves it untouched', async () => {
+      await store.saveSnippet(vault, 'gone', 'a {}')
+      await fs.writeFile(appearancePath(), '{ broken')
+
+      await store.deleteSnippet(vault, 'gone')
+
+      expect(await store.loadSnippet(vault, 'gone')).toBeNull()
+      expect(await fs.readFile(appearancePath(), 'utf-8')).toBe('{ broken')
     })
   })
 
   describe('vault isolation', () => {
     it('keeps snippets of the same id separate across vaults', async () => {
-      await store.saveSnippet('vault-a', 'shared-name', 'a { color: red; }')
-      await store.saveSnippet('vault-b', 'shared-name', 'a { color: blue; }')
+      const other = path.join(os.tmpdir(), `snippet-store-test-${crypto.randomBytes(8).toString('hex')}`)
+      await fs.mkdir(other, { recursive: true })
+      try {
+        await store.saveSnippet(vault, 'shared-name', 'a { color: red; }')
+        await store.saveSnippet(other, 'shared-name', 'a { color: blue; }')
 
-      expect(await store.loadSnippet('vault-a', 'shared-name')).toBe('a { color: red; }')
-      expect(await store.loadSnippet('vault-b', 'shared-name')).toBe('a { color: blue; }')
+        expect(await store.loadSnippet(vault, 'shared-name')).toBe('a { color: red; }')
+        expect(await store.loadSnippet(other, 'shared-name')).toBe('a { color: blue; }')
+      } finally {
+        await fs.rm(other, { recursive: true, force: true })
+      }
     })
+  })
+})
+
+describe('isValidSnippetFilename', () => {
+  it.each(['dark.css', 'my snippet.css', 'Dark.v2.css', 'größe.css', 'a-b_c.css'])('accepts %s', (name) => {
+    expect(isValidSnippetFilename(name)).toBe(true)
+  })
+
+  it.each(['.hidden.css', 'a/b.css', 'a\\b.css', '50%.css', 'a:b.css', 'x.txt', '.css', '../x.css', 'a\u0000.css'])('rejects %j', (name) => {
+    expect(isValidSnippetFilename(name)).toBe(false)
   })
 })

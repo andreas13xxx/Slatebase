@@ -18,8 +18,9 @@ Ist-Stand in Slatebase (Analyse 2026-10-17, siehe Chat-Verlauf):
   Oberfläche liest `--bg-base`, `--bg-surface`, `--text-primary`, `--accent`, … (155 Tokens in
   `index.css`). Ein Theme, das `--background-primary` setzt, ändert die UI daher fast nicht.
 - CSS-Snippets (`backend/src/snippets/`, `SnippetInjector`, `SnippetLifecycle`) sind das Vorbild für die
-  Injection. Der Speicherort unterscheidet sich bewusst: Snippets liegen unter `backend/data/snippets/`,
-  Themes im Vault unter `.obsidian/themes/` (wie die Obsidian-Plugins, die `plugin-service.ts` dort liest).
+  Injection. Beide liegen im Vault: Snippets unter `.obsidian/snippets/`, Themes unter `.obsidian/themes/`
+  (zum Zeitpunkt dieser Analyse lagen Snippets noch unter `backend/data/snippets/`; sie wurden später in den
+  Vault verlegt).
 - Gemessen an Things (70 KB) und Minimal (267 KB): nur 10 bzw. 12 echte Variablen-Lücken.
 
 ## Ziel

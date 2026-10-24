@@ -1,11 +1,23 @@
-// Snippet Routes — Route module for CSS snippet management endpoints (CRUD)
+// Snippet Routes — CSS snippets stored in the vault's `.obsidian/snippets/` folder (CRUD + activation)
+//
+// Access levels come from vault-authorization-middleware.ts, not from this file: reads need
+// read access, every non-GET route falls through to the `write` default — snippets are vault
+// files and apply to everyone who opens the vault.
 
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import type { SessionContext } from '../auth/index.js'
+import type { IEventBus } from '../realtime/types.js'
 import type { ISnippetStore, SnippetRegistryData } from '../snippets/types.js'
+import { AppearanceFileInvalidError } from '../shared/appearance-file.js'
 import { SnippetTooLargeError } from '../snippets/errors.js'
-import { saveSnippetSchema, updateSnippetContentSchema, snippetRegistrySchema } from '../snippets/validation.js'
+import {
+  SNIPPET_ID_PATTERN,
+  saveSnippetSchema,
+  updateSnippetContentSchema,
+  snippetRegistrySchema,
+} from '../snippets/validation.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
@@ -38,7 +50,7 @@ const snippetIdParamSchema = z.object({
   snippetId: z.string()
     .min(1, 'snippetId must not be empty')
     .max(120, 'snippetId must not exceed 120 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid snippet ID: must contain only letters, digits, underscores, and hyphens'),
+    .regex(SNIPPET_ID_PATTERN, 'Invalid snippet ID: must not start with a dot or contain / \\ % : * ? " < > | or control characters'),
 })
 
 function validateVaultIdParam(c: Context, vaultId: string): Response | null {
@@ -72,7 +84,14 @@ export interface SnippetRouteDependencies {
   snippetStore: ISnippetStore
   accessControl: IVaultAccessControl
   vaultRegistry: IVaultRegistry
+  eventBus: IEventBus
   logger: ILogger
+}
+
+const APPEARANCE_PATH = '.obsidian/appearance.json'
+
+function snippetPath(snippetId: string): string {
+  return `.obsidian/snippets/${snippetId}.css`
 }
 
 // ─── Factory Function ────────────────────────────────────────────────────────
@@ -80,21 +99,53 @@ export interface SnippetRouteDependencies {
 /**
  * Creates Hono routes for CSS snippet management.
  * All routes are nested under /vaults/:vaultId/snippets.
- * Access control: same as vault files (owner + shared users with read access) —
- * mirrors pluginRoutes.ts's model of treating collaborators as trusted to
- * manage vault-scoped customization, not just content.
  */
 export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
-  const { snippetStore, logger } = deps
+  const { snippetStore, accessControl, vaultRegistry, eventBus, logger } = deps
   const app = new Hono()
+
+  function vaultPathOf(vaultId: string): string | null {
+    return vaultRegistry.findById(vaultId)?.storagePath ?? null
+  }
+
+  /** Tells other clients of the vault that a snippet file or the enabled list changed. */
+  async function publishChange(c: Context, path: string, action: 'saved' | 'deleted'): Promise<void> {
+    const session = c.get('session') as SessionContext | undefined
+    if (session === undefined) return
+    const vaultId = c.req.param('vaultId') as string
+    try {
+      eventBus.publish({
+        type: 'vault:change',
+        payload: { vaultId, action, path, userId: session.userId, username: session.username },
+        target: { kind: 'users', userIds: await accessControl.getUsersWithAccess(vaultId) },
+        excludeUserId: session.userId,
+      })
+    } catch (error) {
+      // Live refresh is best-effort; the write itself already succeeded.
+      logger.warn('Failed to publish snippet change event', {
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  /** Validates the vault id and resolves its storage path; returns the error response on failure. */
+  function resolveVault(c: Context): { vaultPath: string } | { error: Response } {
+    const vaultId = c.req.param('vaultId') as string
+    const vaultIdError = validateVaultIdParam(c, vaultId)
+    if (vaultIdError) return { error: vaultIdError }
+    const vaultPath = vaultPathOf(vaultId)
+    if (vaultPath === null) {
+      return { error: c.json(createApiError('VAULT_NOT_FOUND', `Vault not found: ${vaultId}`), 404) }
+    }
+    return { vaultPath }
+  }
 
   // ─── Registry Routes (BEFORE :snippetId to avoid "registry" being parsed as param) ───
 
   // PUT /registry — Save activation status for all snippets
   app.put('/registry', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
 
     let body: unknown
     try {
@@ -110,23 +161,38 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
       return c.json(createApiError('VALIDATION_ERROR', message), 400)
     }
 
+    const enabledIds = Object.entries(parsed.data.snippets)
+      .filter(([id, entry]) => entry.enabled && SNIPPET_ID_PATTERN.test(id))
+      .map(([id]) => id)
+
     try {
-      await snippetStore.saveRegistry(vaultId, parsed.data as SnippetRegistryData)
+      // Obsidian may list snippets Slatebase cannot address (names with ":" or "%"). The client
+      // never sees them as snippets, so they are carried over instead of silently switched off.
+      const unaddressable = (await snippetStore.loadEnabledIds(vault.vaultPath)).filter((id) => !SNIPPET_ID_PATTERN.test(id))
+      await snippetStore.saveEnabledIds(vault.vaultPath, [...enabledIds, ...unaddressable])
+      await publishChange(c, APPEARANCE_PATH, 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handleSnippetError(c, error, logger)
     }
   })
 
-  // GET /registry — Load activation status for all snippets
+  // GET /registry — Load activation status (enabled snippets only; absent means disabled)
   app.get('/registry', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
 
     try {
-      const registry = await snippetStore.loadRegistry(vaultId)
-      return c.json(registry ?? { version: 1, snippets: {} }, 200)
+      const [enabledIds, snippets] = await Promise.all([
+        snippetStore.loadEnabledIds(vault.vaultPath),
+        snippetStore.listSnippets(vault.vaultPath),
+      ])
+      const updatedAtById = new Map(snippets.map((meta) => [meta.id, meta.updatedAt]))
+      const registry: SnippetRegistryData = { version: 1, snippets: {} }
+      for (const id of enabledIds) {
+        registry.snippets[id] = { enabled: true, updatedAt: updatedAtById.get(id) ?? '' }
+      }
+      return c.json(registry, 200)
     } catch (error) {
       return handleSnippetError(c, error, logger)
     }
@@ -136,12 +202,11 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
   // GET / — List snippets
   app.get('/', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
 
     try {
-      const snippets = await snippetStore.listSnippets(vaultId)
+      const snippets = await snippetStore.listSnippets(vault.vaultPath)
       return c.json({ snippets }, 200)
     } catch (error) {
       return handleSnippetError(c, error, logger)
@@ -150,9 +215,8 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
   // POST / — Create or upload a snippet (Requirement 8.2, 8.3, 8.4)
   app.post('/', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
 
     let body: unknown
     try {
@@ -172,13 +236,14 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     const snippetId = idFromFilename(filename)
 
     try {
-      const existing = await snippetStore.loadSnippet(vaultId, snippetId)
+      const existing = await snippetStore.loadSnippet(vault.vaultPath, snippetId)
       if (existing !== null) {
         return c.json(createApiError('SNIPPET_ALREADY_EXISTS', `A snippet named "${filename}" already exists`), 409)
       }
 
-      await snippetStore.saveSnippet(vaultId, snippetId, content)
-      const [meta] = (await snippetStore.listSnippets(vaultId)).filter((m) => m.id === snippetId)
+      await snippetStore.saveSnippet(vault.vaultPath, snippetId, content)
+      const [meta] = (await snippetStore.listSnippets(vault.vaultPath)).filter((m) => m.id === snippetId)
+      await publishChange(c, snippetPath(snippetId), 'saved')
       return c.json(meta, 201)
     } catch (error) {
       return handleSnippetError(c, error, logger)
@@ -189,17 +254,16 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
   // GET /:snippetId — Load snippet content
   app.get('/:snippetId', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
     const snippetId = c.req.param('snippetId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
     const snippetIdError = validateSnippetIdParam(c, snippetId)
     if (snippetIdError) return snippetIdError
 
     try {
-      const content = await snippetStore.loadSnippet(vaultId, snippetId)
+      const content = await snippetStore.loadSnippet(vault.vaultPath, snippetId)
       if (content === null) {
-        return c.json(createApiError('SNIPPET_NOT_FOUND', `Snippet "${snippetId}" not found in vault "${vaultId}"`), 404)
+        return c.json(createApiError('SNIPPET_NOT_FOUND', `Snippet "${snippetId}" not found`), 404)
       }
       return new Response(content, {
         status: 200,
@@ -212,10 +276,9 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
 
   // PUT /:snippetId — Save (overwrite) snippet content (Requirement 8.5)
   app.put('/:snippetId', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
     const snippetId = c.req.param('snippetId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
     const snippetIdError = validateSnippetIdParam(c, snippetId)
     if (snippetIdError) return snippetIdError
 
@@ -234,38 +297,31 @@ export function createSnippetRoutes(deps: SnippetRouteDependencies): Hono {
     }
 
     try {
-      await snippetStore.saveSnippet(vaultId, snippetId, parsed.data.content)
+      await snippetStore.saveSnippet(vault.vaultPath, snippetId, parsed.data.content)
+      await publishChange(c, snippetPath(snippetId), 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handleSnippetError(c, error, logger)
     }
   })
 
-  // DELETE /:snippetId — Delete a snippet (also prunes its registry entry)
+  // DELETE /:snippetId — Delete a snippet (also removes it from the enabled list)
   app.delete('/:snippetId', async (c: Context): Promise<Response> => {
-    const vaultId = c.req.param('vaultId') as string
+    const vault = resolveVault(c)
+    if ('error' in vault) return vault.error
     const snippetId = c.req.param('snippetId') as string
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
     const snippetIdError = validateSnippetIdParam(c, snippetId)
     if (snippetIdError) return snippetIdError
 
     try {
-      const existing = await snippetStore.loadSnippet(vaultId, snippetId)
+      const existing = await snippetStore.loadSnippet(vault.vaultPath, snippetId)
       if (existing === null) {
-        return c.json(createApiError('SNIPPET_NOT_FOUND', `Snippet "${snippetId}" not found in vault "${vaultId}"`), 404)
+        return c.json(createApiError('SNIPPET_NOT_FOUND', `Snippet "${snippetId}" not found`), 404)
       }
 
-      await snippetStore.deleteSnippet(vaultId, snippetId)
-
-      await snippetStore.mutateRegistry(vaultId, (registry) => {
-        if (registry === null || !(snippetId in registry.snippets)) {
-          return registry ?? { version: 1, snippets: {} }
-        }
-        const { [snippetId]: _removed, ...rest } = registry.snippets
-        return { version: 1, snippets: rest }
-      })
-
+      await snippetStore.deleteSnippet(vault.vaultPath, snippetId)
+      await publishChange(c, snippetPath(snippetId), 'deleted')
+      await publishChange(c, APPEARANCE_PATH, 'saved')
       return c.body(null, 204)
     } catch (error) {
       return handleSnippetError(c, error, logger)
@@ -281,6 +337,9 @@ function handleSnippetError(c: Context, error: unknown, logger: ILogger): Respon
   if (error instanceof SnippetTooLargeError) {
     logger.warn('Snippet too large', { maxSize: error.maxSize, actualSize: error.actualSize })
     return c.json(createApiError('SNIPPET_TOO_LARGE', error.message), 413)
+  }
+  if (error instanceof AppearanceFileInvalidError) {
+    return c.json(createApiError('APPEARANCE_FILE_INVALID', error.message), 409)
   }
 
   logger.error('Unexpected error in snippet route', {

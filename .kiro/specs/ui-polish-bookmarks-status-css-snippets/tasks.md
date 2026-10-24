@@ -129,7 +129,7 @@ Implementierung dreier additiver UI-Verbesserungen: manuelle Sortierung/Kontextm
 
 - [x] 11. CSS-Snippets — Backend-Grundlagen
   - [x] 11.1 Implementiere `SnippetStore` (Backend)
-    - `backend/src/snippets/snippet-store.ts`, Speicherung unter `data/snippets/<vaultId>/<snippetId>.css` + `_registry.json`, atomare Writes
+    - `backend/src/snippets/snippet-store.ts`, Speicherung im Vault unter `.obsidian/snippets/<snippetId>.css`, Aktivierung in `enabledCssSnippets` der `.obsidian/appearance.json`, atomare Writes (ursprünglich `data/snippets/<vaultId>/` + `_registry.json`, später in den Vault verlegt; Migration in `legacy-migration.ts`)
     - _Requirements: 8.4, 9.3, 10.1, 10.2, 10.5_
 
   - [x] 11.2 Backend-Fehlerklassen und Validierungsschemas

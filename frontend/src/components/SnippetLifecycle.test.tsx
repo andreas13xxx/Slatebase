@@ -3,6 +3,7 @@ import { render, waitFor, fireEvent } from '@testing-library/react'
 import { useEffect } from 'react'
 import { AppProvider, useAppContext } from '../state'
 import { SnippetLifecycle } from './SnippetLifecycle'
+import { dispatchRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import type { IApiClient, SnippetMeta } from '../api'
 import type { VaultInfo } from '../types'
 
@@ -51,6 +52,38 @@ describe('SnippetLifecycle', () => {
     await waitFor(() => {
       expect(document.querySelector('style[data-snippet-id="dark-accent"]')).not.toBeNull()
     })
+  })
+
+  it('re-reads the snippets when the server reports a change in .obsidian/snippets', async () => {
+    const meta: SnippetMeta = { id: 'dark-accent', filename: 'dark-accent.css', size: 10, updatedAt: '2026-01-01T00:00:00.000Z' }
+    let css = 'body { color: red; }'
+    const apiClient = createMockApiClient({
+      listSnippets: vi.fn().mockResolvedValue({ snippets: [meta] }),
+      loadSnippetRegistry: vi.fn().mockResolvedValue({ version: 1, snippets: { 'dark-accent': { enabled: true, updatedAt: '' } } }),
+      loadSnippetContent: vi.fn().mockImplementation(async () => css),
+    })
+
+    render(
+      <AppProvider apiClient={apiClient}>
+        <VaultSwitcher vaults={[vaultA]} />
+        <SnippetLifecycle />
+      </AppProvider>
+    )
+    await waitFor(() => {
+      expect(document.querySelector('style[data-snippet-id="dark-accent"]')?.textContent).toBe('body { color: red; }')
+    })
+
+    css = 'body { color: blue; }'
+    dispatchRealtimeVaultChange({ vaultId: 'vault-a', action: 'saved', path: '.obsidian/snippets/dark-accent.css', userId: 'u', username: 'u' })
+    await waitFor(() => {
+      expect(document.querySelector('style[data-snippet-id="dark-accent"]')?.textContent).toBe('body { color: blue; }')
+    })
+
+    const calls = (apiClient.listSnippets as ReturnType<typeof vi.fn>).mock.calls.length
+    dispatchRealtimeVaultChange({ vaultId: 'vault-a', action: 'saved', path: 'notes/unrelated.md', userId: 'u', username: 'u' })
+    dispatchRealtimeVaultChange({ vaultId: 'vault-b', action: 'saved', path: '.obsidian/appearance.json', userId: 'u', username: 'u' })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect((apiClient.listSnippets as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls)
   })
 
   it('does not apply disabled snippets', async () => {

@@ -1,85 +1,100 @@
-// SnippetStore — Filesystem persistence for user CSS snippets, per vault.
-// Modeled on `plugin/installed-plugin-store.ts`'s atomic-write pattern.
+// SnippetStore — CSS snippets in the vault's `.obsidian/snippets/` folder, like Obsidian.
+// Activation lives in `enabledCssSnippets` of `.obsidian/appearance.json`.
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import type { ISnippetStore, SnippetMeta, SnippetRegistryData } from './types.js'
+import type { Stats } from 'node:fs'
+import type { ISnippetStore, SnippetMeta } from './types.js'
 import { SnippetTooLargeError } from './errors.js'
 import { isValidSnippetFilename, snippetIdFromFilename, MAX_SNIPPET_SIZE } from './validation.js'
+import { AppearanceFileInvalidError, readAppearance, withAppearanceLock, writeAppearance } from '../shared/appearance-file.js'
+import { isMissing, withRetry } from '../shared/fs-retry.js'
 import { isNodeError } from '../shared/fs-utils.js'
-import { KeyedJsonFileStore } from '../shared/json-file-store.js'
+import { validateFilePath } from '../vault/index.js'
+
+const SNIPPETS_DIR = '.obsidian/snippets'
+const ENABLED_KEY = 'enabledCssSnippets'
+
+/** Reads `enabledCssSnippets` from an appearance object; anything but an array of strings yields []. */
+function enabledIdsOf(appearance: Record<string, unknown> | null): string[] {
+  const value = appearance?.[ENABLED_KEY]
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
+}
 
 /**
- * Filesystem-based persistence for CSS snippets.
- * Stores snippets under `data/snippets/<vaultId>/<snippetId>.css`.
- * All writes are atomic (temp file → rename).
+ * Filesystem-based persistence for CSS snippets, stored in the vault itself at
+ * `<vault>/.obsidian/snippets/<id>.css`. All writes are atomic (temp file → rename).
+ *
+ * Symlinks are never followed: a snippet that is a link is treated as absent, so a
+ * link planted in a synced vault cannot expose files outside the vault.
  */
 export class SnippetStore implements ISnippetStore {
-  private readonly snippetsDir: string
-  private readonly registryStore: KeyedJsonFileStore<SnippetRegistryData | null>
-
-  constructor(dataDir: string) {
-    this.snippetsDir = path.join(dataDir, 'snippets')
-    this.registryStore = new KeyedJsonFileStore<SnippetRegistryData | null>(
-      (vaultId) => path.join(this.getVaultDir(vaultId), '_registry.json'),
-      null,
-    )
-  }
-
   /**
    * Saves (creates or overwrites) a snippet's CSS content atomically.
    * Validates the size before writing.
    */
-  async saveSnippet(vaultId: string, snippetId: string, content: string): Promise<void> {
+  async saveSnippet(vaultPath: string, snippetId: string, content: string): Promise<void> {
     const size = Buffer.byteLength(content, 'utf-8')
     if (size > MAX_SNIPPET_SIZE) {
       throw new SnippetTooLargeError(MAX_SNIPPET_SIZE, size)
     }
 
-    const dir = this.getVaultDir(vaultId)
-    await fs.mkdir(dir, { recursive: true })
-
-    const filePath = this.getSnippetPath(vaultId, snippetId)
+    const filePath = this.getSnippetPath(vaultPath, snippetId)
+    await fs.mkdir(path.dirname(filePath), { recursive: true })
     await this.atomicWrite(filePath, content)
   }
 
   /**
    * Loads a snippet's CSS content from disk.
-   * Returns null if it does not exist.
+   * Returns null if it does not exist (or is not a regular file).
    */
-  async loadSnippet(vaultId: string, snippetId: string): Promise<string | null> {
-    return this.readTextFile(this.getSnippetPath(vaultId, snippetId))
+  async loadSnippet(vaultPath: string, snippetId: string): Promise<string | null> {
+    const filePath = this.getSnippetPath(vaultPath, snippetId)
+    const stat = await this.lstatOrNull(filePath)
+    if (stat === null || !stat.isFile()) return null
+    return this.readTextFile(filePath)
   }
 
   /**
-   * Deletes a snippet. Does nothing if it does not exist.
+   * Deletes a snippet and removes it from `enabledCssSnippets`.
+   * Does nothing if it does not exist.
    */
-  async deleteSnippet(vaultId: string, snippetId: string): Promise<void> {
-    try {
-      await fs.unlink(this.getSnippetPath(vaultId, snippetId))
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return
+  async deleteSnippet(vaultPath: string, snippetId: string): Promise<void> {
+    const filePath = this.getSnippetPath(vaultPath, snippetId)
+    await withAppearanceLock(vaultPath, async () => {
+      try {
+        await withRetry(() => fs.unlink(filePath))
+      } catch (error: unknown) {
+        if (!isMissing(error)) throw error
       }
-      throw error
-    }
+
+      let current: Record<string, unknown> | null
+      try {
+        current = await readAppearance(vaultPath)
+      } catch (error: unknown) {
+        if (error instanceof AppearanceFileInvalidError) return // never touch a file we cannot parse
+        throw error
+      }
+      const enabled = enabledIdsOf(current)
+      if (current !== null && enabled.includes(snippetId)) {
+        await writeAppearance(vaultPath, { ...current, [ENABLED_KEY]: enabled.filter((id) => id !== snippetId) })
+      }
+    })
   }
 
   /**
-   * Lists metadata for all snippets in a vault by reading `.css` files in
-   * the vault's snippet directory.
+   * Lists metadata for all snippets in a vault by reading the `.css` files in
+   * `.obsidian/snippets/`. Files whose names Slatebase cannot address are skipped.
    */
-  async listSnippets(vaultId: string): Promise<SnippetMeta[]> {
-    const dir = this.getVaultDir(vaultId)
+  async listSnippets(vaultPath: string): Promise<SnippetMeta[]> {
+    const dir = validateFilePath(vaultPath, SNIPPETS_DIR)
 
     let entries: string[]
     try {
-      entries = await fs.readdir(dir)
+      entries = await withRetry(() => fs.readdir(dir))
     } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return []
-      }
+      if (isMissing(error)) return []
       throw error
     }
 
@@ -87,13 +102,13 @@ export class SnippetStore implements ISnippetStore {
     for (const filename of entries) {
       if (!isValidSnippetFilename(filename)) continue
 
-      const filePath = path.join(dir, filename)
-      let stat: Awaited<ReturnType<typeof fs.stat>>
+      let stat: Stats | null
       try {
-        stat = await fs.stat(filePath)
+        stat = await this.lstatOrNull(path.join(dir, filename))
       } catch {
         continue
       }
+      if (stat === null || !stat.isFile()) continue
 
       metas.push({
         id: snippetIdFromFilename(filename),
@@ -107,78 +122,53 @@ export class SnippetStore implements ISnippetStore {
   }
 
   /**
-   * Saves the snippet activation registry (_registry.json) atomically.
+   * Ids listed in `enabledCssSnippets`. An absent or unparsable appearance.json
+   * yields an empty list; I/O errors propagate.
    */
-  async saveRegistry(vaultId: string, registry: SnippetRegistryData): Promise<void> {
-    await this.registryStore.write(vaultId, registry)
-  }
-
-  /**
-   * Loads the snippet activation registry (_registry.json) from disk.
-   * Returns null if the file does not exist or cannot be parsed.
-   */
-  async loadRegistry(vaultId: string): Promise<SnippetRegistryData | null> {
-    return this.registryStore.read(vaultId)
-  }
-
-  /**
-   * Atomically read-modify-write the registry inside its per-vault mutex —
-   * e.g. deleting a snippet must remove its registry entry without racing a
-   * concurrent delete of a different snippet in the same vault (AP9).
-   */
-  async mutateRegistry(
-    vaultId: string,
-    fn: (current: SnippetRegistryData | null) => SnippetRegistryData,
-  ): Promise<SnippetRegistryData> {
-    // fn always returns a non-null SnippetRegistryData; the store's generic
-    // type is nullable only to represent "no registry file yet" on read.
-    return this.registryStore.mutate(vaultId, (current) => fn(current)) as Promise<SnippetRegistryData>
-  }
-
-  /**
-   * Deletes all snippet data for a vault (files + registry).
-   * Recursively removes the vault's snippet directory. Does nothing if it
-   * does not exist.
-   */
-  async deleteAllForVault(vaultId: string): Promise<void> {
-    const dir = this.getVaultDir(vaultId)
+  async loadEnabledIds(vaultPath: string): Promise<string[]> {
     try {
-      await fs.rm(dir, { recursive: true, force: true })
+      return enabledIdsOf(await readAppearance(vaultPath))
     } catch (error: unknown) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return
-      }
+      if (error instanceof AppearanceFileInvalidError) return []
       throw error
     }
   }
 
+  /**
+   * Replaces `enabledCssSnippets`, preserving all other appearance.json fields.
+   * @throws AppearanceFileInvalidError if the file exists but is not a JSON object.
+   */
+  async saveEnabledIds(vaultPath: string, ids: string[]): Promise<void> {
+    await withAppearanceLock(vaultPath, async () => {
+      const current = (await readAppearance(vaultPath)) ?? {}
+      await fs.mkdir(path.dirname(validateFilePath(vaultPath, '.obsidian/appearance.json')), { recursive: true })
+      await writeAppearance(vaultPath, { ...current, [ENABLED_KEY]: ids })
+    })
+  }
+
   // ─── Private Helpers ─────────────────────────────────────────────────────────
 
-  private getVaultDir(vaultId: string): string {
-    return path.join(this.snippetsDir, vaultId)
+  /** lstat that returns null for a missing path. Symlinks are reported as-is (never followed). */
+  private async lstatOrNull(filePath: string): Promise<Stats | null> {
+    try {
+      return await withRetry(() => fs.lstat(filePath))
+    } catch (error: unknown) {
+      if (isMissing(error)) return null
+      throw error
+    }
   }
 
   /**
-   * Returns the file path for a specific snippet.
-   * Validates the snippetId to prevent path traversal attacks.
-   * @throws Error if snippetId contains unsafe characters.
+   * Returns the file path for a specific snippet inside the vault.
+   * Validates the snippetId and confines the path to the vault.
+   * @throws Error if snippetId is not a valid snippet name.
    */
-  private getSnippetPath(vaultId: string, snippetId: string): string {
+  private getSnippetPath(vaultPath: string, snippetId: string): string {
     const filename = `${snippetId}.css`
     if (!isValidSnippetFilename(filename)) {
-      throw new Error(`Invalid snippet ID: "${snippetId}" — must match /^[a-zA-Z0-9_-]+$/`)
+      throw new Error(`Invalid snippet ID: "${snippetId}"`)
     }
-
-    const vaultDir = this.getVaultDir(vaultId)
-    const resolved = path.join(vaultDir, filename)
-    const expectedParent = vaultDir + path.sep
-
-    // Defense-in-depth: verify resolved path stays within the vault snippets directory
-    if (!resolved.startsWith(expectedParent)) {
-      throw new Error(`Path traversal detected for snippet ID: "${snippetId}"`)
-    }
-
-    return resolved
+    return validateFilePath(vaultPath, `${SNIPPETS_DIR}/${filename}`)
   }
 
   /**

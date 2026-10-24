@@ -14,7 +14,10 @@ import { SnippetEditorModal } from './SnippetEditorModal'
 import './SnippetManager.css'
 
 const MAX_SNIPPET_SIZE = 512 * 1024
-const FILENAME_BODY_PATTERN = /^[a-zA-Z0-9_-]+$/
+// Mirrors the backend's SNIPPET_ID_PATTERN: snippets live in Obsidian's .obsidian/snippets/,
+// where names with spaces or dots are normal.
+// eslint-disable-next-line no-control-regex -- control characters are rejected on purpose
+const FILENAME_BODY_PATTERN = /^(?!\.)[^\\/%:*?"<>|\u0000-\u001f]+$/
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -31,7 +34,7 @@ function validateSnippetName(rawName: string): string | null {
   const filename = toFilename(rawName)
   const body = filename.slice(0, -'.css'.length)
   if (!FILENAME_BODY_PATTERN.test(body)) {
-    return 'Nur Buchstaben, Zahlen, "_" und "-" erlaubt'
+    return 'Name darf nicht mit "." beginnen und keines der Zeichen / \\ % : * ? " < > | enthalten'
   }
   return null
 }
