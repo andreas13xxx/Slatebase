@@ -1049,6 +1049,16 @@
   min-width: 0;
 }
 
+/*
+ * Themes (e.g. AnuPpuccin) set `.nav-file-title-content { flex-grow: var(--x) }`
+ * with a variable only Style Settings defines. Unset, that resets grow to 0 and
+ * this wrapper's `flex: 1` (basis 0) collapses to zero width — names vanish.
+ */
+.tree-node-name-wrapper.nav-file-title-content,
+.tree-node-name-wrapper.nav-folder-title-content {
+  flex-grow: 1;
+}
+
 .tree-node-count {
   font-weight: 400;
   color: var(--sidebar-text);
