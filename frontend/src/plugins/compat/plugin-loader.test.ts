@@ -330,6 +330,25 @@ describe('PluginLoader', () => {
       expect(loader.getStatus('test-plugin')).toBe('deactivated');
     });
 
+    it('should log a late TypeError from the unloaded plugin as a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const manifest = createValidManifest();
+        await loader.loadPlugin('test-plugin', 'bundle', manifest);
+        await loader.activatePlugin('test-plugin');
+        await loader.deactivatePlugin('test-plugin');
+
+        const event = new Event('unhandledrejection', { cancelable: true }) as PromiseRejectionEvent;
+        Object.defineProperty(event, 'reason', { value: new TypeError('this.plugin is null') });
+        window.dispatchEvent(event);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(warn).toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('should be a no-op for unknown plugins', async () => {
       await loader.deactivatePlugin('unknown');
       // No error thrown

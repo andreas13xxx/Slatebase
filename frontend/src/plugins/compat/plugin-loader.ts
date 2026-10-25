@@ -378,10 +378,13 @@ export class PluginLoader implements IPluginLoader {
 
     // Remove from the shared plugins registry so a stale/unloaded instance
     // isn't returned by another plugin's `app.plugins.getPlugin(id)`.
-    (window as unknown as { app?: { plugins?: { unregisterPlugin?: (id: string) => void } } })
-      .app?.plugins?.unregisterPlugin?.(pluginId);
-
-    endUnloadWindow();
+    try {
+      (window as unknown as { app?: { plugins?: { unregisterPlugin?: (id: string) => void } } })
+        .app?.plugins?.unregisterPlugin?.(pluginId);
+    } finally {
+      // Always end the window, or a throw above would leave the listener swallowing app TypeErrors for good.
+      endUnloadWindow();
+    }
     record.status = 'deactivated';
     if (notifyStatusChange) {
       this.deps.onStatusChange(pluginId, 'deactivated');
