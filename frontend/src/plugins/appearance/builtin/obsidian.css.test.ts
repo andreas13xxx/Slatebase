@@ -148,4 +148,26 @@ describe('built-in Obsidian theme stylesheet', () => {
       }
     })
   })
+
+  describe('chrome (Phase 4)', () => {
+    it('floats the status bar bottom right like Obsidian', () => {
+      expect(css).toMatch(/\.status-bar \{[^}]*position: var\(--status-bar-position\)/)
+      expect(LIGHT.get('--status-bar-position')).toBe('fixed')
+      expect(LIGHT.get('--status-bar-radius')).toBe('8px 0 0 0')
+    })
+
+    it('rounds controls as squircles only where corner-shape is supported', () => {
+      const unguarded = css.replace(/@supports[^{]*\{[\s\S]*?\n\}\n/g, '')
+      expect(unguarded).not.toMatch(/(?<!-)corner-shape:/)
+      expect(css).toContain('@supports (corner-shape: superellipse(1.33))')
+      // Every variable the guarded rules read must exist, or `corner-shape: var(--x)` silently does nothing.
+      for (const name of css.match(/corner-shape: var\((--[\w-]+)\)/g) ?? []) {
+        expect(LIGHT.has(name.replace('corner-shape: var(', '').replace(')', ''))).toBe(true)
+      }
+    })
+
+    it('does not select Obsidian workspace classes (they have no effect in Slatebase)', () => {
+      expect(css).not.toMatch(/\.(workspace-[\w-]+|view-header|nav-file-title|side-dock-[\w-]+)\b/)
+    })
+  })
 })

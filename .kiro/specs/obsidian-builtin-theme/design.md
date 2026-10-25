@@ -95,3 +95,21 @@ Jede Phase ist für sich grün (Lint, `tsc`, betroffene Tests) und wird einzeln 
 - Slatebase-DOM weicht an manchen Stellen strukturell ab (z. B. getrennte Tab-Leiste und Editor-Kopfzeile). Phase 4 gleicht Optik und Maße an, baut aber nicht das DOM um.
 - Der Systemstack rendert pro Betriebssystem anders. Das ist Obsidians eigenes Verhalten.
 - Fehlende Messwerte (nicht geöffnete Menüs, Hover-Zustände, Plugin-Ansichten) werden aus den Variablen abgeleitet; Abweichungen zeigt der Screenshot-Vergleich am Ende von Phase 4.
+
+## 5. Ergebnis und Abweichungen
+
+Abgleich in einer isolierten Instanz (Hell und Dunkel, Notiz mit H1–H6, Callout, Zitat, Code, Tabelle, Einstellungen) gegen die
+Referenz-Screenshots aus Obsidian 1.14.5. Farben, Akzent, Überschriften, Tabelle, Callout, Zitat, Statusleiste und Einstellungsdialog stimmen
+in Aufbau und Optik überein.
+
+Bewusst oder unvermeidbar abweichend:
+
+- **Schätzwerte (nicht gemessen):** Einzug des Zitats (`--size-4-5`), Innenabstand des Codeblocks (`8px 12px`), Abstand zwischen Callout-Titel und
+  Inhalt (`--p-spacing`), Radius der Befehlspalette (`--radius-l`). Ein Messlauf mit offenem Zitat/Codeblock/Palette würde sie festlegen.
+- **Struktur:** Die Werkzeugleiste (Ribbon) steht in Slatebase rechts neben dem Dateibaum, in Obsidian links davon. Tab-Leiste und Pane-Kopf bleiben zwei
+  Zeilen; die Tab-Leiste ist auch bei einem einzelnen Tab sichtbar.
+- **Live Preview:** Überschriften haben keinen Block-Abstand (Zeilen-Dekorationen), dort wirkt nur die Typografie.
+- **Schrift:** Der Systemstack ist plattformabhängig (macOS: SF, Linux: z. B. DejaVu Sans), wie in Obsidian. Dadurch ist der App-Name in der
+  Seitenleiste schmaler Fensterbreiten gekürzt.
+- **`--radius-xl`:** Obsidians Wert (24px) gilt jetzt auch für Slatebase-Elemente, die denselben Namen nutzen (Modals, Einstellungen); Menüs und
+  Tooltips bekommen ihre Radien aus den eigenen Variablen.

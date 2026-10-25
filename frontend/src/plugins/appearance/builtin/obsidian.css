@@ -161,6 +161,25 @@
   --clickable-icon-radius: var(--radius-m);
   --image-radius: var(--radius-s);
 
+  /* Corner shapes (1.14): squircles on controls, round on pills. Applied as `corner-shape` under @supports in the chrome section. */
+  --corner-shape: superellipse(1.33);
+  --button-corner-shape: superellipse(1.33);
+  --input-corner-shape: superellipse(1.33);
+  --menu-corner-shape: superellipse(1.33);
+  --tab-corner-shape: superellipse(1.33);
+  --tooltip-corner-shape: superellipse(1.33);
+  --notice-corner-shape: superellipse(1.33);
+  --embed-actions-corner-shape: superellipse(1.33);
+  --tab-switcher-preview-corner-shape: superellipse(1.33);
+  --metadata-property-corner-shape: superellipse(1.33);
+  --metadata-property-corner-shape-hover: superellipse(1.33);
+  --metadata-property-corner-shape-focus: superellipse(1.33);
+  --bases-cards-corner-shape: superellipse(1.33);
+  --bases-kanban-card-corner-shape: superellipse(1.33);
+  --search-input-corner-shape: round;
+  --tag-corner-shape: round;
+  --hotkey-corner-shape: round;
+
   /* Layers, motion */
   --layer-cover: 5;
   --layer-sidedock: 10;
@@ -959,6 +978,13 @@
 :root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h6 { letter-spacing: var(--h6-letter-spacing); }
 :root[data-obsidian-theme="builtin:obsidian"] .cm-lp-heading-marker { color: var(--heading-formatting); }
 
+/* The editor's syntax highlighting colors heading text with the accent through a nested span; Obsidian leaves headings in
+   the text color. The span has to inherit, the `#` marker keeps its own faded color. */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.cm-lp-h1, .cm-lp-h2, .cm-lp-h3, .cm-lp-h4, .cm-lp-h5, .cm-lp-h6) span:not(.cm-lp-heading-marker) {
+  color: inherit;
+  font-weight: inherit;
+}
+
 /* Reading view: text and layout */
 :root[data-obsidian-theme="builtin:obsidian"] .view-mode {
   max-width: var(--file-line-width);
@@ -1009,6 +1035,10 @@
   padding-left: var(--size-4-5);
   color: var(--text-normal);
 }
+
+/* Quotes and callouts are not italic in Obsidian; the highlighting's nested spans carry the italic here. */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.cm-lp-blockquote, .cm-lp-callout),
+:root[data-obsidian-theme="builtin:obsidian"] :is(.cm-lp-blockquote, .cm-lp-callout) span:not(.cm-lp-italic) { font-style: var(--blockquote-font-style); }
 
 /* Code */
 :root[data-obsidian-theme="builtin:obsidian"] .cm-lp-inline-code,
@@ -1164,6 +1194,9 @@
 
 :root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-header svg { color: var(--slb-callout-color, var(--callout-default)); }
 
+/* Nested highlight spans inside the Live Preview callout title would keep their own color. */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout-header span { color: inherit; }
+
 :root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-body {
   padding: var(--p-spacing) 0 0;
   font-size: inherit;
@@ -1174,3 +1207,337 @@
 /* Highlights: Obsidian's translucent fills, no corner rounding */
 :root[data-obsidian-theme="builtin:obsidian"] .cm-lp-highlight,
 :root[data-obsidian-theme="builtin:obsidian"] .view-mode mark.hl-yellow { background: var(--highlight-background); }
+
+/* ─── Chrome (Phase 4) ──────────────────────────────────────────────────────
+   Only Slatebase's own classes are selected, never Obsidian's workspace classes (measured: they have no effect here, see
+   `.kiro/specs/obsidian-themes-structure/`). Dimensions come from the variables above, so the numbers live in one place.
+   Structure stays Slatebase's: the tab bar and the pane header are two rows, the status bar is the only element moved
+   (it floats bottom right, as in Obsidian). */
+
+/* Tab bar: tabs on the sidebar surface, the active one lifted to the editor surface */
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-row .nav-controls,
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar {
+  background: var(--tab-container-background);
+  border-bottom: 0;
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar {
+  min-height: var(--header-height);
+  padding: 0 var(--tab-container-padding-end) 0 var(--tab-container-padding-start);
+  gap: 2px;
+  align-items: flex-end;
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab {
+  height: calc(var(--header-height) - 6px);
+  padding: 0 var(--size-4-3);
+  max-width: var(--tab-max-width);
+  border-bottom: 0;
+  border-radius: var(--tab-radius);
+  font-size: var(--tab-font-size);
+  font-weight: var(--font-normal);
+  color: var(--tab-text-color-active);
+  background: var(--tab-background);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab:hover { background: var(--tab-inner-background-hover); color: var(--tab-text-color-focused); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab--active {
+  height: calc(var(--header-height) - 4px);
+  border-radius: var(--tab-radius-active);
+  background: var(--tab-background-active);
+  color: var(--tab-text-color-focused-active-current);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab--active:hover { background: var(--tab-background-active); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab--drag-over { border-left-color: var(--interactive-accent); }
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-close-btn,
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-mode-btn { border-radius: var(--radius-s); color: var(--icon-color); }
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-close-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+
+/* Pane header: back/forward, title, menu; 40px, no rule below, editor surface */
+:root[data-obsidian-theme="builtin:obsidian"] .editor-header-row {
+  min-height: var(--header-height);
+  background: var(--file-header-background);
+  border-bottom: var(--file-header-border);
+  padding: 0 var(--size-4-2);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .editor-header-row .nav-controls,
+:root[data-obsidian-theme="builtin:obsidian"] .editor-header-row .breadcrumb { background: transparent; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .breadcrumb {
+  padding: 0 var(--size-4-2);
+  font-size: var(--file-header-font-size);
+  font-weight: var(--file-header-font-weight);
+  color: var(--text-muted);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .nav-controls { gap: 0; padding: 0 var(--size-2-2); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .nav-controls-button {
+  width: 28px;
+  height: 24px;
+  border-radius: var(--clickable-icon-radius);
+  color: var(--icon-color);
+  opacity: var(--icon-opacity);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .nav-controls-button:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--icon-color-hover);
+  opacity: var(--icon-opacity-hover);
+}
+
+/* Ribbon (the icon column) */
+:root[data-obsidian-theme="builtin:obsidian"] .app-toolbar {
+  width: var(--ribbon-width);
+  padding: var(--ribbon-padding);
+  gap: 6px;
+  background: var(--ribbon-background);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .toolbar-btn {
+  width: 28px;
+  height: 24px;
+  border-radius: var(--clickable-icon-radius);
+  color: var(--icon-color);
+  opacity: var(--icon-opacity);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .toolbar-btn:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .toolbar-btn--active {
+  background: var(--background-modifier-hover);
+  color: var(--icon-color-hover);
+  opacity: var(--icon-opacity-hover);
+}
+
+/* The system font is wider than Inter; keep the logo row from truncating the app name. */
+:root[data-obsidian-theme="builtin:obsidian"] .app-sidebar-header { gap: var(--size-4-2); padding: 14px var(--size-4-3) 12px; }
+:root[data-obsidian-theme="builtin:obsidian"] .app-title { font-size: var(--font-ui-medium); letter-spacing: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .app-logo { gap: var(--size-4-2); }
+
+/* Sidebar and file tree: 8px-rounded rows, selection as a soft fill, no bold names */
+:root[data-obsidian-theme="builtin:obsidian"] .app-sidebar { background: var(--background-secondary); }
+:root[data-obsidian-theme="builtin:obsidian"] .app-sidebar-header { border-bottom: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .file-explorer { font-size: var(--nav-item-size); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-row,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-toggle,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file { border-radius: var(--nav-item-radius); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-toggle,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file {
+  padding-block: 4px;
+  padding-right: 8px;
+  font-size: var(--nav-item-size);
+  color: var(--nav-item-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-row:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file:hover { background: var(--nav-item-background-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-toggle:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file:hover { color: var(--nav-item-color-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file--selected {
+  background: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-name { font-weight: var(--font-normal); color: var(--nav-item-color); }
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-chevron { color: var(--nav-collapse-icon-color); opacity: 1; }
+
+/* Status bar: floats bottom right, rounded top-left corner, rules only on the open sides */
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar {
+  position: var(--status-bar-position);
+  right: 0;
+  bottom: 0;
+  z-index: var(--layer-status-bar);
+  height: auto;
+  padding: 4px 8px 4px 4px;
+  gap: 4px;
+  background: var(--status-bar-background);
+  border: 0 solid var(--status-bar-border-color);
+  border-width: var(--status-bar-border-width);
+  border-radius: var(--status-bar-radius);
+  font-size: var(--status-bar-font-size);
+  color: var(--status-bar-text-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar__left,
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar__right { gap: 4px; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar__item { padding: 3px 4px; border-radius: var(--radius-s); opacity: 1; }
+
+/* The panel toggles sit bottom right/left of the layout; lift the right one above the floating status bar. */
+:root[data-obsidian-theme="builtin:obsidian"] .right-panel-toggle { bottom: 44px; }
+
+/* Menus: context menu and user menu */
+:root[data-obsidian-theme="builtin:obsidian"] .context-menu,
+:root[data-obsidian-theme="builtin:obsidian"] .user-menu-dropdown {
+  padding: var(--menu-padding);
+  background: var(--menu-background);
+  border: var(--menu-border-width) solid var(--menu-border-color);
+  border-radius: var(--menu-radius);
+  box-shadow: var(--menu-shadow);
+  font-size: var(--font-ui-small);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .context-menu-btn { padding: 6px 8px; border-radius: var(--radius-s); }
+:root[data-obsidian-theme="builtin:obsidian"] .context-menu-btn:hover:not(.context-menu-btn--disabled) { background: var(--background-modifier-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .global-tooltip {
+  padding: var(--tooltip-padding);
+  border-radius: var(--tooltip-radius);
+  background: var(--tooltip-background);
+  color: var(--tooltip-color);
+  font-size: var(--tooltip-font-size);
+  line-height: var(--tooltip-line-height);
+  box-shadow: var(--tooltip-shadow);
+}
+
+/* Command palette (Obsidian's prompt) */
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette {
+  width: var(--prompt-width);
+  max-width: var(--prompt-max-width);
+  background: var(--prompt-background);
+  border: var(--prompt-border-width) solid var(--prompt-border-color);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-search { min-height: var(--prompt-input-height); }
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-item { border-radius: var(--radius-m); font-size: var(--font-ui-medium); }
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-item--selected { background: var(--background-modifier-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-item-shortcut {
+  padding: 2px 8px;
+  border-radius: var(--hotkey-radius);
+  background: var(--hotkey-background);
+  font-size: var(--hotkey-font-size);
+}
+
+/* Modals and the settings panel */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.confirm-modal, .dialog, .new-conversation-modal, .version-browser-modal, .vault-deletion-workflow-modal, .settings-panel) {
+  background: var(--modal-background);
+  border: var(--modal-border-width) solid var(--modal-border-color);
+  border-radius: var(--modal-radius);
+  box-shadow: var(--modal-shadow);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-panel-header { border-bottom: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .settings-panel-content { background: var(--settings-background); padding: var(--size-4-6) var(--size-4-8); }
+:root[data-obsidian-theme="builtin:obsidian"] .settings-panel-sidebar { background: var(--modal-sidebar-background); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__section-btn {
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-medium);
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__section-btn:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__section-btn[aria-current="page"] {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__category-heading {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-normal);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+/* Setting cards: soft fill, no outline, 12px radius, thin dividers between rows */
+:root[data-obsidian-theme="builtin:obsidian"] .setting-section {
+  padding: var(--setting-items-padding-y) var(--setting-items-padding-x);
+  background: var(--setting-items-background);
+  border: var(--setting-items-border-width) solid var(--setting-items-border-color);
+  border-radius: var(--setting-items-radius);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-section__title {
+  font-size: var(--setting-group-heading-size);
+  font-weight: var(--setting-group-heading-weight);
+  color: var(--setting-group-heading-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-section__description,
+:root[data-obsidian-theme="builtin:obsidian"] .setting-row__hint { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-row__label {
+  font-size: var(--setting-item-name-size);
+  font-weight: var(--setting-item-name-weight);
+  color: var(--setting-item-name-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-row__control input[type='checkbox'] { accent-color: var(--checkbox-color); }
+
+/* Buttons: borderless 8px pills, the call to action in the accent color */
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn,
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button,
+:root[data-obsidian-theme="builtin:obsidian"] .settings-save-btn {
+  padding: 4px var(--size-4-3);
+  border: 0;
+  border-radius: var(--button-radius);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--sm { padding: 2px var(--size-4-2); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--secondary,
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button {
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--secondary:hover:not(:disabled),
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button:hover { background: var(--interactive-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--primary,
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button.mod-cta,
+:root[data-obsidian-theme="builtin:obsidian"] .settings-save-btn:not(.settings-save-btn--secondary) {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--primary:hover:not(:disabled),
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button.mod-cta:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .settings-save-btn:not(.settings-save-btn--secondary):hover { background: var(--interactive-accent-hover); }
+
+/* Inputs */
+:root[data-obsidian-theme="builtin:obsidian"] .settings-field-input,
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-input,
+:root[data-obsidian-theme="builtin:obsidian"] .keybindings-input {
+  min-height: var(--input-height);
+  padding: var(--input-padding);
+  background: var(--background-modifier-form-field);
+  border: var(--input-border-width) solid var(--background-modifier-border);
+  border-radius: var(--input-radius);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-input { border: 0; background: transparent; font-size: var(--font-ui-medium); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-field-input:focus-visible,
+:root[data-obsidian-theme="builtin:obsidian"] .keybindings-input:focus-visible { border-color: var(--background-modifier-border-focus); }
+
+/* Obsidian 1.14 rounds controls as a squircle where the browser can draw one; elsewhere the plain radii above apply. */
+@supports (corner-shape: superellipse(1.33)) {
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.st-btn, .modal-button-container button, .settings-save-btn) { corner-shape: var(--button-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.settings-field-input, .keybindings-input) { corner-shape: var(--input-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.context-menu, .user-menu-dropdown) { corner-shape: var(--menu-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.tab-bar-tab) { corner-shape: var(--tab-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.global-tooltip) { corner-shape: var(--tooltip-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.confirm-modal, .dialog, .new-conversation-modal, .version-browser-modal, .vault-deletion-workflow-modal, .settings-panel, .command-palette, .setting-section) { corner-shape: var(--corner-shape); }
+}

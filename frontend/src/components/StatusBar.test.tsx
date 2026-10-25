@@ -127,6 +127,23 @@ describe('StatusBar', () => {
     }
   })
 
+  it('shows the label of a built-in theme without asking the server', () => {
+    themeInjector.applyBuiltin('builtin:obsidian')
+    const listThemes = vi.fn()
+    try {
+      render(
+        <AppProvider apiClient={{ listThemes } as unknown as IApiClient}>
+          <VaultSeeder vault={testVault} />
+          <StatusBar />
+        </AppProvider>
+      )
+      expect(document.querySelector('.status-bar__theme')).toHaveTextContent('Obsidian (Standard)')
+      expect(listThemes).not.toHaveBeenCalled()
+    } finally {
+      themeInjector.remove()
+    }
+  })
+
   it('keeps showing the theme id when the name cannot be loaded', async () => {
     themeInjector.apply('minimal', 'body {}')
     const listThemes = vi.fn().mockRejectedValue(new Error('offline'))

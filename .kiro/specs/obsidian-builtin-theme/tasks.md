@@ -25,9 +25,9 @@ Jede Phase: umsetzen → Lint, `tsc`, betroffene Tests → Review des Diffs → 
 - [x] 3.4 Tests: CSS-Gating, keine Obsidian-Marker-Klassen in App-CSS
 
 ## Phase 4 — Chrome
-- [ ] 4.1 Tab-Leiste und Pane-Kopf
-- [ ] 4.2 Seitenleiste, Ribbon, Dateibaum, Vault-Wechsler
-- [ ] 4.3 Statusleiste
-- [ ] 4.4 Befehlspalette, Modals, Menüs, Tooltips; Slatebases `--radius-xl` (jetzt 24px wie in Obsidian) bei Nutzern wie `.user-menu-dropdown`, `.login-card`, `.settings-panel` prüfen
-- [ ] 4.5 Einstellungen (Navigation, Karten, Toggles, Buttons, Inputs)
-- [ ] 4.6 Doku (README, Benutzerhandbuch), Abgleich mit den Referenz-Screenshots
+- [x] 4.1 Tab-Leiste und Pane-Kopf
+- [x] 4.2 Seitenleiste, Ribbon, Dateibaum, Vault-Wechsler
+- [x] 4.3 Statusleiste
+- [x] 4.4 Befehlspalette, Modals, Menüs, Tooltips; Slatebases `--radius-xl` (jetzt 24px wie in Obsidian) bei Nutzern wie `.user-menu-dropdown`, `.login-card`, `.settings-panel` prüfen
+- [x] 4.5 Einstellungen (Navigation, Karten, Toggles, Buttons, Inputs)
+- [x] 4.6 Doku (README, Willkommens-Vault „Themes"), Abgleich mit den Referenz-Screenshots in einer isolierten Instanz (Hell und Dunkel); Statusleiste zeigt den Namen des eingebauten Themes
