@@ -20,7 +20,7 @@ Stell es dir als gespeicherte, strukturierte Ansicht über deine Notizen vor —
 | **`filters`** | Welche Notizen erscheinen — als Ausdruck, kombinierbar mit `and` / `or` / `not` |
 | **`properties`** | Anzeigenamen der Spalten |
 | **`formulas`** | Berechnete Spalten (schreibgeschützt), z. B. Tage bis zur Deadline |
-| **`views`** | Eine oder mehrere benannte Ansichten: **Tabelle** oder **Karten** (Kanban), je mit eigener Spaltenreihenfolge, Sortierung, Filter und `limit` |
+| **`views`** | Eine oder mehrere benannte Ansichten: **Tabelle**, **Karten** (Kanban), **Liste** oder **Karte** (Map), je mit eigener Spaltenreihenfolge, Sortierung, Filter und `limit` |
 | **`summaries`** | Zusammenfassungen je Spalte (Summe, Anzahl, Durchschnitt, Min/Max …) — unter der Tabelle bzw. im Kanban-Kopf |
 
 ---
@@ -121,13 +121,15 @@ Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Date
 
 ---
 
-## Ansichten: Tabelle und Karten (Kanban)
+## Ansichten: Tabelle, Karten, Liste und Karte
 
 Eine Base kann mehrere Ansichten enthalten; oben erscheint dann ein Umschalter.
 
 - **Tabelle** — eine Zeile pro Notiz, editierbare Zellen.
 - **Karten (Kanban)** — Notizen nach einer Property in Spalten gruppiert. Jeder Wert wird eine Spalte, Notizen ohne Wert landen in „Ohne …". Spalten sind einklappbar, ein Klick auf eine Karte öffnet die Notiz.
   **Ziehe eine Karte in eine andere Spalte**, um den Wert der Gruppierungs-Property in der Notiz zu ändern; das Ziehen in „Ohne …" entfernt die Property. (Nur mit Schreibrecht auf den Vault.)
+- **Liste** (`type: list`) — eine einfache, schreibgeschützte Liste mit einem Eintrag pro Notiz, ohne Gruppierung. Formelspalten werden ausgewertet, Zusammenfassungen erscheinen als Leiste über der Liste.
+- **Karte** (`type: map`) — Notizen mit Geokoordinaten als Pins auf einer Karte; ein Klick auf einen Pin öffnet die Notiz. Die Koordinate liest Slatebase aus der Ansichts-Option `coordinates` (oder `location`) als Property mit `"Breite,Länge"` oder aus zwei Zahl-Properties `latProperty` und `lngProperty` (auch `lat`/`lng`/`longitude`). Notizen ohne lesbare Koordinate erscheinen nicht, ein Zähler nennt ihre Anzahl. Die Kartenkacheln kommen von einem Server, den der Betreiber festlegt (`SLATEBASE_MAP_TILE_URL`); ohne ihn zeigt die Ansicht nur einen Hinweis, dass sie nicht aktiv ist.
 
 ```yaml
 views:
@@ -173,7 +175,7 @@ Damit du nicht überrascht wirst:
 - Der Index liefert jede Property als Liste. Eine Property, die in deinem Vault **irgendwo mehrere Werte** hat — oder in der Property-Typ-Registry als Liste/Tags deklariert ist — wird auch mit nur einem Wert als Liste behandelt. Nur bei einer Property, die nirgends als Liste auftaucht und nicht so deklariert ist, wird eine Ein-Element-Liste wie ein Einzelwert gelesen.
 
 **Ansichten und Einbettung**
-- Eingebaut sind **Tabelle** und **Karten**; andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
+- Eingebaut sind **Tabelle**, **Karten**, **Liste** und **Karte** (Map); andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
 - Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützte Tabelle). Eingebettet zeigt sie nur die erste Ansicht, und zwar als Tabelle.
 
 **KI-Zugriff über MCP**
