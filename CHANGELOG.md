@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.65.0](https://github.com/andreas13xxx/Slatebase/compare/v0.64.0...v0.65.0) (2026-10-25)
+
+
+### Features
+
+* **bases:** Inline-```base-Codeblöcke und bases:insert ([b601adc](https://github.com/andreas13xxx/Slatebase/commit/b601adcfbfd707ece9194892eb0e58044e00f633))
+* **bases:** Inline-```base-Codeblöcke und bases:insert ([6b9eec5](https://github.com/andreas13xxx/Slatebase/commit/6b9eec5b6fc3ae1e1b0a1c0745b477575c7bb4cd))
+* **plugin-compat:** HTMLElement.onNodeInserted implementieren ([3eb48ea](https://github.com/andreas13xxx/Slatebase/commit/3eb48eadd7c75de1484cacbe081eec8dad0f19db))
+* **plugins:** Aktivieren nach Installation und eigener Import-Tab ([b4446d8](https://github.com/andreas13xxx/Slatebase/commit/b4446d818f576c7fe737206a3ad2db2cfc66bc7a))
+* **plugins:** Aktivieren nach Installation und eigener Import-Tab ([8d8353e](https://github.com/andreas13xxx/Slatebase/commit/8d8353ea3a9d1496354fc5eeffb2071a3455ff2d))
+* **theme-store:** Download-Zahlen anzeigen und danach sortieren ([47b4651](https://github.com/andreas13xxx/Slatebase/commit/47b46516522d473f8d7fb5d06816dd9079e1a40b))
+* **themes:** Download-Zahlen im Store, Import-Reiter, Style-Settings-Hinweis ([8385ee3](https://github.com/andreas13xxx/Slatebase/commit/8385ee34792307528810831115fe14beda58408b))
+* **themes:** Import als eigener Reiter, Style-Settings-Hinweis nur einmal ([8e296fe](https://github.com/andreas13xxx/Slatebase/commit/8e296fe16cc20cce76fcbc724c988da7cfa6439b))
+* **themes:** Import als eigener Reiter, Style-Settings-Hinweis nur einmal ([7f16c8a](https://github.com/andreas13xxx/Slatebase/commit/7f16c8adbff1388dfee2a585ee39077fd0717e71))
+* **themes:** Import als eigener Reiter; fix(git-sync): Plugin-data.json synchronisieren ([dd442c0](https://github.com/andreas13xxx/Slatebase/commit/dd442c0905dc6aa96ac112d0c8c7e162673f3813))
+
+
+### Bugfixes
+
+* **git-sync:** Plugin-data.json mit synchronisieren ([73335b5](https://github.com/andreas13xxx/Slatebase/commit/73335b5b8b56366b22fcf8bf4da08f1b7289a2ea))
+* **git-sync:** Plugin-data.json mit synchronisieren ([fcf5921](https://github.com/andreas13xxx/Slatebase/commit/fcf5921fd1ebc48976210a55b44844d1bc82e112))
+* **plugin-compat:** Überschriftsfarben folgen --text-normal ([2ed95e0](https://github.com/andreas13xxx/Slatebase/commit/2ed95e02763f5d78f71764c5fadc8a9047cf0db1))
+* **plugin-compat:** Überschriftsfarben folgen --text-normal statt fester Hex-Werte ([b5cbcdb](https://github.com/andreas13xxx/Slatebase/commit/b5cbcdb6efe7949d3d0e590fa18258b11321b01a))
+* **theme-store:** Review-Befunde zu den Download-Zahlen ([5ddf94e](https://github.com/andreas13xxx/Slatebase/commit/5ddf94eec4dd05ba81978a27bff5d096b86601b8))
+* **themes:** Review-Befunde zu Import-Reiter und Einstellungs-Symbol ([20cc1e2](https://github.com/andreas13xxx/Slatebase/commit/20cc1e2d30195465b647e7218b54a7d54a70a2c1))
+* **themes:** Review-Befunde zu Import-Reiter und Einstellungs-Symbol ([2960f86](https://github.com/andreas13xxx/Slatebase/commit/2960f861db3ded1200510ecaad2f6a1d61e0a9c7))
+
+
+### Sonstige Änderungen
+
+* **bases:** veraltete Aussagen zu Limits, Ansichten und bases:add-item korrigiert ([0b4e7a2](https://github.com/andreas13xxx/Slatebase/commit/0b4e7a20d0ab15d8370b887f256ee1b2f6aa3769))
+* **bases:** veraltete Aussagen zu Limits, Ansichten und bases:add-item korrigiert ([86368dc](https://github.com/andreas13xxx/Slatebase/commit/86368dcaef96a05fc0588d6908b08f607c1f9aad))
+* Experimental-Hinweise entfernt ([3223434](https://github.com/andreas13xxx/Slatebase/commit/32234342a30b010eb8410ed80cf4d5ba9ee8db67))
+* Experimental-Hinweise für Plugins, Bases und Aktivitätszeitleiste entfernt ([e395eca](https://github.com/andreas13xxx/Slatebase/commit/e395ecaf520e295f0e5cc4c8b69ad4ae3de8d51d))
+* **explorer:** Dateibaum auf div-Struktur wie in Obsidian umbauen ([d1e5149](https://github.com/andreas13xxx/Slatebase/commit/d1e5149392cb3181f6fe242877b8923920e58017))
+* **explorer:** Dateibaum auf div-Struktur wie in Obsidian umbauen ([f7dfc91](https://github.com/andreas13xxx/Slatebase/commit/f7dfc916a2ebf5142a3df8293b05c9ae1f66ca1c))
+* **git-sync:** Plugin-data.json-Sync absichern, Specs angepasst ([a7cd06d](https://github.com/andreas13xxx/Slatebase/commit/a7cd06d8d8fc9280ca20e478bd53d8964510be6c))
+* **git-sync:** Plugin-data.json-Sync absichern, Specs angepasst ([c3ac884](https://github.com/andreas13xxx/Slatebase/commit/c3ac884255ffcdcbeade71121aa89f2e3fcff029))
+* **welcome-vault:** Kapitel zum Style Settings Plugin ([d8667d5](https://github.com/andreas13xxx/Slatebase/commit/d8667d5cb724e9dc20dba01dd6783bc446d51f58))
+* **welcome-vault:** Kapitel zum Style Settings Plugin ergänzt ([7b49e9d](https://github.com/andreas13xxx/Slatebase/commit/7b49e9d9fe55b35a49a51b3ec84f35d609a39e21))
+
 ## [0.64.0](https://github.com/andreas13xxx/Slatebase/compare/v0.63.1...v0.64.0) (2026-10-24)
 
 
