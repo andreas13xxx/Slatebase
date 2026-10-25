@@ -306,6 +306,108 @@ describe('PluginStoreBrowser', () => {
       })
     })
 
+    it('activates the plugin before notifying the parent when "activate after installation" is on', async () => {
+      const api = createMockApiClient()
+      const order: string[] = []
+      const onActivate = vi.fn().mockImplementation(async () => { order.push('activate') })
+      const onPluginInstalled = vi.fn().mockImplementation(() => { order.push('installed') })
+
+      render(
+        <PluginStoreBrowser
+          vaultId={vaultId}
+          apiClient={api}
+          onPluginInstalled={onPluginInstalled}
+          activateAfterInstall
+          onActivateAfterInstallChange={vi.fn()}
+          onActivate={onActivate}
+        />,
+      )
+
+      await waitFor(() => { expect(screen.getByText('Calendar')).toBeInTheDocument() })
+      fireEvent.click(screen.getAllByText('Installieren')[0]!)
+
+      await waitFor(() => { expect(onPluginInstalled).toHaveBeenCalledTimes(1) })
+      expect(onActivate).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'calendar' }))
+      expect(order).toEqual(['activate', 'installed'])
+    })
+
+    it('does not activate when "activate after installation" is off', async () => {
+      const api = createMockApiClient()
+      const onActivate = vi.fn()
+      const onPluginInstalled = vi.fn()
+
+      render(
+        <PluginStoreBrowser
+          vaultId={vaultId}
+          apiClient={api}
+          onPluginInstalled={onPluginInstalled}
+          activateAfterInstall={false}
+          onActivateAfterInstallChange={vi.fn()}
+          onActivate={onActivate}
+        />,
+      )
+
+      await waitFor(() => { expect(screen.getByText('Calendar')).toBeInTheDocument() })
+      fireEvent.click(screen.getAllByText('Installieren')[0]!)
+
+      await waitFor(() => { expect(onPluginInstalled).toHaveBeenCalledTimes(1) })
+      expect(onActivate).not.toHaveBeenCalled()
+    })
+
+    it('shows an error but still refreshes the parent when activation fails', async () => {
+      const api = createMockApiClient()
+      const onPluginInstalled = vi.fn()
+
+      render(
+        <PluginStoreBrowser
+          vaultId={vaultId}
+          apiClient={api}
+          onPluginInstalled={onPluginInstalled}
+          activateAfterInstall
+          onActivateAfterInstallChange={vi.fn()}
+          onActivate={vi.fn().mockRejectedValue(new Error('boom'))}
+        />,
+      )
+
+      await waitFor(() => { expect(screen.getByText('Calendar')).toBeInTheDocument() })
+      fireEvent.click(screen.getAllByText('Installieren')[0]!)
+
+      await waitFor(() => { expect(onPluginInstalled).toHaveBeenCalledTimes(1) })
+      expect(screen.getByText('boom')).toBeInTheDocument()
+    })
+
+    it('keeps the card in "installing" until activation has finished', async () => {
+      let finishActivation: () => void = () => {}
+      const onActivate = vi.fn().mockReturnValue(new Promise<void>((resolve) => { finishActivation = resolve }))
+
+      render(
+        <PluginStoreBrowser
+          vaultId={vaultId}
+          apiClient={createMockApiClient()}
+          activateAfterInstall
+          onActivateAfterInstallChange={vi.fn()}
+          onActivate={onActivate}
+        />,
+      )
+
+      await waitFor(() => { expect(screen.getByText('Calendar')).toBeInTheDocument() })
+      fireEvent.click(screen.getAllByText('Installieren')[0]!)
+      await waitFor(() => { expect(onActivate).toHaveBeenCalled() })
+      expect(screen.queryByText('Installiert')).toBeNull()
+
+      finishActivation()
+      await waitFor(() => { expect(screen.getByText('Installiert')).toBeInTheDocument() })
+    })
+
+    it('reports checkbox changes', async () => {
+      const onChange = vi.fn()
+      render(<PluginStoreBrowser vaultId={vaultId} apiClient={createMockApiClient()} onActivateAfterInstallChange={onChange} />)
+
+      const box = await screen.findByLabelText('Nach der Installation aktivieren')
+      fireEvent.click(box)
+      expect(onChange).toHaveBeenCalledWith(true)
+    })
+
     it('does not call onPluginInstalled when install fails', async () => {
       const api = createMockApiClient({
         installFromStore: vi.fn().mockRejectedValue({ code: 'INSTALL_FAILED', message: 'Download failed' }),
