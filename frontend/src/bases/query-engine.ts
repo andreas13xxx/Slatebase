@@ -53,9 +53,14 @@ export async function runBaseQuery(
   view: BaseView,
   hostPath?: string,
 ): Promise<{ rows: BaseRow[]; total: number; truncated: boolean }> {
+  if (hostPath === undefined) {
+    // No host: the plain single query, with no extra async hops.
+    const result = await apiClient.queryBase(vaultId, buildQuerySpec(doc, view))
+    return filterRows(result.rows, doc, view, result.truncated, result.listKeys)
+  }
   const [result, thisRow] = await Promise.all([
     apiClient.queryBase(vaultId, buildQuerySpec(doc, view)),
-    hostPath === undefined ? Promise.resolve(undefined) : fetchHostRow(apiClient, vaultId, doc, view, hostPath),
+    fetchHostRow(apiClient, vaultId, doc, view, hostPath),
   ])
   return filterRows(result.rows, doc, view, result.truncated, result.listKeys, thisRow)
 }
