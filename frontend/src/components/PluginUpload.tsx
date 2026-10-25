@@ -14,6 +14,12 @@ export interface PluginUploadProps {
   vaultId: string
   /** Callback invoked after successful upload to refresh the plugin list. */
   onPluginInstalled?: (result: PluginInstallResult) => void
+  /** Whether the uploaded plugin is activated right away. The checkbox shows when `onActivateAfterInstallChange` is given. */
+  activateAfterInstall?: boolean
+  /** Called when the "activate after installation" checkbox changes. */
+  onActivateAfterInstallChange?: (value: boolean) => void
+  /** Activates the uploaded plugin; awaited before `onPluginInstalled`. Only called when `activateAfterInstall` is on. */
+  onActivate?: (result: PluginInstallResult) => Promise<void>
 }
 
 /**
@@ -22,7 +28,7 @@ export interface PluginUploadProps {
  * `.obsidian/plugins/` folder, where Obsidian keeps its plugins — plugins that are already
  * there (created by Obsidian or arrived through a sync) show up in the plugin list on their own.
  */
-export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUploadProps) {
+export function PluginUpload({ apiClient, vaultId, onPluginInstalled, activateAfterInstall = false, onActivateAfterInstallChange, onActivate }: PluginUploadProps) {
   const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -64,6 +70,13 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
     try {
       const result = await apiClient.uploadPlugin(vaultId, file)
       setUploadSuccess(result)
+      if (activateAfterInstall && onActivate) {
+        try {
+          await onActivate(result)
+        } catch (err: unknown) {
+          setUploadError(`Das Plugin wurde installiert, konnte aber nicht aktiviert werden: ${err instanceof Error ? err.message : 'Aktivierung fehlgeschlagen'}`)
+        }
+      }
       onPluginInstalled?.(result)
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
@@ -75,7 +88,7 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
       // Reset file input so the same file can be selected again
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }, [apiClient, vaultId, onPluginInstalled])
+  }, [apiClient, vaultId, onPluginInstalled, activateAfterInstall, onActivate])
 
   return (
     <div className="plugin-upload">
@@ -110,6 +123,17 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
           </p>
         </div>
 
+        {onActivateAfterInstallChange && (
+          <label className="plugin-upload__activate">
+            <input
+              type="checkbox"
+              checked={activateAfterInstall}
+              onChange={(e) => onActivateAfterInstallChange(e.target.checked)}
+            />
+            {t('pluginStore.activateAfterInstall')}
+          </label>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -128,6 +152,14 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled }: PluginUp
               {uploadSuccess.isUpgrade ? 'Plugin aktualisiert' : 'Plugin installiert'}:{' '}
               <strong>{uploadSuccess.manifest.name}</strong> v{uploadSuccess.manifest.version}
             </span>
+          </div>
+        )}
+
+        {/* A running plugin keeps its old bundle until the page is reloaded */}
+        {uploadSuccess?.isUpgrade && (
+          <div className="plugin-upload__message plugin-upload__message--warning">
+            <AlertTriangle size={14} />
+            <span>Läuft das Plugin bereits, wird die neue Version erst nach einem Neuladen der Seite wirksam.</span>
           </div>
         )}
 

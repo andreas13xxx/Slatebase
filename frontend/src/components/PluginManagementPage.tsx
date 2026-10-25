@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useContext } from 'react'
 import { createPortal } from 'react-dom'
-import type { IApiClient, PluginManifest, PluginRegistryData } from '../api'
+import type { IApiClient, PluginInstallResult, PluginManifest, PluginRegistryData } from '../api'
 import { PluginUpload } from './PluginUpload'
 import { CompatibilityAnalyzer } from '../plugins/compat/compatibility-analyzer'
 import type { ApiCallClassification } from '../plugins/compat/compatibility-analyzer'
@@ -19,7 +19,7 @@ import { useVaultPluginChanges } from '../hooks/useVaultPluginChanges'
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Tab for plugin management page */
-type PluginTab = 'installed' | 'available'
+type PluginTab = 'installed' | 'available' | 'import'
 
 /** Plugin status types */
 type PluginStatus = 'active' | 'inactive' | 'error' | 'loading'
@@ -81,6 +81,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
   const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false)
   const [updatingPlugins, setUpdatingPlugins] = useState<Set<string>>(new Set())
   const [isUpdatingAll, setIsUpdatingAll] = useState(false)
+  const [activateAfterInstall, setActivateAfterInstall] = useState(false)
 
   const analyzerRef = useRef(new CompatibilityAnalyzer())
   const settingsContainerRef = useRef<HTMLDivElement>(null)
@@ -607,6 +608,28 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
   // ─── Render ────────────────────────────────────────────────────────────
 
+  /**
+   * Activates a plugin that was just installed. Bundles that use eval are refused here: they need the
+   * confirmation dialog on the installed list, so they stay inactive and the caller shows why.
+   */
+  async function activateInstalled(result: PluginInstallResult): Promise<void> {
+    if (result.warnings?.some((w) => w.includes('eval(') || w.includes('new Function('))) {
+      throw new Error('Das Plugin nutzt eval und wurde nicht automatisch aktiviert. Aktiviere es unter „Installierte Plugins“ nach Bestätigung der Warnung.')
+    }
+    if (!pluginContext) throw new Error('Plugin system is not ready')
+    await pluginContext.setPluginEnabled(result.pluginId, true)
+  }
+
+  const activationProps = {
+    activateAfterInstall,
+    onActivateAfterInstallChange: setActivateAfterInstall,
+    onActivate: activateInstalled,
+  }
+
+  const importTab = activeTab === 'import'
+    ? <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} {...activationProps} />
+    : null
+
   // Tab bar component (reused across states)
   const tabBar = (
     <div className="plugin-management-tabs">
@@ -621,6 +644,12 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         onClick={() => setActiveTab('available')}
       >
         {t('pluginStore.tabAvailable')}{updateCount > 0 && <span className="plugin-management-tab__badge">{updateCount}</span>}
+      </button>
+      <button
+        className={`plugin-management-tab ${activeTab === 'import' ? 'plugin-management-tab--active' : ''}`}
+        onClick={() => setActiveTab('import')}
+      >
+        {t('pluginStore.tabImport')}
       </button>
     </div>
   )
@@ -642,7 +671,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             <span>Plugins werden geladen…</span>
           </div>
         ) : (
-          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
+          importTab ?? <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} {...activationProps} />
         )}
       </div>
     )
@@ -672,7 +701,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             </button>
           </div>
         ) : (
-          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
+          importTab ?? <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} {...activationProps} />
         )}
       </div>
     )
@@ -691,7 +720,6 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         {tabBar}
         {activeTab === 'installed' ? (
           <>
-            <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
             <div className="plugin-management-empty">
               <Plug size={32} className="plugin-management-empty-icon" />
               <p className="plugin-management-empty-title">Keine Plugins installiert</p>
@@ -701,7 +729,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             </div>
           </>
         ) : (
-          <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
+          importTab ?? <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} {...activationProps} />
         )}
       </div>
     )
@@ -722,17 +750,6 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
       {activeTab === 'installed' ? (
         <>
-          <PluginUploadSection apiClient={apiClient} vaultId={vaultId} onPluginInstalled={() => void loadPlugins()} />
-
-          <div className="plugin-management-warning" role="status">
-            <AlertTriangle size={14} />
-            <span>
-              <strong>Experimentell:</strong> Die Plugin-Kompatibilitätsschicht befindet sich in aktiver Entwicklung.
-              Nur browser-kompatible Plugins können ausgeführt werden. Plugins die Node.js-Module benötigen
-              (z.B. IMAP, Git, Datenbank-Zugriff) werden erst mit serverseitiger Plugin-Ausführung unterstützt.
-            </span>
-          </div>
-
           <div className="plugin-management-update-actions">
             <button
               className="plugin-management-check-updates-button"
@@ -1047,7 +1064,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       />
         </>
       ) : (
-        <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} />
+        importTab ?? <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} {...activationProps} />
       )}
     </div>
   )
@@ -1060,17 +1077,21 @@ interface PluginUploadSectionProps {
   apiClient: IApiClient
   vaultId: string
   onPluginInstalled: () => void
+  activateAfterInstall: boolean
+  onActivateAfterInstallChange: (value: boolean) => void
+  onActivate: (result: PluginInstallResult) => Promise<void>
 }
 
 /**
  * Wraps PluginUpload with access to the API client.
  */
-function PluginUploadSection({ apiClient, vaultId, onPluginInstalled }: PluginUploadSectionProps) {
+function PluginUploadSection({ apiClient, vaultId, onPluginInstalled, ...activation }: PluginUploadSectionProps) {
   return (
     <PluginUpload
       apiClient={apiClient}
       vaultId={vaultId}
       onPluginInstalled={onPluginInstalled}
+      {...activation}
     />
   )
 }

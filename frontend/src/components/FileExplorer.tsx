@@ -1254,13 +1254,15 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         <>
           <nav className="file-explorer" aria-label="File explorer">
           {/* nav-files-container: real Obsidian has one vault, so this class
-              wraps its whole tree. Slatebase shows several vaults side by
-              side with no single equivalent root — closest fit is the
-              overall tree container, so snippets styling nav-files-container
-              (padding, etc.) still apply, even though there's no matching
-              mod-root folder underneath it (see tree-node-children--vault
-              below for where that vault's own top-level children live). */}
-          <ul className="file-explorer-tree nav-files-container" role="tree">
+              wraps its whole tree, and its top-level folders/files sit
+              directly inside one inner <div> (`.nav-files-container > div >
+              .nav-folder`, which themes such as AnuPpuccin's rainbow folders
+              select). Slatebase shows several vaults side by side: each
+              vault contributes a row <div> followed by one such group <div>
+              (tree-node-children--vault) holding its top-level nodes. The
+              row stays a sibling of the group, not inside it, so `:nth-child`
+              rainbow colours start at the vault's first folder. */}
+          <div className="file-explorer-tree nav-files-container" role="tree">
             {state.vaults.map((vault) => {
               const isExpanded = expandedVaults.has(vault.id)
               const isSelected = state.selectedVaultId === vault.id
@@ -1275,7 +1277,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                 && inlineInputState.vaultId === vault.id
 
               return (
-                <li key={vault.id} className="tree-node tree-node--vault">
+                <React.Fragment key={vault.id}>
+                <div className="tree-node tree-node--vault">
                   <div
                     className={`tree-node-row tree-node-row--vault${isSelected ? ' tree-node-row--vault-selected' : ''}${externalDropState.targetPath === '' && externalDropState.targetVaultId === vault.id ? ' tree-node--drop-target' : ''}`}
                     onContextMenu={(e) => handleVaultContextMenu(e, vault)}
@@ -1302,14 +1305,15 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                       {renderVaultBadges(vault)}
                     </button>
                   </div>
+                </div>
 
                   {/* Vault content (expanded) */}
                   {isExpanded && (
-                    <ul className="tree-node-children tree-node-children--vault tree-item-children nav-folder-children" role="group">
+                    <div className="tree-node-children tree-node-children--vault tree-item-children nav-folder-children" role="group">
                       {isLoading && (
-                        <li className="tree-node tree-node--loading">
+                        <div className="tree-node tree-node--loading">
                           <span className="tree-node-loading-text">{t('common.loading')}</span>
-                        </li>
+                        </div>
                       )}
                       {!isLoading && tree?.children && tree.children.length > 0 && (
                         tree.children
@@ -1341,12 +1345,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                         ))
                       )}
                       {!isLoading && tree && (!tree.children || tree.children.length === 0) && (
-                        <li className="tree-node tree-node--empty">
+                        <div className="tree-node tree-node--empty">
                           <span className="tree-node-empty-text">{t('vault.empty')}</span>
-                        </li>
+                        </div>
                       )}
                       {showRootNewFileInput && (
-                        <li className="tree-node tree-node--file">
+                        <div className="tree-node tree-node--file">
                           <div className="tree-node-row">
                             <InlineInput
                               initialValue=""
@@ -1362,14 +1366,14 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                               }}
                             />
                           </div>
-                        </li>
+                        </div>
                       )}
-                    </ul>
+                    </div>
                   )}
-                </li>
+                </React.Fragment>
               )
             })}
-          </ul>
+          </div>
         </nav>
         </>
       )}

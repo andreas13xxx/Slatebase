@@ -287,7 +287,7 @@ describe('FileExplorer', () => {
       expect(titleContent!.parentElement).toBe(titleButton)
     })
 
-    it('data-path resolves uniquely (the outer <li> carries data-node-path instead)', async () => {
+    it('data-path resolves uniquely (the outer row element carries data-node-path instead)', async () => {
       const user = userEvent.setup()
       const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
       renderFileExplorer(
@@ -296,15 +296,15 @@ describe('FileExplorer', () => {
       )
       await user.click(screen.getByText('Test Vault'))
 
-      const li = screen.getByText('Documents').closest('li.tree-node--directory')
+      const li = screen.getByText('Documents').closest('div.tree-node--directory')
       expect(li).not.toBeNull()
       expect(li).toHaveAttribute('data-node-path', 'Documents')
       expect(li).not.toHaveAttribute('data-path')
       // A bare `document.querySelector('[data-path="…"]')` (Iconize's actual
       // call) must resolve to exactly the title button, not also match an
-      // ancestor <li> — otherwise it'd hit the <li> first (document order)
+      // ancestor row element — otherwise it'd hit the row element first (document order)
       // and its insertBefore(iconEl, titleContentSpan) would throw, since
-      // titleContentSpan isn't a direct child of the <li>.
+      // titleContentSpan isn't a direct child of the row element.
       expect(document.querySelectorAll('[data-path="Documents"]')).toHaveLength(1)
     })
   })
@@ -326,7 +326,7 @@ describe('FileExplorer', () => {
       )
       await user.click(screen.getByText('Test Vault'))
 
-      const li = screen.getByText('Documents').closest('li.tree-node--directory')
+      const li = screen.getByText('Documents').closest('div.tree-node--directory')
       expect(li).toHaveClass('tree-item', 'nav-folder', 'is-collapsed')
 
       const titleButton = screen.getByText('Documents').closest('button')
@@ -345,7 +345,7 @@ describe('FileExplorer', () => {
       await user.click(screen.getByText('Test Vault'))
       await user.click(screen.getByText('Documents'))
 
-      const li = screen.getByText('Documents').closest('li.tree-node--directory')
+      const li = screen.getByText('Documents').closest('div.tree-node--directory')
       expect(li).toHaveClass('tree-item', 'nav-folder')
       expect(li).not.toHaveClass('is-collapsed')
       expect(li!.querySelector(':scope > .tree-item-children.nav-folder-children')).not.toBeNull()
@@ -360,7 +360,7 @@ describe('FileExplorer', () => {
       )
       await user.click(screen.getByText('Test Vault'))
 
-      const li = screen.getByText('readme').closest('li.tree-node--file')
+      const li = screen.getByText('readme').closest('div.tree-node--file')
       expect(li).toHaveClass('tree-item', 'nav-file')
 
       const titleButton = screen.getByText('readme').closest('button')
@@ -374,7 +374,24 @@ describe('FileExplorer', () => {
         { vaults: [testVault], vaultTrees: {}, vaultTreesLoading: new Set() },
         mockApiClient,
       )
-      expect(document.querySelector('ul.file-explorer-tree.nav-files-container')).not.toBeNull()
+      expect(document.querySelector('div.file-explorer-tree.nav-files-container')).not.toBeNull()
+    })
+
+    it('top-level folders and files sit directly in a <div> under nav-files-container (theme rainbow selectors)', async () => {
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({ fetchVaultTree: vi.fn().mockResolvedValue(sampleTree) })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set() },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+
+      // AnuPpuccin's rainbow folders select `.nav-files-container > div > .nav-folder`.
+      expect(document.querySelector('.nav-files-container > div > .nav-folder')).not.toBeNull()
+      expect(document.querySelector('.nav-files-container > div > .nav-file')).not.toBeNull()
+      // The vault row is not part of that group, so :nth-child starts at the first folder.
+      const group = document.querySelector('.nav-files-container > div.nav-folder-children')
+      expect(group?.firstElementChild).toHaveClass('nav-folder')
     })
 
     it('.tree-item-self is a direct child of .tree-item for both folders and files (no wrapper div between them)', async () => {
@@ -386,10 +403,10 @@ describe('FileExplorer', () => {
       )
       await user.click(screen.getByText('Test Vault'))
 
-      const folderLi = screen.getByText('Documents').closest('li.tree-item.nav-folder')
+      const folderLi = screen.getByText('Documents').closest('div.tree-item.nav-folder')
       expect(folderLi!.querySelector(':scope > .tree-item-self.nav-folder-title')).not.toBeNull()
 
-      const fileLi = screen.getByText('readme').closest('li.tree-item.nav-file')
+      const fileLi = screen.getByText('readme').closest('div.tree-item.nav-file')
       expect(fileLi!.querySelector(':scope > .tree-item-self.nav-file-title')).not.toBeNull()
     })
 
@@ -422,7 +439,7 @@ describe('FileExplorer', () => {
       )
       await user.click(screen.getByText('Test Vault'))
 
-      const folderLi = screen.getByText('Documents').closest('li.tree-item.nav-folder')!
+      const folderLi = screen.getByText('Documents').closest('div.tree-item.nav-folder')!
       expect(folderLi).not.toHaveClass('is-being-renamed')
 
       await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Documents') })
@@ -440,7 +457,7 @@ describe('FileExplorer', () => {
       )
       await user.click(screen.getByText('Test Vault'))
 
-      const fileLi = screen.getByText('readme').closest('li.tree-item.nav-file')!
+      const fileLi = screen.getByText('readme').closest('div.tree-item.nav-file')!
       expect(fileLi).not.toHaveClass('is-being-renamed')
 
       await user.pointer({ keys: '[MouseRight]', target: screen.getByText('readme') })

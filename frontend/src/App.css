@@ -5893,15 +5893,6 @@
 .plugin-management-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .plugin-management-btn--small { padding: 5px 10px; font-size: 12px; }
 
-/* Plugin management warning banner */
-.plugin-management-warning {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 16px; margin-bottom: 16px;
-  background: var(--warning-bg); border: 1px solid var(--warning-border);
-  border-radius: var(--radius-md); font-size: 12px; line-height: 1.6;
-  color: var(--warning);
-}
-.plugin-management-warning strong { font-weight: 600; }
 .plugin-management-btn--primary {
   background: var(--accent); color: #fff; border-color: var(--accent);
 }
@@ -6802,4 +6793,13 @@
     -webkit-touch-callout: none;
     user-select: none;
   }
+}
+
+.plugin-upload__activate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-normal);
 }

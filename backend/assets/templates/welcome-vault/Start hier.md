@@ -103,6 +103,7 @@ Für Power-User und spezielle Workflows:
 - [[Fortgeschritten/Plugins/Outliner|Plugin: Outliner]]
 - [[Fortgeschritten/Plugins/Paste URL into Selection|Plugin: Paste URL into Selection]]
 - [[Fortgeschritten/Plugins/Recent Files|Plugin: Recent Files]]
+- [[Fortgeschritten/Plugins/Style Settings|Plugin: Style Settings]]
 - [[Fortgeschritten/Plugins/Tasks|Plugin: Tasks]]
 - [[Fortgeschritten/Plugins/Templater|Plugin: Templater]]
 

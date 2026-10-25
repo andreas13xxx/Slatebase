@@ -103,7 +103,7 @@ export function TreeNode({
       && inlineInputState.vaultId === vaultId
 
     return (
-      <li
+      <div role="treeitem" aria-selected={false}
         className={`tree-node tree-node--directory tree-item nav-folder${isExpanded ? '' : ' is-collapsed'}${isRenaming ? ' is-being-renamed' : ''}`}
         data-node-path={node.path}
       >
@@ -118,16 +118,16 @@ export function TreeNode({
           which throws unless that title-content span is a *direct* child of
           the `[data-path]` element itself — hence both live on this <button>.
 
-          `tree-item`/`nav-folder` (on the <li>), `tree-item-self`/
+          `tree-item`/`nav-folder` (on the row element), `tree-item-self`/
           `is-clickable`, `tree-item-icon`/`collapse-icon`, `tree-item-inner`,
           and `tree-item-children`/`nav-folder-children` (below, on the
-          children <ul>) are added alongside Slatebase's own `tree-node-*`
+          children group element) are added alongside Slatebase's own `tree-node-*`
           classes so that Obsidian CSS snippets targeting the file explorer's
           real class names apply unmodified. They're additive only — no
           element is renamed, so Slatebase's own styling and the Iconize
           compat above are unaffected. `is-collapsed` mirrors real Obsidian's
-          collapse-state class on the <li> itself; `is-being-renamed` (also on
-          the <li>) mirrors its rename-state class — real Obsidian keeps
+          collapse-state class on the row element itself; `is-being-renamed` (also on
+          the row element) mirrors its rename-state class — real Obsidian keeps
           nav-folder-title present with content hidden during rename, while
           Slatebase swaps the title-content span for an InlineInput inside
           the same button, so `is-being-renamed` is the only reliable anchor
@@ -202,7 +202,7 @@ export function TreeNode({
           )}
         </button>
         {isExpanded && node.children && node.children.length > 0 && (
-          <ul className="tree-node-children tree-item-children nav-folder-children" role="group">
+          <div className="tree-node-children tree-item-children nav-folder-children" role="group">
             {node.children.map((child) => (
               <TreeNode
                 key={child.path}
@@ -228,11 +228,11 @@ export function TreeNode({
                 onToggleFavorite={onToggleFavorite}
               />
             ))}
-          </ul>
+          </div>
         )}
         {showNewFileInput && (
-          <ul className="tree-node-children tree-item-children nav-folder-children" role="group">
-            <li className="tree-node tree-node--file">
+          <div className="tree-node-children tree-item-children nav-folder-children" role="group">
+            <div className="tree-node tree-node--file">
               <div className="tree-node-row">
                 <InlineInput
                   initialValue=""
@@ -248,10 +248,10 @@ export function TreeNode({
                   }}
                 />
               </div>
-            </li>
-          </ul>
+            </div>
+          </div>
         )}
-      </li>
+      </div>
     )
   }
 
@@ -265,7 +265,7 @@ export function TreeNode({
   // branch only needs a plain wrapper, not the drag/drop props below.
   if (isRenaming) {
     return (
-      <li className="tree-node tree-node--file tree-item nav-file is-being-renamed" data-node-path={node.path}>
+      <div role="treeitem" aria-selected={false} className="tree-node tree-node--file tree-item nav-file is-being-renamed" data-node-path={node.path}>
         <div className="tree-node-row" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {React.createElement(FileIconComponent, { size: 13, className: fileIconClass, style: { flexShrink: 0 } })}
           <InlineInput
@@ -276,12 +276,12 @@ export function TreeNode({
             validate={(value) => validateFileName(value, 255)}
           />
         </div>
-      </li>
+      </div>
     )
   }
 
   return (
-    <li className="tree-node tree-node--file tree-item nav-file" data-node-path={node.path}>
+    <div role="treeitem" aria-selected={isSelected} className="tree-node tree-node--file tree-item nav-file" data-node-path={node.path}>
       {/*
         data-path/nav-file-title(-content): see the analogous comment on the
         directory branch's title button above, including why this button also
@@ -329,6 +329,6 @@ export function TreeNode({
           </span>
         </span>
       </button>
-    </li>
+    </div>
   )
 }

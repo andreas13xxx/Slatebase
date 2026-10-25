@@ -198,7 +198,7 @@ oversight — but it means:
 | 🌳 **File Explorer** | Navigate your vault's directory tree with context menus, drag & drop, and an optional "follow active file" auto-reveal |
 | 📝 **Markdown Editor** | CodeMirror 6 editor with Live Preview, auto-save, and keyboard shortcuts — formatting via Command Palette or an Obsidian toolbar plugin |
 | ✅ **Spellchecker** | Built in, with corrections — not the browser's. Unknown words are underlined; right-click offers suggestions, "add to dictionary", and "ignore for this session". German and English dictionaries, switchable per editor; German compounds are resolved by splitting |
-| 🎙️ **Voice Dictation** ⚠️ | Record in the browser and transcribe to text at the cursor via a self-hosted Whisper backend — multilingual, optional audio attachment. Experimental, off by default (`voice-transcription` toggle); the Whisper backend is operator-provided |
+| 🎙️ **Voice Dictation** | Record in the browser and transcribe to text at the cursor via a self-hosted Whisper backend — multilingual, optional audio attachment. Off by default (`voice-transcription` toggle); the Whisper backend is operator-provided |
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, collapsible headings, and colored `==highlights==` (yellow + 🔴🟠🟢🔵🟣, with `==` autocomplete) |
 | 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; split the editor into resizable panes (side-by-side or stacked, drag tabs between them); browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
@@ -212,7 +212,7 @@ oversight — but it means:
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |
 | 🕸️ **Knowledge Graph** | Interactive visualization of vault link structure with zoom, pan, drag, and search |
 | 📑 **Context Panel** | Right-side panel with document outline, forward/backlinks, unlinked mentions, tags, a footnotes list, and typed frontmatter properties — properties are also editable inline in the link hover preview |
-| 🧮 **Bases** ⚠️ | Real Obsidian `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (drag cards between columns), filters and formulas written in Obsidian's expression language (a pragmatic subset), inline cell editing, `![[x.base]]` embeds and inline ```` ```base ```` code blocks in notes (read-only table), and an MCP tool (`query_base`) to evaluate a base from AI clients. Limits: at most 1000 candidate notes per query, read-only unsortable formula columns, `summaries` not computed yet. Experimental, off by default (`bases` toggle) |
+| 🧮 **Bases** | Real Obsidian `.base` files as filterable, sortable, editable views over your notes' metadata — a table and a cards/Kanban board (drag cards between columns), filters and formulas written in Obsidian's expression language (a pragmatic subset), inline cell editing, `![[x.base]]` embeds and inline ```` ```base ```` code blocks in notes (read-only table), and an MCP tool (`query_base`) to evaluate a base from AI clients. Limits: at most 1000 candidate notes per query, read-only unsortable formula columns, `summaries` not computed yet. Off by default (`bases` toggle) |
 | 🔖 **Bookmarks** | Bookmark files, headings, blocks, or saved searches — reorder by drag and drop, rename, and bookmark all open tabs at once |
 | 📟 **Status Bar** | Clock, vault name, word/character count, and cursor position with click-to-"go to line" — each item toggleable |
 | 🖌️ **Obsidian Themes** | Obsidian themes read straight from the vault's `.obsidian/themes/` folder (the active one is Obsidian's `cssTheme` in `.obsidian/appearance.json`, so the choice applies to everyone using the vault and a vault brought over from Obsidian shows its themes without an import). Works for themes built on Obsidian CSS variables — colors, fonts, headings, line width, plus the editor's Obsidian classes (`mod-cm6`, `HyperMD-*`, `cm-inline-code`, …) so rules such as Minimal's tables and editor width apply. Themes that restyle Obsidian's own layout (tabs, sidebars, title bars) are only partly applied, and Options a theme offers through the Style Settings plugin work in part: the plugin runs here (variable-based options take full effect, class toggles only where Slatebase has the element — about 11 of 64 for Minimal), and the theme list hints at themes that have such options. A **community catalog** (Settings → Themes → Discover, about 900 themes from Obsidian's catalog) installs themes with one click and checks for updates on demand; the server fetches everything from `raw.githubusercontent.com`, the browser never contacts GitHub, and an admin can switch it off (feature `obsidian-theme-store`) |
@@ -221,7 +221,7 @@ oversight — but it means:
 | 📊 **Mermaid & LaTeX** | Mermaid code blocks as interactive SVG diagrams and KaTeX math (inline `$…$` and block `$$…$$`), both dark-mode aware |
 | 🗑️ **Trash & Versions** | Soft-delete with configurable retention plus a per-file version browser with inline diff |
 | 🖨️ **PDF Export** | "Export to PDF…" in the Command Palette prints the reading view through the browser's print dialog |
-| 🧩 **Plugin Compat** ⚠️ | Run browser-compatible Obsidian Community Plugins in the web UI |
+| 🧩 **Plugin Compat** | Run browser-compatible Obsidian Community Plugins in the web UI |
 | 🛒 **Plugin Store** | Browse the Obsidian community plugin list, install from GitHub releases, and keep plugins updated — all from Settings |
 | 📦 **Import & Export** | Import files/folders, export vaults as ZIP or to a local directory |
 | 🌐 **Real-time Updates** | SSE-based push for chat messages, vault changes, presence, and notifications |
@@ -231,7 +231,6 @@ oversight — but it means:
 | 🐳 **Docker Ready** | Pre-built multi-arch images (amd64 + arm64), runs as non-root user |
 | 📖 **Tutorial Vault** | Comprehensive welcome vault with 70+ guides (DE/EN), practice exercises, screenshots, and templates — auto-created for new users or on-demand via Settings/Command Palette |
 
-⚠️ = Experimental feature. Use with caution.
 
 ## Demo
 
@@ -394,7 +393,7 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | GET/PUT | `/vaults/:vaultId/property-types` | Per-vault property type registry |
 | PUT | `/vaults/:vaultId/property-types/:key` | Declare the type of one key |
 
-### Plugins ⚠️
+### Plugins
 
 | Method | Path | Description |
 |--------|------|-------------|

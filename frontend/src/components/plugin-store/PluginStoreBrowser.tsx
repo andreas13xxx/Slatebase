@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { IApiClient, CommunityPluginEntry, UpdateCheckResult, BulkUpdateResult, PluginManifest, PluginReleaseStats } from '../../api'
+import type { IApiClient, CommunityPluginEntry, UpdateCheckResult, BulkUpdateResult, PluginManifest, PluginReleaseStats, PluginInstallResult } from '../../api'
 import { useTranslation } from '../../i18n'
 import { extractErrorMessage } from '../../utils/error'
 import type { PluginStoreDisplayEntry, PluginStoreStatus, PluginStoreSortField, PluginStoreSortDirection } from './types'
@@ -25,6 +25,12 @@ export interface PluginStoreBrowserProps {
   apiClient: IApiClient
   /** Called after a plugin is successfully installed, updated, or bulk-updated, so the parent can refresh its own "installed" list. */
   onPluginInstalled?: () => void
+  /** Whether a freshly installed plugin is activated right away. Shows the checkbox when `onActivateAfterInstallChange` is given. */
+  activateAfterInstall?: boolean
+  /** Called when the "activate after installation" checkbox changes. */
+  onActivateAfterInstallChange?: (value: boolean) => void
+  /** Activates a freshly installed plugin; awaited before `onPluginInstalled`. Only called when `activateAfterInstall` is on. */
+  onActivate?: (result: PluginInstallResult) => Promise<void>
 }
 
 /**
@@ -38,7 +44,7 @@ export interface PluginStoreBrowserProps {
  * 5. Check for updates via apiClient.checkPluginUpdates(vaultId)
  * 6. Integrate PluginStoreSearch, PluginStoreCard, and UpdateBanner
  */
-export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: PluginStoreBrowserProps) {
+export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled, activateAfterInstall = false, onActivateAfterInstallChange, onActivate }: PluginStoreBrowserProps) {
   const { t } = useTranslation()
 
   // ─── State ──────────────────────────────────────────────────────────────────
@@ -238,13 +244,21 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
 
     try {
       const result = await apiClient.installFromStore(vaultId, pluginId, repo)
+      // The card keeps its "installing" state until activation is done, so it never reads "installed" while the plugin loads.
+      if (activateAfterInstall && onActivate) {
+        try {
+          await onActivate(result)
+        } catch (err: unknown) {
+          setPluginErrors(prev => new Map(prev).set(pluginId, extractErrorMessage(err, 'Aktivierung fehlgeschlagen')))
+        }
+      }
+      // Add to installed plugins list
+      setInstalledPlugins(prev => [...prev, result.manifest as PluginManifest])
       setInstallingPlugins(prev => {
         const next = new Set(prev)
         next.delete(pluginId)
         return next
       })
-      // Add to installed plugins list
-      setInstalledPlugins(prev => [...prev, result.manifest as PluginManifest])
       onPluginInstalled?.()
     } catch (err: unknown) {
       setInstallingPlugins(prev => {
@@ -258,7 +272,7 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
         return next
       })
     }
-  }, [apiClient, vaultId, onPluginInstalled])
+  }, [apiClient, vaultId, onPluginInstalled, activateAfterInstall, onActivate])
 
   const handleUpdate = useCallback(async (pluginId: string) => {
     setUpdatingPlugins(prev => new Set(prev).add(pluginId))
@@ -406,6 +420,17 @@ export function PluginStoreBrowser({ vaultId, apiClient, onPluginInstalled }: Pl
         sortDirection={sortDirection}
         onSortDirectionChange={setSortDirection}
       />
+
+      {onActivateAfterInstallChange && (
+        <label className="plugin-store-browser__activate">
+          <input
+            type="checkbox"
+            checked={activateAfterInstall}
+            onChange={(e) => onActivateAfterInstallChange(e.target.checked)}
+          />
+          {t('pluginStore.activateAfterInstall')}
+        </label>
+      )}
 
       <UpdateBanner
         updateCount={updateCount}
