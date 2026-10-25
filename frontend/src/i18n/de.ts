@@ -832,6 +832,8 @@ export const de = {
   pluginStore: {
     tabInstalled: 'Installierte Plugins',
     tabAvailable: 'Verfügbare Plugins',
+    tabImport: 'Importieren',
+    activateAfterInstall: 'Nach der Installation aktivieren',
     searchPlaceholder: 'Plugin suchen…',
     searchAriaLabel: 'Plugin-Store durchsuchen',
     filterCompatible: 'Kompatibel',

@@ -838,6 +838,8 @@ export const en: TranslationShape = {
   pluginStore: {
     tabInstalled: 'Installed Plugins',
     tabAvailable: 'Available Plugins',
+    tabImport: 'Import',
+    activateAfterInstall: 'Activate after installation',
     searchPlaceholder: 'Search plugins…',
     searchAriaLabel: 'Search plugin store',
     filterCompatible: 'Compatible',

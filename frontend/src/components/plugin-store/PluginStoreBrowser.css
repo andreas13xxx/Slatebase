@@ -531,3 +531,11 @@
   margin: 0.75em 0;
   color: var(--text-secondary);
 }
+
+.plugin-store-browser__activate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-normal);
+}
