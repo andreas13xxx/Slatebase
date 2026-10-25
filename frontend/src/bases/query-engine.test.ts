@@ -75,6 +75,87 @@ describe('buildQuerySpec', () => {
   })
 })
 
+describe('runBaseQuery — this (the host note)', () => {
+  const candidates = [
+    { path: 'a.md', fileName: 'a', values: { status: ['open'] }, links: ['Plan'] },
+    { path: 'b.md', fileName: 'b', values: { status: ['done'] }, links: ['Other'] },
+  ]
+  const host = { path: 'Projekte/Plan.md', fileName: 'Plan', values: { status: ['open'] }, folder: 'Projekte' }
+
+  /** A client that answers the host query (it carries a path filter) separately from the candidate query. */
+  function makeClient(hostRows: unknown[] = [host]) {
+    const queryBase = vi.fn().mockImplementation((_vault: string, spec: { filters?: { path?: string } }) =>
+      Promise.resolve({ rows: spec.filters?.path !== undefined ? hostRows : candidates, total: 2 }))
+    return { client: { queryBase } as unknown as IApiClient, queryBase }
+  }
+
+  it('filters candidates by a property of the host', async () => {
+    const { client } = makeClient()
+    const doc: BaseDocument = { filters: 'status == this.status', views: [] }
+
+    const { rows } = await runBaseQuery(client, 'v1', doc, { type: 'table' }, 'Projekte/Plan.md')
+
+    expect(rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('filters candidates that link to the host with file.hasLink(this.file)', async () => {
+    const { client } = makeClient()
+    const doc: BaseDocument = { filters: 'file.hasLink(this.file)', views: [] }
+
+    const { rows } = await runBaseQuery(client, 'v1', doc, { type: 'table' }, 'Projekte/Plan.md')
+
+    expect(rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+
+  it('asks for the host with its path and only the columns the base reads', async () => {
+    const { client, queryBase } = makeClient()
+    const doc: BaseDocument = { filters: 'status == this.status', views: [] }
+
+    await runBaseQuery(client, 'v1', doc, { type: 'table' }, 'Projekte/Plan.md')
+
+    expect(queryBase).toHaveBeenCalledWith('v1', expect.objectContaining({ columns: ['status'], filters: { path: 'Projekte/Plan.md' } }))
+  })
+
+  it('makes no host query when the base never reads this', async () => {
+    const { client, queryBase } = makeClient()
+
+    await runBaseQuery(client, 'v1', { filters: 'status == "open"', views: [] }, { type: 'table' }, 'Projekte/Plan.md')
+
+    expect(queryBase).toHaveBeenCalledTimes(1)
+  })
+
+  it('makes no host query without a host path, and this.* excludes every row', async () => {
+    const { client, queryBase } = makeClient()
+    const doc: BaseDocument = { filters: 'status == this.status', views: [] }
+
+    const { rows } = await runBaseQuery(client, 'v1', doc, { type: 'table' })
+
+    expect(queryBase).toHaveBeenCalledTimes(1)
+    expect(rows).toEqual([])
+  })
+
+  it('excludes every row when the host is not in the index', async () => {
+    const { client } = makeClient([])
+    const doc: BaseDocument = { filters: 'status == this.status', views: [] }
+
+    const { rows } = await runBaseQuery(client, 'v1', doc, { type: 'table' }, 'Projekte/Plan.md')
+
+    expect(rows).toEqual([])
+  })
+
+  it('takes only the row with the exact host path when the backend glob matched more', async () => {
+    const { client } = makeClient([
+      { path: 'Projekte/Plan.md', fileName: 'Plan', values: { status: ['open'] } },
+      { path: 'Projekte/Plan.md.bak', fileName: 'Plan.md', values: { status: ['done'] } },
+    ])
+    const doc: BaseDocument = { filters: 'status == this.status', views: [] }
+
+    const { rows } = await runBaseQuery(client, 'v1', doc, { type: 'table' }, 'Projekte/Plan.md')
+
+    expect(rows.map((r) => r.path)).toEqual(['a.md'])
+  })
+})
+
 describe('runBaseQuery (client-side filtering)', () => {
   function makeApiClient(rows: Array<{ path: string; fileName: string; values: Record<string, string[]>; folder?: string; tags?: string[] }>): IApiClient {
     return {

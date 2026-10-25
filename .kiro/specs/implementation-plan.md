@@ -193,7 +193,7 @@ Plugin-API `registerBasesView()`, MCP-Werkzeug `query_base`, Welcome-Vault-Guide
 mit konservativem Prädikat-Pushdown (Property-Gleichheit/`file.hasTag`/`file.inFolder` vor der
 Kappung) + sichtbarem `truncated`-Hinweis; Property-Typ Liste/Skalar (beobachtet + Registry);
 `summaries`-Aggregation (Tabelle, Kanban-Header, MCP); `file.size`/`file.backlinks`; `![[file.base]]`-Embed + `bases:add-item`; sortierbare Formelspalten (clientseitig); Welcome-Vault-
-Guides + Beispiele DE/EN erweitert. Danach: Inline-```` ```base ````-Codeblock in Notizen (Live Preview + Reading View), `bases:insert` fügt ihn ein.
+Guides + Beispiele DE/EN erweitert. Danach: Inline-```` ```base ````-Codeblock in Notizen (Live Preview + Reading View), `bases:insert` fügt ihn ein. Spec `bases-embed-this-and-views`: `![[x.base#Ansicht]]` (benannte Ansicht, unbekannter Name = sichtbarer Fehler) und `this` (einbettende Notiz) in Filtern/Formeln. Bewusst offen: echte `cards`/`list`/`map`-Ansichten in der Einbettung (nur Tabelle), Aktualisierung der Einbettung bei `vault:change`, `this` in Plugin-Ansichten und im MCP-Werkzeug.
 **Noch zurückgestellt:** Lambdas/`map`/`filter` in der Ausdruckssprache, custom `summaries`-Formeln
 über `values`, `file.embeds` (bräuchte getrennte Embed-Markierung im Index).
 Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).

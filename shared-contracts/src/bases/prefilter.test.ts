@@ -7,6 +7,30 @@
 import { describe, it, expect } from 'vitest'
 import { buildPrefilterNode, buildCombinedPrefilter } from './prefilter.js'
 
+describe('buildPrefilterNode — this.* (the host note) is never pushed', () => {
+  it.each([
+    'this == "x"',
+    'this.status == "done"',
+    '"done" == this.status',
+    'this.file.name == "Tasks"',
+    'this.note.status == "open"',
+    'status == this.status',
+    'file.inFolder(this.file.folder)',
+    'file.hasLink(this.file)',
+    'file.hasTag(this.tag)',
+  ])('pushes nothing for %s', (expression) => {
+    expect(buildPrefilterNode(expression)).toBeNull()
+  })
+
+  it('pushes only the provable part of a mixed AND', () => {
+    expect(buildPrefilterNode('file.hasTag("a") && status == this.status')).toEqual({ tag: 'a' })
+  })
+
+  it('pushes nothing for an OR with a this.* branch', () => {
+    expect(buildPrefilterNode('file.hasTag("a") || file.hasLink(this.file)')).toBeNull()
+  })
+})
+
 describe('buildPrefilterNode — pushable predicates', () => {
   it('pushes property equality (prop == literal)', () => {
     expect(buildPrefilterNode('status == "done"')).toEqual({ property: 'status', op: 'eq', value: 'done' })

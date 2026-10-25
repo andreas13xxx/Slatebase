@@ -154,8 +154,41 @@ Andere Ansichtstypen kommen von Obsidian-Plugins (siehe [[Fortgeschritten/Obsidi
 ## Eine Base einbetten und Einträge anlegen
 
 - **Einbetten:** Schreibe `![[Meine Base.base]]` in eine Notiz. Im Lesemodus und in der Live-Vorschau erscheint die Base als schreibgeschützte Tabelle direkt in der Notiz — nützlich für ein Dashboard, das mehrere Bases nebeneinander zeigt.
+- **Eine bestimmte Ansicht einbetten:** `![[Meine Base.base#Ansichtsname]]` zeigt die Ansicht mit diesem Namen statt der ersten. Existiert der Name nicht, steht dort „Ansicht nicht gefunden" — es springt nie stillschweigend auf die erste Ansicht. Das Beispiel hier zeigt die Ansicht „Offene Aufgaben" der Beispiel-Tabelle:
+
+  ![[Features/Beispiel-Aufgaben (Base).base#Offene Aufgaben]]
+
 - **Inline als Codeblock:** Ein ```` ```base ````-Block enthält das YAML der Base direkt in der Notiz, ganz ohne eigene `.base`-Datei. Führe **„Bases: Neue Base einfügen"** über die [[Features/Command Palette|Command Palette]] aus, um ein Gerüst an der Cursorposition einzufügen. Die Notiz zeigt dann dieselbe schreibgeschützte Tabelle; in der Live-Vorschau erscheint der Rohtext, sobald du in den Block klickst. Auf einer [[Features/Öffentliche Links|öffentlichen Freigabe]] und solange das Feature-Toggle `bases` aus ist, bleibt der Block als Code stehen; der Befehl fügt dann nichts ein, sondern verweist auf das Toggle.
 - **Eintrag hinzufügen:** Führe **„Bases: Add item"** über die [[Features/Command Palette|Command Palette]] aus, während eine Base geöffnet ist. Slatebase legt eine neue Notiz im Geltungsbereich der Base an — der Zielordner stammt aus einem `file.inFolder(...)`-Filter (sonst Vault-Wurzel), und die angezeigten Properties werden als leere Frontmatter-Felder vorbereitet (ein `property == "x"`-Filter füllt den Wert vor). Die Notiz öffnet sich und erscheint als neue Zeile.
+
+---
+
+## `this`: Filter relativ zur Notiz
+
+In Filtern und Formeln steht `this` für die Notiz, in der die Base eingebettet ist — wie in Obsidian. So zeigt dieselbe Base in jeder Notiz etwas anderes:
+
+- `this.file.name`, `this.file.path`, `this.file.folder`, `this.file.tags`, `this.file.size` … — die Datei-Felder der einbettenden Notiz
+- `this.status` (oder `this.note.status`) — eine Property aus ihrem Frontmatter
+- `this.file` allein ist die Notiz selbst und passt als Argument von `file.hasLink(...)`
+
+Das klassische Beispiel sind die **Backlinks einer Notiz**: Alle Notizen, die auf diese Notiz verlinken. Der Block unten steht direkt in dieser Seite und listet darum alle Notizen, die auf „Bases" verweisen:
+
+```base
+filters: file.hasLink(this.file)
+properties:
+  file.name:
+    displayName: "Verweist auf Bases"
+views:
+  - type: table
+    name: "Verweise"
+    order:
+      - file.name
+```
+
+Wird die Base als **eigene `.base`-Datei** geöffnet, ist `this` die Base-Datei selbst. Ist keine Notiz bekannt, ergibt `this.…` einen leeren Wert — eine Zeile, die davon abhängt, wird dann ausgeschlossen, nie fälschlich behalten.
+
+> [!note] Namen und Duplikate
+> `file.hasLink(this.file)` vergleicht den Link, so wie er in der Notiz steht (`Plan`, `Projekte/Plan`), mit dem Pfad der Host-Notiz — mit oder ohne `.md`, ganz oder als Pfadende. Gibt es zwei Dateien mit demselben Namen in verschiedenen Ordnern, kann ein Link auf den kurzen Namen beide treffen.
 
 ---
 
@@ -176,7 +209,9 @@ Damit du nicht überrascht wirst:
 
 **Ansichten und Einbettung**
 - Eingebaut sind **Tabelle**, **Karten**, **Liste** und **Karte** (Map); andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
-- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützte Tabelle). Eingebettet zeigt sie nur die erste Ansicht, und zwar als Tabelle.
+- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützte Tabelle). Eingebettet zeigt sie **eine** Ansicht — die erste oder die per `#Ansichtsname` gewählte — und zwar immer als **Tabelle**, auch wenn die Ansicht vom Typ Karten, Liste oder Karte ist.
+- Eine eingebettete Base wird beim Anzeigen einmal abgefragt und **nicht** bei Änderungen im Vault aktualisiert; die geöffnete `.base`-Datei dagegen schon. Das gilt auch für `this`: Ändert sich die einbettende Notiz, zeigt die Einbettung den alten Stand, bis die Notiz neu geöffnet wird.
+- `this` gilt in der eingebauten Tabelle, nicht in Ansichten, die ein Plugin liefert, und nicht im MCP-Werkzeug `query_base` (dort ergibt `this.…` einen leeren Wert).
 
 **KI-Zugriff über MCP**
 - Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients), inklusive der `summaries`. Es liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück.

@@ -41,6 +41,8 @@ export interface BasesViewProps {
   vaultId: string
   /** Raw `.base` file content. */
   source: string
+  /** Vault-relative path of this `.base` file — what `this` refers to when a base is opened on its own. */
+  hostPath?: string
   /** Whether the user may edit (write access). */
   readOnly: boolean
   /** Open a note by its vault-relative path. */
@@ -52,7 +54,7 @@ export interface BasesViewProps {
 type Mode = 'view' | 'source'
 
 export const BasesView = memo(function BasesView({
-  apiClient, vaultId, source, readOnly, onOpenNote, onSaveSource,
+  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource,
 }: BasesViewProps) {
   const [mode, setMode] = useState<Mode>('view')
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
@@ -95,7 +97,7 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView)
+      const { rows: resultRows, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
       setTruncated(resultTruncated)
       setQueryError(null)
@@ -104,7 +106,7 @@ export const BasesView = memo(function BasesView({
     } finally {
       setLoading(false)
     }
-  }, [apiClient, vaultId, doc, activeView])
+  }, [apiClient, vaultId, doc, activeView, hostPath])
 
   // The built-in table owns the row fetch; a plugin view fetches via its own
   // QueryController, so only query here when the table is what renders.
