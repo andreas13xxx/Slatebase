@@ -225,6 +225,48 @@ describe('buildWidgetDecorations — inline base code block', () => {
   })
 })
 
+describe('buildWidgetDecorations — base embed with a view name', () => {
+  const tree: DirectoryTree = {
+    name: 'root', type: 'directory', path: '',
+    children: [{ name: 'Tasks.base', type: 'file', path: 'Tasks.base' }],
+  }
+  const twoViews = 'views:\n  - type: table\n    name: Alle\n  - type: cards\n    name: Board\n'
+
+  /** Mounts the embed widget for `markdown` and waits until its DOM shows `expected`. */
+  async function expectText(markdown: string, expected: string): Promise<void> {
+    const apiClient = {
+      fetchFileContent: vi.fn().mockResolvedValue({ content: twoViews, isBinary: false }),
+      queryBase: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
+    }
+    const result = buildWidgetDecorations(makeState(markdown), { vaultId: 'v1', directoryTree: tree, apiClient, basesEnabled: true })
+    const widget = result.decorations
+      .map((r) => (r.value.spec as { widget?: { toDOM(): HTMLElement } }).widget)
+      .find((w) => w !== undefined)!
+    const dom = widget.toDOM()
+    await vi.waitFor(() => expect(dom.textContent).toContain(expected))
+  }
+
+  it('shows the view named after # in the embed header', async () => {
+    await expectText('![[Tasks.base#Board]]', 'Tasks.base › Board')
+  })
+
+  it('reports an unknown view name', async () => {
+    await expectText('![[Tasks.base#Fehlt]]', 'Ansicht nicht gefunden: Fehlt')
+  })
+
+  it('does not treat a .base embed as a Base while the bases feature is off', async () => {
+    const apiClient = { fetchFileContent: vi.fn().mockResolvedValue({ content: twoViews, isBinary: false }), queryBase: vi.fn() }
+    const result = buildWidgetDecorations(makeState('![[Tasks.base]]'), { vaultId: 'v1', directoryTree: tree, apiClient })
+    const widget = result.decorations
+      .map((r) => (r.value.spec as { widget?: { toDOM(): HTMLElement } }).widget)
+      .find((w) => w !== undefined)!
+    const dom = widget.toDOM()
+
+    expect(dom.className).not.toContain('cm-lp-embed-base')
+    expect(apiClient.queryBase).not.toHaveBeenCalled()
+  })
+})
+
 describe('buildWidgetDecorations — embed kind classification', () => {
   it('renders a non-image/pdf, non-.md extension (e.g. .excalidraw) as a note embed, not a bare file placeholder', () => {
     // Regression test: plugins like Excalidraw rely on their note embed being

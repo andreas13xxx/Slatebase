@@ -54,6 +54,40 @@ describe('ViewMode', () => {
     )
   }
 
+  describe('base file embed with a view name', () => {
+    const tree: DirectoryTree = {
+      name: 'root', type: 'directory', path: '',
+      children: [{ name: 'Tasks.base', type: 'file', path: 'Tasks.base' }],
+    }
+    const twoViews = 'views:\n  - type: table\n    name: Alle\n  - type: cards\n    name: Board\n'
+
+    function renderEmbed(content: string) {
+      const apiClient = {
+        ...createMockApiClient(twoViews),
+        queryBase: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
+      } as unknown as IApiClient
+      return renderWithContext(<ViewMode {...defaultProps} directoryTree={tree} content={content} />, apiClient)
+    }
+
+    it('shows the view named after # in the header', async () => {
+      const { findByText } = renderEmbed('![[Tasks.base#Board]]')
+
+      expect(await findByText('Tasks.base › Board')).toBeTruthy()
+    })
+
+    it('reports an unknown view name', async () => {
+      const { findByText } = renderEmbed('![[Tasks.base#Fehlt]]')
+
+      expect(await findByText('Ansicht nicht gefunden: Fehlt')).toBeTruthy()
+    })
+
+    it('shows the first view without a name', async () => {
+      const { findByText } = renderEmbed('![[Tasks.base]]')
+
+      expect(await findByText('Tasks.base')).toBeTruthy()
+    })
+  })
+
   describe('inline base code block', () => {
     const baseBlock = '```base\nviews:\n  - type: table\n    name: Table\n```'
 

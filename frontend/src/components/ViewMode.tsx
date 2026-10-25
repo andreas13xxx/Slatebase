@@ -1999,6 +1999,7 @@ function renderEmbedNode(
         vaultId,
         filePath: resolvedBasePath,
         target: node.target,
+        ...(node.heading ? { viewName: node.heading } : {}),
         onOpenNote: (path: string) => onInternalLinkClick?.(path),
       })
     }

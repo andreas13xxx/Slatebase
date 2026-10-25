@@ -21,6 +21,7 @@ import type { BaseDocument, BaseQueryResultWire, BaseQuerySpecWire, BaseRow, Bas
 import { parseBase, runBaseQuery } from '../../bases'
 import { AppContext } from '../../state'
 import { BasesTableView } from './BasesTableView'
+import { pickEmbedView } from './pickEmbedView'
 
 /** The minimal API surface BasesEmbed needs — a subset of IApiClient. */
 export interface IBasesEmbedApiClient {
@@ -36,17 +37,20 @@ export interface BasesEmbedProps {
   source?: string
   /** The raw link text (for error messages and the header). Omitted for an inline block. */
   target?: string
+  /** Name of the view to show (`![[file.base#View]]`); omitted for the first view. Ignored for an inline block. */
+  viewName?: string
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /** Explicit client (CM6 widget); falls back to AppContext in reading view. */
   apiClient?: IBasesEmbedApiClient | null
 }
 
-export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
+export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, viewName, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
   const appContext = useContext(AppContext)
   const apiClient: IBasesEmbedApiClient | null = explicitClient ?? appContext?.apiClient ?? null
 
   const [doc, setDoc] = useState<BaseDocument | null>(null)
+  const [view, setView] = useState<BaseView | null>(null)
   const [rows, setRows] = useState<BaseRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -79,15 +83,16 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
           setLoading(false)
           return
         }
-        const view = parsed.document.views[0]
-        if (!view) {
-          setError('Base hat keine Ansicht')
+        const picked = pickEmbedView(parsed.document, source === undefined ? viewName : undefined)
+        if ('error' in picked) {
+          setError(picked.error)
           setLoading(false)
           return
         }
-        const result = await runBaseQuery(apiClient, vaultId, parsed.document, view)
+        const result = await runBaseQuery(apiClient, vaultId, parsed.document, picked.view)
         if (cancelled) return
         setDoc(parsed.document)
+        setView(picked.view)
         setRows(result.rows)
         setLoading(false)
       } catch {
@@ -98,15 +103,10 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
     })()
 
     return () => { cancelled = true }
-  }, [apiClient, vaultId, filePath, source, target])
+  }, [apiClient, vaultId, filePath, source, target, viewName])
 
   // The embedded view, forced to a read-only table.
-  const tableView = useMemo<BaseView | null>(() => {
-    if (!doc) return null
-    const first = doc.views[0]
-    if (!first) return null
-    return { ...first, type: 'table' }
-  }, [doc])
+  const tableView = useMemo<BaseView | null>(() => (view ? { ...view, type: 'table' } : null), [view])
 
   if (error) {
     return <div className="view-mode-embed view-mode-embed--missing bases-embed">{error}</div>
@@ -123,7 +123,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
     <div className="view-mode-embed bases-embed">
       {target !== undefined && (
         <span className="view-mode-embed-header">
-          <span className="view-mode-embed-title">{target}</span>
+          <span className="view-mode-embed-title">{viewName ? `${target} › ${view?.name ?? viewName}` : target}</span>
         </span>
       )}
       <BasesTableView

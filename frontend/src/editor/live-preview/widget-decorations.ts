@@ -331,6 +331,7 @@ class EmbedWidget extends WidgetType {
         vaultId: this.vaultId,
         filePath: resolvedPath,
         target: this.filename,
+        ...(this.heading ? { viewName: this.heading } : {}),
         onOpenNote: () => { /* navigation is handled by the editor host */ },
         apiClient: this.apiClient,
       })
@@ -1858,7 +1859,7 @@ export function buildWidgetDecorations(
               PDF_EXTENSIONS.has(ext) ? 'pdf' :
               AUDIO_EXTENSIONS.has(ext) ? 'audio' :
               VIDEO_EXTENSIONS.has(ext) ? 'video' :
-              ext === 'base' ? 'base' :
+              ext === '.base' && options.basesEnabled ? 'base' :
               'note'
 
             const widget = new EmbedWidget(
