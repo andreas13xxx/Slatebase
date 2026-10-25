@@ -249,7 +249,6 @@ export type UnsupportedReason =
   | 'native-windows'
   | 'url-scheme'
   | 'attachments'
-  | 'bases-add-item'
   | 'desktop-shell'
   | 'in-app-help'
   | 'new-tab-defaults'
@@ -275,10 +274,6 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
   attachments: {
     de: 'externe Bild-Links lassen sich nicht automatisch in den Vault herunterladen — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen“ hinein',
     en: 'there is no automatic download of external image links into the vault — attachments come in via drag-and-drop, clipboard paste, or "Insert attachment"',
-  },
-  'bases-add-item': {
-    de: 'neue Einträge passend zu den Filtern einer Base anzulegen ist noch nicht umgesetzt — lege die Notiz direkt an',
-    en: 'creating an entry that matches a base\'s filters is not implemented yet — create the note directly',
   },
   'desktop-shell': {
     de: 'die Datei liegt auf dem Server, nicht auf diesem Rechner',

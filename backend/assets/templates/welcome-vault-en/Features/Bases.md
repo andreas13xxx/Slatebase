@@ -20,7 +20,7 @@ Think of it as a saved, structured view over your notes — the database layer t
 | **`filters`** | Which notes appear — as an expression, combinable with `and` / `or` / `not` |
 | **`properties`** | Display names of the columns |
 | **`formulas`** | Calculated columns (read-only), e.g. days until a deadline |
-| **`views`** | One or more named views: **table** or **cards** (Kanban), each with its own column order, sort, filter and `limit` |
+| **`views`** | One or more named views: **table**, **cards** (Kanban), **list** or **map**, each with its own column order, sort, filter and `limit` |
 | **`summaries`** | Per-column summaries (sum, count, average, min/max …) — under the table or in the Kanban header |
 
 ---
@@ -121,13 +121,15 @@ Click a column header to sort; the sort is written back into the `.base` file. T
 
 ---
 
-## Views: table and cards (Kanban)
+## Views: table, cards, list and map
 
 A base can hold several views; a view switcher appears at the top.
 
 - **Table** — one row per note, editable cells.
 - **Cards (Kanban)** — notes grouped into columns by a property. Each value becomes a column; notes without a value land in a "No …" column. Columns collapse, and clicking a card opens the note.
   **Drag a card to another column** to change the grouping property's value in the note; dropping on "No …" removes the property. (Requires write access to the vault.)
+- **List** (`type: list`) — a simple read-only list with one entry per note, no grouping. Formula columns are evaluated, and summaries appear as a bar above the list.
+- **Map** (`type: map`) — notes with geo coordinates as pins on a map; clicking a pin opens the note. Slatebase reads the coordinate from the view option `coordinates` (or `location`) as a property holding `"lat,lng"`, or from two numeric properties `latProperty` and `lngProperty` (also `lat`/`lng`/`longitude`). Notes without a readable coordinate are not plotted; a counter shows how many were skipped. The map tiles come from a server the operator sets (`SLATEBASE_MAP_TILE_URL`); without one the view only shows a notice that it is inactive.
 
 ```yaml
 views:
@@ -173,7 +175,7 @@ So nothing surprises you:
 - The index hands over every property as a list. A property that has **more than one value somewhere** in your vault — or is declared as a list/tags in the property-type registry — is treated as a list even with a single value. Only for a property that never appears as a list and is not declared one is a one-element list read like a single value.
 
 **Views and embedding**
-- Only **table** and **cards** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
+- **Table**, **cards**, **list** and **map** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
 - A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (a read-only table each). Embedded, it shows only the first view, as a table.
 
 **AI access via MCP**
