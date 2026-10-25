@@ -25,7 +25,7 @@ export const GIT_SYNC_SECRET_MODULE_ID = 'git-sync'
 const GITIGNORE_BLOCK_START = '# >>> slatebase managed (do not edit) >>>'
 const GITIGNORE_BLOCK_END = '# <<< slatebase managed <<<'
 /**
- * Vault-specific settings (`.slatebase/config.json`, property types, Obsidian config/themes/plugins)
+ * Vault-specific settings (`.slatebase/config.json`, property types, the spellcheck word list, Obsidian config/themes/plugins)
  * are synced; per-instance data (trash, versions, link-index cache) and per-device state
  * (workspace layout) are not. Plugin `data.json` is synced so plugin settings follow the vault. `.slatebase/*` rather than
  * `.slatebase/` because git cannot re-include a file inside an excluded directory.
@@ -34,6 +34,7 @@ const MANAGED_GITIGNORE_LINES = [
   '.slatebase/*',
   '!.slatebase/config.json',
   '!.slatebase/property-types.json',
+  '!.slatebase/spellcheck-words.json',
   '.obsidian/workspace*.json',
 ]
 /** Lines older versions wrote on their own — superseded by the managed block. */

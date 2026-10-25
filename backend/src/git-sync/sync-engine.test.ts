@@ -122,6 +122,7 @@ describe('GitSyncEngine', () => {
     const gitignore = await readFile(join(vaultPath, '.gitignore'), 'utf-8')
     expect(gitignore).toContain('.slatebase/*')
     expect(gitignore).toContain('!.slatebase/config.json')
+    expect(gitignore).toContain('!.slatebase/spellcheck-words.json')
     expect(gitignore).toContain('.obsidian/workspace*.json')
     expect(gitignore).not.toMatch(/^\.obsidian\/$/m)
 

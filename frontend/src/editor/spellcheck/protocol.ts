@@ -39,6 +39,8 @@ export type SpellcheckRequest =
   | { kind: 'check'; id: number; words: string[] }
   | { kind: 'suggest'; id: number; word: string }
   | { kind: 'add'; words: string[] }
+  /** Replaces the whole personal list — a vault switch or a list changed elsewhere. */
+  | { kind: 'set-personal'; words: string[] }
 
 /** Worker → main thread. */
 export type SpellcheckResponse =

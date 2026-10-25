@@ -61,6 +61,13 @@ let loadToken = 0
 /** Personal words, re-applied to each newly built instance. */
 const personalWords = new Set<string>()
 
+/**
+ * The subset of `personalWords` the instance did not already know. Only these
+ * may be removed again — dropping a personal word that the base dictionary
+ * also lists would otherwise make the dictionary forget it.
+ */
+const learnedWords = new Set<string>()
+
 function respond(message: SpellcheckResponse): void {
   scope.postMessage(message)
 }
@@ -73,7 +80,7 @@ async function fetchText(url: string): Promise<string> {
   return await response.text()
 }
 
-async function load(language: SpellcheckLanguage, affUrl: string, dicUrl: string, personal: string[]): Promise<void> {
+async function load(language: SpellcheckLanguage, affUrl: string, dicUrl: string): Promise<void> {
   const token = ++loadToken
   // Drop the old checker immediately: until the new one is ready, "no
   // dictionary" (nothing underlined) is the honest state, and reporting
@@ -87,9 +94,11 @@ async function load(language: SpellcheckLanguage, affUrl: string, dicUrl: string
 
     const instance = nspell(aff, dic)
 
-    personalWords.clear()
-    for (const word of personal) {
-      personalWords.add(word)
+    // `personalWords` is read here, not the `personal` argument: a 'set-personal'
+    // that arrived while the dictionary was downloading has already replaced it.
+    learnedWords.clear()
+    for (const word of personalWords) {
+      if (!instance.correct(word)) learnedWords.add(word)
       instance.add(word)
     }
 
@@ -146,7 +155,9 @@ scope.addEventListener('message', (event) => {
 
   switch (request.kind) {
     case 'load':
-      void load(request.language, request.affUrl, request.dicUrl, request.personal)
+      personalWords.clear()
+      for (const word of request.personal) personalWords.add(word)
+      void load(request.language, request.affUrl, request.dicUrl)
       break
 
     case 'check':
@@ -172,12 +183,30 @@ scope.addEventListener('message', (event) => {
       for (const word of request.words) {
         if (personalWords.has(word)) continue
         personalWords.add(word)
+        if (speller && !speller.correct(word)) learnedWords.add(word)
         speller?.add(word)
         added = true
       }
       // The whole cache goes, not just the added words: a learned word can
       // also be the missing part of a compound cached as unknown.
       if (added) verdictCache.clear()
+      break
+    }
+
+    case 'set-personal': {
+      const next = new Set(request.words)
+      for (const word of [...personalWords]) {
+        if (next.has(word)) continue
+        personalWords.delete(word)
+        if (learnedWords.delete(word)) speller?.remove(word)
+      }
+      for (const word of next) {
+        if (personalWords.has(word)) continue
+        personalWords.add(word)
+        if (speller && !speller.correct(word)) learnedWords.add(word)
+        speller?.add(word)
+      }
+      verdictCache.clear()
       break
     }
   }

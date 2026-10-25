@@ -968,6 +968,14 @@ export interface IApiClient {
   /** Merge a partial change into the current user's settings for one vault. */
   saveVaultSettings(vaultId: string, patch: UserVaultSettingsPatch): Promise<{ settings: UserVaultSettings }>
 
+  // --- Spellcheck dictionary methods ---
+  /** Get the vault's personal spellcheck word list. */
+  getSpellcheckWords(vaultId: string): Promise<{ words: string[] }>
+  /** Add words to the vault's personal spellcheck word list; returns the full list. */
+  addSpellcheckWords(vaultId: string, words: string[]): Promise<{ words: string[] }>
+  /** Remove a word from the vault's personal spellcheck word list; returns the full list. */
+  removeSpellcheckWord(vaultId: string, word: string): Promise<{ words: string[] }>
+
   // --- Vault Config methods ---
   /** Get the configuration for a vault. */
   getVaultConfig(vaultId: string): Promise<VaultConfig>
@@ -1299,6 +1307,24 @@ export class ApiClient implements IApiClient {
   /** Run a Bases query (filter/sort/columns) against a vault's metadata index. */
   async queryBase(vaultId: string, spec: BaseQuerySpecWire): Promise<BaseQueryResultWire> {
     return this.request<BaseQueryResultWire>('POST', `/api/v1/vaults/${vaultId}/bases/query`, spec)
+  }
+
+  // --- Spellcheck dictionary methods ---
+
+  /** Get the vault's personal spellcheck word list. */
+  async getSpellcheckWords(vaultId: string): Promise<{ words: string[] }> {
+    return this.request<{ words: string[] }>('GET', `/api/v1/vaults/${vaultId}/spellcheck/words`)
+  }
+
+  /** Add words to the vault's personal spellcheck word list; returns the full list. */
+  async addSpellcheckWords(vaultId: string, words: string[]): Promise<{ words: string[] }> {
+    return this.request<{ words: string[] }>('POST', `/api/v1/vaults/${vaultId}/spellcheck/words`, { words })
+  }
+
+  /** Remove a word from the vault's personal spellcheck word list; returns the full list. */
+  async removeSpellcheckWord(vaultId: string, word: string): Promise<{ words: string[] }> {
+    // POST with the word in the body: `..` and `/` do not survive a URL path.
+    return this.request<{ words: string[] }>('POST', `/api/v1/vaults/${vaultId}/spellcheck/words/remove`, { word })
   }
 
   // --- Property type methods ---

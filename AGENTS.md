@@ -70,7 +70,7 @@ cd frontend && npm run lint           # ESLint
 
 Filesystem-based, no database. All under `backend/data/`:
 - `vaults.json` + `vaults/<id>/` — Vault registry + files
-- `vaults/<id>/.slatebase/` — Per-vault internal data (trash, versions, link-index, config, property types)
+- `vaults/<id>/.slatebase/` — Per-vault internal data (trash, versions, link-index, config, property types, `spellcheck-words.json` — the vault's personal spellcheck words; like `config.json` and `property-types.json` it is exempt in the Git Sync `.gitignore` block and so travels with the vault)
 - CSS snippets are vault content like themes: `<vault>/.obsidian/snippets/<id>.css`, enabled ones in `enabledCssSnippets` of `.obsidian/appearance.json` (edit it only through `shared/appearance-file.ts`, which holds the per-vault lock and refuses to overwrite invalid JSON). The old `snippets/<vaultId>/` under `data/` is migrated at startup and no longer written
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)

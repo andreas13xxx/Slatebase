@@ -14,7 +14,7 @@
  * @module spellcheck/spellcheck-client
  */
 import { showToast } from '../../components/ToastNotification'
-import { readPersonalWords, addPersonalWord } from './personal-dictionary'
+import { readPersonalWords, addPersonalWord, subscribeToPersonalWords } from './personal-dictionary'
 import {
   DEFAULT_SPELLCHECK_LANGUAGE,
   type SpellcheckLanguage,
@@ -36,6 +36,7 @@ let requestCounter = 0
 let currentLanguage: SpellcheckLanguage | null = null
 let ready = false
 let loadFailureReported = false
+let personalSubscription: (() => void) | null = null
 
 /** Resolvers for in-flight requests, keyed by request id. */
 const pendingChecks = new Map<number, (unknownWords: string[]) => void>()
@@ -114,6 +115,7 @@ function ensureWorker(): Worker | null {
       console.error('[Spellcheck] Worker error:', event.message)
       ready = false
     })
+    followPersonalWords()
   } catch (error) {
     workerUnavailable = true
     console.warn('[Spellcheck] Web Worker unavailable — spellcheck disabled:', error)
@@ -121,6 +123,19 @@ function ensureWorker(): Worker | null {
   }
 
   return worker
+}
+
+/**
+ * Follows vault switches and server refreshes of the personal list: the worker
+ * gets the new list and every open editor re-lints. Registered when the first
+ * check creates the worker — before that there is nothing to tell.
+ */
+function followPersonalWords(): void {
+  if (personalSubscription) return
+  personalSubscription = subscribeToPersonalWords((list) => {
+    send({ kind: 'set-personal', words: list })
+    notifyChanged()
+  })
 }
 
 function send(request: SpellcheckRequest): boolean {
@@ -237,6 +252,8 @@ export function learnWord(word: string): void {
 /** Test seam — drops the worker and all cached state. */
 export function resetSpellcheckClient(): void {
   worker?.terminate()
+  personalSubscription?.()
+  personalSubscription = null
   worker = null
   workerUnavailable = false
   currentLanguage = null
