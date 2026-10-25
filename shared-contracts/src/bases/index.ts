@@ -29,7 +29,7 @@ export type {
 
 export { parseBase } from './parser.js'
 export { serializeBase } from './serializer.js'
-export { buildQuerySpec, rowContext, filterRows, evaluateFormulaColumn } from './base-eval.js'
+export { buildQuerySpec, rowContext, filterRows, evaluateFormulaColumn, wireRowToBaseRow, buildHostQuerySpec } from './base-eval.js'
 export { computeSummaries } from './summaries.js'
 export type { ColumnSummary, ComputedSummaries } from './summaries.js'
 export { buildPrefilterNode, buildCombinedPrefilter } from './prefilter.js'

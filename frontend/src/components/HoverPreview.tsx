@@ -202,6 +202,7 @@ export function HoverPreview() {
           content={bodyContent}
           vaultId={vaultId ?? ''}
           directoryTree={directoryTree}
+          {...(resolvedPath ? { sourcePath: resolvedPath } : {})}
           // No navigation from inside a preview, and no nested previews.
         />
       </div>

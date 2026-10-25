@@ -466,6 +466,7 @@ export function TabContent() {
               apiClient={apiClient!}
               vaultId={activeTab.vaultId}
               source={activeTab.content ?? ''}
+              hostPath={activeTab.filePath}
               readOnly={isReadOnly ?? false}
               onOpenNote={(path) => {
                 const fileName = path.split('/').pop() ?? path

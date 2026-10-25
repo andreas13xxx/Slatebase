@@ -254,6 +254,21 @@ describe('buildWidgetDecorations — base embed with a view name', () => {
     await expectText('![[Tasks.base#Fehlt]]', 'Ansicht nicht gefunden: Fehlt')
   })
 
+  it('looks up the note it sits in as the host of this.*', async () => {
+    const thisBase = 'filters: file.hasLink(this.file)\nviews:\n  - type: table\n    name: Alle\n'
+    const queryBase = vi.fn().mockResolvedValue({ rows: [], total: 0 })
+    const apiClient = { fetchFileContent: vi.fn().mockResolvedValue({ content: thisBase, isBinary: false }), queryBase }
+    const result = buildWidgetDecorations(makeState('![[Tasks.base]]'), {
+      vaultId: 'v1', directoryTree: tree, apiClient, basesEnabled: true, sourcePath: 'Projekte/Plan.md',
+    })
+    const widget = result.decorations
+      .map((r) => (r.value.spec as { widget?: { toDOM(): HTMLElement } }).widget)
+      .find((w) => w !== undefined)!
+    widget.toDOM()
+
+    await vi.waitFor(() => expect(queryBase).toHaveBeenCalledWith('v1', expect.objectContaining({ filters: { path: 'Projekte/Plan.md' } })))
+  })
+
   it('does not treat a .base embed as a Base while the bases feature is off', async () => {
     const apiClient = { fetchFileContent: vi.fn().mockResolvedValue({ content: twoViews, isBinary: false }), queryBase: vi.fn() }
     const result = buildWidgetDecorations(makeState('![[Tasks.base]]'), { vaultId: 'v1', directoryTree: tree, apiClient })

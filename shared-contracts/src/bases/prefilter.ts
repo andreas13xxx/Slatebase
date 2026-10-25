@@ -81,6 +81,9 @@ function propertyKey(node: ExprNode): string | null {
   if (node.kind !== 'property') return null
   if (node.name === 'file' || node.name === 'formula') return null
   if (node.name.startsWith('file.') || node.name.startsWith('formula.')) return null
+  // `this` is the host note, not a column of the candidate rows: pushing it would
+  // exclude rows by a property they do not have.
+  if (node.name === 'this' || node.name.startsWith('this.')) return null
   // A dotted member access (`title.length`) is not a plain property.
   const key = node.name.startsWith('note.') ? node.name.slice('note.'.length) : node.name
   if (key.includes('.')) return null

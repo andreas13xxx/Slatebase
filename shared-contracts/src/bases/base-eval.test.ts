@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildQuerySpec, filterRows, evaluateFormulaColumn } from './base-eval.js'
+import { buildQuerySpec, buildHostQuerySpec, filterRows, evaluateFormulaColumn } from './base-eval.js'
 import type { BaseDocument, BaseQueryRowWire, BaseRow } from './types.js'
 
 const wire = (path: string, values: Record<string, string[]>, extra: Partial<BaseQueryRowWire> = {}): BaseQueryRowWire => ({
@@ -152,6 +152,102 @@ describe('file.size and file.backlinks (R4)', () => {
     const d: BaseDocument = { filters: 'file.size > 0', views: [] }
     const spec = buildQuerySpec(d, { type: 'table', order: ['file.size'] })
     expect(spec.fileColumns).toContain('file.size')
+  })
+})
+
+describe('this — the host note (embedded base)', () => {
+  const host: BaseRow = {
+    path: 'Projekte/Plan.md',
+    fileName: 'Plan',
+    values: { status: ['open'], 'file.folder': 'Projekte', 'file.tags': ['proj'], 'file.size': 120 },
+  }
+  /** `thisRow` null means "no host" (an explicit undefined would select the default host). */
+  const keep = (filters: string, rows: BaseQueryRowWire[], thisRow: BaseRow | null = host) =>
+    filterRows(rows, { filters, views: [] }, { type: 'table' }, false, undefined, thisRow ?? undefined).rows.map((r) => r.path)
+
+  it('resolves this.file.* against the host', () => {
+    const rows = [wire('a.md', {}), wire('b.md', {})]
+
+    expect(keep('this.file.name == "Plan"', rows)).toEqual(['a.md', 'b.md'])
+    expect(keep('this.file.path == "Projekte/Plan.md"', rows)).toEqual(['a.md', 'b.md'])
+    expect(keep('this.file.folder == "Projekte"', rows)).toEqual(['a.md', 'b.md'])
+    expect(keep('this.file.size == 120', rows)).toEqual(['a.md', 'b.md'])
+    expect(keep('this.file.tags.contains("proj")', rows)).toEqual(['a.md', 'b.md'])
+    expect(keep('this.file.name == "Anderes"', rows)).toEqual([])
+  })
+
+  it('resolves this.<property> and this.note.<property> from the host frontmatter', () => {
+    const rows = [wire('a.md', { status: ['open'] }), wire('b.md', { status: ['done'] })]
+
+    expect(keep('status == this.status', rows)).toEqual(['a.md'])
+    expect(keep('status == this.note.status', rows)).toEqual(['a.md'])
+  })
+
+  it('filters rows that link to the host with file.hasLink(this.file)', () => {
+    const rows = [
+      wire('a.md', {}, { links: ['Plan'] }),
+      wire('b.md', {}, { links: ['Projekte/Plan'] }),
+      wire('c.md', {}, { links: ['Plan.md'] }),
+      wire('d.md', {}, { links: ['Anderes'] }),
+      wire('e.md', {}),
+    ]
+
+    expect(keep('file.hasLink(this.file)', rows)).toEqual(['a.md', 'b.md', 'c.md'])
+  })
+
+  it('resolves everything to null without a host, excluding the row instead of keeping it', () => {
+    const rows = [wire('a.md', { status: ['open'] }, { links: ['Plan'] })]
+
+    expect(keep('file.hasLink(this.file)', rows, null)).toEqual([])
+    expect(keep('status == this.status', rows, null)).toEqual([])
+    expect(keep('this.file.name == "Plan"', rows, null)).toEqual([])
+  })
+
+  it('is available inside formula columns', () => {
+    const d: BaseDocument = { formulas: { same: 'status == this.status' }, views: [] }
+    const row: BaseRow = { path: 'a.md', fileName: 'a', values: { status: ['open'] } }
+
+    expect(evaluateFormulaColumn(d, row, 'same', host)).toEqual({ ok: true, value: true })
+    expect(evaluateFormulaColumn(d, row, 'same')).toEqual({ ok: true, value: false })
+  })
+
+  it('matches a link only by its full name or as a path suffix, not by a partial name', () => {
+    const rows = [wire('a.md', {}, { links: ['Masterplan'] }), wire('b.md', {}, { links: ['Plan-B'] })]
+
+    expect(keep('file.hasLink(this.file)', rows)).toEqual([])
+  })
+})
+
+describe('this — query specs', () => {
+  const doc: BaseDocument = {
+    filters: { and: ['file.hasLink(this.file)', 'status == this.status', 'this.file.size > 10', 'tags.contains(this.note.topic)'] },
+    formulas: { same: 'owner == this.owner' },
+    views: [],
+  }
+
+  it('keeps this.* out of the candidate query columns', () => {
+    const spec = buildQuerySpec(doc, { type: 'table' })
+
+    expect(spec.columns.some((c) => c === 'this' || c.startsWith('this.'))).toBe(false)
+    expect(spec.columns).toEqual(expect.arrayContaining(['status', 'tags', 'owner']))
+  })
+
+  it('builds no host query when the base never reads this', () => {
+    expect(buildHostQuerySpec({ filters: 'status == "x"', views: [] }, { type: 'table' }, 'Host.md')).toBeNull()
+  })
+
+  it('asks the host query for exactly the referenced host columns, narrowed to the host path', () => {
+    const spec = buildHostQuerySpec(doc, { type: 'table' }, 'Projekte/Plan.md')!
+
+    expect(spec.filters).toEqual({ path: 'Projekte/Plan.md' })
+    expect([...spec.columns].sort()).toEqual(['owner', 'status', 'topic'])
+    expect(spec.fileColumns).toEqual(['file.size'])
+  })
+
+  it('also looks at view filters', () => {
+    const spec = buildHostQuerySpec({ views: [] }, { type: 'table', filters: 'status == this.status' }, 'H.md')!
+
+    expect(spec.columns).toEqual(['status'])
   })
 })
 

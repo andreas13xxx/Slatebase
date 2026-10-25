@@ -1,4 +1,4 @@
-import { type ReactNode, Fragment, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
+import { type ReactNode, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
@@ -67,7 +67,12 @@ export interface ViewModeProps {
   onInternalLinkClick?: (targetPath: string) => void
   onTagClick?: (tag: string) => void
   token?: string
+  /** Vault-relative path of the note being rendered — what `this` refers to in an embedded base. */
+  sourcePath?: string
 }
+
+/** The note a rendered base is embedded in (`this` in its filters); undefined when ViewMode has no `sourcePath`. */
+const HostPathContext = createContext<string | undefined>(undefined)
 
 /**
  * Resolves a wikilink target against the DirectoryTree, with deterministic
@@ -217,7 +222,7 @@ function createSafePipeline(content: string): Root {
  *
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 11.5, 11.6
  */
-export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token }: ViewModeProps) {
+export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, sourcePath }: ViewModeProps) {
   const rendered = useMemo(() => {
     try {
       const tree = createSafePipeline(content)
@@ -339,11 +344,13 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
   }, [rendered, viewModeId, onInternalLinkClick])
 
   return createElement(Fragment, null,
-    createElement('article', {
-      className: 'view-mode',
-      'aria-label': 'Markdown-Ansicht',
-      'data-viewmode-id': viewModeId,
-    }, rendered),
+    createElement(HostPathContext.Provider, { value: sourcePath },
+      createElement('article', {
+        className: 'view-mode',
+        'aria-label': 'Markdown-Ansicht',
+        'data-viewmode-id': viewModeId,
+      }, rendered),
+    ),
     contextMenu && createElement(ContextMenu, {
       x: contextMenu.x,
       y: contextMenu.y,
@@ -450,6 +457,8 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
       vaultId,
       directoryTree,
       token,
+      // `this` in a base inside the embedded note is that note, not the one embedding it.
+      sourcePath: filePath,
     })
   )
 }
@@ -957,8 +966,28 @@ function renderBlockNode(
  */
 function InlineBase({ vaultId, source, onOpenNote }: { vaultId: string; source: string; onOpenNote: (path: string) => void }): ReactNode {
   const features = useContext(FeatureContext)
+  const hostPath = useContext(HostPathContext)
   if (!features?.isEnabled('bases')) return renderCodeBlock(source, 'base', 'inline-base')
-  return createElement(BasesEmbed, { vaultId, source, onOpenNote })
+  return createElement(BasesEmbed, { vaultId, source, ...(hostPath !== undefined ? { hostPath } : {}), onOpenNote })
+}
+
+/** A `![[file.base]]` embed; reads the note it sits in from `HostPathContext` so `this` resolves to it. */
+function BaseFileEmbed({ vaultId, filePath, target, viewName, onOpenNote }: {
+  vaultId: string
+  filePath: string
+  target: string
+  viewName: string | null
+  onOpenNote: (path: string) => void
+}): ReactNode {
+  const hostPath = useContext(HostPathContext)
+  return createElement(BasesEmbed, {
+    vaultId,
+    filePath,
+    target,
+    ...(viewName ? { viewName } : {}),
+    ...(hostPath !== undefined ? { hostPath } : {}),
+    onOpenNote,
+  })
 }
 
 /**
@@ -1994,12 +2023,12 @@ function renderEmbedNode(
     // The server never resolves .base on a public share; its tree has no such file, but be explicit.
     const resolvedBasePath = parsePublicVaultId(vaultId) === null ? resolveWikilinkTarget(node.target, directoryTree) : null
     if (resolvedBasePath) {
-      return createElement(BasesEmbed, {
+      return createElement(BaseFileEmbed, {
         key,
         vaultId,
         filePath: resolvedBasePath,
         target: node.target,
-        ...(node.heading ? { viewName: node.heading } : {}),
+        viewName: node.heading ?? null,
         onOpenNote: (path: string) => onInternalLinkClick?.(path),
       })
     }

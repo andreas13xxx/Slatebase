@@ -79,6 +79,21 @@ describe('BasesEmbed', () => {
     expect(apiClient.queryBase).not.toHaveBeenCalled()
   })
 
+  it('looks up the host note for this.* when a host path is given', async () => {
+    const apiClient = createClient()
+    const source = 'filters: file.hasLink(this.file)\nviews:\n  - type: table\n    name: Table\n'
+    render(<BasesEmbed vaultId="v1" source={source} hostPath="Projekte/Plan.md" onOpenNote={vi.fn()} apiClient={apiClient} />)
+
+    await waitFor(() => expect(apiClient.queryBase).toHaveBeenCalledWith('v1', expect.objectContaining({ filters: { path: 'Projekte/Plan.md' } })))
+  })
+
+  it('makes no host lookup without this.* in the base', async () => {
+    const apiClient = createClient()
+    render(<BasesEmbed vaultId="v1" source={SOURCE} hostPath="Projekte/Plan.md" onOpenNote={vi.fn()} apiClient={apiClient} />)
+
+    await waitFor(() => expect(apiClient.queryBase).toHaveBeenCalledTimes(1))
+  })
+
   it('ignores a view name for an inline block', async () => {
     const apiClient = createClient()
     const { container } = render(<BasesEmbed vaultId="v1" source={SOURCE} viewName="Fehlt" onOpenNote={vi.fn()} apiClient={apiClient} />)

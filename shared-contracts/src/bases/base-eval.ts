@@ -52,6 +52,8 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
     if (formulaKeys.has(id)) return false
     if (id.startsWith('file.') || id.startsWith('formula.')) return false
     if (id === 'file' || id === 'note') return false
+    // `this.*` reads the host note, not the candidate rows — see `buildHostQuerySpec`.
+    if (isThisRef(id)) return false
     return true
   }).map((id) => (id.startsWith('note.') ? id.slice('note.'.length) : id))
 
@@ -77,6 +79,45 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
   for (const s of view.sort ?? []) if (s.column.startsWith('file.')) fileColumns.add(s.column)
   if (fileColumns.size > 0) spec.fileColumns = Array.from(fileColumns)
 
+  return spec
+}
+
+/** `this` or a `this.…` reference — the host note of an embedded base. */
+function isThisRef(id: string): boolean {
+  return id === 'this' || id.startsWith('this.')
+}
+
+/** Every `this.*` reference in the document's and the view's filters and formulas. */
+function collectThisRefs(doc: BaseDocument, view: BaseView): string[] {
+  const refs = new Set<string>()
+  collectFilterRefs(doc.filters, refs)
+  collectFilterRefs(view.filters, refs)
+  for (const src of Object.values(doc.formulas ?? {})) collectExpressionRefs(src, refs)
+  return Array.from(refs).filter(isThisRef)
+}
+
+/**
+ * Builds the query that fetches the HOST row for `this` (the note a base is
+ * embedded in, or the base file itself), or null when the base never reads
+ * `this` — then no second query is needed. It asks for exactly the host columns
+ * the base references (`this.status` → `status`, `this.file.size` → `file.size`)
+ * and narrows to the host path. The path is a backend glob, so a path with glob
+ * characters may match more than the host: the caller picks the row whose path
+ * is exactly `hostPath`.
+ */
+export function buildHostQuerySpec(doc: BaseDocument, view: BaseView, hostPath: string): BaseQuerySpecWire | null {
+  const refs = collectThisRefs(doc, view)
+  if (refs.length === 0) return null
+  const columns = new Set<string>()
+  const fileColumns = new Set<string>()
+  for (const ref of refs) {
+    if (ref === 'this' || ref === 'this.file') continue
+    const rest = ref.slice('this.'.length)
+    if (rest.startsWith('file.')) fileColumns.add(rest)
+    else columns.add(rest.startsWith('note.') ? rest.slice('note.'.length) : rest)
+  }
+  const spec: BaseQuerySpecWire = { columns: Array.from(columns), filters: { path: hostPath } }
+  if (fileColumns.size > 0) spec.fileColumns = Array.from(fileColumns)
   return spec
 }
 
@@ -113,11 +154,37 @@ function toExprValue(key: string, v: unknown, extraListKeys?: ReadonlySet<string
  * With `doc`, `formula.x` (or a bare formula id) resolves to that formula of
  * the base, evaluated on demand — so filters can use formula values too.
  */
-export function rowContext(row: BaseRow, doc?: BaseDocument): FormulaContext {
-  return buildContext(row, doc, new Set())
+export function rowContext(row: BaseRow, doc?: BaseDocument, thisRow?: BaseRow): FormulaContext {
+  return buildContext(row, doc, new Set(), thisRow)
 }
 
-function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: ReadonlySet<string>): FormulaContext {
+/**
+ * Resolves a `this.*` reference against the host row — the note a base is
+ * embedded in, or the base file itself when it is opened on its own (Obsidian's
+ * `this`). `this.file` alone is the host's path, usable as `file.hasLink(this.file)`;
+ * `this.file.*` is the host's file metadata and `this.<prop>` / `this.note.<prop>`
+ * its frontmatter. With no host row everything resolves to null.
+ */
+function resolveThis(name: string, thisRow: BaseRow | undefined): FormulaValue {
+  if (!thisRow) return null
+  if (name === 'this.file') return thisRow.path
+  if (name === 'this.file.name' || name === 'this.file.basename') return thisRow.fileName
+  if (name === 'this.file.path') return thisRow.path
+  if (name.startsWith('this.file.')) {
+    const key = name.slice('this.'.length)
+    return toExprValue(key, thisRow.values[key], thisRow.listKeys)
+  }
+  const rest = name.slice('this.'.length)
+  const key = rest.startsWith('note.') ? rest.slice('note.'.length) : rest
+  return toExprValue(key, thisRow.values[key], thisRow.listKeys)
+}
+
+/** Lower-cased link or path without a trailing `.md`, so `Notes/A.md` and the link `a` compare alike. */
+function linkKey(value: string): string {
+  return value.replace(/\.md$/i, '').toLowerCase()
+}
+
+function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: ReadonlySet<string>, thisRow?: BaseRow): FormulaContext {
   const values = row.values
   const listKeys = row.listKeys
   const tags = Array.isArray(values['file.tags']) ? (values['file.tags'] as string[]) : []
@@ -125,9 +192,10 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
   const folder = typeof values['file.folder'] === 'string' ? (values['file.folder'] as string) : ''
   return {
     resolve(name: string): FormulaValue {
+      if (name === 'this' || name.startsWith('this.')) return resolveThis(name, thisRow)
       const formulaKey = name.startsWith('formula.') ? name.slice('formula.'.length) : name
       if (doc?.formulas && formulaKey in doc.formulas && (name.startsWith('formula.') || !(name in values))) {
-        const r = evaluateFormulaIn(doc, row, formulaKey, active)
+        const r = evaluateFormulaIn(doc, row, formulaKey, active, thisRow)
         if (!r.ok) throw new Error(r.error)
         return r.value
       }
@@ -151,8 +219,15 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
         return own === target || own.startsWith(target + '/') || row.path.toLowerCase().startsWith(target + '/')
       },
       hasLink: (target: string) => {
-        const needle = target.toLowerCase()
-        return links.some((l) => l.toLowerCase() === needle || l.toLowerCase().endsWith('/' + needle))
+        const needle = linkKey(target)
+        // An empty target names no file — match nothing (e.g. `this.file` without a host).
+        if (needle === '') return false
+        // Links are stored as written (`Tasks`, `Notes/Tasks`), a file reference is a full path
+        // (`Notes/Tasks.md`): match the same name, or either one as the path suffix of the other.
+        return links.some((l) => {
+          const k = linkKey(l)
+          return k === needle || k.endsWith('/' + needle) || needle.endsWith('/' + k)
+        })
       },
     },
   }
@@ -171,6 +246,25 @@ function matchesFilter(node: BaseFilterNode | undefined, ctx: FormulaContext): b
 // ─── Wire rows → filtered rows ──────────────────────────────────────────────
 
 /**
+ * Maps one wire row of the query route to a `BaseRow`: file metadata is folded
+ * into `values` under `file.*`. Also builds the host row for `this`.
+ */
+export function wireRowToBaseRow(r: BaseQueryRowWire, listKeys?: ReadonlySet<string>): BaseRow {
+  const values: Record<string, unknown> = { ...r.values }
+  if (r.ctime !== undefined) values['file.ctime'] = r.ctime
+  if (r.mtime !== undefined) values['file.mtime'] = r.mtime
+  if (r.ext !== undefined) values['file.ext'] = r.ext
+  if (r.folder !== undefined) values['file.folder'] = r.folder
+  if (r.tags !== undefined) values['file.tags'] = r.tags
+  if (r.links !== undefined) values['file.links'] = r.links
+  if (r.size !== undefined) values['file.size'] = r.size
+  if (r.backlinks !== undefined) values['file.backlinks'] = r.backlinks
+  return listKeys
+    ? { path: r.path, fileName: r.fileName, values, listKeys }
+    : { path: r.path, fileName: r.fileName, values }
+}
+
+/**
  * Maps the query route's wire rows to `BaseRow`s (file metadata folded into
  * `values` under `file.*`), keeps those passing BOTH the document filter and
  * the view filter, then applies the view `limit`. `total` is the match count
@@ -185,25 +279,13 @@ export function filterRows(
   view: BaseView,
   truncated?: boolean,
   listKeys?: readonly string[],
+  thisRow?: BaseRow,
 ): { rows: BaseRow[]; total: number; truncated: boolean } {
   const listKeySet = listKeys && listKeys.length > 0 ? new Set(listKeys) : undefined
-  const allRows: BaseRow[] = wireRows.map((r) => {
-    const values: Record<string, unknown> = { ...r.values }
-    if (r.ctime !== undefined) values['file.ctime'] = r.ctime
-    if (r.mtime !== undefined) values['file.mtime'] = r.mtime
-    if (r.ext !== undefined) values['file.ext'] = r.ext
-    if (r.folder !== undefined) values['file.folder'] = r.folder
-    if (r.tags !== undefined) values['file.tags'] = r.tags
-    if (r.links !== undefined) values['file.links'] = r.links
-    if (r.size !== undefined) values['file.size'] = r.size
-    if (r.backlinks !== undefined) values['file.backlinks'] = r.backlinks
-    return listKeySet
-      ? { path: r.path, fileName: r.fileName, values, listKeys: listKeySet }
-      : { path: r.path, fileName: r.fileName, values }
-  })
+  const allRows: BaseRow[] = wireRows.map((r) => wireRowToBaseRow(r, listKeySet))
 
   const matched = allRows.filter((row) => {
-    const ctx = rowContext(row, doc)
+    const ctx = rowContext(row, doc, thisRow)
     return matchesFilter(doc.filters, ctx) && matchesFilter(view.filters, ctx)
   })
   const rows = view.limit !== undefined ? matched.slice(0, view.limit) : matched
@@ -217,13 +299,13 @@ export function filterRows(
  * bare id `other`) inside a formula resolves to that other formula, evaluated
  * on demand; a reference cycle yields an error result instead of recursing.
  */
-export function evaluateFormulaColumn(doc: BaseDocument, row: BaseRow, id: string): FormulaResult {
-  return evaluateFormulaIn(doc, row, id, new Set())
+export function evaluateFormulaColumn(doc: BaseDocument, row: BaseRow, id: string, thisRow?: BaseRow): FormulaResult {
+  return evaluateFormulaIn(doc, row, id, new Set(), thisRow)
 }
 
-function evaluateFormulaIn(doc: BaseDocument, row: BaseRow, id: string, active: ReadonlySet<string>): FormulaResult {
+function evaluateFormulaIn(doc: BaseDocument, row: BaseRow, id: string, active: ReadonlySet<string>, thisRow?: BaseRow): FormulaResult {
   const source = doc.formulas?.[id]
   if (source === undefined) return { ok: false, error: `Unknown formula: ${id}` }
   if (active.has(id)) return { ok: false, error: `Formula cycle at: ${id}` }
-  return evaluateFormula(source, buildContext(row, doc, new Set(active).add(id)))
+  return evaluateFormula(source, buildContext(row, doc, new Set(active).add(id), thisRow))
 }

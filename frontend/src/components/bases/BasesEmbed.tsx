@@ -39,13 +39,15 @@ export interface BasesEmbedProps {
   target?: string
   /** Name of the view to show (`![[file.base#View]]`); omitted for the first view. Ignored for an inline block. */
   viewName?: string
+  /** Vault-relative path of the note this base is embedded in — what `this` refers to in its filters and formulas. */
+  hostPath?: string
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /** Explicit client (CM6 widget); falls back to AppContext in reading view. */
   apiClient?: IBasesEmbedApiClient | null
 }
 
-export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, viewName, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
+export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, viewName, hostPath, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
   const appContext = useContext(AppContext)
   const apiClient: IBasesEmbedApiClient | null = explicitClient ?? appContext?.apiClient ?? null
 
@@ -89,7 +91,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
           setLoading(false)
           return
         }
-        const result = await runBaseQuery(apiClient, vaultId, parsed.document, picked.view)
+        const result = await runBaseQuery(apiClient, vaultId, parsed.document, picked.view, hostPath)
         if (cancelled) return
         setDoc(parsed.document)
         setView(picked.view)
@@ -103,7 +105,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
     })()
 
     return () => { cancelled = true }
-  }, [apiClient, vaultId, filePath, source, target, viewName])
+  }, [apiClient, vaultId, filePath, source, target, viewName, hostPath])
 
   // The embedded view, forced to a read-only table.
   const tableView = useMemo<BaseView | null>(() => (view ? { ...view, type: 'table' } : null), [view])

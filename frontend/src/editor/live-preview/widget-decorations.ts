@@ -165,6 +165,8 @@ class EmbedWidget extends WidgetType {
   private readonly heading: string | null
   private readonly directoryTree: DirectoryTree | null
   private readonly apiClient: IBasesEmbedApiClient | null
+  /** Path of the note this embed sits in — what `this` refers to in an embedded base. */
+  private readonly hostPath: string | null
   private objectUrl: string | null = null
   private reactRoot: Root | null = null
   private pluginEmbed: EmbedComponent | null = null
@@ -177,7 +179,8 @@ class EmbedWidget extends WidgetType {
     display: string | null,
     heading: string | null,
     directoryTree: DirectoryTree | null,
-    apiClient: IBasesEmbedApiClient | null = null
+    apiClient: IBasesEmbedApiClient | null = null,
+    hostPath: string | null = null
   ) {
     super()
     this.filename = filename
@@ -188,6 +191,7 @@ class EmbedWidget extends WidgetType {
     this.heading = heading
     this.directoryTree = directoryTree
     this.apiClient = apiClient
+    this.hostPath = hostPath
   }
 
   /**
@@ -332,6 +336,7 @@ class EmbedWidget extends WidgetType {
         filePath: resolvedPath,
         target: this.filename,
         ...(this.heading ? { viewName: this.heading } : {}),
+        ...(this.hostPath ? { hostPath: this.hostPath } : {}),
         onOpenNote: () => { /* navigation is handled by the editor host */ },
         apiClient: this.apiClient,
       })
@@ -397,6 +402,8 @@ class EmbedWidget extends WidgetType {
             vaultId: this.vaultId,
             directoryTree: this.directoryTree,
             token: this.token,
+            // `this` in a base inside the embedded note is that note, not the one embedding it.
+            sourcePath: resolvedPath,
           })
         )
       })
@@ -466,7 +473,8 @@ class EmbedWidget extends WidgetType {
       this.kind === other.kind &&
       this.display === other.display &&
       this.heading === other.heading &&
-      this.directoryTree === other.directoryTree
+      this.directoryTree === other.directoryTree &&
+      this.hostPath === other.hostPath
   }
 
   get estimatedHeight(): number {
@@ -1018,13 +1026,16 @@ class InlineBaseWidget extends WidgetType {
   private readonly source: string
   private readonly vaultId: string
   private readonly apiClient: IBasesEmbedApiClient | null
+  /** Path of the note the block sits in — what `this` refers to. */
+  private readonly hostPath: string | null
   private reactRoot: Root | null = null
 
-  constructor(source: string, vaultId: string, apiClient: IBasesEmbedApiClient | null) {
+  constructor(source: string, vaultId: string, apiClient: IBasesEmbedApiClient | null, hostPath: string | null) {
     super()
     this.source = source
     this.vaultId = vaultId
     this.apiClient = apiClient
+    this.hostPath = hostPath
   }
 
   toDOM(): HTMLElement {
@@ -1035,6 +1046,7 @@ class InlineBaseWidget extends WidgetType {
       createElement(BasesEmbed, {
         vaultId: this.vaultId,
         source: this.source,
+        ...(this.hostPath ? { hostPath: this.hostPath } : {}),
         onOpenNote: () => { /* navigation is handled by the editor host */ },
         apiClient: this.apiClient,
       })
@@ -1043,7 +1055,7 @@ class InlineBaseWidget extends WidgetType {
   }
 
   eq(other: InlineBaseWidget): boolean {
-    return this.source === other.source && this.vaultId === other.vaultId
+    return this.source === other.source && this.vaultId === other.vaultId && this.hostPath === other.hostPath
   }
 
   get estimatedHeight(): number {
@@ -1870,7 +1882,8 @@ export function buildWidgetDecorations(
               display,
               heading,
               options.directoryTree ?? null,
-              options.apiClient ?? null
+              options.apiClient ?? null,
+              options.sourcePath || null
             )
 
             // Replace the ![[...]] syntax with the widget
@@ -2046,7 +2059,7 @@ export function buildWidgetDecorations(
         if (language.toLowerCase() === 'base' && options.basesEnabled) {
           const source = fencedCodeSource(doc, node, fenceOpenFrom, fenceCloseFrom)
 
-          const widget = new InlineBaseWidget(source, options.vaultId, options.apiClient ?? null)
+          const widget = new InlineBaseWidget(source, options.vaultId, options.apiClient ?? null, options.sourcePath || null)
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)
           )
