@@ -750,15 +750,6 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
       {activeTab === 'installed' ? (
         <>
-          <div className="plugin-management-warning" role="status">
-            <AlertTriangle size={14} />
-            <span>
-              <strong>Experimentell:</strong> Die Plugin-Kompatibilitätsschicht befindet sich in aktiver Entwicklung.
-              Nur browser-kompatible Plugins können ausgeführt werden. Plugins die Node.js-Module benötigen
-              (z.B. IMAP, Git, Datenbank-Zugriff) werden erst mit serverseitiger Plugin-Ausführung unterstützt.
-            </span>
-          </div>
-
           <div className="plugin-management-update-actions">
             <button
               className="plugin-management-check-updates-button"

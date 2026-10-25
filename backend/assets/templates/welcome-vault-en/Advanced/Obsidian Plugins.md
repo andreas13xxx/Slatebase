@@ -135,6 +135,7 @@ These plugins have been tested and work with Slatebase:
 | Importer | Partial | Migrates Notion/Evernote/Keep/HTML/Markdown; Apple Notes needs macOS and doesn't work here |
 | Paste URL into Selection | Good | Pasting a URL over a selection wraps it as a Markdown link |
 | Better Word Count | Good | Extended status bar stats (sentences, reading time, page count), manually verified with a real plugin bundle |
+| Style Settings | Partial | Theme settings: variables take full effect, class toggles only where Slatebase has the element |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 
@@ -200,6 +201,7 @@ Detailed guides with examples and exercises for tested plugins:
 | Importer | Migrate notes from Notion, Evernote, and more | [[Advanced/Plugins/Importer]] |
 | Paste URL into Selection | Turn a selection into a Markdown link by pasting a URL | [[Advanced/Plugins/Paste URL into Selection]] |
 | Better Word Count | Extended status bar writing statistics | [[Advanced/Plugins/Better Word Count]] |
+| Style Settings | Settings of themes and snippets | [[Advanced/Plugins/Style Settings]] |
 
 ### Hands-on Exercises
 
