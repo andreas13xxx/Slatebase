@@ -7,6 +7,25 @@ import { BUILTIN_OBSIDIAN_THEME_ID } from '../builtin-themes'
 const css = readFileSync(resolve(process.cwd(), 'src/plugins/appearance/builtin/obsidian.css'), 'utf-8')
 const GATE = `:root[data-obsidian-theme="${BUILTIN_OBSIDIAN_THEME_ID}"]`
 
+/** Splits a selector list at its top-level commas (the commas inside `:is(...)` and `:not(...)` stay). */
+function splitSelectorList(list: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of list) {
+    if (char === '(') depth += 1
+    if (char === ')') depth -= 1
+    if (char === ',' && depth === 0) {
+      parts.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  parts.push(current.trim())
+  return parts.filter((part) => part !== '')
+}
+
 /** Selectors of every style rule (at any @-rule depth), one entry per comma-separated selector. */
 function styleSelectors(source: string): string[] {
   const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -15,7 +34,7 @@ function styleSelectors(source: string): string[] {
   for (const char of stripped) {
     if (char === '{') {
       const text = prelude.trim()
-      if (text !== '' && !text.startsWith('@')) selectors.push(...text.split(',').map((part) => part.trim()))
+      if (text !== '' && !text.startsWith('@')) selectors.push(...splitSelectorList(text))
       prelude = ''
     } else if (char === '}' || char === ';') {
       prelude = ''
@@ -104,6 +123,29 @@ describe('built-in Obsidian theme stylesheet', () => {
       expect(LIGHT.get('--callout-blend-mode')).toBe('darken')
       expect(DARK.get('--shadow-s')).toContain('rgba(0, 0, 0, 0.3)')
       expect(DARK.get('--text-selection')).toContain('33%')
+    })
+  })
+
+  describe('content (Phase 3)', () => {
+    it('has the measured heading scale', () => {
+      const sizes = ['--h1-size', '--h2-size', '--h3-size', '--h4-size', '--h5-size', '--h6-size'].map((name) => LIGHT.get(name))
+      expect(sizes).toEqual(['1.618em', '1.462em', '1.318em', '1.188em', '1.076em', '1em'])
+      const weights = ['--h1-weight', '--h2-weight', '--h3-weight', '--h4-weight', '--h5-weight', '--h6-weight'].map((name) => LIGHT.get(name))
+      expect(weights).toEqual(['700', '680', '660', '640', '620', '600'])
+      expect(LIGHT.get('--h1-letter-spacing')).toBe('-0.015em')
+      expect(LIGHT.get('--h3-line-height')).toBe('1.3')
+    })
+
+    it('styles the reading view headings and the Live Preview headings with the same variables', () => {
+      expect(css).toContain('.view-mode h1 { font-size: var(--h1-size)')
+      expect(css).toContain('.cm-lp-h1 { letter-spacing: var(--h1-letter-spacing); }')
+    })
+
+    it('colors every Slatebase callout type in both views', () => {
+      const types = ['note', 'info', 'tip', 'warning', 'danger', 'bug', 'example', 'quote', 'success', 'question', 'failure', 'abstract', 'todo']
+      for (const type of types) {
+        expect(css).toContain(`.view-mode-callout--${type}, .cm-lp-callout-${type}`)
+      }
     })
   })
 })

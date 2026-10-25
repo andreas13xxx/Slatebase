@@ -899,3 +899,278 @@
   --toast-error-border: var(--danger-border);
   --toast-error-icon: var(--color-red);
 }
+
+/* ─── Content (Phase 3): editor (Live Preview) and reading view ─────────────
+   Heading scale as measured: size, weight, line height, letter spacing. The bridge binds `.cm-lp-h1…6` to
+   `--hN-size/-weight/-line-height/-color`; the letter spacing and the reading view are added here.
+   Spacing: Obsidian puts `--heading-spacing` (2.5rem) above a heading that follows other content and `--p-spacing` (1rem)
+   between consecutive headings (measured on a note with H1…H6 in a row); the Live Preview line structure of Slatebase
+   gives its headings no block margin, so the spacing is applied in the reading view only. */
+:root[data-obsidian-theme="builtin:obsidian"] body {
+  --h1-size: 1.618em;
+  --h2-size: 1.462em;
+  --h3-size: 1.318em;
+  --h4-size: 1.188em;
+  --h5-size: 1.076em;
+  --h6-size: 1em;
+  --h1-weight: 700;
+  --h2-weight: 680;
+  --h3-weight: 660;
+  --h4-weight: 640;
+  --h5-weight: 620;
+  --h6-weight: 600;
+  --h1-line-height: 1.2;
+  --h2-line-height: 1.2;
+  --h3-line-height: 1.3;
+  --h4-line-height: 1.4;
+  --h5-line-height: 1.5;
+  --h6-line-height: 1.5;
+  --h1-letter-spacing: -0.015em;
+  --h2-letter-spacing: -0.011em;
+  --h3-letter-spacing: -0.008em;
+  --h4-letter-spacing: -0.005em;
+  --h5-letter-spacing: -0.002em;
+  --h6-letter-spacing: 0em;
+  --h1-style: normal;
+  --h2-style: normal;
+  --h3-style: normal;
+  --h4-style: normal;
+  --h5-style: normal;
+  --h6-style: normal;
+  --h1-variant: normal;
+  --h2-variant: normal;
+  --h3-variant: normal;
+  --h4-variant: normal;
+  --h5-variant: normal;
+  --h6-variant: normal;
+  --inline-title-size: 1.618em;
+  --inline-title-weight: 700;
+  --inline-title-line-height: 1.2;
+  --inline-title-margin-bottom: 0.5em;
+  --bold-color: var(--text-normal);
+  --italic-color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h1 { letter-spacing: var(--h1-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h2 { letter-spacing: var(--h2-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h3 { letter-spacing: var(--h3-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h4 { letter-spacing: var(--h4-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h5 { letter-spacing: var(--h5-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h6 { letter-spacing: var(--h6-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-heading-marker { color: var(--heading-formatting); }
+
+/* Reading view: text and layout */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode {
+  max-width: var(--file-line-width);
+  margin-inline: auto;
+  padding: var(--file-margins-y) var(--file-margins-x);
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(h1, h2, h3, h4, h5, h6) {
+  margin: var(--heading-spacing) 0 0;
+  font-style: normal;
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(h1, h2, h3, h4, h5, h6) + :is(h1, h2, h3, h4, h5, h6) { margin-top: var(--p-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h1 { font-size: var(--h1-size); font-weight: var(--h1-weight); line-height: var(--h1-line-height); letter-spacing: var(--h1-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h2 { font-size: var(--h2-size); font-weight: var(--h2-weight); line-height: var(--h2-line-height); letter-spacing: var(--h2-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h3 { font-size: var(--h3-size); font-weight: var(--h3-weight); line-height: var(--h3-line-height); letter-spacing: var(--h3-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h4 { font-size: var(--h4-size); font-weight: var(--h4-weight); line-height: var(--h4-line-height); letter-spacing: var(--h4-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h5 { font-size: var(--h5-size); font-weight: var(--h5-weight); line-height: var(--h5-line-height); letter-spacing: var(--h5-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h6 { font-size: var(--h6-size); font-weight: var(--h6-weight); line-height: var(--h6-line-height); letter-spacing: var(--h6-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode p { margin: var(--p-spacing) 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode strong { font-weight: var(--bold-weight); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode hr { border-top: var(--hr-thickness) solid var(--hr-color); }
+
+/* Lists */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(ul, ol) { padding-left: var(--list-indent); margin: var(--p-spacing) 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode li { margin: var(--list-spacing) 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode li::marker { color: var(--list-marker-color); }
+
+/* Blockquote: a 2px accent rule, no fill */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode blockquote {
+  margin: var(--p-spacing) 0;
+  padding: 0 0 0 var(--size-4-5);
+  border-left: var(--blockquote-border-thickness) solid var(--blockquote-border-color);
+  border-radius: 0;
+  background: var(--blockquote-background-color);
+  color: var(--text-normal);
+  font-style: var(--blockquote-font-style);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-blockquote {
+  border-left: var(--blockquote-border-thickness) solid var(--blockquote-border-color);
+  padding-left: var(--size-4-5);
+  color: var(--text-normal);
+}
+
+/* Code */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-inline-code,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-inline-code {
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  background: var(--code-background);
+  border: var(--code-border-width) solid var(--code-border-color);
+  border-radius: var(--code-radius);
+  padding: 0.15em 0.3em;
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-code {
+  background: var(--code-background);
+  border: var(--code-border-width) solid var(--code-border-color);
+  border-radius: var(--code-radius);
+  padding: var(--size-4-2) var(--size-4-3);
+  font-size: var(--code-size);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-code code { font-family: var(--font-monospace); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-code-block-line {
+  background: var(--code-background);
+  border-left: 0;
+  padding-left: var(--size-4-3);
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-code-block-first { border-radius: var(--code-radius) var(--code-radius) 0 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-code-block-last { border-radius: 0 0 var(--code-radius) var(--code-radius); }
+
+/* Tables: thin grid, header only bolder, no fills */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table {
+  width: auto;
+  font-size: var(--table-text-size);
+  line-height: var(--table-line-height);
+  background: var(--table-background);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table th,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table td,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table th,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table td {
+  padding: var(--size-4-1) var(--size-4-2);
+  border: var(--table-border-width) solid var(--table-border-color);
+  vertical-align: var(--table-cell-vertical-alignment);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table th,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table th {
+  background: var(--table-header-background);
+  font-weight: var(--table-header-weight);
+  color: var(--table-header-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table tbody tr:nth-child(even) { background: var(--table-row-alt-background); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table tbody tr:hover { background: var(--table-row-background-hover); }
+
+/* Links: accent colored and underlined; unresolved ones are dimmed */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-link,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-wikilink,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--internal {
+  color: var(--link-color);
+  text-decoration: var(--link-decoration);
+  text-decoration-thickness: var(--link-decoration-thickness);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-link:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-wikilink:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--internal:hover {
+  color: var(--link-color-hover);
+  text-decoration: var(--link-decoration-hover);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--external {
+  color: var(--link-external-color);
+  text-decoration: var(--link-external-decoration);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--external:hover {
+  color: var(--link-external-color-hover);
+  text-decoration: var(--link-external-decoration-hover);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--broken {
+  color: var(--link-unresolved-color);
+  opacity: var(--link-unresolved-opacity);
+  text-decoration: underline;
+  text-decoration-style: var(--link-unresolved-decoration-style);
+  text-decoration-color: var(--link-unresolved-decoration-color);
+}
+
+/* Tags: accent pill without outline */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-tag,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-tag {
+  background: var(--tag-background);
+  color: var(--tag-color);
+  border: var(--tag-border-width) solid var(--tag-border-color);
+  border-radius: var(--tag-radius);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
+  font-size: var(--tag-size);
+  font-weight: var(--tag-weight, inherit);
+  text-decoration: var(--tag-decoration);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-tag:hover {
+  background: var(--tag-background-hover);
+  color: var(--tag-color-hover);
+  border-color: var(--tag-border-color-hover);
+  text-decoration: var(--tag-decoration-hover);
+}
+
+/* Callouts. The type decides one color; fill, title and icon derive from it, like Obsidian's `--callout-color`. */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--note, .cm-lp-callout-note) { --slb-callout-color: var(--callout-default); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--info, .cm-lp-callout-info) { --slb-callout-color: var(--callout-info); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--tip, .cm-lp-callout-tip) { --slb-callout-color: var(--callout-tip); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--warning, .cm-lp-callout-warning) { --slb-callout-color: var(--callout-warning); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--danger, .cm-lp-callout-danger) { --slb-callout-color: var(--callout-error); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--bug, .cm-lp-callout-bug) { --slb-callout-color: var(--callout-bug); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--example, .cm-lp-callout-example) { --slb-callout-color: var(--callout-example); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--quote, .cm-lp-callout-quote) { --slb-callout-color: var(--callout-quote); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--success, .cm-lp-callout-success) { --slb-callout-color: var(--callout-success); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--question, .cm-lp-callout-question) { --slb-callout-color: var(--callout-question); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--failure, .cm-lp-callout-failure) { --slb-callout-color: var(--callout-fail); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--abstract, .cm-lp-callout-abstract) { --slb-callout-color: var(--callout-summary); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--todo, .cm-lp-callout-todo) { --slb-callout-color: var(--callout-todo); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout {
+  background: color-mix(in oklch, var(--slb-callout-color, var(--callout-default)) 10%, transparent);
+  border-left: var(--callout-border-width) solid color-mix(in oklch, var(--slb-callout-color, var(--callout-default)) 25%, transparent);
+  border-radius: var(--callout-radius);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout {
+  margin: var(--p-spacing) 0;
+  padding: var(--callout-padding);
+}
+
+/* Live Preview styles each callout line on its own, so only the horizontal padding applies per line. */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout { padding: 4px 12px 4px 24px; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-header,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout-header {
+  padding: var(--callout-title-padding);
+  font-size: inherit;
+  font-weight: var(--callout-title-weight);
+  color: var(--slb-callout-color, var(--callout-default));
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-header svg { color: var(--slb-callout-color, var(--callout-default)); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-body {
+  padding: var(--p-spacing) 0 0;
+  font-size: inherit;
+  line-height: inherit;
+  color: var(--text-normal);
+}
+
+/* Highlights: Obsidian's translucent fills, no corner rounding */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-highlight,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode mark.hl-yellow { background: var(--highlight-background); }

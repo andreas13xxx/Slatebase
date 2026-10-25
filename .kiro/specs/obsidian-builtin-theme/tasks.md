@@ -19,10 +19,10 @@ Jede Phase: umsetzen → Lint, `tsc`, betroffene Tests → Review des Diffs → 
 - [x] 2.5 Test: Variablenwerte der Datei (Hell/Dunkel) gegen die Referenzwerte
 
 ## Phase 3 — Inhalt
-- [ ] 3.1 Überschriften im Live Preview und in der Leseansicht (Größe, Gewicht, Zeilenhöhe, Buchstabenabstand)
-- [ ] 3.2 Textbreite, Ränder, Absatz-/Überschriftenabstand, fetter Text
-- [ ] 3.3 Callouts, Blockquote, Inline-Code, Codeblock, Tabelle, Tags, Links, Listen, Aufgaben, Hervorhebung
-- [ ] 3.4 Tests: CSS-Gating, keine Obsidian-Marker-Klassen in App-CSS
+- [x] 3.1 Überschriften im Live Preview und in der Leseansicht (Größe, Gewicht, Zeilenhöhe, Buchstabenabstand); Block-Abstände nur in der Leseansicht, weil Live-Preview-Überschriften in Slatebase Zeilen-Dekorationen ohne Block-Margin sind
+- [x] 3.2 Textbreite, Ränder, Absatz-/Überschriftenabstand, fetter Text
+- [x] 3.3 Callouts, Blockquote, Inline-Code, Codeblock, Tabelle, Tags, Links, Listen, Aufgaben, Hervorhebung
+- [x] 3.4 Tests: CSS-Gating, keine Obsidian-Marker-Klassen in App-CSS
 
 ## Phase 4 — Chrome
 - [ ] 4.1 Tab-Leiste und Pane-Kopf
