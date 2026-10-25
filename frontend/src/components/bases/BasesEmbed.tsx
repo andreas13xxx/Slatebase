@@ -1,7 +1,8 @@
 /**
- * BasesEmbed — a read-only embedded Bases view for `![[file.base]]` (bases:insert).
+ * BasesEmbed — a read-only embedded Bases view for `![[file.base]]` and for an
+ * inline ```` ```base ```` code block (bases:insert).
  *
- * Fetches the referenced `.base`, parses it, runs its first (or named) view's
+ * Fetches the referenced `.base` (or takes the code block's YAML as `source`), parses it, runs its first (or named) view's
  * query against the vault, and renders a read-only table. Deliberately a
  * trimmed variant of BasesView: no view switcher, no cell editing, no sort
  * write-back — an embed is a snapshot inside another note, not the full editor.
@@ -29,17 +30,19 @@ export interface IBasesEmbedApiClient {
 
 export interface BasesEmbedProps {
   vaultId: string
-  /** Resolved vault-relative path of the embedded `.base` file. */
-  filePath: string
-  /** The raw link text (for error messages). */
-  target: string
+  /** Resolved vault-relative path of the embedded `.base` file. Ignored when `source` is set. */
+  filePath?: string
+  /** Inline `.base` YAML from a ```` ```base ```` code block; skips the file fetch. */
+  source?: string
+  /** The raw link text (for error messages and the header). Omitted for an inline block. */
+  target?: string
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /** Explicit client (CM6 widget); falls back to AppContext in reading view. */
   apiClient?: IBasesEmbedApiClient | null
 }
 
-export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, target, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
+export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
   const appContext = useContext(AppContext)
   const apiClient: IBasesEmbedApiClient | null = explicitClient ?? appContext?.apiClient ?? null
 
@@ -60,9 +63,17 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, target, 
 
     void (async () => {
       try {
-        const file = await apiClient.fetchFileContent(vaultId, filePath)
-        if (cancelled) return
-        const parsed = parseBase(file.content)
+        let content = source
+        if (content === undefined) {
+          if (filePath === undefined) {
+            setError('Keine Base angegeben')
+            setLoading(false)
+            return
+          }
+          content = (await apiClient.fetchFileContent(vaultId, filePath)).content
+          if (cancelled) return
+        }
+        const parsed = parseBase(content)
         if (!parsed.success) {
           setError(`Ungültige Base: ${parsed.errors.map((e) => e.message).join('; ')}`)
           setLoading(false)
@@ -81,13 +92,13 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, target, 
         setLoading(false)
       } catch {
         if (cancelled) return
-        setError(`Fehler beim Laden: ${target}`)
+        setError(`Fehler beim Laden: ${target ?? 'Base'}`)
         setLoading(false)
       }
     })()
 
     return () => { cancelled = true }
-  }, [apiClient, vaultId, filePath, target])
+  }, [apiClient, vaultId, filePath, source, target])
 
   // The embedded view, forced to a read-only table.
   const tableView = useMemo<BaseView | null>(() => {
@@ -110,9 +121,11 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, target, 
 
   return (
     <div className="view-mode-embed bases-embed">
-      <span className="view-mode-embed-header">
-        <span className="view-mode-embed-title">{target}</span>
-      </span>
+      {target !== undefined && (
+        <span className="view-mode-embed-header">
+          <span className="view-mode-embed-title">{target}</span>
+        </span>
+      )}
       <BasesTableView
         doc={doc}
         view={tableView}

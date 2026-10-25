@@ -4,6 +4,8 @@ import React from 'react'
 import { ViewMode, resolveWikilinkTarget } from './ViewMode'
 import { AppContext } from '../state'
 import type { AppContextValue } from '../state'
+import { FeatureContext, type FeatureContextValue } from '../state/featureContext'
+import { initialFeatureState } from '../state/featureState'
 import type { DirectoryTree, AppState } from '../types'
 import type { IApiClient } from '../api'
 import { registerExtension, resetEmbedRegistry } from '../plugins/compat/embed-registry'
@@ -51,6 +53,53 @@ describe('ViewMode', () => {
       </AppContext.Provider>
     )
   }
+
+  describe('inline base code block', () => {
+    const baseBlock = '```base\nviews:\n  - type: table\n    name: Table\n```'
+
+    /** Renders with a feature context in which `bases` is on or off. */
+    function renderWithBases(enabled: boolean, content: string) {
+      const apiClient = { ...createMockApiClient(), queryBase: vi.fn().mockResolvedValue({ rows: [], total: 0 }) } as unknown as IApiClient
+      const features: FeatureContextValue = { state: initialFeatureState, dispatch: vi.fn(), isEnabled: (name) => enabled && name === 'bases' }
+      return renderWithContext(
+        <FeatureContext.Provider value={features}><ViewMode {...defaultProps} content={content} /></FeatureContext.Provider>,
+        apiClient,
+      )
+    }
+
+    it('renders a ```base block as an embedded Base instead of code', () => {
+      const { container } = renderWithBases(true, baseBlock)
+
+      expect(container.querySelector('.bases-embed')).not.toBeNull()
+      expect(container.querySelector('pre.view-mode-code')).toBeNull()
+    })
+
+    it('matches the language case-insensitively', () => {
+      const { container } = renderWithBases(true, baseBlock.replace('```base', '```BASE'))
+
+      expect(container.querySelector('.bases-embed')).not.toBeNull()
+    })
+
+    it('keeps the YAML visible as code while the bases feature is off', () => {
+      const { container } = renderWithBases(false, baseBlock)
+
+      expect(container.querySelector('.bases-embed')).toBeNull()
+      expect(container.querySelector('pre.view-mode-code')?.textContent).toContain('type: table')
+    })
+
+    it('keeps it as code without any feature context', () => {
+      const { container } = render(<ViewMode {...defaultProps} content={baseBlock} />)
+
+      expect(container.querySelector('.bases-embed')).toBeNull()
+    })
+
+    it('keeps it as plain code on a public share, which cannot query a Base', () => {
+      const { container } = render(<ViewMode {...defaultProps} vaultId="public-share:abc" content={baseBlock} />)
+
+      expect(container.querySelector('.bases-embed')).toBeNull()
+      expect(container.querySelector('pre.view-mode-code')).not.toBeNull()
+    })
+  })
 
   it('renders an article element with aria-label', () => {
     const { container } = render(<ViewMode {...defaultProps} content="Hello" />)

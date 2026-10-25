@@ -152,6 +152,7 @@ Andere Ansichtstypen kommen von Obsidian-Plugins (siehe [[Fortgeschritten/Obsidi
 ## Eine Base einbetten und Einträge anlegen
 
 - **Einbetten:** Schreibe `![[Meine Base.base]]` in eine Notiz. Im Lesemodus und in der Live-Vorschau erscheint die Base als schreibgeschützte Tabelle direkt in der Notiz — nützlich für ein Dashboard, das mehrere Bases nebeneinander zeigt.
+- **Inline als Codeblock:** Ein ```` ```base ````-Block enthält das YAML der Base direkt in der Notiz, ganz ohne eigene `.base`-Datei. Führe **„Bases: Neue Base einfügen"** über die [[Features/Command Palette|Command Palette]] aus, um ein Gerüst an der Cursorposition einzufügen. Die Notiz zeigt dann dieselbe schreibgeschützte Tabelle; in der Live-Vorschau erscheint der Rohtext, sobald du in den Block klickst. Auf einer [[Features/Öffentliche Links|öffentlichen Freigabe]] und solange das Feature-Toggle `bases` aus ist, bleibt der Block als Code stehen; der Befehl fügt dann nichts ein, sondern verweist auf das Toggle.
 - **Eintrag hinzufügen:** Führe **„Bases: Add item"** über die [[Features/Command Palette|Command Palette]] aus, während eine Base geöffnet ist. Slatebase legt eine neue Notiz im Geltungsbereich der Base an — der Zielordner stammt aus einem `file.inFolder(...)`-Filter (sonst Vault-Wurzel), und die angezeigten Properties werden als leere Frontmatter-Felder vorbereitet (ein `property == "x"`-Filter füllt den Wert vor). Die Notiz öffnet sich und erscheint als neue Zeile.
 
 ---
@@ -173,7 +174,7 @@ Damit du nicht überrascht wirst:
 
 **Ansichten und Einbettung**
 - Eingebaut sind **Tabelle** und **Karten**; andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
-- Eine Base lässt sich **als eigene `.base`-Datei öffnen oder per `![[…]]` einbetten** (schreibgeschützte Tabelle). Ein Einbetten als Codeblock innerhalb einer Notiz gibt es nicht.
+- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützte Tabelle). Eingebettet zeigt sie nur die erste Ansicht, und zwar als Tabelle.
 
 **KI-Zugriff über MCP**
 - Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients), inklusive der `summaries`. Es liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück.
@@ -186,6 +187,29 @@ Dieser Vault bringt zwei fertige Beispiele mit, die auf denselben Aufgaben-Notiz
 
 - [[Features/Beispiel-Aufgaben (Base)]] — eine **Tabelle** mit Filter, Formel-Spalte „Tage übrig", der Aufwands-Spalte und einer **Zusammenfassungszeile** (Anzahl, Summe des Aufwands, Durchschnitt der Resttage).
 - [[Features/Beispiel-Board (Base)]] — ein **Karten-Board**, nach `status` gruppiert, mit einer Summary-Leiste über den Spalten.
+
+Dieselben Aufgaben als **Inline-Base** — das ist ein ```` ```base ````-Block, der direkt in dieser Notiz steht:
+
+```base
+filters:
+  and:
+    - file.inFolder("Features/Beispiel-Aufgaben")
+    - 'type == "task"'
+properties:
+  file.name:
+    displayName: "Aufgabe"
+  status:
+    displayName: "Status"
+  priority:
+    displayName: "Priorität"
+views:
+  - type: table
+    name: "Aufgaben"
+    order:
+      - file.name
+      - status
+      - priority
+```
 
 Öffne die Tabelle, dann:
 
@@ -201,6 +225,7 @@ Dieser Vault bringt zwei fertige Beispiele mit, die auf denselben Aufgaben-Notiz
 > 2. Führe **„Bases: Add item"** aus, während die Base geöffnet ist — eine neue Aufgaben-Notiz sollte im richtigen Ordner entstehen und als Zeile erscheinen.
 > 3. Führe **„Neue Base erstellen"** aus und baue eine kleine eigene Base mit dem Filter `file.hasTag("features")`.
 > 4. Füge eine `summaries`-Zeile mit `estimate: Sum` hinzu und bette die Base per `![[…]]` in eine andere Notiz ein.
+> 5. Führe **„Bases: Neue Base einfügen"** aus und passe den `filters`-Block im eingefügten Codeblock an.
 
 ---
 

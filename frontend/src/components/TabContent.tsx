@@ -287,12 +287,14 @@ export function TabContent() {
   const directoryTreeForActiveVault = activeTabVaultId
     ? appState.vaultTrees[activeTabVaultId] ?? appState.directoryTree
     : null
+  const basesEnabled = isEnabled('bases')
   const editModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
     onInternalLinkClick: handleInternalLinkClick,
     apiClient,
-  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, apiClient])
+    basesEnabled,
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, apiClient, basesEnabled])
   const previewModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
@@ -300,7 +302,8 @@ export function TabContent() {
     typeRegistry,
     onPropertyTypeChange: handlePropertyTypeChange,
     apiClient,
-  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange, apiClient])
+    basesEnabled,
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange, apiClient, basesEnabled])
 
   // No active tab — empty state
   if (!activeTab) {

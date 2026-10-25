@@ -70,6 +70,8 @@ beide, eslint 0 Errors.
   Root; Frontmatter-Keys aus angezeigten Properties leer vorbelegt) via `saveFile` + unique-name.
 - [ ] 5.4 Beide Command-Palette-Befehle, deutsche Labels, hinter `bases`-Toggle.
 - [ ] 5.5 Tests: Embed-Rendering (Live Preview + Reading), Notiz-Anlage inkl. Scope-Ableitung.
+- Nachtrag: `bases:insert` fügt einen Inline-```` ```base ````-Block ein (`BasesEmbed` mit `source`,
+  `InlineBaseWidget`, `ViewMode` `case 'code'`) — siehe Nachtrag in `design.md`.
 
 ## R6 — Formelspalten sortierbar
 

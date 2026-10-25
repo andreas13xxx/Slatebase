@@ -121,7 +121,6 @@ Diese Command-IDs sind registriert (damit `executeCommandById()` sie findet), f�
 | `workspace:toggle-stacked-tabs` | `stacked-tabs` | Tabs stehen nebeneinander in einer Leiste; gestapelte Tabs gibt es nicht. (`workspace:split-vertical`/`-horizontal` und `editor:focus-top/-bottom/-left/-right` sind seit Split Panes echt.) |
 | `workspace:new-window`, `workspace:close-window`, `workspace:move-to-new-window`, `workspace:open-in-new-window`, `window:toggle-always-on-top` | `native-windows` | Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster. |
 | `workspace:new-tab` | `blank-tab` | Ein leerer Tab ohne Datei ist nicht vorgesehen: Tabs entstehen beim Öffnen einer Datei. |
-| `bases:insert` | `bases-embed` | Bases lassen sich nicht als Codeblock in eine Notiz einbetten, nur als eigene `.base`-Datei. |
 | `open-with-default-app:open`, `open-with-default-app:show` | `desktop-shell` | Desktop-only-Konzepte („in nativer App öffnen", „im System-Explorer anzeigen") — Dateien liegen serverseitig, es gibt kein lokales Dateisystem. |
 | `download-attachments` | `attachments` | Es gibt keinen automatischen Download externer Bild-Links in den Vault — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen" hinein. |
 | `app:open-help` | `in-app-help` | Die Anleitung steht im Welcome-Vault statt in einer eigenen Hilfe-Ansicht. |

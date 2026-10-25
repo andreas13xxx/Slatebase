@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
@@ -165,6 +165,63 @@ describe('buildWidgetDecorations — <center> HTML block', () => {
       return spec.attributes?.class === 'cm-lp-html-center'
     })
     expect(centerLine).toBeUndefined()
+  })
+})
+
+describe('buildWidgetDecorations — inline base code block', () => {
+  const doc = '```base\nviews:\n  - type: table\n    name: Table\n```'
+
+  const widgetsOf = (text: string, basesEnabled: boolean | undefined) =>
+    buildWidgetDecorations(makeState(text), { vaultId: 'v1', ...(basesEnabled === undefined ? {} : { basesEnabled }) })
+      .decorations.filter((r) => (r.value.spec as { widget?: unknown }).widget !== undefined)
+
+  it('replaces the whole fenced block with one widget', () => {
+    const result = buildWidgetDecorations(makeState(doc), { vaultId: 'v1', basesEnabled: true })
+    const replaced = result.decorations.filter((r) => (r.value.spec as { widget?: unknown }).widget !== undefined)
+
+    expect(replaced).toHaveLength(1)
+    expect(replaced[0]!.from).toBe(0)
+    expect(replaced[0]!.to).toBe(doc.length)
+    expect(result.hideableRanges).toHaveLength(1)
+  })
+
+  it('leaves other languages as a plain code block', () => {
+    expect(widgetsOf(doc.replace('```base', '```yaml'), true)).toHaveLength(0)
+  })
+
+  it('stays a plain code block while the bases feature is off or unset', () => {
+    expect(widgetsOf(doc, false)).toHaveLength(0)
+    expect(widgetsOf(doc, undefined)).toHaveLength(0)
+  })
+
+  it('matches the language case-insensitively', () => {
+    expect(widgetsOf(doc.replace('```base', '```BASE'), true)).toHaveLength(1)
+  })
+
+  it('still renders a block whose closing fence has not been typed yet', () => {
+    expect(widgetsOf('```base\nviews:\n  - type: table', true)).toHaveLength(1)
+  })
+
+  it('treats two blocks with the same source as equal and different source as different', () => {
+    const [a] = widgetsOf(doc, true)
+    const [b] = widgetsOf(doc, true)
+    const [c] = widgetsOf(doc.replace('Table', 'Other'), true)
+    const widgetA = (a!.value.spec as { widget: { eq(o: unknown): boolean } }).widget
+
+    expect(widgetA.eq((b!.value.spec as { widget: unknown }).widget)).toBe(true)
+    expect(widgetA.eq((c!.value.spec as { widget: unknown }).widget)).toBe(false)
+  })
+
+  it('unmounts its React root when CM6 destroys the widget', async () => {
+    const [a] = widgetsOf(doc, true)
+    const widget = (a!.value.spec as { widget: { toDOM(): HTMLElement; destroy(dom: HTMLElement): void } }).widget
+    const dom = widget.toDOM()
+    await vi.waitFor(() => expect(dom.textContent).not.toBe(''))
+
+    widget.destroy(dom)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(dom.textContent).toBe('')
   })
 })
 

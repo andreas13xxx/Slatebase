@@ -15,6 +15,7 @@ import type { Plugin } from 'unified'
 import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import type { DirectoryTree } from '../types'
 import { AppContext } from '../state'
+import { FeatureContext } from '../state/featureContext'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../state/aliasStore'
@@ -903,6 +904,15 @@ function renderBlockNode(
       return createElement(MathRenderer, { key, source: (node as unknown as { value: string }).value, displayMode: true })
 
     case 'code':
+      // An inline Base: the server never resolves a Base query on a public share, so it stays plain code there.
+      if (node.lang?.toLowerCase() === 'base' && parsePublicVaultId(vaultId) === null) {
+        return createElement(InlineBase, {
+          key,
+          vaultId,
+          source: node.value,
+          onOpenNote: (path: string) => onInternalLinkClick?.(path),
+        })
+      }
       return renderCodeBlock(node.value, node.lang, key)
 
     case 'list':
@@ -939,6 +949,16 @@ function renderBlockNode(
       // Req 5.7: Unknown node types rendered as plain text
       return createElement('span', { key }, String((node as { value?: string }).value ?? ''))
   }
+}
+
+/**
+ * An inline ```` ```base ```` block: a read-only Base table while the `bases` feature is on,
+ * otherwise (the feature guards the query endpoint off) the YAML as a plain code block.
+ */
+function InlineBase({ vaultId, source, onOpenNote }: { vaultId: string; source: string; onOpenNote: (path: string) => void }): ReactNode {
+  const features = useContext(FeatureContext)
+  if (!features?.isEnabled('bases')) return renderCodeBlock(source, 'base', 'inline-base')
+  return createElement(BasesEmbed, { vaultId, source, onOpenNote })
 }
 
 /**

@@ -125,6 +125,12 @@ Dateien: `frontend/src/plugins/embed/syntax.ts`, `editor/live-preview/widget-dec
 `components/ViewMode.tsx`, `components/bases/BasesView.tsx`, `plugins/compat/core-commands-app.ts`
 (Command-Registrierung).
 
+> **Nachtrag (Inline-Codeblock):** `BasesEmbed` nimmt alternativ zu `filePath` ein `source` (YAML) und
+> überspringt den Datei-Abruf. Live Preview: `InlineBaseWidget` in `widget-decorations.ts` ersetzt den
+> Fenced-Block (vor den Plugin-Codeblock-Prozessoren); Reading View: `case 'code'` in `ViewMode.tsx`.
+> `bases:insert` ist ein Editor-Befehl und fügt `INLINE_BASE_TEMPLATE` an der Cursorposition ein.
+> Weiterhin nur erste Ansicht, als Tabelle, ohne Bearbeitung.
+
 ## R6 — Formelspalten sortierbar
 
 1. Formelwerte liegen nach `evaluateFormulaColumn` ohnehin vor. `BasesTableView` sortiert bei
