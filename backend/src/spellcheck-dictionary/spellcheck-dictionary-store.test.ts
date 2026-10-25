@@ -77,11 +77,49 @@ describe('SpellcheckDictionaryStore', () => {
     expect((await store.getWords(VAULT_ID)).words).toEqual(['auch', 'gut'])
   })
 
+  it('does not cut a list that a Git merge pushed over the cap', async () => {
+    const words = Array.from({ length: MAX_SPELLCHECK_WORDS + 10 }, (_, i) => `w${String(i).padStart(5, '0')}`)
+    await fs.writeFile(filePath, JSON.stringify({ words }), 'utf-8')
+    expect((await store.getWords(VAULT_ID)).words).toHaveLength(MAX_SPELLCHECK_WORDS + 10)
+    // Removing still works and keeps the rest.
+    expect((await store.removeWord(VAULT_ID, 'w00000')).words).toHaveLength(MAX_SPELLCHECK_WORDS + 9)
+    // Adding something new is refused, re-adding something known is not.
+    await expect(store.addWords(VAULT_ID, ['neu'])).rejects.toBeInstanceOf(SpellcheckDictionaryFullError)
+  })
+
+  it('drops entries the API would not accept when reading', async () => {
+    await fs.writeFile(filePath, JSON.stringify({ words: ['gut', 'zwei Wörter', 'x'.repeat(101), 'a\nb'] }), 'utf-8')
+    expect((await store.getWords(VAULT_ID)).words).toEqual(['gut'])
+  })
+
+  it('does not write when nothing changes', async () => {
+    await expect(store.removeWord(VAULT_ID, 'fehlt')).resolves.toEqual({ words: [] })
+    await expect(fs.access(filePath)).rejects.toThrow()
+
+    await store.addWords(VAULT_ID, ['Slatebase'])
+    const before = await fs.stat(filePath)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    await store.addWords(VAULT_ID, ['Slatebase'])
+    await store.removeWord(VAULT_ID, 'fehlt')
+    expect((await fs.stat(filePath)).mtimeMs).toBe(before.mtimeMs)
+  })
+
+  it.each([
+    ['an empty object', '{}'],
+    ['an array', '["a","b"]'],
+    ['words of the wrong type', '{"words":"a"}'],
+  ])('refuses to overwrite valid JSON of the wrong shape (%s)', async (_label, content) => {
+    await fs.writeFile(filePath, content, 'utf-8')
+    await expect(store.addWords(VAULT_ID, ['neu'])).rejects.toBeInstanceOf(SpellcheckDictionaryUnreadableError)
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(content)
+  })
+
   it('refuses to overwrite a file that is not valid JSON', async () => {
     const conflicted = '<<<<<<< HEAD\n{"words":["a"]}\n=======\n{"words":["b"]}\n>>>>>>> origin\n'
     await fs.writeFile(filePath, conflicted, 'utf-8')
     await expect(store.addWords(VAULT_ID, ['neu'])).rejects.toBeInstanceOf(SpellcheckDictionaryUnreadableError)
-    await expect(store.removeWord(VAULT_ID, 'a')).rejects.toBeInstanceOf(SpellcheckDictionaryUnreadableError)
+    // Nothing readable to remove from: no write either way.
+    await store.removeWord(VAULT_ID, 'a')
     expect(await fs.readFile(filePath, 'utf-8')).toBe(conflicted)
   })
 })

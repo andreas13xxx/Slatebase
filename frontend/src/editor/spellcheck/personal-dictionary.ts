@@ -34,12 +34,35 @@ const LEGACY_STORAGE_KEY = 'slatebase:spellcheck-personal'
  */
 const MAX_WORDS = 5000
 
+/** Same rules as the server's `spellcheckWordSchema`: a rejected word would fail the whole request. */
+const MAX_WORD_LENGTH = 100
+// eslint-disable-next-line no-control-regex
+const FORBIDDEN_CHARACTERS = /[\s\u0000-\u001f\u007f]/
+
+function isValidWord(word: string): boolean {
+  return word.length >= 1 && word.length <= MAX_WORD_LENGTH && !FORBIDDEN_CHARACTERS.test(word)
+}
+
 /** Words the user ignored via the context menu, forgotten on reload. */
 const sessionIgnored = new Set<string>()
 
 let api: DictionaryApi | null = null
 let activeVaultId: string | null = null
 let words: string[] = []
+
+/** Whether the legacy list was already offered to a server this session (success or not). */
+let legacyMigrationAttempted = false
+
+/**
+ * Changes made while the server copy of the active vault is still on its way.
+ * They are applied on top of it, otherwise a word added during the request
+ * would vanish again when the response replaces the list.
+ */
+interface LoadWindow {
+  added: Set<string>
+  removed: Set<string>
+}
+let loadWindow: LoadWindow | null = null
 
 const changeListeners = new Set<(words: string[]) => void>()
 
@@ -105,39 +128,52 @@ export async function setActivePersonalDictionaryVault(vaultId: string | null): 
 
   activeVaultId = vaultId
   words = vaultId === null ? [] : readCache(vaultId)
+  const session: LoadWindow = { added: new Set(), removed: new Set() }
+  loadWindow = vaultId === null ? null : session
   notify()
-  if (vaultId === null || !api) return
+  if (vaultId === null || !api) {
+    loadWindow = null
+    return
+  }
 
   try {
     let remote = (await api.getSpellcheckWords(vaultId)).words
     if (activeVaultId !== vaultId) return
     remote = await migrateLegacyWords(api, vaultId, remote)
     if (activeVaultId !== vaultId) return
-    words = remote.slice(0, MAX_WORDS)
+    words = [...new Set([...remote, ...session.added])].filter((word) => !session.removed.has(word)).slice(0, MAX_WORDS)
     writeCache(vaultId, words)
     notify()
   } catch {
     // Keep the cached words; the next vault switch or reload asks again.
+  } finally {
+    if (loadWindow === session) loadWindow = null
   }
 }
 
 /**
  * Uploads the old device-wide list into the vault that is opened first, then
- * deletes it. The old key stays when the upload fails (read-only access, server
- * down), so a later visit can still migrate it.
+ * deletes it. Entries the server would reject are filtered out first — one bad
+ * word fails the whole request. A failed upload (read-only access, server down)
+ * keeps the old key for the next session; it is tried once per session, not on
+ * every vault switch.
  */
 async function migrateLegacyWords(client: DictionaryApi, vaultId: string, remote: string[]): Promise<string[]> {
-  let legacy: string[]
+  if (legacyMigrationAttempted) return remote
+
+  let stored: string[]
   try {
-    legacy = parseWordList(localStorage.getItem(LEGACY_STORAGE_KEY))
+    stored = parseWordList(localStorage.getItem(LEGACY_STORAGE_KEY))
   } catch {
     return remote
   }
+  const legacy = [...new Set(stored.filter(isValidWord))]
   if (legacy.length === 0) {
     removeLegacyKey()
     return remote
   }
 
+  legacyMigrationAttempted = true
   try {
     const merged = (await client.addSpellcheckWords(vaultId, legacy)).words
     removeLegacyKey()
@@ -161,38 +197,63 @@ export function readPersonalWords(): string[] {
 }
 
 function reportSaveFailure(): void {
-  showToast('error', 'Wörterbuch konnte nicht im Vault gespeichert werden — das Wort gilt nur bis zum Neuladen.')
+  showToast('error', 'Wörterbuch konnte nicht im Vault gespeichert werden — die Änderung wurde zurückgenommen.')
+}
+
+/** Applies a change to the in-memory list, the cache and an open load window. */
+function applyChange(vaultId: string, word: string, present: boolean): void {
+  words = present ? [...words, word] : words.filter((entry) => entry !== word)
+  writeCache(vaultId, words)
+  if (loadWindow) {
+    if (present) {
+      loadWindow.added.add(word)
+      loadWindow.removed.delete(word)
+    } else {
+      loadWindow.removed.add(word)
+      loadWindow.added.delete(word)
+    }
+  }
+}
+
+/**
+ * Undoes a change whose server write failed, so the list does not keep words
+ * (or lose them) that the vault never learned about. The listeners tell the
+ * worker and re-lint. Skipped if the user has since switched vaults.
+ */
+function rollBack(vaultId: string, word: string, present: boolean): void {
+  reportSaveFailure()
+  if (activeVaultId !== vaultId || words.includes(word) === present) return
+  applyChange(vaultId, word, present)
+  notify()
 }
 
 /**
  * Adds a word to the active vault's list.
  *
  * The in-memory list changes immediately; the server write follows in the
- * background. A failed write leaves the word known for this session and says so.
+ * background and is rolled back, with a toast, if it fails.
  *
  * @returns `true` if the list actually changed — the caller uses this to skip
  *   the worker round-trip and lint refresh for a duplicate.
  */
 export function addPersonalWord(word: string): boolean {
   const trimmed = word.trim()
-  if (!trimmed || activeVaultId === null) return false
+  if (!isValidWord(trimmed) || activeVaultId === null) return false
   if (words.includes(trimmed) || words.length >= MAX_WORDS) return false
 
   const vaultId = activeVaultId
-  words = [...words, trimmed]
-  writeCache(vaultId, words)
-  api?.addSpellcheckWords(vaultId, [trimmed]).catch(reportSaveFailure)
+  applyChange(vaultId, trimmed, true)
+  api?.addSpellcheckWords(vaultId, [trimmed]).catch(() => rollBack(vaultId, trimmed, false))
   return true
 }
 
-/** Removes a word from the active vault's list. */
+/** Removes a word from the active vault's list; rolled back if the server write fails. */
 export function removePersonalWord(word: string): boolean {
   if (activeVaultId === null || !words.includes(word)) return false
 
   const vaultId = activeVaultId
-  words = words.filter((entry) => entry !== word)
-  writeCache(vaultId, words)
-  api?.removeSpellcheckWord(vaultId, word).catch(reportSaveFailure)
+  applyChange(vaultId, word, false)
+  api?.removeSpellcheckWord(vaultId, word).catch(() => rollBack(vaultId, word, true))
   return true
 }
 
@@ -216,6 +277,8 @@ export function resetPersonalDictionary(): void {
   api = null
   activeVaultId = null
   words = []
+  loadWindow = null
+  legacyMigrationAttempted = false
   sessionIgnored.clear()
   changeListeners.clear()
 }

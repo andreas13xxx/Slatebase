@@ -393,7 +393,7 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | GET/PUT | `/vaults/:vaultId/property-types` | Per-vault property type registry |
 | PUT | `/vaults/:vaultId/property-types/:key` | Declare the type of one key |
 | GET/POST | `/vaults/:vaultId/spellcheck/words` | The vault's personal spellcheck words / add words |
-| DELETE | `/vaults/:vaultId/spellcheck/words/:word` | Remove a word |
+| POST | `/vaults/:vaultId/spellcheck/words/remove` | Remove a word (sent in the body — `..` and `/` do not survive a URL path) |
 
 ### Plugins
 

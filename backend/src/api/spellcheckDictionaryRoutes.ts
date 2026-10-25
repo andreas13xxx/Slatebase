@@ -7,7 +7,7 @@
  * Routes:
  *   GET    /vaults/:vaultId/spellcheck/words        — Get the word list
  *   POST   /vaults/:vaultId/spellcheck/words        — Add one or more words
- *   DELETE /vaults/:vaultId/spellcheck/words/:word  — Remove a word
+ *   POST   /vaults/:vaultId/spellcheck/words/remove — Remove a word (in the body: `..` or `/` do not survive a path)
  */
 
 import { Hono } from 'hono'
@@ -17,6 +17,7 @@ import {
   SpellcheckDictionaryFullError,
   SpellcheckDictionaryUnreadableError,
   addSpellcheckWordsSchema,
+  removeSpellcheckWordSchema,
 } from '../spellcheck-dictionary/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
@@ -97,13 +98,26 @@ export function createSpellcheckDictionaryRoutes(deps: SpellcheckDictionaryRoute
     }
   })
 
-  app.delete('/vaults/:vaultId/spellcheck/words/:word', async (c: Context) => {
+  app.post('/vaults/:vaultId/spellcheck/words/remove', async (c: Context) => {
     const session = c.get('session') as SessionContext
     const vaultId = c.req.param('vaultId') as string
-    const word = c.req.param('word') as string
+
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json(createApiError('VALIDATION_ERROR', 'Invalid JSON body'), 400)
+    }
+
+    const result = removeSpellcheckWordSchema.safeParse(body)
+    if (!result.success) {
+      const firstIssue = result.error.issues[0]
+      const message = firstIssue !== undefined ? firstIssue.message : 'Invalid input'
+      return c.json(createApiError('VALIDATION_ERROR', message), 400)
+    }
 
     try {
-      return c.json(await spellcheckDictionaryService.removeWord(vaultId, word), 200)
+      return c.json(await spellcheckDictionaryService.removeWord(vaultId, result.data.word), 200)
     } catch (error) {
       return handleError(c, error, 'remove', vaultId, session.userId)
     }

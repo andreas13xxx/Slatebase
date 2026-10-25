@@ -108,8 +108,6 @@ function handleResponse(response: SpellcheckResponse): void {
 function ensureWorker(): Worker | null {
   if (worker || workerUnavailable) return worker
 
-  followPersonalWords()
-
   try {
     worker = new Worker(new URL('./spellcheck.worker.ts', import.meta.url), { type: 'module' })
     worker.addEventListener('message', (event: MessageEvent<SpellcheckResponse>) => handleResponse(event.data))
@@ -117,6 +115,7 @@ function ensureWorker(): Worker | null {
       console.error('[Spellcheck] Worker error:', event.message)
       ready = false
     })
+    followPersonalWords()
   } catch (error) {
     workerUnavailable = true
     console.warn('[Spellcheck] Web Worker unavailable — spellcheck disabled:', error)

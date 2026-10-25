@@ -1,4 +1,4 @@
-// Integration tests for spellcheckDictionaryRoutes — GET/POST/DELETE /vaults/:vaultId/spellcheck/words
+// Integration tests for spellcheckDictionaryRoutes — GET/POST /vaults/:vaultId/spellcheck/words
 
 import { describe, it, expect } from 'vitest'
 import { Hono } from 'hono'
@@ -80,14 +80,29 @@ describe('spellcheckDictionaryRoutes', () => {
     expect(((await res.json()) as { code: string }).code).toBe('CONFLICT')
   })
 
-  it('DELETE decodes the word from the path', async () => {
-    let removed = ''
+  it('remove takes the word from the body, so path-hostile words work', async () => {
+    const removed: string[] = []
     const app = createTestApp(createMockService({
-      removeWord: async (_vaultId, word) => { removed = word; return { words: [] } },
+      removeWord: async (_vaultId, word) => { removed.push(word); return { words: [] } },
     }))
-    const res = await app.request(`/api/v1/vaults/v1/spellcheck/words/${encodeURIComponent('Größe')}`, { method: 'DELETE' })
-    expect(res.status).toBe(200)
-    expect(removed).toBe('Größe')
+    for (const word of ['Größe', '..', 'a/b']) {
+      const res = await app.request('/api/v1/vaults/v1/spellcheck/words/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word }),
+      })
+      expect(res.status).toBe(200)
+    }
+    expect(removed).toEqual(['Größe', '..', 'a/b'])
+  })
+
+  it('remove rejects a missing word with 400', async () => {
+    const res = await createTestApp(createMockService()).request('/api/v1/vaults/v1/spellcheck/words/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    expect(res.status).toBe(400)
   })
 
   it('returns 500 for unexpected failures', async () => {

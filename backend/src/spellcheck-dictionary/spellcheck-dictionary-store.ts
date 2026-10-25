@@ -10,6 +10,7 @@ import { readFile } from 'node:fs/promises'
 import type { ILogger } from '../logger/index.js'
 import type { ISpellcheckDictionaryService, SpellcheckWordList } from './types.js'
 import { MAX_SPELLCHECK_WORDS } from './types.js'
+import { isValidSpellcheckWord } from './validation.js'
 import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 import { isNodeError } from '../shared/fs-utils.js'
 
@@ -33,15 +34,18 @@ function normalizeWords(words: Iterable<string>): string[] {
 }
 
 /**
- * Validates raw JSON into a word list. Returns null (= fall back to empty) for
- * unrecognizable data; individual non-string entries are dropped.
+ * Validates raw JSON into a word list. Returns null (= unrecognizable) for
+ * anything that is not `{ words: [...] }`; individual entries the API would not
+ * accept are dropped. The list is deliberately not cut to the cap: a Git merge
+ * of two devices' lists can exceed it, and truncating on read would delete the
+ * alphabetically last words on the next write.
  */
 function sanitizeList(raw: unknown): SpellcheckWordList | null {
   if (typeof raw !== 'object' || raw === null) return null
   const obj = raw as Record<string, unknown>
   if (!Array.isArray(obj.words)) return null
-  const words = obj.words.filter((w): w is string => typeof w === 'string' && w.length > 0)
-  return { words: normalizeWords(words).slice(0, MAX_SPELLCHECK_WORDS) }
+  const words = obj.words.filter((w): w is string => typeof w === 'string' && isValidSpellcheckWord(w))
+  return { words: normalizeWords(words) }
 }
 
 // ─── Implementation ──────────────────────────────────────────────────────────
@@ -66,10 +70,15 @@ export class SpellcheckDictionaryStore implements ISpellcheckDictionaryService {
   }
 
   async addWords(vaultId: string, words: string[]): Promise<SpellcheckWordList> {
-    await this.assertReadable(vaultId)
-    return this.store.mutate(vaultId, (current) => {
-      const merged = normalizeWords([...current.words, ...words])
-      if (merged.length > MAX_SPELLCHECK_WORDS) {
+    // Nothing new: answer from the file without touching it, so a repeated add
+    // never rewrites (and so never dirties) a file that Git Sync tracks.
+    const current = await this.store.read(vaultId)
+    if (words.every((word) => current.words.includes(word))) return current
+
+    return this.store.mutate(vaultId, async (latest) => {
+      await this.assertReadable(vaultId)
+      const merged = normalizeWords([...latest.words, ...words])
+      if (merged.length > MAX_SPELLCHECK_WORDS && merged.length > latest.words.length) {
         throw new SpellcheckDictionaryFullError(MAX_SPELLCHECK_WORDS)
       }
       return { words: merged }
@@ -77,10 +86,14 @@ export class SpellcheckDictionaryStore implements ISpellcheckDictionaryService {
   }
 
   async removeWord(vaultId: string, word: string): Promise<SpellcheckWordList> {
-    await this.assertReadable(vaultId)
-    return this.store.mutate(vaultId, (current) => ({
-      words: current.words.filter((entry) => entry !== word),
-    }))
+    // Removing a word that is not there must not create or reformat the file.
+    const current = await this.store.read(vaultId)
+    if (!current.words.includes(word)) return current
+
+    return this.store.mutate(vaultId, async (latest) => {
+      await this.assertReadable(vaultId)
+      return { words: latest.words.filter((entry) => entry !== word) }
+    })
   }
 
   // ─── Internal ────────────────────────────────────────────────────────────────
@@ -94,24 +107,27 @@ export class SpellcheckDictionaryStore implements ISpellcheckDictionaryService {
   }
 
   /**
-   * Refuses to write over a file that exists but cannot be parsed — typically a
-   * Git merge that left conflict markers in it. Reading treats such a file as an
-   * empty list; writing would replace the user's words with a list of one.
+   * Refuses to write over a file that exists but is not a word list — invalid
+   * JSON (typically a Git merge that left conflict markers) or valid JSON of
+   * the wrong shape. Reading treats such a file as an empty list; writing would
+   * replace the user's words with a list of one. Called from inside the
+   * store's `mutate`, so the check and the write share the per-vault lock.
    */
   private async assertReadable(vaultId: string): Promise<void> {
-    const filePath = this.getFilePath(vaultId)
     let raw: string
     try {
-      raw = await readFile(filePath, 'utf-8')
+      raw = await readFile(this.getFilePath(vaultId), 'utf-8')
     } catch (err: unknown) {
       if (isNodeError(err) && err.code === 'ENOENT') return
       throw err
     }
+    let parsed: unknown
     try {
-      JSON.parse(raw)
+      parsed = JSON.parse(raw)
     } catch {
       throw new SpellcheckDictionaryUnreadableError()
     }
+    if (sanitizeList(parsed) === null) throw new SpellcheckDictionaryUnreadableError()
   }
 }
 
@@ -125,10 +141,10 @@ export class SpellcheckDictionaryFullError extends Error {
   }
 }
 
-/** Thrown when `.slatebase/spellcheck-words.json` exists but is not valid JSON. */
+/** Thrown when `.slatebase/spellcheck-words.json` exists but is not a readable word list. */
 export class SpellcheckDictionaryUnreadableError extends Error {
   constructor() {
-    super('The personal dictionary file is not valid JSON (unresolved Git merge?) — fix or delete .slatebase/spellcheck-words.json')
+    super('The personal dictionary file is not a valid word list (unresolved Git merge?) — fix or delete .slatebase/spellcheck-words.json')
     this.name = 'SpellcheckDictionaryUnreadableError'
   }
 }
