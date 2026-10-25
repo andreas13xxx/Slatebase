@@ -25,6 +25,7 @@ import type {
   PluginManifestData,
 } from './types';
 import { BundleEvaluationError, LifecycleError } from './errors';
+import { beginUnloadWindow } from './unload-rejections';
 import { Scope } from './obsidian-api-extensions';
 
 // Populates the `window.obsidian` namespace that the injected
@@ -317,6 +318,9 @@ export class PluginLoader implements IPluginLoader {
       return; // Plugin not loaded, nothing to deactivate
     }
 
+    // Late errors from the plugin's own fire-and-forget work are logged as warnings, not left uncaught.
+    const endUnloadWindow = beginUnloadWindow(pluginId);
+
     // Prefer unload(): the Component/Plugin base class releases what it tracked
     // (registered cleanups, event refs, intervals, child components) and calls
     // onunload() itself. Calling onunload() directly would skip all of that.
@@ -374,9 +378,13 @@ export class PluginLoader implements IPluginLoader {
 
     // Remove from the shared plugins registry so a stale/unloaded instance
     // isn't returned by another plugin's `app.plugins.getPlugin(id)`.
-    (window as unknown as { app?: { plugins?: { unregisterPlugin?: (id: string) => void } } })
-      .app?.plugins?.unregisterPlugin?.(pluginId);
-
+    try {
+      (window as unknown as { app?: { plugins?: { unregisterPlugin?: (id: string) => void } } })
+        .app?.plugins?.unregisterPlugin?.(pluginId);
+    } finally {
+      // Always end the window, or a throw above would leave the listener swallowing app TypeErrors for good.
+      endUnloadWindow();
+    }
     record.status = 'deactivated';
     if (notifyStatusChange) {
       this.deps.onStatusChange(pluginId, 'deactivated');
