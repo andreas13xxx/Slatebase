@@ -33,6 +33,8 @@ export interface LivePreviewOptions {
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
   /** API client, for an embedded Bases view (`![[file.base]]`) to query the vault. */
   apiClient?: IBasesEmbedApiClient | null
+  /** Whether the `bases` feature is on; gates rendering of inline ```` ```base ```` blocks. */
+  basesEnabled?: boolean
   /**
    * Callback when the user right-clicks a rendered link (`.cm-lp-link` /
    * `.cm-lp-wikilink`) in Live Preview — lets the caller show a link-specific
@@ -131,6 +133,7 @@ function buildDecorations(
     typeRegistry: options.typeRegistry,
     onPropertyTypeChange: options.onPropertyTypeChange,
     apiClient: options.apiClient,
+    basesEnabled: options.basesEnabled,
   })
 
   // Merge all decorations and hideable ranges

@@ -250,7 +250,6 @@ export type UnsupportedReason =
   | 'url-scheme'
   | 'attachments'
   | 'bases-add-item'
-  | 'bases-embed'
   | 'desktop-shell'
   | 'in-app-help'
   | 'new-tab-defaults'
@@ -280,10 +279,6 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
   'bases-add-item': {
     de: 'neue Einträge passend zu den Filtern einer Base anzulegen ist noch nicht umgesetzt — lege die Notiz direkt an',
     en: 'creating an entry that matches a base\'s filters is not implemented yet — create the note directly',
-  },
-  'bases-embed': {
-    de: 'Bases lassen sich nicht als Codeblock in Notizen einbetten — lege eine eigene .base-Datei an',
-    en: 'bases cannot be embedded as a code block in notes — create a separate .base file',
   },
   'desktop-shell': {
     de: 'die Datei liegt auf dem Server, nicht auf diesem Rechner',

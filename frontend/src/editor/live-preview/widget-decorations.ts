@@ -66,6 +66,8 @@ export interface WidgetDecorationOptions {
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
   /** API client, for the embedded Bases view (`![[file.base]]`) to query the vault. */
   apiClient?: IBasesEmbedApiClient | null
+  /** Whether the `bases` feature is on; an inline ```` ```base ```` block only renders as a table then, else it stays code. */
+  basesEnabled?: boolean
 }
 
 /**
@@ -447,15 +449,8 @@ class EmbedWidget extends WidgetType {
       this.objectUrl = null
     }
     if (this.reactRoot) {
-      // Deferred: CM6 calls destroy() while it's still mid-update (often
-      // itself inside a React commit that's swapping tabs), and unmounting
-      // synchronously there trips React's "synchronously unmount a root
-      // while React was already rendering" warning. Nothing reads this DOM
-      // node again once CM6 has discarded the widget, so unmounting a tick
-      // later is safe.
-      const root = this.reactRoot
+      unmountRootDeferred(this.reactRoot)
       this.reactRoot = null
-      queueMicrotask(() => root.unmount())
     }
     if (this.pluginEmbed) {
       this.pluginEmbed.unload?.()
@@ -902,6 +897,30 @@ function renderWikilinkSegment(container: HTMLElement, text: string): void {
 }
 
 /**
+ * Unmounts a widget's nested React root a tick later. CM6 calls a widget's
+ * destroy() while it is still mid-update (often itself inside a React commit
+ * that is swapping tabs), and unmounting synchronously there trips React's
+ * "synchronously unmount a root while React was already rendering" warning.
+ * Nothing reads the DOM node again once CM6 has discarded the widget, so
+ * unmounting a tick later is safe.
+ */
+function unmountRootDeferred(root: Root): void {
+  queueMicrotask(() => root.unmount())
+}
+
+/**
+ * Returns the text between a FencedCode node's opening and closing fence lines
+ * (the whole node body when a fence is missing, e.g. while the block is typed).
+ */
+function fencedCodeSource(doc: Text, node: { from: number; to: number }, fenceOpenFrom: number, fenceCloseFrom: number): string {
+  const openLine = fenceOpenFrom !== -1 ? doc.lineAt(fenceOpenFrom) : null
+  const closeLine = fenceCloseFrom !== -1 ? doc.lineAt(fenceCloseFrom) : null
+  const codeStart = openLine ? openLine.to + 1 : node.from
+  const codeEnd = closeLine ? closeLine.from : node.to
+  return codeEnd > codeStart ? doc.sliceString(codeStart, codeEnd) : ''
+}
+
+/**
  * Widget for rendering plugin-registered code block processors in Live Preview.
  *
  * When a FencedCode block's language has a registered CodeBlockProcessor
@@ -984,6 +1003,56 @@ class CodeBlockProcessorWidget extends WidgetType {
     const renderChild = (_dom as unknown as { __renderChild?: MarkdownRenderChild }).__renderChild
     if (renderChild) {
       renderChild.unload()
+    }
+  }
+}
+
+/**
+ * Widget for an inline ```` ```base ```` code block: mounts the read-only
+ * BasesEmbed in a nested React root with the block's YAML as its source.
+ * Same detached-root constraints as the `![[file.base]]` embed, hence the
+ * explicit apiClient.
+ */
+class InlineBaseWidget extends WidgetType {
+  private readonly source: string
+  private readonly vaultId: string
+  private readonly apiClient: IBasesEmbedApiClient | null
+  private reactRoot: Root | null = null
+
+  constructor(source: string, vaultId: string, apiClient: IBasesEmbedApiClient | null) {
+    super()
+    this.source = source
+    this.vaultId = vaultId
+    this.apiClient = apiClient
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-embed-base'
+    this.reactRoot = createRoot(container)
+    this.reactRoot.render(
+      createElement(BasesEmbed, {
+        vaultId: this.vaultId,
+        source: this.source,
+        onOpenNote: () => { /* navigation is handled by the editor host */ },
+        apiClient: this.apiClient,
+      })
+    )
+    return container
+  }
+
+  eq(other: InlineBaseWidget): boolean {
+    return this.source === other.source && this.vaultId === other.vaultId
+  }
+
+  get estimatedHeight(): number {
+    return 100
+  }
+
+  destroy(): void {
+    if (this.reactRoot) {
+      unmountRootDeferred(this.reactRoot)
+      this.reactRoot = null
     }
   }
 }
@@ -1971,13 +2040,22 @@ export function buildWidgetDecorations(
           return
         }
 
+        // Inline Base: replace the block with a read-only table. Without the `bases`
+        // feature it stays a plain code block — the query endpoint is guarded off.
+        if (language.toLowerCase() === 'base' && options.basesEnabled) {
+          const source = fencedCodeSource(doc, node, fenceOpenFrom, fenceCloseFrom)
+
+          const widget = new InlineBaseWidget(source, options.vaultId, options.apiClient ?? null)
+          decorations.push(
+            Decoration.replace({ widget }).range(node.from, node.to)
+          )
+          hideableRanges.push({ from: node.from, to: node.to, groupFrom: node.from, groupTo: node.to })
+          return
+        }
+
         // Plugin-registered code block processors (dataview, kanban, tasks, etc.)
         if (hasCodeBlockProcessor(language)) {
-          const openLine = fenceOpenFrom !== -1 ? doc.lineAt(fenceOpenFrom) : null
-          const closeLine = fenceCloseFrom !== -1 ? doc.lineAt(fenceCloseFrom) : null
-          const codeStart = openLine ? openLine.to + 1 : node.from
-          const codeEnd = closeLine ? closeLine.from : node.to
-          const source = codeEnd > codeStart ? doc.sliceString(codeStart, codeEnd) : ''
+          const source = fencedCodeSource(doc, node, fenceOpenFrom, fenceCloseFrom)
 
           const widget = new CodeBlockProcessorWidget(language, source, options.sourcePath ?? '')
           decorations.push(

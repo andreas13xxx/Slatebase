@@ -152,6 +152,7 @@ Other view types come from Obsidian plugins.
 ## Embedding a base and adding items
 
 - **Embed:** write `![[My Base.base]]` in a note. In reading mode and Live Preview the base renders as a read-only table inside the note — handy for a dashboard that shows several bases side by side.
+- **Inline as a code block:** a ```` ```base ```` block holds the base's YAML right in the note, no separate `.base` file needed. Run **"Bases: Insert new base"** from the [[Features/Command Palette|Command Palette]] to insert a skeleton at the cursor. The note then shows the same read-only table; in Live Preview the raw text appears as soon as you click into the block. On a [[Features/Public Links|public share]] and while the `bases` feature toggle is off, the block stays as code; the command then inserts nothing and points to the toggle.
 - **Add an item:** run **"Bases: Add item"** from the [[Features/Command Palette|Command Palette]] while a base is open. Slatebase creates a new note in the base's scope — the target folder comes from a `file.inFolder(...)` filter (else the vault root), and the displayed properties are prepared as blank frontmatter fields (a `property == "x"` filter pre-fills the value). The note opens and appears as a new row.
 
 ---
@@ -173,7 +174,7 @@ So nothing surprises you:
 
 **Views and embedding**
 - Only **table** and **cards** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
-- A base can be **opened as its own `.base` file or embedded via `![[…]]`** (a read-only table). There is no embedding as a code block inside a note.
+- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (a read-only table each). Embedded, it shows only the first view, as a table.
 
 **AI access via MCP**
 - The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients), including its `summaries`. It returns 100 rows by default (maximum 1000) and returns formula values as text.
@@ -186,6 +187,29 @@ This vault ships two ready-made examples that work on the same task notes:
 
 - [[Features/Example Tasks (Base)]] — a **table** with a filter, a "Days left" formula column, the estimate column and a **summary row** (count, sum of estimate, average of days left).
 - [[Features/Example Board (Base)]] — a **card board** grouped by `status`, with a summary bar above the columns.
+
+The same tasks as an **inline base** — a ```` ```base ```` block that sits directly in this note:
+
+```base
+filters:
+  and:
+    - file.inFolder("Features/Example Tasks")
+    - 'type == "task"'
+properties:
+  file.name:
+    displayName: "Task"
+  status:
+    displayName: "Status"
+  priority:
+    displayName: "Priority"
+views:
+  - type: table
+    name: "Tasks"
+    order:
+      - file.name
+      - status
+      - priority
+```
 
 Open the table, then:
 
@@ -201,6 +225,7 @@ Open the table, then:
 > 2. Run **"Bases: Add item"** while the base is open — a new task note should be created in the right folder and appear as a row.
 > 3. Run **"Create new Base"** and build a small base of your own with the filter `file.hasTag("features")`.
 > 4. Add a `summaries` row with `estimate: Sum` and embed the base in another note with `![[…]]`.
+> 5. Run **"Bases: Insert new base"** and adjust the `filters` block in the inserted code block.
 
 ---
 

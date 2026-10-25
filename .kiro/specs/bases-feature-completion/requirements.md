@@ -127,6 +127,11 @@ eine neue Zeile/Notiz anlegen.
 - R5.3 Beide als Command-Palette-Befehle (deutsche Labels), hinter dem `bases`-Toggle.
 - R5.4 Tests für Einbettungs-Rendering und Notiz-Anlage.
 
+> **Nachtrag (Inline-Codeblock):** `bases:insert` fügt inzwischen einen ```` ```base ````-Block mit Tabellen-Gerüst
+> ein (wie Obsidian), statt auf das `![[datei.base]]`-Embed zu verweisen. Der Block trägt das YAML
+> der Base direkt in der Notiz und rendert in Live Preview und Reading View dieselbe read-only Tabelle;
+> das Datei-Embed bleibt unverändert. Auf einer öffentlichen Freigabe bleibt der Block Code.
+
 ### R6 — Formelspalten sortierbar (ehem. Lücke 5) — ZULETZT
 
 **User Story:** Als Nutzer möchte ich nach einer Formelspalte sortieren.

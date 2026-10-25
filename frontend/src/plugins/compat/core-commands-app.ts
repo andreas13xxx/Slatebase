@@ -122,6 +122,8 @@ export interface CoreAppCommandHandlers {
   searchQuery: string
   searchCaseSensitive: boolean
   searchRegex: boolean
+  /** Whether the `bases` feature is on; `bases:insert` only inserts a block while it is (else it would not render). */
+  basesEnabled?: boolean
 }
 
 function getActiveTab(h: CoreAppCommandHandlers): TabEntry | null {
@@ -503,6 +505,15 @@ function generateUniqueBlockId(content: string): string {
   return id
 }
 
+/** Inline Base skeleton: one table view, which `BasesEmbed` renders read-only in the note. */
+export const INLINE_BASE_TEMPLATE = '```base\nviews:\n  - type: table\n    name: Table\n```\n'
+
+/** Insert an empty inline ```` ```base ```` block at the cursor, starting on its own line. */
+function insertInlineBase(editor: IEditor): void {
+  const cursor = editor.getCursor('to')
+  editor.replaceRange(`${cursor.ch === 0 ? '' : '\n'}${INLINE_BASE_TEMPLATE}`, cursor)
+}
+
 function bookmarkCurrentBlock(h: CoreAppCommandHandlers): void {
   const tab = getActiveTab(h)
   const view = getActiveEditorView()
@@ -839,7 +850,10 @@ function buildSpecs(): CoreAppCommandSpec[] {
       if (path) showToast('success', 'Neue Notiz angelegt')
       else showToast('error', 'Notiz konnte nicht angelegt werden')
     } },
-    { id: 'bases:insert', name: 'Bases: Insert new base', unsupported: 'bases-embed' },
+    { id: 'bases:insert', name: 'Bases: Insert new base', editor: true, run: (h, editor) => {
+      if (!h.basesEnabled) { showToast('info', 'Bases ist nicht aktiviert — ein Administrator kann es unter Feature-Toggles einschalten'); return }
+      insertInlineBase(editor)
+    } },
     {
       id: 'bases:add-view',
       name: 'Bases: Add view',

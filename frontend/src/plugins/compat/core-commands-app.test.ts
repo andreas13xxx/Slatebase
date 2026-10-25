@@ -3,7 +3,8 @@ import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { history } from '@codemirror/commands'
 import { CommandRegistry } from './command-registry'
-import { registerCoreAppCommands, type CoreAppCommandHandlers } from './core-commands-app'
+import { registerCoreAppCommands, INLINE_BASE_TEMPLATE, type CoreAppCommandHandlers } from './core-commands-app'
+import { parseBase } from '../../bases'
 import { EditorShim, setEditorViewAccessor } from './editor-shim'
 import { setActiveEditorView } from '../../editor/plugin-extensions'
 import { setActiveCanvasController } from '../../state/activeCanvasBridge'
@@ -1210,6 +1211,48 @@ describe('registerCoreAppCommands — note-composer:*', () => {
 })
 
 /** Minimal CoreAppCommandHandlers builder shared by tests below that don't need the full beforeEach setup above. */
+describe('registerCoreAppCommands — bases:insert', () => {
+  afterEach(() => {
+    setActiveEditorView(null)
+  })
+
+  function run(doc: string, cursor: number, basesEnabled = true): string {
+    const view = new EditorView({
+      state: EditorState.create({ doc, selection: { anchor: cursor } }),
+      parent: document.body,
+    })
+    setEditorViewAccessor(() => view)
+    setActiveEditorView(view)
+    const registry = new CommandRegistry()
+    registry.setEditorContextResolver(() => ({ editor: new EditorShim(), file: { path: 'note.md', basename: 'note', extension: 'md' } }))
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab(), basesEnabled }))
+    registry.executeCommand('bases:insert')
+    const result = view.state.doc.toString()
+    view.destroy()
+    return result
+  }
+
+  it('inserts a parseable inline base block at the start of an empty line', () => {
+    const result = run('', 0)
+
+    expect(result).toBe(INLINE_BASE_TEMPLATE)
+    const yaml = result.replace(/^```base\n/, '').replace(/```\n$/, '')
+    expect(parseBase(yaml).success).toBe(true)
+  })
+
+  it('moves the block onto its own line when the cursor is mid-line', () => {
+    expect(run('text', 4)).toBe(`text\n${INLINE_BASE_TEMPLATE}`)
+  })
+
+  it('inserts nothing and explains why while the bases feature is off', () => {
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+
+    expect(run('text', 4, false)).toBe('text')
+    expect(toastSpy).toHaveBeenCalledWith('info', expect.stringContaining('nicht aktiviert'))
+    toastSpy.mockRestore()
+  })
+})
+
 describe('registerCoreAppCommands — footnotes and commands without an equivalent', () => {
   afterEach(() => {
     setActiveEditorView(null)
@@ -1247,10 +1290,10 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     const registry = new CommandRegistry()
     registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
 
-    registry.executeCommand('bases:insert')
+    registry.executeCommand('workspace:new-window')
     registry.executeCommand('open-with-default-app:open')
 
-    expect(toastSpy).toHaveBeenNthCalledWith(1, 'info', expect.stringContaining('Bases'))
+    expect(toastSpy).toHaveBeenNthCalledWith(1, 'info', expect.stringContaining('windows'))
     expect(toastSpy).toHaveBeenNthCalledWith(2, 'info', expect.stringContaining('server'))
     toastSpy.mockRestore()
   })
@@ -1312,14 +1355,15 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     const registry = new CommandRegistry()
     registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
 
-    expect(registry.getCommand('bases:insert')).toBeDefined()
-    expect(registry.getCommand('workspace:split-vertical')).toBeDefined()
+    expect(registry.getCommand('workspace:new-window')).toBeDefined()
+    expect(registry.getCommand('open-with-default-app:open')).toBeDefined()
   })
 })
 
-function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: ReturnType<typeof vi.fn>; activeTab: TabEntry }): CoreAppCommandHandlers {
+function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: ReturnType<typeof vi.fn>; activeTab: TabEntry; basesEnabled?: boolean }): CoreAppCommandHandlers {
   const apiClient = overrides.apiClient ?? createMockApiClient()
   return {
+    basesEnabled: overrides.basesEnabled ?? false,
     vaultId: 'vault-1',
     vaultName: 'My Vault',
     directoryTree: null,

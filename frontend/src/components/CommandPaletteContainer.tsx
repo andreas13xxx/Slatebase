@@ -467,6 +467,7 @@ export function CommandPaletteContainer({
     searchQuery: searchState.query,
     searchCaseSensitive: searchState.caseSensitive,
     searchRegex: searchState.regex,
+    basesEnabled: isEnabled('bases'),
   }
 
   useEffect(() => {
