@@ -254,6 +254,10 @@ describe('buildWidgetDecorations — base embed with a view name', () => {
     await expectText('![[Tasks.base#Fehlt]]', 'Ansicht nicht gefunden: Fehlt')
   })
 
+  it('cuts a |display suffix off the view name', async () => {
+    await expectText('![[Tasks.base#Board|Anzeige]]', 'Tasks.base › Board')
+  })
+
   it('looks up the note it sits in as the host of this.*', async () => {
     const thisBase = 'filters: file.hasLink(this.file)\nviews:\n  - type: table\n    name: Alle\n'
     const queryBase = vi.fn().mockResolvedValue({ rows: [], total: 0 })

@@ -154,8 +154,41 @@ Other view types come from Obsidian plugins.
 ## Embedding a base and adding items
 
 - **Embed:** write `![[My Base.base]]` in a note. In reading mode and Live Preview the base renders as a read-only table inside the note — handy for a dashboard that shows several bases side by side.
+- **Embed a specific view:** `![[My Base.base#View name]]` shows the view with that name instead of the first. If the name does not exist you get "Ansicht nicht gefunden" (view not found) — it never silently falls back to the first view. The example here shows the "Open tasks" view of the example table:
+
+  ![[Features/Example Tasks (Base).base#Open tasks]]
+
 - **Inline as a code block:** a ```` ```base ```` block holds the base's YAML right in the note, no separate `.base` file needed. Run **"Bases: Insert new base"** from the [[Features/Command Palette|Command Palette]] to insert a skeleton at the cursor. The note then shows the same read-only table; in Live Preview the raw text appears as soon as you click into the block. On a [[Features/Public Links|public share]] and while the `bases` feature toggle is off, the block stays as code; the command then inserts nothing and points to the toggle.
 - **Add an item:** run **"Bases: Add item"** from the [[Features/Command Palette|Command Palette]] while a base is open. Slatebase creates a new note in the base's scope — the target folder comes from a `file.inFolder(...)` filter (else the vault root), and the displayed properties are prepared as blank frontmatter fields (a `property == "x"` filter pre-fills the value). The note opens and appears as a new row.
+
+---
+
+## `this`: filters relative to the note
+
+In filters and formulas, `this` stands for the note the base is embedded in — as in Obsidian. The same base can therefore show something different in every note:
+
+- `this.file.name`, `this.file.path`, `this.file.folder`, `this.file.tags`, `this.file.size` … — the file fields of the embedding note
+- `this.status` (or `this.note.status`) — a property from its frontmatter
+- `this.file` on its own is the note itself and works as the argument of `file.hasLink(...)`
+
+The classic example is a note's **backlinks**: all notes that link to this note. The block below sits right in this page, so it lists every note that points to "Bases":
+
+```base
+filters: file.hasLink(this.file)
+properties:
+  file.name:
+    displayName: "Links to Bases"
+views:
+  - type: table
+    name: "Links"
+    order:
+      - file.name
+```
+
+When the base is opened as its **own `.base` file**, `this` is the base file itself. If no note is known, `this.…` is empty — a row that depends on it is excluded, never wrongly kept.
+
+> [!note] Names and duplicates
+> `file.hasLink(this.file)` compares the link as written in the note (`Plan`, `Projects/Plan`) with the host note's path — with or without `.md`, in full or as the path's tail. If two files share a name in different folders, a link to the short name can match both.
 
 ---
 
@@ -176,7 +209,9 @@ So nothing surprises you:
 
 **Views and embedding**
 - **Table**, **cards**, **list** and **map** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
-- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (a read-only table each). Embedded, it shows only the first view, as a table.
+- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (a read-only table each). Embedded, it shows **one** view — the first, or the one chosen with `#View name` — and always as a **table**, even if the view is of type cards, list or map.
+- An embedded base is queried once when shown and is **not** refreshed on vault changes; an opened `.base` file is. That includes `this`: if the embedding note changes, the embed keeps the old state until the note is reopened.
+- `this` works in the built-in table, not in views a plugin provides, and not in the MCP `query_base` tool (there `this.…` is empty).
 
 **AI access via MCP**
 - The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients), including its `summaries`. It returns 100 rows by default (maximum 1000) and returns formula values as text.

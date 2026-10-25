@@ -116,6 +116,37 @@ describe('BasesView plugin views', () => {
   })
 })
 
+describe('BasesView — this is the base file itself', () => {
+  const thisSource = [
+    'filters: file.hasLink(this.file)',
+    'views:',
+    '  - type: table',
+    '    name: Tabelle',
+    '    order: [title]',
+    'properties:',
+    '  title: {}',
+  ].join('\n')
+
+  it('looks up the base file as the host of this.*', async () => {
+    const apiClient = makeApiClient()
+    render(
+      <BasesView apiClient={apiClient} vaultId="v1" source={thisSource} hostPath="Projekte/Offen.base" readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+    )
+
+    await waitFor(() => expect(apiClient.queryBase).toHaveBeenCalledWith('v1', expect.objectContaining({ filters: { path: 'Projekte/Offen.base' } })))
+  })
+
+  it('makes no host lookup for a base that never reads this', async () => {
+    const apiClient = makeApiClient()
+    render(
+      <BasesView apiClient={apiClient} vaultId="v1" source={tableSource} hostPath="Projekte/Offen.base" readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+    )
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Alpha' })).toBeTruthy())
+    expect(apiClient.queryBase).toHaveBeenCalledTimes(1)
+  })
+})
+
 // ── Kanban card move: optimistic concurrency (ETag) ─────────────────────────
 
 const kanbanResult: BaseQueryResultWire = {
