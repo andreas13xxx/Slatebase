@@ -5,83 +5,183 @@ import {
   removePersonalWord,
   ignoreWordForSession,
   isIgnoredForSession,
-  clearSessionIgnored,
+  initializePersonalDictionary,
+  setActivePersonalDictionaryVault,
+  subscribeToPersonalWords,
+  resetPersonalDictionary,
 } from './personal-dictionary'
 
-const STORAGE_KEY = 'slatebase:spellcheck-personal'
+vi.mock('../../components/ToastNotification', () => ({ showToast: vi.fn() }))
+import { showToast } from '../../components/ToastNotification'
+
+const LEGACY_KEY = 'slatebase:spellcheck-personal'
+const cacheKey = (vaultId: string): string => `slatebase:spellcheck-personal:${vaultId}`
+
+function createMockApi(initial: string[] = []) {
+  let list = [...initial]
+  return {
+    getSpellcheckWords: vi.fn(async () => ({ words: [...list] })),
+    addSpellcheckWords: vi.fn(async (_vaultId: string, words: string[]) => {
+      list = [...new Set([...list, ...words])].sort()
+      return { words: [...list] }
+    }),
+    removeSpellcheckWord: vi.fn(async (_vaultId: string, word: string) => {
+      list = list.filter((entry) => entry !== word)
+      return { words: [...list] }
+    }),
+  }
+}
 
 describe('personal dictionary', () => {
   beforeEach(() => {
     localStorage.clear()
-    clearSessionIgnored()
+    resetPersonalDictionary()
+    vi.mocked(showToast).mockClear()
   })
 
-  describe('readPersonalWords', () => {
-    it('returns an empty list when nothing was ever saved', () => {
+  describe('loading a vault', () => {
+    it('is empty while no vault is active', () => {
       expect(readPersonalWords()).toEqual([])
     })
 
-    it('reads back saved words', () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(['Slatebase', 'Zettelkasten']))
+    it('takes the words from the server', async () => {
+      initializePersonalDictionary(createMockApi(['Slatebase', 'Zettelkasten']))
+      await setActivePersonalDictionaryVault('v1')
       expect(readPersonalWords()).toEqual(['Slatebase', 'Zettelkasten'])
     })
 
-    it('returns an empty list for invalid JSON instead of throwing', () => {
-      localStorage.setItem(STORAGE_KEY, 'not-json{{{')
+    it('treats an empty server answer as authoritative over the cache', async () => {
+      localStorage.setItem(cacheKey('v1'), JSON.stringify(['Veraltet']))
+      initializePersonalDictionary(createMockApi([]))
+      await setActivePersonalDictionaryVault('v1')
       expect(readPersonalWords()).toEqual([])
     })
 
-    it('ignores non-string entries', () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(['gut', 42, null, '', 'auch gut']))
-      expect(readPersonalWords()).toEqual(['gut', 'auch gut'])
+    it('shows the cached words before the server answers and keeps them if it fails', async () => {
+      localStorage.setItem(cacheKey('v1'), JSON.stringify(['Zwischengespeichert']))
+      const api = createMockApi()
+      api.getSpellcheckWords.mockRejectedValueOnce(new Error('offline'))
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
+      expect(readPersonalWords()).toEqual(['Zwischengespeichert'])
     })
 
-    it('returns an empty list when the stored value is not an array', () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ words: ['x'] }))
+    it('keeps vaults apart and notifies listeners on a switch', async () => {
+      const listener = vi.fn()
+      initializePersonalDictionary(createMockApi(['Eins']))
+      subscribeToPersonalWords(listener)
+      await setActivePersonalDictionaryVault('v1')
+      listener.mockClear()
+      await setActivePersonalDictionaryVault(null)
       expect(readPersonalWords()).toEqual([])
+      expect(listener).toHaveBeenLastCalledWith([])
+    })
+
+    it('ignores corrupted cache content', async () => {
+      localStorage.setItem(cacheKey('v1'), '{not json')
+      await setActivePersonalDictionaryVault('v1')
+      expect(readPersonalWords()).toEqual([])
+    })
+
+    it('drops a response for a vault that is no longer active', async () => {
+      const api = createMockApi(['Alt'])
+      let release: (value: { words: string[] }) => void = () => {}
+      api.getSpellcheckWords.mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+      initializePersonalDictionary(api)
+      const first = setActivePersonalDictionaryVault('v1')
+      await setActivePersonalDictionaryVault('v2')
+      release({ words: ['VonV1'] })
+      await first
+      expect(readPersonalWords()).toEqual(['Alt'])
     })
   })
 
   describe('addPersonalWord', () => {
-    it('persists a new word and reports the change', () => {
+    it('adds a word, caches it and writes it to the server', async () => {
+      const api = createMockApi()
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
       expect(addPersonalWord('Slatebase')).toBe(true)
       expect(readPersonalWords()).toEqual(['Slatebase'])
+      expect(api.addSpellcheckWords).toHaveBeenCalledWith('v1', ['Slatebase'])
+      expect(JSON.parse(localStorage.getItem(cacheKey('v1')) ?? '[]')).toEqual(['Slatebase'])
     })
 
-    it('reports no change for a duplicate', () => {
-      addPersonalWord('Slatebase')
+    it('does not add a duplicate', async () => {
+      initializePersonalDictionary(createMockApi(['Slatebase']))
+      await setActivePersonalDictionaryVault('v1')
       expect(addPersonalWord('Slatebase')).toBe(false)
-      expect(readPersonalWords()).toEqual(['Slatebase'])
     })
 
-    it('trims surrounding whitespace', () => {
-      addPersonalWord('  Slatebase  ')
+    it('trims and rejects blank words', async () => {
+      initializePersonalDictionary(createMockApi())
+      await setActivePersonalDictionaryVault('v1')
+      expect(addPersonalWord('  Slatebase  ')).toBe(true)
       expect(readPersonalWords()).toEqual(['Slatebase'])
-    })
-
-    it('rejects a blank word', () => {
       expect(addPersonalWord('   ')).toBe(false)
-      expect(readPersonalWords()).toEqual([])
     })
 
-    it('silently ignores localStorage write errors', () => {
-      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('QuotaExceededError')
-      })
-      expect(() => addPersonalWord('Slatebase')).not.toThrow()
-      spy.mockRestore()
+    it('adds nothing while no vault is active', () => {
+      expect(addPersonalWord('Slatebase')).toBe(false)
+    })
+
+    it('keeps the word for the session and says so when the server write fails', async () => {
+      const api = createMockApi()
+      api.addSpellcheckWords.mockRejectedValueOnce(new Error('403'))
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
+      addPersonalWord('Slatebase')
+      await vi.waitFor(() => expect(showToast).toHaveBeenCalledWith('error', expect.any(String)))
+      expect(readPersonalWords()).toEqual(['Slatebase'])
     })
   })
 
   describe('removePersonalWord', () => {
-    it('removes a known word', () => {
-      addPersonalWord('Slatebase')
+    it('removes a word locally and on the server', async () => {
+      const api = createMockApi(['Slatebase'])
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
       expect(removePersonalWord('Slatebase')).toBe(true)
       expect(readPersonalWords()).toEqual([])
+      expect(api.removeSpellcheckWord).toHaveBeenCalledWith('v1', 'Slatebase')
     })
 
-    it('reports no change for an unknown word', () => {
+    it('returns false for an unknown word', async () => {
+      initializePersonalDictionary(createMockApi())
+      await setActivePersonalDictionaryVault('v1')
       expect(removePersonalWord('Unbekannt')).toBe(false)
+    })
+  })
+
+  describe('migration of the old device-wide list', () => {
+    it('uploads it into the first vault opened and deletes the old key', async () => {
+      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt', 'Wort']))
+      const api = createMockApi(['Schon'])
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
+      expect(api.addSpellcheckWords).toHaveBeenCalledWith('v1', ['Alt', 'Wort'])
+      expect(readPersonalWords()).toEqual(['Alt', 'Schon', 'Wort'])
+      expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
+    })
+
+    it('keeps the old key when the upload fails', async () => {
+      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt']))
+      const api = createMockApi(['Schon'])
+      api.addSpellcheckWords.mockRejectedValueOnce(new Error('403'))
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
+      expect(readPersonalWords()).toEqual(['Schon'])
+      expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull()
+    })
+
+    it('does not migrate when the server could not be reached', async () => {
+      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt']))
+      const api = createMockApi()
+      api.getSpellcheckWords.mockRejectedValueOnce(new Error('offline'))
+      initializePersonalDictionary(api)
+      await setActivePersonalDictionaryVault('v1')
+      expect(api.addSpellcheckWords).not.toHaveBeenCalled()
+      expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull()
     })
   })
 

@@ -28,6 +28,10 @@ import {
   setActiveVault as setActiveVaultSettings,
   refreshFromServer as refreshVaultSettings,
 } from './state/vaultSettingsStore'
+import {
+  initializePersonalDictionary,
+  setActivePersonalDictionaryVault,
+} from './editor/spellcheck/personal-dictionary'
 import { useZoom } from './state/zoomStore'
 import { I18nProvider, useTranslation } from './i18n'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
@@ -382,6 +386,7 @@ function AppContent() {
     // Per-vault settings only need the client here; the active vault is set by
     // the effect below, which also fetches that vault's values.
     initializeVaultSettings(apiClient)
+    initializePersonalDictionary(apiClient)
   }, [dispatch])
 
   // Keep the per-vault settings store pointed at the selected vault, so the
@@ -389,6 +394,11 @@ function AppContent() {
   // vault the user is actually looking at.
   useEffect(() => {
     void setActiveVaultSettings(state.selectedVaultId)
+  }, [state.selectedVaultId])
+
+  // The spellcheck word list lives in the vault, so it follows the selection too.
+  useEffect(() => {
+    void setActivePersonalDictionaryVault(state.selectedVaultId)
   }, [state.selectedVaultId])
 
   // Keep the alias map (frontmatter `aliases` → path) pointed at the selected

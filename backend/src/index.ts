@@ -90,6 +90,8 @@ import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
 import { PropertyTypeStore } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
+import { SpellcheckDictionaryStore } from './spellcheck-dictionary/index.js'
+import { createSpellcheckDictionaryRoutes } from './api/spellcheckDictionaryRoutes.js'
 import { createPropertyRoutes } from './api/propertyRoutes.js'
 import { createBasesRoutes } from './api/basesRoutes.js'
 import { createPublicShareManagementRoutes, createPublicShareReaderRoutes } from './api/publicShareRoutes.js'
@@ -999,6 +1001,16 @@ const propertyTypeRoutes = createPropertyTypeRoutes({
   logger,
 })
 app.route('/api/v1', propertyTypeRoutes)
+
+// Spellcheck dictionary route registration (auth middleware applies via /api/v1/* pattern)
+const spellcheckDictionaryStore = new SpellcheckDictionaryStore(
+  (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
+  logger,
+)
+app.route('/api/v1', createSpellcheckDictionaryRoutes({
+  spellcheckDictionaryService: spellcheckDictionaryStore,
+  logger,
+}))
 
 // Property metadata route registration (auth middleware applies via /api/v1/* pattern)
 const propertyRoutes = createPropertyRoutes({

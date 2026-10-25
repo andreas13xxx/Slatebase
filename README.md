@@ -197,7 +197,7 @@ oversight — but it means:
 | 📁 **Multi-Vault Management** | Create, delete, import, and switch between multiple vaults |
 | 🌳 **File Explorer** | Navigate your vault's directory tree with context menus, drag & drop, and an optional "follow active file" auto-reveal |
 | 📝 **Markdown Editor** | CodeMirror 6 editor with Live Preview, auto-save, and keyboard shortcuts — formatting via Command Palette or an Obsidian toolbar plugin |
-| ✅ **Spellchecker** | Built in, with corrections — not the browser's. Unknown words are underlined; right-click offers suggestions, "add to dictionary", and "ignore for this session". German and English dictionaries, switchable per editor; German compounds are resolved by splitting |
+| ✅ **Spellchecker** | Built in, with corrections — not the browser's. Unknown words are underlined; right-click offers suggestions, "add to dictionary", and "ignore for this session". Your own words are stored in the vault and travel with Git Sync. German and English dictionaries, switchable per editor; German compounds are resolved by splitting |
 | 🎙️ **Voice Dictation** | Record in the browser and transcribe to text at the cursor via a self-hosted Whisper backend — multilingual, optional audio attachment. Off by default (`voice-transcription` toggle); the Whisper backend is operator-provided |
 | 👁️ **Markdown Viewer** | Rendered view with GFM, syntax highlighting, frontmatter, collapsible headings, and colored `==highlights==` (yellow + 🔴🟠🟢🔵🟣, with `==` autocomplete) |
 | 🗂️ **Tabs & Navigation** | Open multiple files simultaneously with unsaved indicators; split the editor into resizable panes (side-by-side or stacked, drag tabs between them); browser-like back/forward history, fuzzy Quick Switcher (Ctrl+O), Ctrl+Shift+]/[ tab cycling, and a clickable folder breadcrumb |
@@ -392,6 +392,8 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | POST | `/vaults/:vaultId/properties/query` | Files matching property filters |
 | GET/PUT | `/vaults/:vaultId/property-types` | Per-vault property type registry |
 | PUT | `/vaults/:vaultId/property-types/:key` | Declare the type of one key |
+| GET/POST | `/vaults/:vaultId/spellcheck/words` | The vault's personal spellcheck words / add words |
+| DELETE | `/vaults/:vaultId/spellcheck/words/:word` | Remove a word |
 
 ### Plugins
 
