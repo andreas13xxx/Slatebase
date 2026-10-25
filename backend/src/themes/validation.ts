@@ -14,6 +14,20 @@ export const MAX_THEME_CSS_SIZE = 3 * 1024 * 1024
  */
 const THEME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,119}$/
 
+/**
+ * Id under which the Obsidian-look theme that ships with Slatebase is stored as `cssTheme` in `appearance.json`.
+ * The colon keeps it out of {@link isValidThemeId}, so it can never be a theme folder name and never collides with one.
+ */
+export const BUILTIN_OBSIDIAN_THEME_ID = 'builtin:obsidian'
+
+/** Ids of the themes that ship with the frontend bundle: selectable per vault, but no folder, no CSS in the vault. */
+const BUILTIN_THEME_IDS: readonly string[] = [BUILTIN_OBSIDIAN_THEME_ID]
+
+/** Returns true if `id` names a theme that ships with Slatebase rather than a folder under `.obsidian/themes/`. */
+export function isBuiltinThemeId(id: string): boolean {
+  return BUILTIN_THEME_IDS.includes(id)
+}
+
 /** Device names Windows refuses as file or folder names, with or without an extension. */
 const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i
 
@@ -65,7 +79,7 @@ export const saveThemeSchema = z.object({
 
 /** Body of `PUT /themes/active`. */
 export const setActiveThemeSchema = z.object({
-  themeId: z.union([themeIdSchema, z.null()]),
+  themeId: z.union([z.string().refine(isBuiltinThemeId), themeIdSchema, z.null()]),
 })
 
 export type SaveThemeInput = z.infer<typeof saveThemeSchema>

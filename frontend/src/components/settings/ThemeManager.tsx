@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useAppContext } from '../../state'
 import type { ThemeMeta } from '../../api'
+import { BUILTIN_THEMES, isBuiltinThemeId } from '../../plugins/appearance/builtin-themes'
 import { themeInjector } from '../../plugins/appearance/theme-injector'
 import { extractErrorMessage } from '../../utils/error'
 import { ConfirmModal } from '../ConfirmModal'
@@ -69,6 +70,10 @@ export function ThemeManager() {
     if (!vaultId || !apiClient) return
     if (themeId === null) {
       themeInjector.remove()
+      return
+    }
+    if (isBuiltinThemeId(themeId)) {
+      themeInjector.applyBuiltin(themeId)
       return
     }
     const { css } = await apiClient.loadTheme(vaultId, themeId)
@@ -141,6 +146,20 @@ export function ThemeManager() {
             />
             <span className="theme-manager__name">Slatebase (Standard)</span>
           </label>
+
+          {BUILTIN_THEMES.map((theme) => (
+            <label key={theme.id} className="theme-manager__item">
+              <input
+                type="radio"
+                name="vault-theme"
+                value={theme.id}
+                checked={activeId === theme.id}
+                onChange={() => void handleSelect(theme.id)}
+              />
+              <span className="theme-manager__name">{theme.name}</span>
+              <span className="theme-manager__meta">{theme.description}</span>
+            </label>
+          ))}
 
           {themes.map((theme) => (
             <div key={theme.id} className="theme-manager__row">

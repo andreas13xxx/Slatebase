@@ -58,6 +58,39 @@ describe('ThemeManager', () => {
     expect(screen.getByText(/Keine Themes in diesem Vault/)).toBeInTheDocument()
   })
 
+  it('offers the built-in Obsidian theme without a delete button and marks it when it is active', async () => {
+    renderManager(createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'builtin:obsidian' }),
+    }))
+
+    expect(await screen.findByRole('radio', { name: /Obsidian \(Standard\)/ })).toBeChecked()
+    expect(screen.getByLabelText('Slatebase (Standard)')).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: /Obsidian \(Standard\).*löschen/ })).toBeNull()
+  })
+
+  it('selects the built-in theme: saves its id and applies it without loading CSS', async () => {
+    const apiClient = createMockApiClient()
+    renderManager(apiClient)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Obsidian \(Standard\)/ }))
+
+    await waitFor(() => expect(apiClient.setActiveTheme).toHaveBeenCalledWith('vault1', 'builtin:obsidian'))
+    await waitFor(() => expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('builtin:obsidian'))
+    expect(apiClient.loadTheme).not.toHaveBeenCalled()
+    expect(themeTag()).toBeNull()
+  })
+
+  it('switching from the built-in theme back to the default removes the marker', async () => {
+    themeInjector.applyBuiltin('builtin:obsidian')
+    renderManager(createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [], activeThemeId: 'builtin:obsidian' }),
+    }))
+
+    fireEvent.click(await screen.findByLabelText('Slatebase (Standard)'))
+
+    await waitFor(() => expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false))
+  })
+
   it('lists themes with their metadata and marks the active one', async () => {
     renderManager(createMockApiClient({
       listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'Things' }),

@@ -13,6 +13,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppContext } from '../state'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
+import { isBuiltinThemeId } from '../plugins/appearance/builtin-themes'
 import { themeInjector } from '../plugins/appearance/theme-injector'
 
 const APPEARANCE_PATH = '.obsidian/appearance.json'
@@ -47,6 +48,10 @@ export function ThemeLifecycle(): null {
         if (cancelled || mine !== generation) return
         if (activeId === null) {
           themeInjector.remove()
+          return
+        }
+        if (isBuiltinThemeId(activeId)) {
+          themeInjector.applyBuiltin(activeId)
           return
         }
         const { css } = await apiClient!.loadTheme(vaultId!, activeId)

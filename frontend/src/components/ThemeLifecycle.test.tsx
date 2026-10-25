@@ -63,6 +63,21 @@ describe('ThemeLifecycle', () => {
     expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('Things')
   })
 
+  it('applies a built-in theme from its id alone, without asking the server for CSS', async () => {
+    const apiClient = createMockApiClient({ getActiveTheme: vi.fn().mockResolvedValue('builtin:obsidian') })
+
+    render(
+      <AppProvider apiClient={apiClient}>
+        <VaultSwitcher vaults={[vaultA]} />
+        <ThemeLifecycle />
+      </AppProvider>,
+    )
+
+    await waitFor(() => expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('builtin:obsidian'))
+    expect(apiClient.loadTheme).not.toHaveBeenCalled()
+    expect(themeTag()).toBeNull()
+  })
+
   it('applies nothing when the vault has no active theme', async () => {
     const apiClient = createMockApiClient()
     render(

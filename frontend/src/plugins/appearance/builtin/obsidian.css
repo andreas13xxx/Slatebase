@@ -1,0 +1,10 @@
+/**
+ * Built-in theme "Obsidian (Standard)" — reproduces the look of Obsidian's default theme.
+ *
+ * Every rule is gated on `:root[data-obsidian-theme="builtin:obsidian"]`, which `ThemeInjector.applyBuiltin()` sets, so
+ * nothing here applies without the theme. It is bundle CSS, not an injected stylesheet; the token bridge
+ * (`../theme-bridge.css`) is switched on by the same attribute and derives Slatebase's tokens from the variables below.
+ *
+ * Reference: Obsidian 1.14.5, light and dark, measured on `body`. Spec: `.kiro/specs/obsidian-builtin-theme/`.
+ * Light values are set on `body`, dark values on `body.theme-dark` (the class `plugins/compat/body-classes.ts` keeps in sync).
+ */

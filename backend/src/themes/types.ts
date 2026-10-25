@@ -52,8 +52,14 @@ export interface IThemeService {
   saveTheme(vaultPath: string, themeId: string, css: string, manifest?: ThemeManifestInput): Promise<ThemeMeta>;
   /** Deletes a theme folder. If it was the active theme, the selection is reset. No-op if missing. */
   deleteTheme(vaultPath: string, themeId: string): Promise<void>;
-  /** Returns `cssTheme` from `appearance.json`, or null for the default (empty/missing/unreadable JSON). */
+  /**
+   * Returns `cssTheme` from `appearance.json`, or null for the default (empty/missing/unreadable JSON).
+   * The value may be the id of a built-in theme (`builtin:obsidian`) that has no folder in the vault.
+   */
   getActiveThemeId(vaultPath: string): Promise<string | null>;
-  /** Sets (or with null clears) `cssTheme`, preserving all other `appearance.json` fields. */
+  /**
+   * Sets (or with null clears) `cssTheme`, preserving all other `appearance.json` fields. A built-in theme id is
+   * stored without an existence check; any other id must name an installed theme.
+   */
   setActiveThemeId(vaultPath: string, themeId: string | null): Promise<void>;
 }
