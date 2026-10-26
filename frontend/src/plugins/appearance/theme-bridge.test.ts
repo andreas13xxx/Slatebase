@@ -134,6 +134,13 @@ describe('theme bridge', () => {
     expect(compat).toMatch(/\n\s*--code-normal:/)
   })
 
+  it('defines --code-normal for the dark scheme too (the bridge paints code text with it)', () => {
+    // Without a dark value a theme that does not set --code-normal gets the light #0f172a on a dark code background.
+    expect(compat.match(/--code-normal:/g)).toHaveLength(3) // light, [data-theme="dark"], prefers-color-scheme: dark
+    expect(compat).toMatch(/\[data-theme="dark"\]\)[\s\S]*?--code-normal: #e6edf3;[\s\S]*?@media \(prefers-color-scheme: dark\)/)
+    expect(compat).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]*?--code-normal: #e6edf3;/)
+  })
+
   it('binds heading typography to the Obsidian heading variables', () => {
     for (let level = 1; level <= 6; level += 1) {
       const body = ruleBody(bridge, `:root[data-obsidian-theme] .cm-lp-h${level} `)
