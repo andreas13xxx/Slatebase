@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.66.0](https://github.com/andreas13xxx/Slatebase/compare/v0.65.0...v0.66.0) (2026-10-26)
+
+
+### Features
+
+* **bases:** Ansichtswahl beim Einbetten (#Ansicht) und this-Kontext ([ed75ff4](https://github.com/andreas13xxx/Slatebase/commit/ed75ff4de78e4fbc2f9320d648bbbc155146b765))
+* **bases:** this-Kontext in Filtern und Formeln eingebetteter Bases ([36de330](https://github.com/andreas13xxx/Slatebase/commit/36de330225781ba5d1a0c5f262e93214a3d6fe37))
+* **spellcheck:** Wörterbuch pro Vault, über Git Sync mitgeführt ([af9bc83](https://github.com/andreas13xxx/Slatebase/commit/af9bc839f72232f49192e82d77dcd5e67a2c5052))
+* **spellcheck:** Wörterbuch pro Vault, über Git Sync mitgeführt ([fbffdee](https://github.com/andreas13xxx/Slatebase/commit/fbffdee02425af06b844413ee3a3c0df935ef860))
+* **themes:** eingebautes Theme "Obsidian (Standard)" ([7a21b89](https://github.com/andreas13xxx/Slatebase/commit/7a21b892a0368da795726a6354dc662cd9b454f9))
+* **themes:** eingebautes Theme "Obsidian (Standard)" — Phase 1 Mechanismus ([3bcf7d4](https://github.com/andreas13xxx/Slatebase/commit/3bcf7d4bc0e6b8f8929df93d4921fc05ca2562b2))
+* **themes:** Obsidian-Standard-Theme — Phase 2 Farben und Variablen ([30642f9](https://github.com/andreas13xxx/Slatebase/commit/30642f9291970b8a8e2bc873be8e8a7a869069ee))
+* **themes:** Obsidian-Standard-Theme — Phase 3 Inhalt ([41264a2](https://github.com/andreas13xxx/Slatebase/commit/41264a23d1e1a7149e4a0310843c6c095c64cc1a))
+* **themes:** Obsidian-Standard-Theme — Phase 4 Chrome und Doku ([f97006e](https://github.com/andreas13xxx/Slatebase/commit/f97006e324fd0df92b01c7300f05079c70b36541))
+
+
+### Bugfixes
+
+* **bases:** runBaseQuery ohne Host-Pfad wieder ohne zusätzliche async-Schritte ([39eebd9](https://github.com/andreas13xxx/Slatebase/commit/39eebd91033b6f177692ff163fb9b542ec13fac4))
+* **plugins:** Entlade-Fenster per finally schließen, Loader-Test ergänzt ([9a9a859](https://github.com/andreas13xxx/Slatebase/commit/9a9a8597f509109c7bbf5170475c66098baee11f))
+* **plugins:** späte Plugin-Fehler beim Entladen als Warnung loggen ([cbfe7e1](https://github.com/andreas13xxx/Slatebase/commit/cbfe7e10ca2cf23c0b5c7e64efebe92aa2ff081a))
+* **plugins:** späte Plugin-Fehler beim Entladen als Warnung loggen ([1277be1](https://github.com/andreas13xxx/Slatebase/commit/1277be1e5ef0acd568084f7f5d1b988c59b617e4))
+* **spellcheck:** Review-Befunde zum Vault-Wörterbuch ([7ebecaf](https://github.com/andreas13xxx/Slatebase/commit/7ebecafdbf2192cc8f64daf29a7002bc56f9c237))
+* **themes:** Review-Befunde zum eingebauten Obsidian-Theme ([ada97a5](https://github.com/andreas13xxx/Slatebase/commit/ada97a5b24f82576e6f4ec937dbbc2cc740271ac))
+
+
+### Sonstige Änderungen
+
+* **bases:** #Ansicht und this in Anleitung, README und Steering; fehlende Tests ([2b40399](https://github.com/andreas13xxx/Slatebase/commit/2b40399ca3d4f406a2bcf56010bae252062c157d))
+
 ## [0.65.0](https://github.com/andreas13xxx/Slatebase/compare/v0.64.0...v0.65.0) (2026-10-25)
 
 
