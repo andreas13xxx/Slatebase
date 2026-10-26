@@ -123,6 +123,22 @@ describe('ThemeManager', () => {
     expect(screen.getByRole('radio', { name: /Things/ })).toBeChecked()
   })
 
+  it('reports a theme over the size limit and drops the built-in marker it replaces', async () => {
+    themeInjector.applyBuiltin('builtin:obsidian')
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const apiClient = createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'builtin:obsidian' }),
+      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(3 * 1024 * 1024 + 1), meta: things }),
+    })
+    renderManager(apiClient)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Things/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/zu groß/)
+    expect(apiClient.setActiveTheme).toHaveBeenCalledWith('vault1', 'Things')
+    expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false)
+  })
+
   it('switching back to the default clears the theme', async () => {
     themeInjector.apply('Things', 'a{}')
     const apiClient = createMockApiClient({

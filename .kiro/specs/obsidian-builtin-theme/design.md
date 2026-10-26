@@ -10,6 +10,11 @@ Abgewogen wurde ein eigenes Feld in `.slatebase/config.json`. Dagegen sprach: zw
 Vorrangregeln zwischen beiden Feldern. Preis der gewählten Lösung: Obsidian selbst kennt die ID nicht. Ein Obsidian, das denselben
 Vault öffnet, findet kein Theme dieses Namens und zeigt sein Standard-Theme; schreibt es `appearance.json` neu, geht die Auswahl
 verloren und Slatebase zeigt danach „Slatebase (Standard)". Das ist ein Rückfall auf den Standard, kein Datenverlust.
+Der Doppelpunkt der ID kann unter Windows kein Ordnername sein; Obsidian findet also nie einen Ordner dazu und kann den Wert überschreiben. Die Doku (README, Willkommens-Vault) sagt das ausdrücklich.
+
+**Zwei Listen, ein Test:** Backend (`BUILTIN_THEME_IDS`) und Frontend (`BUILTIN_THEMES`) sind getrennte Pakete ohne gemeinsamen Code. `builtin-themes.test.ts` liest die Backend-Quelle und vergleicht beide, damit eine Umbenennung auf nur einer Seite auffällt.
+
+**Abgelehnte Stylesheets:** Ein Vault-Theme über 3 MB lehnt `ThemeInjector.apply` ab. `ThemeLifecycle` und `ThemeManager` entfernen dann den Marker eines vorher aktiven eingebauten Themes (und zeigen im Manager den Fehler), damit die Anzeige nicht eine andere Auswahl behauptet als der Server speichert.
 
 ### Backend
 - `themes/validation.ts`: `BUILTIN_OBSIDIAN_THEME_ID = 'builtin:obsidian'`, `isBuiltinThemeId()`. `isValidThemeId` bleibt unverändert strikt (kein `:`),

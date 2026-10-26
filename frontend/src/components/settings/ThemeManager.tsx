@@ -77,7 +77,11 @@ export function ThemeManager() {
       return
     }
     const { css } = await apiClient.loadTheme(vaultId, themeId)
-    themeInjector.apply(themeId, css)
+    if (!themeInjector.apply(themeId, css)) {
+      // Refused (over the size limit): leave no previously applied theme behind that no longer matches the selection.
+      themeInjector.remove()
+      throw new Error('Das Theme ist zu groß und wird nicht angezeigt (Grenze: 3 MB)')
+    }
   }, [vaultId, apiClient])
 
   const handleSelect = useCallback(async (themeId: string | null) => {
