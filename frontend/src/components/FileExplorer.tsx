@@ -27,7 +27,7 @@ import type { TFile, TFolder } from '../plugins/compat/types'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { useLongPress } from '../hooks/useLongPress'
 import { FeatureContext } from '../state/featureContext'
-import { openPublicShareDialog } from '../public-share/publicShareEvents'
+import { notifyPublicSharesChanged, openPublicShareDialog, PUBLIC_SHARES_CHANGED_EVENT } from '../public-share/publicShareEvents'
 
 /**
  * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
@@ -116,6 +116,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
   // Counter to force re-render when favorites change
   const [, setFavoritesVersion] = useState(0)
+  // `${vaultId}::${path}` of every note that has a public link (own links only).
+  const [sharedKeys, setSharedKeys] = useState<Set<string>>(() => new Set())
 
   // Several handlers below (delete, rename, move, create, drag/drop, lazy-load) each
   // independently fetch-then-dispatch a fresh tree. Without the sequence guard in
@@ -152,6 +154,23 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       }
     }
   }, [expandedVaults, state.vaultTrees, state.vaultTreesLoading, dispatch, refreshVaultTree])
+
+  useEffect(() => {
+    if (!publicSharesEnabled || !apiClient) return
+    let cancelled = false
+    const load = (): void => {
+      apiClient.listMyPublicShares().then(
+        (shares) => { if (!cancelled) setSharedKeys(new Set(shares.map((s) => `${s.vaultId}::${s.filePath}`))) },
+        () => { /* markers are optional; keep the last known state */ },
+      )
+    }
+    load()
+    window.addEventListener(PUBLIC_SHARES_CHANGED_EVENT, load)
+    return () => {
+      cancelled = true
+      window.removeEventListener(PUBLIC_SHARES_CHANGED_EVENT, load)
+    }
+  }, [publicSharesEnabled, apiClient])
 
   /** Check if a file is a favorite for a given vault. */
   const checkIsFavorite = useCallback((vaultId: string, path: string): boolean => {
@@ -719,6 +738,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
       // Update favorites path on move
       favoritesStore.updatePath(vaultId, node.path, destinationPath)
+      notifyPublicSharesChanged()
       setFavoritesVersion((v) => v + 1)
     } catch (err: unknown) {
       showToast('error', extractErrorMessage(err, t('fileOps.moveError')))
@@ -784,6 +804,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     apiClient.deleteContent(vaultId, node.path).then(async () => {
       // Reload tree for this vault
       await refreshVaultTree(vaultId)
+      notifyPublicSharesChanged()
     }).catch((err: unknown) => {
       showToast('error', extractErrorMessage(err, t('fileOps.deleteError')))
     })
@@ -984,6 +1005,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
         // Update favorites path on rename
         favoritesStore.updatePath(vaultId, oldPath, newPath)
+        notifyPublicSharesChanged()
         setFavoritesVersion((v) => v + 1)
       } catch (err: unknown) {
         const msg = err !== null && typeof err === 'object' && 'message' in err
@@ -1161,6 +1183,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
       // Update favorites path on drag-drop move
       favoritesStore.updatePath(vaultId, draggedPath, destinationPath)
+      notifyPublicSharesChanged()
       setFavoritesVersion((v) => v + 1)
     } catch (err: unknown) {
       showToast('error', extractErrorMessage(err, t('fileOps.moveError')))
@@ -1341,6 +1364,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                             onInlineCancel={handleInlineCancel}
                             isFavorite={(path) => checkIsFavorite(vault.id, path)}
                             onToggleFavorite={(path) => handleToggleFavorite(vault.id, path)}
+                            isShared={publicSharesEnabled ? (path) => sharedKeys.has(`${vault.id}::${path}`) : undefined}
                           />
                         ))
                       )}

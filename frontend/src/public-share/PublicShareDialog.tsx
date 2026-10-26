@@ -8,6 +8,7 @@ import { PasswordInput } from '../components/PasswordInput'
 import { showToast } from '../components/ToastNotification'
 import { formatShareDate, kindLabel, linkUrl, toExpiryIso } from './publicShareFormat'
 import type { CreatedPublicShare, EmbedPreviewEntry, PublicShareSummary } from './types'
+import { notifyPublicSharesChanged } from './publicShareEvents'
 import './PublicShareDialog.css'
 
 interface PublicShareDialogProps {
@@ -88,6 +89,7 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       setExisting(result.share)
       setPassword('')
       setExpiry('')
+      notifyPublicSharesChanged()
     }, 'Der Link konnte nicht erzeugt werden.')
   }
 
@@ -97,6 +99,7 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       await apiClient.revokePublicShare(vaultId, existing.id)
       setExisting(null)
       setCreated(null)
+      notifyPublicSharesChanged()
       showToast('success', 'Der Link wurde widerrufen.')
     }, 'Der Link konnte nicht widerrufen werden.')
 

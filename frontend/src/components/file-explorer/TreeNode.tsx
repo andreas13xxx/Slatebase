@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, Star } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, Link2, Star } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../../utils/fileIcons'
 import { InlineInput } from '../InlineInput'
 import { validateFileName, normalizeFileName, getSelectionRange } from '../../utils/fileValidation'
@@ -36,6 +36,8 @@ export interface TreeNodeProps {
   onInlineCancel: () => void
   isFavorite: (path: string) => boolean
   onToggleFavorite: (path: string) => void
+  /** Whether the file has a public link; shows a marker in the row. */
+  isShared?: ((path: string) => boolean) | undefined
 }
 
 /**
@@ -65,6 +67,7 @@ export function TreeNode({
   onInlineCancel,
   isFavorite,
   onToggleFavorite,
+  isShared,
 }: TreeNodeProps) {
   const isDirectory = node.type === 'directory'
   const isExpanded = expandedPaths.has(`${vaultId}::${node.path}`)
@@ -226,6 +229,7 @@ export function TreeNode({
                 onInlineCancel={onInlineCancel}
                 isFavorite={isFavorite}
                 onToggleFavorite={onToggleFavorite}
+                isShared={isShared}
               />
             ))}
           </div>
@@ -258,6 +262,7 @@ export function TreeNode({
   const FileIconComponent = getFileIcon(node.name)
   const fileIconClass = getFileIconClass(node.name)
   const favorited = isFavorite(node.path)
+  const shared = isShared?.(node.path) ?? false
 
   // While renaming there's no title button at all (matches real Obsidian,
   // which also swaps the row for a bare edit control) — dragging or
@@ -318,6 +323,11 @@ export function TreeNode({
         <span className="tree-node-name-wrapper nav-file-title-content tree-item-inner">
           {React.createElement(FileIconComponent, { size: 13, className: fileIconClass, style: { flexShrink: 0 } })}
           <span className="tree-node-file-name">{getDisplayName(node.name)}</span>
+          {shared && (
+            <span className="tree-node-shared" role="img" aria-label="Hat einen öffentlichen Link" title="Hat einen öffentlichen Link">
+              <Link2 size={12} />
+            </span>
+          )}
           <span
             className={`tree-node-star${favorited ? ' tree-node-star--active' : ''}`}
             onClick={(e) => { e.stopPropagation(); onToggleFavorite(node.path) }}
