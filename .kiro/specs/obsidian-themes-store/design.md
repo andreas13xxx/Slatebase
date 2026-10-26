@@ -58,7 +58,7 @@ guardedFetch(url, { allowedHosts, maxBytes, timeoutMs, maxRedirects, accept? }):
 
 ### Install-Ablauf (`install`)
 1. `repo` gegen Schema und gegen den **aktuellen Katalog** prüfen (`ThemeNotInCatalogError` → 404).
-2. `manifest.json` (≤ 64 KB) und `theme.css` (≤ 3 MB) parallel holen. Eines fehlt oder ist ungültig → Fehler, nichts wird geschrieben.
+2. `manifest.json` (≤ 64 KB) und `theme.css` (≤ 6 MB) parallel holen. Fehlt `theme.css` (404), wird die ältere `obsidian.css` (gleiche Grenze) geholt. Ein `theme.css`-Repo ohne Manifest, ein ungültiges Manifest oder fehlende Dateien → Fehler, nichts wird geschrieben. Nur bei einer `obsidian.css` darf das Manifest fehlen; dann gilt der Katalogname als Manifest (`{ name }`), die Namensprüfung in Schritt 3 ist damit erfüllt, und die Installation hat keine Version.
 3. `manifest.name` muss mit dem Katalognamen übereinstimmen (case-insensitiv); sonst Fehler „Manifest passt nicht zum Katalog" (verhindert, dass ein Repo ein fremdes Theme überschreibt).
 4. `ThemeService.saveTheme(vaultPath, id, css, manifest)` unter dem bestehenden Schutz (Reservierte Namen, Groß-/Kleinschreibung, Staged Writes). `replace` entscheidet vorher über `themeExists`: vorhanden und nicht `replace` → `409`.
 5. Optional `setActiveThemeId`. Die bestehenden Ereignisse (`vault:change`) tragen die Änderung zu offenen Clients.
@@ -143,11 +143,18 @@ abgesichert. Der Eintrag in `VAULT-ROUTE-AUTHORIZATION.md` nennt die neuen Pfade
 
 ## 7. Offene Fragen und Entscheidungen
 
-- **Grenze für `theme.css`: entschieden am 2026-10-21 auf 3 MB** (vorher 2 MB). Gilt für Store und Import
+- **Grenze für `theme.css`: entschieden am 2026-10-26 auf 6 MB** (am 2026-10-21 von 2 auf 3 MB angehoben; die Zahlen unten
+  stammen aus jener Entscheidung). Anlass war Willemstad (5,3 MB), eines der 50 meistgeladenen Themes. Die Messung der
+  Oberflächenbremse mit einem Theme dieser Größe steht noch aus (siehe „Zu prüfen"). Gilt für Store und Import
   (`MAX_THEME_CSS_SIZE` im Backend, `MAX_THEME_CSS_BYTES` und die Meldung im Frontend, Doku „maximal 2 MB" in
   Welcome-Vault und README). Sechs weitere Themes werden installierbar, 20 bleiben draußen. Zu prüfen: Das Anhängen eines
-  bis zu 3 MB großen `<style>`-Blocks muss die Oberfläche beim Wechsel nicht merklich bremsen (Messung in der Abnahme,
-  mit Catppuccin und Virgo), und die Request-Body-Grenze der Theme-Route darf 3 MB nicht unterschreiten.
+  bis zu 6 MB großen `<style>`-Blocks muss die Oberfläche beim Wechsel nicht merklich bremsen (Messung in der Abnahme,
+  bisher mit Catppuccin und Virgo; mit Willemstad offen), und die Request-Body-Grenze der Theme-Route darf 6 MB nicht unterschreiten.
+- **`obsidian.css` (entschieden am 2026-10-26):** Der Store akzeptiert die ältere Stylesheet-Datei als Rückfall, weil 9 der 50
+  meistgeladenen Themes nur sie haben (Atom, Dracula for Obsidian, Everforest, Notation, Ono Sendai, Pink Topaz, Obuntu,
+  Golden Topaz, Yin and Yang). Die Update-Prüfung zählt ein fehlendes Remote-Manifest als „unbekannt", nicht als Warnung;
+  solche Themes erhalten also keine Update-Hinweise und werden bei Bedarf neu installiert. Messung:
+  `.kiro/specs/obsidian-themes-structure/kompatibilitaet-top50.md`.
 
 Entschieden am 2026-10-20: Katalog beim Start vorwärmen, unendliches Scrollen, Abschalten nur serverweit (siehe §2).
 

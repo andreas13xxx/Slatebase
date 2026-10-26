@@ -111,10 +111,11 @@ geprüft hat.
 3.1 „Installieren" ruft eine Vault-Route auf (`POST /vaults/:vaultId/theme-store/install`, Body `{ "repo": "owner/repo" }`);
     sie braucht Schreibzugriff auf den Vault (zentrale Vault-Autorisierung: GET = lesen, sonst schreiben).
 3.2 Der Server prüft, dass `repo` im aktuellen Katalog steht (kein beliebiges Repo), und lädt `manifest.json` und
-    `theme.css` von `raw.githubusercontent.com/<repo>/HEAD/`.
-3.3 Der Server validiert wie beim Import: CSS höchstens 3 MB (Anhebung von 2 MB, siehe Messung), Manifest höchstens 64 KB und gültiges JSON, Theme-ID aus
+    `theme.css` von `raw.githubusercontent.com/<repo>/HEAD/`; fehlt `theme.css`, die ältere `obsidian.css`.
+3.3 Der Server validiert wie beim Import: CSS höchstens 6 MB (Anhebung von 2 auf 3 MB am 2026-10-21, auf 6 MB am 2026-10-26, siehe Messung), Manifest höchstens 64 KB und gültiges JSON, Theme-ID aus
     `manifest.name` (gleiche Regeln wie `validation.ts`: reservierte Namen, Windows-Namen, Groß-/Kleinschreibung). Fehlt
     das Manifest oder ist es ungültig, schlägt die Installation fehl (anders als beim Import: Der Katalog verspricht eins).
+    Ausnahme: Stammt das Stylesheet aus der älteren `obsidian.css`, darf das Manifest fehlen; der Katalogname ersetzt es.
 3.4 Die Installation geht durch `ThemeService.saveTheme` (atomare Schreibvorgänge, Manifest vor CSS, keine Symlinks).
 3.5 Existiert schon ein Theme mit dieser ID, **überschreibt** die Installation nur, wenn der Client `replace: true`
     sendet (nach Rückfrage); sonst `409`.
@@ -122,7 +123,7 @@ geprüft hat.
     denselben Hinweis zeigen kann wie beim Import.
 3.7 Optional „Danach aktivieren" (Standard: aus). Aktivieren nutzt den bestehenden Weg (`appearance.json`,
     `vault:change`).
-3.8 Ein Fehler (Netz, 404, zu groß, ungültig) zeigt die konkrete Ursache am Eintrag, getrennt nach „Dateien nicht im Repo gefunden" (404), „Theme zu groß (x MB, Grenze 3 MB)" und „Netzwerkfehler, erneut versuchen"; es bleibt kein halber Zustand im
+3.8 Ein Fehler (Netz, 404, zu groß, ungültig) zeigt die konkrete Ursache am Eintrag, getrennt nach „Dateien nicht im Repo gefunden" (404), „Theme zu groß (x MB, Grenze 6 MB)" und „Netzwerkfehler, erneut versuchen"; es bleibt kein halber Zustand im
     Vault.
 
 ### R4 — Updates
@@ -148,7 +149,7 @@ geprüft hat.
 6.1 Nur diese Hosts: `raw.githubusercontent.com` (Dateien, Screenshots) und für den Katalog dieselbe Allowlist wie der
     Plugin-Store. Redirects werden nur innerhalb der Allowlist verfolgt (höchstens 5).
 6.2 `repo` wird gegen `^[\w.-]+/[\w.-]+$` und gegen den Katalog geprüft, bevor es in eine URL eingesetzt wird.
-6.3 Größenlimits wie R3.3 (3 MB) und R5.1 (2 MB), hart beim Lesen des Streams (nicht erst nach dem vollständigen Download).
+6.3 Größenlimits wie R3.3 (6 MB) und R5.1 (2 MB), hart beim Lesen des Streams (nicht erst nach dem vollständigen Download).
 6.4 Der Server gibt kein Token und keine internen Pfade zurück. Ein konfiguriertes `SLATEBASE_GITHUB_TOKEN` wird für
     `raw.githubusercontent.com` **nicht** mitgesendet (kein Grund, und es würde das Token an einen Cache-Host geben).
 6.5 Ein Theme ist beliebiges CSS aus fremder Hand. Die Oberfläche sagt das vor der ersten Installation einmalig und zeigt

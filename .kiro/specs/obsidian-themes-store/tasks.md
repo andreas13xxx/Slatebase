@@ -130,5 +130,7 @@ Bewusst nicht geändert:
 - 2026-10-20: Zuordnung installierter Themes zum Katalog über den Namen, keine Zusatzdatei im Vault.
 - 2026-10-20: Kein automatischer Update-Check; Screenshots nur über den Server.
 - 2026-10-21: CSS-Grenze 3 MB für Store und Import (6 weitere Themes installierbar, 20 bleiben zu groß).
+- 2026-10-26: CSS-Grenze 6 MB (Willemstad, 5,3 MB, ist eines der 50 meistgeladenen Themes) und Rückfall auf `obsidian.css`
+  (9 der 50 meistgeladenen Themes); siehe Design §7. Offen: Messung der Oberflächenbremse mit einem Theme von rund 5 MB.
 - 2026-10-20: Katalog beim Start vorwärmen (nicht blockierend), unendliches Scrollen mit Schaltfläche „Mehr laden",
   Abschalten nur serverweit.
