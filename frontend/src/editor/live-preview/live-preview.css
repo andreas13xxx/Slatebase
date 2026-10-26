@@ -627,6 +627,17 @@
   height: 0;
 }
 
+/*
+ * Keep CodeMirror's widget buffers inline in ordinary lines. They are <img> elements, so a theme rule such as
+ * Blue Topaz's `body:not(.x) .markdown-source-view.mod-cm6 img:not([class*="emoji"]) { display: block }` (specificity
+ * 0,4,2) beats CM's own `.ͼ1 .cm-widgetBuffer { display: inline }` and turns every inline widget into its own line.
+ * Five classes + one element (0,5,1) outrank such a rule without `!important`; tight block lines are excluded
+ * because they set `display: block` on purpose (above).
+ */
+.cm-editor .cm-content .cm-line:not(.cm-lp-tight-block-line) img.cm-widgetBuffer {
+  display: inline;
+}
+
 /* --- Standard Markdown Images --- */
 .cm-lp-image {
   max-width: 100%;
