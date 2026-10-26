@@ -133,7 +133,7 @@ export class ThemeStoreService implements IThemeStoreService {
       if (options.activate) await this.themeService.setActiveThemeId(vaultPath, meta.id)
       // The cached update check predates this install (a just-updated theme would still be listed as outdated).
       this.cache.invalidateUpdateCheck(vaultId)
-      this.logger.info('Theme installed from the community catalog', { repo, themeId: meta.id, size: meta.size, replace: options.replace })
+      this.logger.info('Theme installed from the community catalog', { repo, themeId: meta.id, size: meta.size, replace: options.replace, cssFile: files.cssFile })
       return meta
     })
   }

@@ -134,6 +134,14 @@ describe('theme bridge', () => {
     expect(compat).toMatch(/\n\s*--code-normal:/)
   })
 
+  it('gives code and tab text a default that follows the theme palette, at specificity 0 so any theme wins', () => {
+    // The compat layer pins both to fixed colors per scheme; without this default a theme that sets neither loses its own text color.
+    const whereBlocks = [...bridge.matchAll(/:where\(:root\[data-obsidian-theme\] body\) \{([^}]*)\}/g)].map((m) => declarations(m[1] as string))
+    const merged = new Map(whereBlocks.flatMap((block) => [...block]))
+    expect(merged.get('--code-normal')).toBe('var(--text-normal)')
+    expect(merged.get('--tab-text-color')).toBe('var(--text-muted)')
+  })
+
   it('defines --code-normal for the dark scheme too (the bridge paints code text with it)', () => {
     // Without a dark value a theme that does not set --code-normal gets the light #0f172a on a dark code background.
     expect(compat.match(/--code-normal:/g)).toHaveLength(3) // light, [data-theme="dark"], prefers-color-scheme: dark

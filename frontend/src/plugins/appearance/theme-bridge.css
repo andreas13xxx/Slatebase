@@ -85,6 +85,12 @@
   --text-faint: var(--color-base-50);
   --text-accent: var(--color-accent);
   --interactive-accent: var(--color-accent);
+
+  /* Variables the bridge paints below but the compat layer pins to fixed colors (`:root`, per color scheme). A theme that
+     does not set them would lose its own text color there, so they follow the theme's palette instead, which is what
+     code and tab text did before they were bound. Specificity 0: any theme rule wins. */
+  --code-normal: var(--text-normal);
+  --tab-text-color: var(--text-muted);
 }
 
 :root[data-obsidian-theme] body {

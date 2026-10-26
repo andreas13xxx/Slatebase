@@ -94,7 +94,7 @@ export function storeErrorMessage(err: unknown, fallback: string): string {
   const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined
   switch (code) {
     case 'THEME_FILES_NOT_FOUND':
-      return 'Das Theme-Repository enthält keine installierbaren Dateien (theme.css und manifest.json im Hauptverzeichnis).'
+      return 'Das Theme-Repository enthält keine installierbaren Dateien (erwartet: theme.css oder die ältere obsidian.css im Hauptverzeichnis, bei theme.css zusätzlich manifest.json).'
     case 'THEME_TOO_LARGE':
       return 'Das Theme ist größer als 6 MB und kann nicht installiert werden.'
     case 'THEME_INVALID':
