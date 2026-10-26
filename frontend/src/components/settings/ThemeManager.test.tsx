@@ -58,6 +58,39 @@ describe('ThemeManager', () => {
     expect(screen.getByText(/Keine Themes in diesem Vault/)).toBeInTheDocument()
   })
 
+  it('offers the built-in Obsidian theme without a delete button and marks it when it is active', async () => {
+    renderManager(createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'builtin:obsidian' }),
+    }))
+
+    expect(await screen.findByRole('radio', { name: /Obsidian \(Standard\)/ })).toBeChecked()
+    expect(screen.getByLabelText('Slatebase (Standard)')).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: /Obsidian \(Standard\).*löschen/ })).toBeNull()
+  })
+
+  it('selects the built-in theme: saves its id and applies it without loading CSS', async () => {
+    const apiClient = createMockApiClient()
+    renderManager(apiClient)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Obsidian \(Standard\)/ }))
+
+    await waitFor(() => expect(apiClient.setActiveTheme).toHaveBeenCalledWith('vault1', 'builtin:obsidian'))
+    await waitFor(() => expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('builtin:obsidian'))
+    expect(apiClient.loadTheme).not.toHaveBeenCalled()
+    expect(themeTag()).toBeNull()
+  })
+
+  it('switching from the built-in theme back to the default removes the marker', async () => {
+    themeInjector.applyBuiltin('builtin:obsidian')
+    renderManager(createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [], activeThemeId: 'builtin:obsidian' }),
+    }))
+
+    fireEvent.click(await screen.findByLabelText('Slatebase (Standard)'))
+
+    await waitFor(() => expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false))
+  })
+
   it('lists themes with their metadata and marks the active one', async () => {
     renderManager(createMockApiClient({
       listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'Things' }),
@@ -88,6 +121,22 @@ describe('ThemeManager', () => {
     await waitFor(() => expect(apiClient.setActiveTheme).toHaveBeenCalledWith('vault1', 'Things'))
     await waitFor(() => expect(themeTag()?.textContent).toBe('body { color: red; }'))
     expect(screen.getByRole('radio', { name: /Things/ })).toBeChecked()
+  })
+
+  it('reports a theme over the size limit and drops the built-in marker it replaces', async () => {
+    themeInjector.applyBuiltin('builtin:obsidian')
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const apiClient = createMockApiClient({
+      listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'builtin:obsidian' }),
+      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(3 * 1024 * 1024 + 1), meta: things }),
+    })
+    renderManager(apiClient)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Things/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/zu groß/)
+    expect(apiClient.setActiveTheme).toHaveBeenCalledWith('vault1', 'Things')
+    expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false)
   })
 
   it('switching back to the default clears the theme', async () => {

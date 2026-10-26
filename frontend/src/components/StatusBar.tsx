@@ -19,6 +19,7 @@ import {
   onStatusBarItemsChange,
 } from '../plugins/compat/status-bar-registry'
 import type { StatusBarItemEntry } from '../plugins/compat/status-bar-registry'
+import { BUILTIN_THEMES } from '../plugins/appearance/builtin-themes'
 import { themeInjector } from '../plugins/appearance/theme-injector'
 import { CSS_CHANGE_EVENT } from '../plugins/appearance/css-change'
 import { useStatusBarItemVisibility } from '../hooks/useStatusBarItemVisibility'
@@ -110,10 +111,12 @@ function ThemeItem() {
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
   const [resolved, setResolved] = useState<{ vaultId: string; themeId: string; name: string } | null>(null)
+  // A built-in theme has no folder or manifest in the vault: its label is known without asking the server.
+  const builtinName = BUILTIN_THEMES.find((theme) => theme.id === themeId)?.name
 
   // The manifest name is the display name; the id (folder name) is the fallback while it loads or if it cannot be read.
   useEffect(() => {
-    if (!visible || !themeId || !vaultId || !apiClient) return
+    if (!visible || !themeId || !vaultId || !apiClient || builtinName !== undefined) return
     let cancelled = false
     // listThemes carries metadata only; loadTheme would download the whole stylesheet (up to 3 MB) a second time.
     apiClient.listThemes(vaultId)
@@ -123,10 +126,10 @@ function ThemeItem() {
       })
       .catch(() => { /* cosmetic: keep showing the id */ })
     return () => { cancelled = true }
-  }, [visible, themeId, vaultId, apiClient])
+  }, [visible, themeId, vaultId, apiClient, builtinName])
 
   if (!visible || !themeId) return null
-  const name = resolved?.themeId === themeId && resolved.vaultId === vaultId ? resolved.name : themeId
+  const name = builtinName ?? (resolved?.themeId === themeId && resolved.vaultId === vaultId ? resolved.name : themeId)
 
   return (
     <div className="status-bar__item status-bar__theme" aria-label={t('statusBar.themeAriaLabel')}>

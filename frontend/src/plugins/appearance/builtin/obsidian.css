@@ -1,0 +1,1543 @@
+/**
+ * Built-in theme "Obsidian (Standard)" — reproduces the look of Obsidian's default theme.
+ *
+ * Every rule is gated on `:root[data-obsidian-theme="builtin:obsidian"]`, which `ThemeInjector.applyBuiltin()` sets, so
+ * nothing here applies without the theme. It is bundle CSS, not an injected stylesheet; the token bridge
+ * (`../theme-bridge.css`) is switched on by the same attribute and derives Slatebase's tokens from the variables below.
+ *
+ * Reference: Obsidian 1.14.5, light and dark, measured on `body`. Spec: `.kiro/specs/obsidian-builtin-theme/`.
+ * Light values are set on `body`, dark values on `body.theme-dark` (the class `plugins/compat/body-classes.ts` keeps in sync).
+ *
+ * The grey scale (`--color-base-*`) and the semantic surface/text variables derived from it come from `theme-bridge.css`;
+ * this file sets what Obsidian's measurement shows beyond that. Where Obsidian derives a value from another variable
+ * (hover mixes from `--mono-100`, accent shades from `--accent-h/s/l`), the derivation is kept, so one rule serves both modes
+ * and only the base values differ.
+ */
+
+/* ─── Mode independent, light values ───────────────────────────────────────── */
+:root[data-obsidian-theme="builtin:obsidian"] body {
+  /* Accent. `--color-accent-1/-2` are lighter shades; which one a control uses differs per mode (see below). */
+  --accent-h: 258;
+  --accent-s: 88%;
+  --accent-l: 66%;
+  --color-accent: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+  --color-accent-hsl: var(--accent-h), var(--accent-s), var(--accent-l);
+  --interactive-accent-hsl: var(--accent-h), var(--accent-s), var(--accent-l);
+  --color-accent-1: hsl(calc(var(--accent-h) - 1), calc(var(--accent-s) * 1.01), calc(var(--accent-l) * 1.075));
+  --color-accent-2: hsl(calc(var(--accent-h) - 3), calc(var(--accent-s) * 1.02), calc(var(--accent-l) * 1.15));
+  --interactive-accent: var(--color-accent-1);
+  --interactive-accent-hover: var(--color-accent-2);
+  --text-accent: var(--color-accent);
+  --text-accent-hover: var(--color-accent-2);
+
+  /* Black and white; hover and overlay fills are mixed from `--mono-100`, so they flip with the mode. */
+  --mono-0: white;
+  --mono-100: black;
+  --mono-rgb-0: 255, 255, 255;
+  --mono-rgb-100: 0, 0, 0;
+
+  /* Extended colors */
+  --color-red: #e93147;
+  --color-orange: #ec7500;
+  --color-yellow: #e0ac00;
+  --color-green: #08b94e;
+  --color-cyan: #00bfbc;
+  --color-blue: #086ddd;
+  --color-purple: #7852ee;
+  --color-pink: #d53984;
+  --color-red-rgb: 233, 49, 71;
+  --color-orange-rgb: 236, 117, 0;
+  --color-yellow-rgb: 224, 172, 0;
+  --color-green-rgb: 8, 185, 78;
+  --color-cyan-rgb: 0, 191, 188;
+  --color-blue-rgb: 8, 109, 221;
+  --color-purple-rgb: 120, 82, 238;
+  --color-pink-rgb: 213, 57, 132;
+
+  /* Surfaces and modifiers beyond the bridge's derivation */
+  --background-modifier-form-field: var(--color-base-00);
+  --background-modifier-form-field-hover: var(--background-modifier-form-field);
+  --background-modifier-hover: color-mix(in oklch, var(--mono-100) 6.7%, transparent);
+  --background-modifier-active-hover: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
+  --background-modifier-error: var(--color-red);
+  --background-modifier-error-hover: var(--color-red);
+  --background-modifier-error-rgb: var(--color-red-rgb);
+  --background-modifier-success: var(--color-green);
+  --background-modifier-success-rgb: var(--color-green-rgb);
+  --background-modifier-warning: var(--color-orange);
+  --background-modifier-warning-hover: var(--color-orange);
+  --background-modifier-message: color-mix(in oklch, black 90%, transparent);
+  --background-modifier-box-shadow: rgba(0, 0, 0, 0.1);
+  --background-modifier-cover: rgba(220, 220, 220, 0.4);
+  --interactive-normal: var(--color-base-30);
+  --interactive-hover: var(--color-base-30);
+
+  /* Text */
+  --text-on-accent: white;
+  --text-on-accent-inverted: black;
+  --text-error: var(--color-red);
+  --text-success: var(--color-green);
+  --text-warning: var(--color-orange);
+  --text-selection: color-mix(in oklch, var(--interactive-accent) 20%, transparent);
+  --text-highlight-bg: color-mix(in oklch, var(--color-yellow) 30%, transparent);
+  --caret-color: var(--text-normal);
+
+  /* Typography: the system stack, like Obsidian (not Inter) */
+  --font-default: ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Google Sans Flex", Roboto, "Inter Variable", "Inter", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  --font-monospace-default: ui-monospace, SFMono-Regular, "Cascadia Mono", "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco, "Consolas", "Source Code Pro", monospace;
+  --font-interface: var(--font-default);
+  --font-text: var(--font-default);
+  --font-monospace: var(--font-monospace-default);
+  --font-interface-theme: var(--font-interface);
+  --font-text-theme: var(--font-text);
+  --font-monospace-theme: var(--font-monospace);
+  --font-text-size: 16px;
+  --font-smallest: 0.8em;
+  --font-smaller: 0.875em;
+  --font-small: 0.933em;
+  --font-ui-smaller: 12px;
+  --font-ui-small: 13px;
+  --font-ui-medium: 15px;
+  --font-ui-large: 20px;
+  --font-thin: 100;
+  --font-extralight: 200;
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+  --font-black: 900;
+  --font-weight: var(--font-normal);
+  --bold-modifier: 200;
+  --bold-weight: calc(var(--font-weight) + var(--bold-modifier));
+  --line-height-normal: 1.5;
+  --line-height-tight: 1.3;
+  --p-spacing: 1rem;
+  --p-spacing-empty: 0rem;
+  --heading-spacing: calc(var(--p-spacing) * 2.5);
+  --heading-formatting: var(--color-base-50);
+
+  /* Radii, borders, sizes */
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --radius-l: 12px;
+  --radius-xl: 24px;
+  --border-width: 1px;
+  --size-2-1: 2px;
+  --size-2-2: 4px;
+  --size-2-3: 6px;
+  --size-4-1: 4px;
+  --size-4-2: 8px;
+  --size-4-3: 12px;
+  --size-4-4: 16px;
+  --size-4-5: 20px;
+  --size-4-6: 24px;
+  --size-4-8: 32px;
+  --size-4-9: 36px;
+  --size-4-10: 40px;
+  --size-4-12: 48px;
+  --size-4-16: 64px;
+  --size-4-18: 72px;
+  --icon-xs: 14px;
+  --icon-s: 16px;
+  --icon-m: 16px;
+  --icon-l: 18px;
+  --icon-xl: 32px;
+  --icon-xs-stroke-width: 2px;
+  --icon-s-stroke-width: 2px;
+  --icon-m-stroke-width: 2px;
+  --icon-l-stroke-width: 1.75px;
+  --icon-xl-stroke-width: 1.25px;
+  --icon-size: var(--icon-m);
+  --icon-stroke: var(--icon-m-stroke-width);
+  --icon-color: var(--text-muted);
+  --icon-color-hover: var(--text-muted);
+  --icon-color-active: var(--text-accent);
+  --icon-color-focused: var(--text-normal);
+  --icon-opacity: 0.85;
+  --icon-opacity-hover: 1;
+  --icon-opacity-active: 1;
+  --clickable-icon-radius: var(--radius-m);
+  --image-radius: var(--radius-s);
+
+  /* Corner shapes (1.14): squircles on controls, round on pills. Applied as `corner-shape` under @supports in the chrome section. */
+  --corner-shape: superellipse(1.33);
+  --button-corner-shape: superellipse(1.33);
+  --input-corner-shape: superellipse(1.33);
+  --menu-corner-shape: superellipse(1.33);
+  --tab-corner-shape: superellipse(1.33);
+  --tooltip-corner-shape: superellipse(1.33);
+  --notice-corner-shape: superellipse(1.33);
+  --embed-actions-corner-shape: superellipse(1.33);
+  --tab-switcher-preview-corner-shape: superellipse(1.33);
+  --metadata-property-corner-shape: superellipse(1.33);
+  --metadata-property-corner-shape-hover: superellipse(1.33);
+  --metadata-property-corner-shape-focus: superellipse(1.33);
+  --bases-cards-corner-shape: superellipse(1.33);
+  --bases-kanban-card-corner-shape: superellipse(1.33);
+  --search-input-corner-shape: round;
+  --tag-corner-shape: round;
+  --hotkey-corner-shape: round;
+
+  /* Layers, motion */
+  --layer-cover: 5;
+  --layer-sidedock: 10;
+  --layer-status-bar: 15;
+  --layer-popover: 30;
+  --layer-slides: 45;
+  --layer-modal: 50;
+  --layer-notice: 60;
+  --layer-menu: 65;
+  --layer-tooltip: 70;
+  --layer-dragged-item: 80;
+  --anim-duration-none: 0;
+  --anim-duration-superfast: 70ms;
+  --anim-duration-fast: 140ms;
+  --anim-duration-moderate: 300ms;
+  --anim-duration-slow: 560ms;
+  --anim-motion-smooth: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  --anim-motion-delay: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --anim-motion-jumpy: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --anim-motion-swing: cubic-bezier(0, 0.55, 0.45, 1);
+
+  /* Shadows and blur */
+  --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.028), 0px 3.4px 6.7px rgba(0, 0, 0, 0.042), 0px 15px 30px rgba(0, 0, 0, 0.07);
+  --shadow-l: 0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 15px 30px rgba(0, 0, 0, 0.1);
+  --shadow-xs: 0 1px 6px rgba(0, 0, 0, 0.015), 0 4px 24px rgba(0, 0, 0, 0.065), 0 0 transparent;
+  --blur-radius-s: 6px;
+  --blur-radius-m: 10px;
+  --blur-radius-l: 16px;
+  --blur-saturation: 1.5;
+  --blur-brightness: 1.15;
+  --blur-opacity-s: 65%;
+  --blur-opacity-m: 90%;
+  --blur-s: blur(var(--blur-radius-s)) saturate(var(--blur-saturation)) brightness(var(--blur-brightness));
+  --blur-m: blur(var(--blur-radius-m)) saturate(var(--blur-saturation)) brightness(var(--blur-brightness));
+  --blur-l: blur(var(--blur-radius-l)) saturate(var(--blur-saturation)) brightness(var(--blur-brightness));
+  --blur-background: color-mix(in srgb, var(--color-base-00) var(--blur-opacity-s), transparent);
+  --raised-background: var(--blur-background);
+  --raised-blur: var(--blur-s);
+  --raised-shadow: var(--shadow-xs);
+  --workspace-background-translucent: color-mix(in oklch, var(--mono-0) 60%, transparent);
+
+  /* Dividers, scrollbars, focus */
+  --divider-color: var(--color-base-30);
+  --divider-color-hover: var(--interactive-accent);
+  --divider-width: 1px;
+  --divider-width-hover: 3px;
+  --divider-vertical-height: 100%;
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb-bg: gray;
+  --scrollbar-active-thumb-bg: color-mix(in oklch, var(--mono-100) 20%, transparent);
+  --scrollbar-width: 12px;
+  --scrollbar-height: 12px;
+  --scrollbar-radius: 12px;
+  --focus-ring-color: #0df;
+  --focus-ring-outline: 2px solid light-dark(#0060df, #0df);
+  --hr-color: var(--color-base-30);
+  --hr-thickness: 2px;
+  --indentation-guide-color: color-mix(in oklch, var(--mono-100) 12%, transparent);
+  --indentation-guide-color-active: color-mix(in oklch, var(--mono-100) 30%, transparent);
+  --indentation-guide-width: 1px;
+  --indentation-guide-width-active: 1px;
+  --swatch-shadow: inset 0 0 0 1px color-mix(in oklch, var(--mono-100) 15%, transparent);
+  --swatch-width: 22px;
+  --swatch-height: 22px;
+  --swatch-radius: 14px;
+
+  /* Buttons, inputs, dropdowns, checkboxes, toggles, sliders */
+  --button-radius: var(--radius-m);
+  --button-transition: none;
+  --input-height: 30px;
+  --input-radius: var(--radius-m);
+  --input-padding: 4px 8px;
+  --input-border-width: 1px;
+  --input-border-width-focus: 2px;
+  --input-font-weight: var(--font-normal);
+  --input-placeholder-color: var(--color-base-50);
+  --input-shadow: none;
+  --input-shadow-hover: none;
+  --input-transition: none;
+  --input-icon-inset: 8px;
+  --input-date-separator: var(--color-base-50);
+  --dropdown-background: var(--color-base-30);
+  --dropdown-background-hover: var(--color-base-30);
+  --dropdown-background-blend-mode: hard-light, normal;
+  --dropdown-background-position: right 0.65em top 50%, right 0.15em top 50%, 0 0;
+  --dropdown-background-size: 1em auto, 2em 2em, 100%;
+  --dropdown-icon-background: transparent;
+  --dropdown-icon-inset: 0.65em;
+  --dropdown-icon-width: 1em;
+  --dropdown-padding: 0 2.4em 0 0.8em;
+  --dropdown-padding-start: 0.8em;
+  --dropdown-padding-end: 2.4em;
+  --dropdown-text-align: start;
+  --dropdown-transition: none;
+  --checkbox-size: 16px;
+  --checkbox-radius: var(--radius-s);
+  --checkbox-color: var(--interactive-accent);
+  --checkbox-color-hover: var(--interactive-accent-hover);
+  --checkbox-border-color: var(--color-base-50);
+  --checkbox-border-color-hover: var(--color-base-70);
+  --checkbox-marker-color: var(--color-base-00);
+  --checkbox-margin-inline-start: 0.85em;
+  --checklist-done-color: var(--text-muted);
+  --checklist-done-decoration: line-through;
+  --toggle-width: 44px;
+  --toggle-border-width: 2px;
+  --toggle-radius: 24px;
+  --toggle-thumb-color: white;
+  --toggle-thumb-width: 26px;
+  --toggle-thumb-height: 16px;
+  --toggle-thumb-radius: 24px;
+  --toggle-thumb-opacity-active: 0.6;
+  --toggle-s-width: 36px;
+  --toggle-s-border-width: 2px;
+  --toggle-s-thumb-width: 20px;
+  --toggle-s-thumb-height: 12px;
+  --slider-track-background: var(--color-base-35);
+  --slider-track-height: 4px;
+  --slider-fill-background: var(--interactive-accent);
+  --slider-thumb-background: white;
+  --slider-thumb-background-hover: white;
+  --slider-thumb-border-color: var(--color-base-35);
+  --slider-thumb-border-width: 0;
+  --slider-thumb-width: 30px;
+  --slider-thumb-height: 18px;
+  --slider-thumb-radius: 18px;
+  --slider-thumb-y: -6px;
+  --slider-thumb-shadow: 0 0px 2px 0px rgba(0, 0, 0, 0.1), 0 2px 6px 0px rgba(0, 0, 0, 0.1);
+  --slider-thumb-shadow-hover: var(--slider-thumb-shadow);
+  --slider-thumb-shadow-active: var(--slider-thumb-shadow);
+  --slider-thumb-shadow-focus: var(--slider-thumb-shadow), 0 0px 0px 2px var(--color-base-40);
+  --slider-value-font-size: 13px;
+  --slider-value-font-weight: var(--font-normal);
+
+  /* Menus, modals, prompt, tooltips, notices, popovers */
+  --menu-background: var(--color-base-20);
+  --menu-border-color: var(--color-base-35);
+  --menu-border-width: 1px;
+  --menu-padding: 6px;
+  --menu-radius: var(--radius-m);
+  --menu-shadow: var(--shadow-s);
+  --menu-backdrop-filter: none;
+  --menu-scroll-mask: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000000 24px);
+  --modal-background: var(--color-base-00);
+  --modal-border-color: var(--color-base-35);
+  --modal-border-width: 1px;
+  --modal-radius: 24px;
+  --modal-shadow: none;
+  --modal-width: 90vw;
+  --modal-height: 85vh;
+  --modal-max-width: 1100px;
+  --modal-max-width-narrow: 800px;
+  --modal-max-height: 1000px;
+  --modal-header-height: auto;
+  --modal-sidebar-background: var(--color-base-00);
+  --modal-community-sidebar-width: 280px;
+  --dialog-width: 560px;
+  --dialog-max-width: 80vw;
+  --dialog-max-height: 85vh;
+  --prompt-background: var(--color-base-00);
+  --prompt-border-color: var(--color-base-35);
+  --prompt-border-width: 1px;
+  --prompt-width: 700px;
+  --prompt-max-width: 80vw;
+  --prompt-max-height: 70vh;
+  --prompt-input-height: 40px;
+  --prompt-backdrop-filter: none;
+  --suggestion-background: var(--color-base-00);
+  --suggestion-backdrop-filter: none;
+  --tooltip-background: color-mix(in oklch, black 90%, transparent);
+  --tooltip-color: #FAFAFA;
+  --tooltip-font-size: 13px;
+  --tooltip-font-weight: var(--font-normal);
+  --tooltip-line-height: 1.3;
+  --tooltip-max-width: 300px;
+  --tooltip-padding: 8px 12px;
+  --tooltip-radius: var(--radius-l);
+  --tooltip-shadow: var(--shadow-s);
+  --notice-background: color-mix(in oklch, black 90%, transparent);
+  --notice-color: #FAFAFA;
+  --notice-border: none;
+  --notice-font-size: 13px;
+  --notice-font-weight: var(--font-normal);
+  --notice-line-height: 1.3;
+  --notice-max-width: 300px;
+  --notice-padding: 8px 12px;
+  --notice-radius: var(--radius-m);
+  --notice-shadow: var(--shadow-s);
+  --popover-width: 450px;
+  --popover-height: 400px;
+  --popover-max-height: 95vh;
+  --popover-font-size: 16px;
+  --popover-pdf-width: 450px;
+  --popover-pdf-height: 400px;
+  --hotkey-background: var(--background-modifier-hover);
+  --hotkey-font-size: 12px;
+  --hotkey-radius: 2em;
+  --drag-ghost-background: rgba(0, 0, 0, 0.85);
+  --drag-ghost-text-color: #fff;
+  --drag-item-background: var(--color-base-00);
+  --drag-item-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  /* Workspace chrome: ribbon, tabs, title bar, status bar, side dock, file navigation */
+  --ribbon-background: var(--color-base-20);
+  --ribbon-background-collapsed: var(--color-base-00);
+  --ribbon-width: 44px;
+  --ribbon-padding: 8px 4px 12px;
+  --header-height: 40px;
+  --titlebar-height: 30px;
+  --titlebar-background: var(--color-base-20);
+  --titlebar-background-focused: var(--color-base-20);
+  --titlebar-border-width: 0px;
+  --titlebar-border-color: var(--color-base-30);
+  --titlebar-text-color: var(--text-muted);
+  --titlebar-text-color-focused: var(--text-normal);
+  --titlebar-text-weight: var(--font-bold);
+  --tab-background: transparent;
+  --tab-background-active: var(--color-base-00);
+  --tab-background-hover: transparent;
+  --tab-container-background: var(--color-base-20);
+  --tab-container-padding-start: 8px;
+  --tab-container-padding-end: 8px;
+  --tab-divider-color: var(--color-base-35);
+  --tab-font-size: 13px;
+  --tab-inner-background: transparent;
+  --tab-inner-background-active: transparent;
+  --tab-inner-background-hover: var(--background-modifier-hover);
+  --tab-inner-border-color: transparent;
+  --tab-inner-border-color-active: transparent;
+  --tab-inner-border-color-hover: transparent;
+  --tab-inner-border-width: 0px;
+  --tab-outline-color: var(--color-base-30);
+  --tab-outline-color-hover: transparent;
+  --tab-outline-width: 1px;
+  --tab-curve: 10px;
+  --tab-radius: var(--radius-m);
+  --tab-radius-active: 10px 10px 0 0;
+  --tab-width: 200px;
+  --tab-max-width: 320px;
+  --tab-text-color: var(--color-base-50);
+  --tab-text-color-active: var(--text-muted);
+  --tab-text-color-focused: var(--text-muted);
+  --tab-text-color-focused-active: var(--text-muted);
+  --tab-text-color-focused-active-current: var(--text-normal);
+  --tab-text-color-focused-highlighted: var(--text-accent);
+  --tab-stacked-pane-width: 700px;
+  --tab-stacked-header-width: 40px;
+  --tab-stacked-font-size: 13px;
+  --tab-stacked-font-weight: var(--font-normal);
+  --tab-stacked-text-align: start;
+  --tab-stacked-text-transform: rotate(0deg);
+  --tab-stacked-text-writing-mode: vertical-lr;
+  --tab-stacked-shadow: -8px 0 8px 0 rgba(0, 0, 0, 0.05);
+  --sidebar-tab-container-background: var(--color-base-20);
+  --file-header-font-size: 13px;
+  --file-header-font-weight: var(--font-normal);
+  --file-header-background: var(--color-base-00);
+  --file-header-background-focused: var(--color-base-00);
+  --file-header-border: 1px solid transparent;
+  --file-header-justify: start;
+  --status-bar-background: var(--color-base-20);
+  --status-bar-border-color: var(--color-base-30);
+  --status-bar-border-width: 1px 0 0 1px;
+  --status-bar-font-size: 12px;
+  --status-bar-position: fixed;
+  --status-bar-radius: 8px 0 0 0;
+  --status-bar-text-color: var(--text-muted);
+  --vault-profile-color: var(--text-normal);
+  --vault-profile-color-hover: var(--text-normal);
+  --vault-profile-font-size: 13px;
+  --vault-profile-font-weight: var(--font-medium);
+  --vault-profile-radius: var(--radius-m);
+  --nav-item-size: 13px;
+  --nav-item-color: var(--text-muted);
+  --nav-item-color-hover: var(--text-normal);
+  --nav-item-color-active: var(--text-normal);
+  --nav-item-color-selected: var(--text-normal);
+  --nav-item-color-highlighted: var(--text-accent);
+  --nav-item-background-hover: var(--background-modifier-hover);
+  --nav-item-background-active: var(--background-modifier-hover);
+  --nav-item-background-selected: color-mix(in oklch, var(--color-accent) 15%, transparent);
+  --nav-item-padding: 4px 8px 4px 24px;
+  --nav-item-parent-padding: 4px 8px 4px 24px;
+  --nav-item-margin-bottom: 2px;
+  --nav-item-radius: var(--radius-m);
+  --nav-item-white-space: pre;
+  --nav-item-children-padding-start: 4px;
+  --nav-item-children-margin-start: 12px;
+  --nav-heading-color: var(--text-normal);
+  --nav-heading-color-hover: var(--text-normal);
+  --nav-heading-color-collapsed: var(--color-base-50);
+  --nav-heading-color-collapsed-hover: var(--text-muted);
+  --nav-heading-weight: var(--font-medium);
+  --nav-heading-weight-hover: var(--font-medium);
+  --nav-collapse-icon-color: var(--color-base-50);
+  --nav-collapse-icon-color-collapsed: var(--color-base-50);
+  --nav-indentation-guide-color: var(--indentation-guide-color);
+  --nav-indentation-guide-width: 1px;
+  --nav-tag-background: transparent;
+  --nav-tag-color: var(--color-base-50);
+  --nav-tag-color-hover: var(--text-muted);
+  --nav-tag-color-active: var(--text-muted);
+  --nav-tag-radius: var(--radius-s);
+  --nav-tag-weight: var(--font-semibold);
+  --collapse-icon-color: var(--color-base-50);
+  --collapse-icon-color-collapsed: var(--text-accent);
+  --search-input-radius: 100px;
+  --search-icon-color: var(--text-muted);
+  --search-icon-size: 16px;
+  --search-clear-button-color: var(--text-muted);
+  --search-clear-button-size: 13px;
+  --search-result-background: var(--color-base-00);
+
+  /* Settings */
+  --settings-background: var(--color-base-00);
+  --setting-items-background: var(--color-base-10);
+  --setting-items-border-width: 0;
+  --setting-items-border-color: var(--color-base-30);
+  --setting-items-divider-width: 1px;
+  --setting-items-divider-color: var(--color-base-30);
+  --setting-items-padding-x: 20px;
+  --setting-items-padding-y: 20px;
+  --setting-items-radius: var(--radius-l);
+  --setting-item-name-size: 13px;
+  --setting-item-name-weight: var(--font-normal);
+  --setting-item-name-color: var(--text-normal);
+  --setting-group-heading-size: 15px;
+  --setting-group-heading-weight: var(--font-semibold);
+  --setting-group-heading-color: var(--text-normal);
+  --setting-group-max-width: 700px;
+  --flair-background: var(--color-base-30);
+  --flair-color: var(--text-normal);
+  --pill-background: transparent;
+  --pill-background-hover: transparent;
+  --pill-border-color: var(--color-base-30);
+  --pill-border-color-hover: var(--color-base-35);
+  --pill-border-width: 1px;
+  --pill-color: var(--text-muted);
+  --pill-color-hover: var(--text-normal);
+  --pill-color-remove: var(--color-base-50);
+  --pill-color-remove-hover: var(--text-accent);
+  --pill-padding-x: 0.65em;
+  --pill-padding-y: 0.25em;
+  --pill-radius: 2em;
+  --pill-decoration: none;
+  --pill-decoration-hover: none;
+  --pill-focus-left-adjust: -4px;
+  --pill-focus-width: calc(100% + 6px);
+
+  /* Editor and reading view: layout */
+  --file-line-width: 700px;
+  --file-margins: 32px 32px;
+  --file-margins-x: 32px;
+  --file-margins-y: 32px;
+  --file-folding-offset: 24px;
+  --indent-size: 4;
+  --indent-unit: 0.5625em;
+  --list-indent: calc(var(--indent-unit) * var(--indent-size));
+  --list-indent-editing: 0.75em;
+  --list-indent-source: 0;
+  --list-spacing: 0.075em;
+  --list-bullet-size: 0.3em;
+  --list-bullet-radius: 50%;
+  --list-bullet-border: none;
+  --list-bullet-transform: none;
+  --list-bullet-end-padding: 1.3rem;
+  --list-marker-color: var(--color-base-50);
+  --list-marker-color-hover: var(--text-muted);
+  --list-marker-color-collapsed: var(--text-accent);
+  --list-numbered-style: decimal;
+
+  /* Editor and reading view: inline and block elements */
+  --link-color: var(--text-accent);
+  --link-color-hover: var(--text-accent-hover);
+  --link-decoration: underline;
+  --link-decoration-hover: underline;
+  --link-decoration-thickness: auto;
+  --link-external-color: var(--text-accent);
+  --link-external-color-hover: var(--text-accent-hover);
+  --link-external-decoration: underline;
+  --link-external-decoration-hover: underline;
+  --link-external-filter: none;
+  --link-unresolved-color: var(--text-accent);
+  --link-unresolved-opacity: 0.7;
+  --link-unresolved-filter: none;
+  --link-unresolved-decoration-style: solid;
+  --link-unresolved-decoration-color: color-mix(in oklch, var(--interactive-accent) 30%, transparent);
+  --link-weight: var(--font-normal);
+  --tag-color: var(--text-accent);
+  --tag-color-hover: var(--text-accent);
+  --tag-background: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
+  --tag-background-hover: color-mix(in oklch, var(--interactive-accent) 20%, transparent);
+  --tag-border-color: color-mix(in oklch, var(--interactive-accent) 15%, transparent);
+  --tag-border-color-hover: color-mix(in oklch, var(--interactive-accent) 15%, transparent);
+  --tag-border-width: 0px;
+  --tag-decoration: none;
+  --tag-decoration-hover: none;
+  --tag-padding-x: 0.65em;
+  --tag-padding-y: 0.25em;
+  --tag-radius: 2em;
+  --tag-size: var(--font-smaller);
+  --highlight-background: color-mix(in oklch, var(--color-yellow) 30%, transparent);
+  --highlight-background-red: color-mix(in oklch, var(--color-red) 30%, transparent);
+  --highlight-background-orange: color-mix(in oklch, var(--color-orange) 30%, transparent);
+  --highlight-background-yellow: color-mix(in oklch, var(--color-yellow) 30%, transparent);
+  --highlight-background-green: color-mix(in oklch, var(--color-green) 30%, transparent);
+  --highlight-background-blue: color-mix(in oklch, var(--color-blue) 30%, transparent);
+  --highlight-background-purple: color-mix(in oklch, var(--color-purple) 30%, transparent);
+  --highlight-opacity: 30%;
+  --highlight-mix-blend-mode: darken;
+  --blockquote-border-thickness: 2px;
+  --blockquote-border-color: var(--interactive-accent);
+  --blockquote-font-style: normal;
+  --blockquote-background-color: transparent;
+  --embed-padding: 0 0 0 24px;
+  --embed-border-start: 2px solid var(--interactive-accent);
+  --embed-border-top: none;
+  --embed-border-end: none;
+  --embed-border-bottom: none;
+  --embed-max-height: 4000px;
+  --embed-canvas-max-height: 400px;
+  --embed-block-shadow-hover: 0 0 0 1px var(--color-base-30), inset 0 0 0 1px var(--color-base-30);
+  --embed-action-color: var(--text-normal);
+  --embed-action-radius: var(--radius-m);
+  --embed-actions-background: color-mix(in srgb, var(--color-base-00) 80%, transparent);
+  --embed-actions-padding: 2px;
+  --embed-actions-radius: calc(var(--radius-m) + 2px);
+  --embed-actions-blur: var(--blur-s);
+  --embed-actions-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 0 6px 0 rgba(0, 0, 0, 0.05);
+  --footnote-size: var(--font-smaller);
+  --footnote-line-height: 1.5;
+  --footnote-gap: 4px;
+  --footnote-radius: var(--radius-s);
+  --footnote-padding-block: 6px;
+  --footnote-padding-inline: 6px;
+  --footnote-divider-color: var(--color-base-30);
+  --footnote-divider-color-active: transparent;
+  --footnote-divider-width: 1px;
+  --footnote-id-color: var(--text-muted);
+  --footnote-id-color-no-occurrences: var(--color-base-50);
+  --footnote-id-delimiter: ".";
+  --footnote-input-background: transparent;
+  --footnote-input-background-active: var(--background-modifier-hover);
+
+  /* Callouts */
+  --callout-radius: var(--radius-s);
+  --callout-padding: 12px 12px 12px 24px;
+  --callout-border-width: 0px;
+  --callout-border-opacity: 0.25;
+  --callout-title-padding: 0;
+  --callout-title-weight: calc(var(--font-weight) + var(--bold-modifier));
+  --callout-content-padding: 0;
+  --callout-content-background: transparent;
+  --callout-blend-mode: darken;
+  --callout-default: var(--color-blue);
+  --callout-info: var(--color-blue);
+  --callout-todo: var(--color-blue);
+  --callout-summary: var(--color-cyan);
+  --callout-tip: var(--color-cyan);
+  --callout-important: var(--color-cyan);
+  --callout-success: var(--color-green);
+  --callout-question: var(--color-orange);
+  --callout-warning: var(--color-orange);
+  --callout-fail: var(--color-red);
+  --callout-error: var(--color-red);
+  --callout-bug: var(--color-red);
+  --callout-example: var(--color-purple);
+  --callout-quote: #9e9e9e;
+
+  /* Code */
+  --code-background: var(--color-base-10);
+  --code-border-color: var(--color-base-30);
+  --code-border-width: 0px;
+  --code-radius: var(--radius-s);
+  --code-size: var(--font-smaller);
+  --code-white-space: pre-wrap;
+  --code-bracket-background: var(--background-modifier-hover);
+  --code-normal: var(--text-normal);
+  --code-comment: var(--color-base-50);
+  --code-function: var(--color-yellow);
+  --code-important: var(--color-orange);
+  --code-keyword: var(--color-pink);
+  --code-operator: var(--color-red);
+  --code-property: var(--color-cyan);
+  --code-punctuation: var(--text-muted);
+  --code-string: var(--color-green);
+  --code-tag: var(--color-red);
+  --code-value: var(--color-purple);
+
+  /* Tables */
+  --table-background: transparent;
+  --table-border-width: 1px;
+  --table-border-color: var(--color-base-30);
+  --table-white-space: break-spaces;
+  --table-header-background: transparent;
+  --table-header-border-width: 1px;
+  --table-header-border-color: var(--color-base-30);
+  --table-header-font: inherit;
+  --table-header-size: var(--font-text-size);
+  --table-header-weight: calc(var(--font-weight) + var(--bold-modifier));
+  --table-header-color: var(--text-normal);
+  --table-text-size: var(--font-text-size);
+  --table-line-height: 1.3;
+  --table-column-min-width: 6ch;
+  --table-column-max-width: none;
+  --table-column-alt-background: transparent;
+  --table-column-first-border-width: 1px;
+  --table-column-last-border-width: 1px;
+  --table-row-alt-background: transparent;
+  --table-row-alt-background-hover: transparent;
+  --table-row-background-hover: transparent;
+  --table-row-last-border-width: 1px;
+  --table-cell-vertical-alignment: top;
+  --table-selection: color-mix(in oklch, var(--color-accent) 10%, transparent);
+  --table-selection-blend-mode: darken;
+  --table-selection-border-color: var(--interactive-accent);
+  --table-selection-border-radius: var(--radius-s);
+  --table-selection-border-width: 2px;
+  --table-drag-handle-background: transparent;
+  --table-drag-handle-background-active: var(--interactive-accent);
+  --table-drag-handle-color: var(--color-base-50);
+  --table-drag-handle-color-active: white;
+  --table-add-button-background: transparent;
+  --table-add-button-border-width: 1px;
+  --table-add-button-border-color: var(--color-base-30);
+  --table-drop-indicator-half-width: 2px;
+
+  /* Properties (metadata) */
+  --metadata-background: transparent;
+  --metadata-padding: 8px 0;
+  --metadata-gap: 3px;
+  --metadata-border-width: 0;
+  --metadata-border-radius: 0;
+  --metadata-border-color: var(--color-base-30);
+  --metadata-divider-width: 0;
+  --metadata-divider-color: var(--color-base-30);
+  --metadata-divider-color-hover: transparent;
+  --metadata-divider-color-focus: transparent;
+  --metadata-label-width: 9em;
+  --metadata-label-font-size: var(--font-smaller);
+  --metadata-label-text-color: var(--text-muted);
+  --metadata-label-text-color-hover: var(--text-muted);
+  --metadata-label-background: transparent;
+  --metadata-label-background-hover: transparent;
+  --metadata-label-background-active: var(--background-modifier-hover);
+  --metadata-input-font-size: var(--font-smaller);
+  --metadata-input-text-color: var(--text-normal);
+  --metadata-input-background: transparent;
+  --metadata-input-background-hover: transparent;
+  --metadata-input-background-active: var(--background-modifier-hover);
+  --metadata-input-padding: 4px 8px;
+  --metadata-input-height: calc(var(--font-text-size) * 1.75);
+  --metadata-input-longtext-lines: 3;
+  --metadata-property-background: transparent;
+  --metadata-property-background-hover: transparent;
+  --metadata-property-background-active: var(--background-modifier-hover);
+  --metadata-property-box-shadow-hover: 0 0 0 1px var(--color-base-35);
+  --metadata-property-box-shadow-focus: 0 0 0 2px var(--color-base-40);
+  --metadata-property-padding: 0;
+  --metadata-property-radius: 6px;
+  --metadata-property-radius-hover: 6px;
+  --metadata-property-radius-focus: 6px;
+  --metadata-sidebar-label-font-size: 13px;
+  --metadata-sidebar-input-font-size: 13px;
+
+  /* Canvas, graph, bases */
+  --canvas-background: var(--color-base-00);
+  --canvas-dot-pattern: var(--color-base-30);
+  --canvas-card-label-color: var(--color-base-50);
+  --canvas-color: #c0c0c0;
+  --canvas-color-1: var(--color-red);
+  --canvas-color-2: var(--color-orange);
+  --canvas-color-3: var(--color-yellow);
+  --canvas-color-4: var(--color-green);
+  --canvas-color-5: var(--color-cyan);
+  --canvas-color-6: var(--color-purple);
+  --canvas-controls-icon-size: 16px;
+  --canvas-controls-icon-stroke: 2px;
+  --canvas-controls-radius: var(--radius-s);
+  --graph-line: var(--color-base-35);
+  --graph-node: var(--text-muted);
+  --graph-node-focused: var(--text-accent);
+  --graph-node-tag: var(--color-green);
+  --graph-node-attachment: var(--color-yellow);
+  --graph-node-unresolved: var(--color-base-50);
+  --graph-text: var(--text-normal);
+  --graph-controls-width: 240px;
+  --bases-header-height: 40px;
+  --bases-header-border-width: 0 0 1px 0;
+  --bases-header-padding-start: 2px;
+  --bases-header-padding-end: 2px;
+  --bases-table-border-color: var(--color-base-30);
+  --bases-table-font-size: var(--font-smaller);
+  --bases-table-row-height: 30px;
+  --bases-table-header-color: var(--text-muted);
+  --bases-table-header-background: var(--color-base-00);
+  --bases-table-group-background: var(--color-base-10);
+  --bases-table-summary-background: var(--color-base-00);
+  --bases-cards-background: var(--color-base-00);
+  --bases-cards-radius: var(--radius-m);
+  --bases-cards-shadow: 0 0 0 1px var(--color-base-30);
+  --bases-cards-shadow-hover: 0 0 0 1px var(--color-base-35);
+  --bases-kanban-card-background: var(--color-base-00);
+  --bases-kanban-column-background: var(--color-base-10);
+
+  /* Frame geometry reported by the desktop app; Slatebase has no title bar, so these only matter to plugins that read them */
+  --frame-left-space: calc(80px - 44px);
+  --frame-right-space: 0px;
+  --frame-ribbon-left: 44px;
+  --frame-ribbon-right: 0px;
+}
+
+/* ─── Dark ──────────────────────────────────────────────────────────────────
+   The grey scale and the semantic surfaces come from the bridge's `body.theme-dark` block; what is listed here is
+   everything Obsidian sets differently for dark. */
+:root[data-obsidian-theme="builtin:obsidian"] body.theme-dark {
+  --color-accent-1: hsl(calc(var(--accent-h) - 3), calc(var(--accent-s) * 1.02), calc(var(--accent-l) * 1.15));
+  --color-accent-2: hsl(calc(var(--accent-h) - 5), calc(var(--accent-s) * 1.05), calc(var(--accent-l) * 1.29));
+  --interactive-accent: var(--color-accent);
+  --interactive-accent-hover: var(--color-accent-1);
+  --text-accent: var(--color-accent-1);
+  --text-accent-hover: var(--color-accent-2);
+
+  --mono-0: black;
+  --mono-100: white;
+  --mono-rgb-0: 0, 0, 0;
+  --mono-rgb-100: 255, 255, 255;
+
+  --color-red: #fb464c;
+  --color-orange: #e9973f;
+  --color-yellow: #e0de71;
+  --color-green: #44cf6e;
+  --color-cyan: #53dfdd;
+  --color-blue: #027aff;
+  --color-purple: #a882ff;
+  --color-pink: #fa99cd;
+  --color-red-rgb: 251, 70, 76;
+  --color-orange-rgb: 233, 151, 63;
+  --color-yellow-rgb: 224, 222, 113;
+  --color-green-rgb: 68, 207, 110;
+  --color-cyan-rgb: 83, 223, 221;
+  --color-blue-rgb: 2, 122, 255;
+  --color-purple-rgb: 168, 130, 255;
+  --color-pink-rgb: 250, 153, 205;
+
+  --background-modifier-form-field: var(--color-base-25);
+  --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+  --background-modifier-cover: rgba(10, 10, 10, 0.4);
+  --text-selection: color-mix(in oklch, var(--interactive-accent) 33%, transparent);
+
+  --color-secondary-2: color-mix(in srgb, var(--color-base-20) 96%, white 4%);
+  --color-secondary-3: color-mix(in srgb, var(--color-base-20) 92%, white 8%);
+  --color-secondary-4: color-mix(in srgb, var(--color-base-20) 90%, white 10%);
+  --color-secondary-5: color-mix(in srgb, var(--color-base-20) 84%, white 16%);
+  --color-secondary-6: color-mix(in srgb, var(--color-base-20) 76%, white 24%);
+
+  --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.121), 0px 3.4px 6.7px rgba(0, 0, 0, 0.179), 0px 15px 30px rgba(0, 0, 0, 0.3);
+  --shadow-l: 0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 30px 90px rgba(0, 0, 0, 0.2);
+  --shadow-xs: none;
+  --blur-background: color-mix(in srgb, var(--color-base-30) var(--blur-opacity-s), transparent);
+  --raised-shadow: none;
+  --drag-item-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  --canvas-color: #7e7e7e;
+  --callout-blend-mode: lighten;
+  --highlight-mix-blend-mode: lighten;
+  --table-selection-blend-mode: lighten;
+}
+
+/* ─── Slatebase's own tokens ────────────────────────────────────────────────
+   The bridge maps surfaces, text, borders, accent and fonts. These are the remaining Slatebase tokens (status colors,
+   radii, shadows, tag/search/graph/highlight/toast colors) that have an Obsidian counterpart. Callout tokens follow in
+   the content section. Each is derived from the variables above, so Hell and Dunkel need no second block. */
+:root[data-obsidian-theme="builtin:obsidian"] body {
+  --text-inverse: var(--text-on-accent);
+
+  --success: var(--color-green);
+  --success-bg: color-mix(in srgb, var(--color-green) 12%, var(--background-primary));
+  --success-border: color-mix(in srgb, var(--color-green) 35%, var(--background-primary));
+  --warning: var(--color-orange);
+  --warning-bg: color-mix(in srgb, var(--color-orange) 12%, var(--background-primary));
+  --warning-border: color-mix(in srgb, var(--color-orange) 35%, var(--background-primary));
+  --danger: var(--color-red);
+  --danger-hover: color-mix(in srgb, var(--color-red) 85%, var(--mono-100));
+  --danger-bg: color-mix(in srgb, var(--color-red) 12%, var(--background-primary));
+  --danger-border: color-mix(in srgb, var(--color-red) 35%, var(--background-primary));
+  --danger-text: var(--color-red);
+  --info-bg: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+  --info-border: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary));
+  --info-text: var(--text-accent);
+
+  --sidebar-hover: var(--nav-item-background-hover);
+  --sidebar-active: var(--nav-item-background-active);
+  --right-panel-header-bg: color-mix(in oklch, var(--mono-100) 3%, transparent);
+
+  --radius-sm: var(--radius-s);
+  --radius-md: var(--radius-m);
+  --radius-lg: var(--radius-l);
+  --shadow-md: var(--shadow-s);
+  --shadow-lg: var(--shadow-s);
+  --shadow-xl: var(--shadow-l);
+
+  --tag-bg: var(--tag-background);
+  --tag-text: var(--tag-color);
+  --tag-border: var(--tag-border-color);
+  --search-match-bg: var(--text-highlight-bg);
+  --search-match-text: var(--text-normal);
+  --search-active-bg: var(--nav-item-background-selected);
+  --search-hit-hover-bg: var(--background-modifier-hover);
+  --hl-yellow-bg: var(--highlight-background-yellow);
+  --hl-red-bg: var(--highlight-background-red);
+  --hl-orange-bg: var(--highlight-background-orange);
+  --hl-green-bg: var(--highlight-background-green);
+  --hl-blue-bg: var(--highlight-background-blue);
+  --hl-purple-bg: var(--highlight-background-purple);
+
+  --graph-bg: var(--background-primary);
+  --graph-node-fill: var(--graph-node);
+  --graph-edge-color: var(--graph-line);
+  --graph-edge-highlight: var(--interactive-accent);
+  --graph-label-color: var(--graph-text);
+  --graph-tag-node: var(--graph-node-tag);
+  --graph-property-node: var(--color-orange);
+  --graph-search-highlight: var(--color-orange);
+
+  --toast-info-bg: color-mix(in srgb, var(--color-blue) 10%, var(--background-primary));
+  --toast-info-border: color-mix(in srgb, var(--color-blue) 30%, var(--background-primary));
+  --toast-info-icon: var(--color-blue);
+  --toast-success-bg: var(--success-bg);
+  --toast-success-border: var(--success-border);
+  --toast-success-icon: var(--color-green);
+  --toast-warning-bg: var(--warning-bg);
+  --toast-warning-border: var(--warning-border);
+  --toast-warning-icon: var(--color-orange);
+  --toast-error-bg: var(--danger-bg);
+  --toast-error-border: var(--danger-border);
+  --toast-error-icon: var(--color-red);
+}
+
+/* ─── Content (Phase 3): editor (Live Preview) and reading view ─────────────
+   Heading scale as measured: size, weight, line height, letter spacing. The bridge binds `.cm-lp-h1…6` to
+   `--hN-size/-weight/-line-height/-color`; the letter spacing and the reading view are added here.
+   Spacing: Obsidian puts `--heading-spacing` (2.5rem) above a heading that follows other content and `--p-spacing` (1rem)
+   between consecutive headings (measured on a note with H1…H6 in a row); the Live Preview line structure of Slatebase
+   gives its headings no block margin, so the spacing is applied in the reading view only. */
+:root[data-obsidian-theme="builtin:obsidian"] body {
+  --h1-size: 1.618em;
+  --h2-size: 1.462em;
+  --h3-size: 1.318em;
+  --h4-size: 1.188em;
+  --h5-size: 1.076em;
+  --h6-size: 1em;
+  --h1-weight: 700;
+  --h2-weight: 680;
+  --h3-weight: 660;
+  --h4-weight: 640;
+  --h5-weight: 620;
+  --h6-weight: 600;
+  --h1-line-height: 1.2;
+  --h2-line-height: 1.2;
+  --h3-line-height: 1.3;
+  --h4-line-height: 1.4;
+  --h5-line-height: 1.5;
+  --h6-line-height: 1.5;
+  --h1-letter-spacing: -0.015em;
+  --h2-letter-spacing: -0.011em;
+  --h3-letter-spacing: -0.008em;
+  --h4-letter-spacing: -0.005em;
+  --h5-letter-spacing: -0.002em;
+  --h6-letter-spacing: 0em;
+  --h1-style: normal;
+  --h2-style: normal;
+  --h3-style: normal;
+  --h4-style: normal;
+  --h5-style: normal;
+  --h6-style: normal;
+  --h1-variant: normal;
+  --h2-variant: normal;
+  --h3-variant: normal;
+  --h4-variant: normal;
+  --h5-variant: normal;
+  --h6-variant: normal;
+  --inline-title-size: 1.618em;
+  --inline-title-weight: 700;
+  --inline-title-line-height: 1.2;
+  --inline-title-margin-bottom: 0.5em;
+  --bold-color: var(--text-normal);
+  --italic-color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h1 { letter-spacing: var(--h1-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h2 { letter-spacing: var(--h2-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h3 { letter-spacing: var(--h3-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h4 { letter-spacing: var(--h4-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h5 { letter-spacing: var(--h5-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-h6 { letter-spacing: var(--h6-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-heading-marker { color: var(--heading-formatting); }
+
+/* The editor's syntax highlighting colors heading text with the accent through a nested span; Obsidian leaves headings in
+   the text color. The span has to inherit, the `#` marker keeps its own faded color. */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.cm-lp-h1, .cm-lp-h2, .cm-lp-h3, .cm-lp-h4, .cm-lp-h5, .cm-lp-h6) span:not(.cm-lp-heading-marker) {
+  color: inherit;
+  font-weight: inherit;
+}
+
+/* Reading view: text and layout */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode {
+  max-width: var(--file-line-width);
+  margin-inline: auto;
+  padding: var(--file-margins-y) var(--file-margins-x);
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(h1, h2, h3, h4, h5, h6) {
+  margin: var(--heading-spacing) 0 0;
+  font-style: normal;
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(h1, h2, h3, h4, h5, h6) + :is(h1, h2, h3, h4, h5, h6) { margin-top: var(--p-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h1 { font-size: var(--h1-size); font-weight: var(--h1-weight); line-height: var(--h1-line-height); letter-spacing: var(--h1-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h2 { font-size: var(--h2-size); font-weight: var(--h2-weight); line-height: var(--h2-line-height); letter-spacing: var(--h2-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h3 { font-size: var(--h3-size); font-weight: var(--h3-weight); line-height: var(--h3-line-height); letter-spacing: var(--h3-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h4 { font-size: var(--h4-size); font-weight: var(--h4-weight); line-height: var(--h4-line-height); letter-spacing: var(--h4-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h5 { font-size: var(--h5-size); font-weight: var(--h5-weight); line-height: var(--h5-line-height); letter-spacing: var(--h5-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode h6 { font-size: var(--h6-size); font-weight: var(--h6-weight); line-height: var(--h6-line-height); letter-spacing: var(--h6-letter-spacing); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode p { margin: var(--p-spacing) 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode strong { font-weight: var(--bold-weight); }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode hr { border-top: var(--hr-thickness) solid var(--hr-color); }
+
+/* Lists */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode :is(ul, ol) { padding-left: var(--list-indent); margin: var(--p-spacing) 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode li { margin: var(--list-spacing) 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode li::marker { color: var(--list-marker-color); }
+
+/* Blockquote: a 2px accent rule, no fill */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode blockquote {
+  margin: var(--p-spacing) 0;
+  padding: 0 0 0 var(--size-4-5);
+  border-left: var(--blockquote-border-thickness) solid var(--blockquote-border-color);
+  border-radius: 0;
+  background: var(--blockquote-background-color);
+  color: var(--text-normal);
+  font-style: var(--blockquote-font-style);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-blockquote {
+  border-left: var(--blockquote-border-thickness) solid var(--blockquote-border-color);
+  padding-left: var(--size-4-5);
+  color: var(--text-normal);
+}
+
+/* Quotes and callouts are not italic in Obsidian; the highlighting's nested spans carry the italic here. */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.cm-lp-blockquote, .cm-lp-callout),
+:root[data-obsidian-theme="builtin:obsidian"] :is(.cm-lp-blockquote, .cm-lp-callout) span:not(.cm-lp-italic) { font-style: var(--blockquote-font-style); }
+
+/* Code */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-inline-code,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-inline-code {
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  background: var(--code-background);
+  border: var(--code-border-width) solid var(--code-border-color);
+  border-radius: var(--code-radius);
+  padding: 0.15em 0.3em;
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-code {
+  background: var(--code-background);
+  border: var(--code-border-width) solid var(--code-border-color);
+  border-radius: var(--code-radius);
+  padding: var(--size-4-2) var(--size-4-3);
+  font-size: var(--code-size);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-code code { font-family: var(--font-monospace); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-code-block-line {
+  background: var(--code-background);
+  border-left: 0;
+  padding-left: var(--size-4-3);
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-code-block-first { border-radius: var(--code-radius) var(--code-radius) 0 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-code-block-last { border-radius: 0 0 var(--code-radius) var(--code-radius); }
+
+/* Tables: thin grid, header only bolder, no fills */
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table {
+  width: auto;
+  font-size: var(--table-text-size);
+  line-height: var(--table-line-height);
+  background: var(--table-background);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table th,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table td,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table th,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table td {
+  padding: var(--size-4-1) var(--size-4-2);
+  border: var(--table-border-width) solid var(--table-border-color);
+  vertical-align: var(--table-cell-vertical-alignment);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-table th,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table th {
+  background: var(--table-header-background);
+  font-weight: var(--table-header-weight);
+  color: var(--table-header-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table tbody tr:nth-child(even) { background: var(--table-row-alt-background); }
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-table tbody tr:hover { background: var(--table-row-background-hover); }
+
+/* Links: accent colored and underlined; unresolved ones are dimmed */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-link,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-wikilink,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--internal {
+  color: var(--link-color);
+  text-decoration: var(--link-decoration);
+  text-decoration-thickness: var(--link-decoration-thickness);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-link:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-wikilink:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--internal:hover {
+  color: var(--link-color-hover);
+  text-decoration: var(--link-decoration-hover);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--external {
+  color: var(--link-external-color);
+  text-decoration: var(--link-external-decoration);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--external:hover {
+  color: var(--link-external-color-hover);
+  text-decoration: var(--link-external-decoration-hover);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-link--broken {
+  color: var(--link-unresolved-color);
+  opacity: var(--link-unresolved-opacity);
+  text-decoration: underline;
+  text-decoration-style: var(--link-unresolved-decoration-style);
+  text-decoration-color: var(--link-unresolved-decoration-color);
+}
+
+/* Tags: accent pill without outline */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-tag,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-tag {
+  background: var(--tag-background);
+  color: var(--tag-color);
+  border: var(--tag-border-width) solid var(--tag-border-color);
+  border-radius: var(--tag-radius);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
+  font-size: var(--tag-size);
+  font-weight: var(--tag-weight, inherit);
+  text-decoration: var(--tag-decoration);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-tag:hover {
+  background: var(--tag-background-hover);
+  color: var(--tag-color-hover);
+  border-color: var(--tag-border-color-hover);
+  text-decoration: var(--tag-decoration-hover);
+}
+
+/* Callouts. The type decides one color; fill, title and icon derive from it, like Obsidian's `--callout-color`. */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--note, .cm-lp-callout-note) { --slb-callout-color: var(--callout-default); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--info, .cm-lp-callout-info) { --slb-callout-color: var(--callout-info); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--tip, .cm-lp-callout-tip) { --slb-callout-color: var(--callout-tip); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--warning, .cm-lp-callout-warning) { --slb-callout-color: var(--callout-warning); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--danger, .cm-lp-callout-danger) { --slb-callout-color: var(--callout-error); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--bug, .cm-lp-callout-bug) { --slb-callout-color: var(--callout-bug); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--example, .cm-lp-callout-example) { --slb-callout-color: var(--callout-example); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--quote, .cm-lp-callout-quote) { --slb-callout-color: var(--callout-quote); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--success, .cm-lp-callout-success) { --slb-callout-color: var(--callout-success); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--question, .cm-lp-callout-question) { --slb-callout-color: var(--callout-question); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--failure, .cm-lp-callout-failure) { --slb-callout-color: var(--callout-fail); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--abstract, .cm-lp-callout-abstract) { --slb-callout-color: var(--callout-summary); }
+:root[data-obsidian-theme="builtin:obsidian"] :is(.view-mode-callout--todo, .cm-lp-callout-todo) { --slb-callout-color: var(--callout-todo); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout {
+  background: color-mix(in oklch, var(--slb-callout-color, var(--callout-default)) 10%, transparent);
+  border-left: var(--callout-border-width) solid color-mix(in oklch, var(--slb-callout-color, var(--callout-default)) 25%, transparent);
+  border-radius: var(--callout-radius);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout {
+  margin: var(--p-spacing) 0;
+  padding: var(--callout-padding);
+}
+
+/* Live Preview styles each callout line on its own, so only the horizontal padding applies per line. */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout { padding: 4px 12px 4px 24px; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-header,
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout-header {
+  padding: var(--callout-title-padding);
+  font-size: inherit;
+  font-weight: var(--callout-title-weight);
+  color: var(--slb-callout-color, var(--callout-default));
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-header svg { color: var(--slb-callout-color, var(--callout-default)); }
+
+/* Nested highlight spans inside the Live Preview callout title would keep their own color. */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-callout-header span { color: inherit; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode-callout-body {
+  padding: var(--p-spacing) 0 0;
+  font-size: inherit;
+  line-height: inherit;
+  color: var(--text-normal);
+}
+
+/* Highlights: Obsidian's translucent fills, no corner rounding */
+:root[data-obsidian-theme="builtin:obsidian"] .cm-lp-highlight,
+:root[data-obsidian-theme="builtin:obsidian"] .view-mode mark.hl-yellow { background: var(--highlight-background); }
+
+/* ─── Chrome (Phase 4) ──────────────────────────────────────────────────────
+   Only Slatebase's own classes are selected, never Obsidian's workspace classes (measured: they have no effect here, see
+   `.kiro/specs/obsidian-themes-structure/`). Dimensions come from the variables above, so the numbers live in one place.
+   Structure stays Slatebase's: the tab bar and the pane header are two rows, the status bar is the only element moved
+   (it floats bottom right, as in Obsidian). */
+
+/* Tab bar: tabs on the sidebar surface, the active one lifted to the editor surface */
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-row .nav-controls,
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar {
+  background: var(--tab-container-background);
+  border-bottom: 0;
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar {
+  min-height: var(--header-height);
+  padding: 0 var(--tab-container-padding-end) 0 var(--tab-container-padding-start);
+  gap: 2px;
+  align-items: flex-end;
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab {
+  height: calc(var(--header-height) - 6px);
+  padding: 0 var(--size-4-3);
+  max-width: var(--tab-max-width);
+  border-bottom: 0;
+  border-radius: var(--tab-radius);
+  font-size: var(--tab-font-size);
+  font-weight: var(--font-normal);
+  color: var(--tab-text-color-active);
+  background: var(--tab-background);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab:hover { background: var(--tab-inner-background-hover); color: var(--tab-text-color-focused); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab--active {
+  height: calc(var(--header-height) - 4px);
+  border-radius: var(--tab-radius-active);
+  background: var(--tab-background-active);
+  color: var(--tab-text-color-focused-active-current);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab--active:hover { background: var(--tab-background-active); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-tab--drag-over { border-left-color: var(--interactive-accent); }
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-close-btn,
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-mode-btn { border-radius: var(--radius-s); color: var(--icon-color); }
+:root[data-obsidian-theme="builtin:obsidian"] .tab-bar-close-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+
+/* Pane header: back/forward, title, menu; 40px, no rule below, editor surface */
+:root[data-obsidian-theme="builtin:obsidian"] .editor-header-row {
+  min-height: var(--header-height);
+  background: var(--file-header-background);
+  border-bottom: var(--file-header-border);
+  padding: 0 var(--size-4-2);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .editor-header-row .nav-controls,
+:root[data-obsidian-theme="builtin:obsidian"] .editor-header-row .breadcrumb { background: transparent; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .breadcrumb {
+  padding: 0 var(--size-4-2);
+  font-size: var(--file-header-font-size);
+  font-weight: var(--file-header-font-weight);
+  color: var(--text-muted);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .nav-controls { gap: 0; padding: 0 var(--size-2-2); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .nav-controls-button {
+  width: 28px;
+  height: 24px;
+  border-radius: var(--clickable-icon-radius);
+  color: var(--icon-color);
+  opacity: var(--icon-opacity);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .nav-controls-button:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--icon-color-hover);
+  opacity: var(--icon-opacity-hover);
+}
+
+/* Ribbon (the icon column) */
+:root[data-obsidian-theme="builtin:obsidian"] .app-toolbar {
+  width: var(--ribbon-width);
+  padding: var(--ribbon-padding);
+  gap: 6px;
+  background: var(--ribbon-background);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .toolbar-btn {
+  width: 28px;
+  height: 24px;
+  border-radius: var(--clickable-icon-radius);
+  color: var(--icon-color);
+  opacity: var(--icon-opacity);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .toolbar-btn:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .toolbar-btn--active {
+  background: var(--background-modifier-hover);
+  color: var(--icon-color-hover);
+  opacity: var(--icon-opacity-hover);
+}
+
+/* The system font is wider than Inter; keep the logo row from truncating the app name. */
+:root[data-obsidian-theme="builtin:obsidian"] .app-sidebar-header { gap: var(--size-4-2); padding: 14px var(--size-4-3) 12px; }
+:root[data-obsidian-theme="builtin:obsidian"] .app-title { font-size: var(--font-ui-medium); letter-spacing: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .app-logo { gap: var(--size-4-2); }
+
+/* Sidebar and file tree: 8px-rounded rows, selection as a soft fill, no bold names */
+:root[data-obsidian-theme="builtin:obsidian"] .app-sidebar { background: var(--background-secondary); }
+:root[data-obsidian-theme="builtin:obsidian"] .app-sidebar-header { border-bottom: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .file-explorer { font-size: var(--nav-item-size); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-row,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-toggle,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file { border-radius: var(--nav-item-radius); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-toggle,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file {
+  padding-block: 4px;
+  padding-right: 8px;
+  font-size: var(--nav-item-size);
+  color: var(--nav-item-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-row:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file:hover { background: var(--nav-item-background-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-toggle:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file:hover { color: var(--nav-item-color-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-file--selected {
+  background: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-name { font-weight: var(--font-normal); color: var(--nav-item-color); }
+:root[data-obsidian-theme="builtin:obsidian"] .tree-node-chevron { color: var(--nav-collapse-icon-color); opacity: 1; }
+
+/* Status bar: floats bottom right, rounded top-left corner, rules only on the open sides */
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar {
+  position: var(--status-bar-position);
+  right: 0;
+  bottom: 0;
+  z-index: var(--layer-status-bar);
+  height: auto;
+  padding: 4px 8px 4px 4px;
+  gap: 4px;
+  background: var(--status-bar-background);
+  border: 0 solid var(--status-bar-border-color);
+  border-width: var(--status-bar-border-width);
+  border-radius: var(--status-bar-radius);
+  font-size: var(--status-bar-font-size);
+  color: var(--status-bar-text-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar__left,
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar__right { gap: 4px; }
+
+:root[data-obsidian-theme="builtin:obsidian"] .status-bar__item { padding: 3px 4px; border-radius: var(--radius-s); opacity: 1; }
+
+/* The panel toggles sit bottom right/left of the layout; lift the right one above the floating status bar. */
+:root[data-obsidian-theme="builtin:obsidian"] .right-panel-toggle { bottom: 44px; }
+
+/* Menus: context menu and user menu */
+:root[data-obsidian-theme="builtin:obsidian"] .context-menu,
+:root[data-obsidian-theme="builtin:obsidian"] .user-menu-dropdown {
+  padding: var(--menu-padding);
+  background: var(--menu-background);
+  border: var(--menu-border-width) solid var(--menu-border-color);
+  border-radius: var(--menu-radius);
+  box-shadow: var(--menu-shadow);
+  font-size: var(--font-ui-small);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .context-menu-btn { padding: 6px 8px; border-radius: var(--radius-s); }
+:root[data-obsidian-theme="builtin:obsidian"] .context-menu-btn:hover:not(.context-menu-btn--disabled) { background: var(--background-modifier-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .global-tooltip {
+  padding: var(--tooltip-padding);
+  border-radius: var(--tooltip-radius);
+  background: var(--tooltip-background);
+  color: var(--tooltip-color);
+  font-size: var(--tooltip-font-size);
+  line-height: var(--tooltip-line-height);
+  box-shadow: var(--tooltip-shadow);
+}
+
+/* Command palette (Obsidian's prompt) */
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette {
+  width: var(--prompt-width);
+  max-width: var(--prompt-max-width);
+  background: var(--prompt-background);
+  border: var(--prompt-border-width) solid var(--prompt-border-color);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-search { min-height: var(--prompt-input-height); }
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-item { border-radius: var(--radius-m); font-size: var(--font-ui-medium); }
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-item--selected { background: var(--background-modifier-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-item-shortcut {
+  padding: 2px 8px;
+  border-radius: var(--hotkey-radius);
+  background: var(--hotkey-background);
+  font-size: var(--hotkey-font-size);
+}
+
+/* Modals and the settings panel */
+:root[data-obsidian-theme="builtin:obsidian"] :is(.confirm-modal, .dialog, .new-conversation-modal, .version-browser-modal, .vault-deletion-workflow-modal, .settings-panel) {
+  background: var(--modal-background);
+  border: var(--modal-border-width) solid var(--modal-border-color);
+  border-radius: var(--modal-radius);
+  box-shadow: var(--modal-shadow);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-panel-header { border-bottom: 0; }
+:root[data-obsidian-theme="builtin:obsidian"] .settings-panel-content { background: var(--settings-background); padding: var(--size-4-6) var(--size-4-8); }
+:root[data-obsidian-theme="builtin:obsidian"] .settings-panel-sidebar { background: var(--modal-sidebar-background); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__section-btn {
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-medium);
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__section-btn:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__section-btn[aria-current="page"] {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-nav-list__category-heading {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-normal);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+/* Setting cards: soft fill, no outline, 12px radius, thin dividers between rows */
+:root[data-obsidian-theme="builtin:obsidian"] .setting-section {
+  padding: var(--setting-items-padding-y) var(--setting-items-padding-x);
+  background: var(--setting-items-background);
+  border: var(--setting-items-border-width) solid var(--setting-items-border-color);
+  border-radius: var(--setting-items-radius);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-section__title {
+  font-size: var(--setting-group-heading-size);
+  font-weight: var(--setting-group-heading-weight);
+  color: var(--setting-group-heading-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-section__description,
+:root[data-obsidian-theme="builtin:obsidian"] .setting-row__hint { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-row__label {
+  font-size: var(--setting-item-name-size);
+  font-weight: var(--setting-item-name-weight);
+  color: var(--setting-item-name-color);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .setting-row__control input[type='checkbox'] { accent-color: var(--checkbox-color); }
+
+/* Buttons: borderless 8px pills, the call to action in the accent color */
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn,
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button,
+:root[data-obsidian-theme="builtin:obsidian"] .settings-save-btn {
+  padding: 4px var(--size-4-3);
+  border: 0;
+  border-radius: var(--button-radius);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--sm { padding: 2px var(--size-4-2); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--secondary,
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button {
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--secondary:hover:not(:disabled),
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button:hover { background: var(--interactive-hover); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--primary,
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button.mod-cta,
+:root[data-obsidian-theme="builtin:obsidian"] .settings-save-btn:not(.settings-save-btn--secondary) {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .st-btn--primary:hover:not(:disabled),
+:root[data-obsidian-theme="builtin:obsidian"] .modal-button-container button.mod-cta:hover,
+:root[data-obsidian-theme="builtin:obsidian"] .settings-save-btn:not(.settings-save-btn--secondary):hover { background: var(--interactive-accent-hover); }
+
+/* Inputs */
+:root[data-obsidian-theme="builtin:obsidian"] .settings-field-input,
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-input,
+:root[data-obsidian-theme="builtin:obsidian"] .keybindings-input {
+  min-height: var(--input-height);
+  padding: var(--input-padding);
+  background: var(--background-modifier-form-field);
+  border: var(--input-border-width) solid var(--background-modifier-border);
+  border-radius: var(--input-radius);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+:root[data-obsidian-theme="builtin:obsidian"] .command-palette-input { border: 0; background: transparent; font-size: var(--font-ui-medium); }
+
+:root[data-obsidian-theme="builtin:obsidian"] .settings-field-input:focus-visible,
+:root[data-obsidian-theme="builtin:obsidian"] .keybindings-input:focus-visible { border-color: var(--background-modifier-border-focus); }
+
+/* Obsidian 1.14 rounds controls as a squircle where the browser can draw one; elsewhere the plain radii above apply. */
+@supports (corner-shape: superellipse(1.33)) {
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.st-btn, .modal-button-container button, .settings-save-btn) { corner-shape: var(--button-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.settings-field-input, .keybindings-input) { corner-shape: var(--input-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.context-menu, .user-menu-dropdown) { corner-shape: var(--menu-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.tab-bar-tab) { corner-shape: var(--tab-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.global-tooltip) { corner-shape: var(--tooltip-corner-shape); }
+  :root[data-obsidian-theme="builtin:obsidian"] :is(.confirm-modal, .dialog, .new-conversation-modal, .version-browser-modal, .vault-deletion-workflow-modal, .settings-panel, .command-palette, .setting-section) { corner-shape: var(--corner-shape); }
+}

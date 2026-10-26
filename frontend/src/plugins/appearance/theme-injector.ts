@@ -7,6 +7,9 @@
  * tag; and applying it sets `data-obsidian-theme` on <html>, which switches on
  * `theme-bridge.css` (Slatebase's own tokens then follow the theme's variables).
  *
+ * Built-in themes (`builtin-themes.ts`) have no tag: their CSS is bundle CSS gated on the same attribute, so
+ * {@link IThemeInjector.applyBuiltin} only sets the marker.
+ *
  * Cascade order is base CSS < theme < snippets, so the theme tag is placed before the
  * first snippet tag if snippets are already present; snippets applied later append after it.
  */
@@ -23,9 +26,11 @@ const THEME_MARKER_ATTRIBUTE = 'data-obsidian-theme'
 export interface IThemeInjector {
   /** Injects (or replaces) the active theme's CSS and enables the token bridge. Returns false if rejected. */
   apply(themeId: string, css: string): boolean
+  /** Switches a built-in theme (CSS ships in the bundle) on: drops any vault theme tag, sets the marker. */
+  applyBuiltin(themeId: string): void
   /** Removes the theme tag and the bridge marker, restoring the Slatebase default look. */
   remove(): void
-  /** Id of the currently applied theme, or null. */
+  /** Id of the currently applied theme (vault or built-in), or null. */
   currentThemeId(): string | null
 }
 
@@ -59,6 +64,15 @@ export class ThemeInjector implements IThemeInjector {
     return true
   }
 
+  applyBuiltin(themeId: string): void {
+    const existing = document.head.querySelector(THEME_STYLE_SELECTOR)
+    const changed = existing !== null || document.documentElement.getAttribute(THEME_MARKER_ATTRIBUTE) !== themeId
+    existing?.remove()
+    this.appliedCss = null
+    document.documentElement.setAttribute(THEME_MARKER_ATTRIBUTE, themeId)
+    if (changed) notifyCssChange()
+  }
+
   remove(): void {
     const existing = document.head.querySelector(THEME_STYLE_SELECTOR)
     existing?.remove()
@@ -68,7 +82,8 @@ export class ThemeInjector implements IThemeInjector {
   }
 
   currentThemeId(): string | null {
-    return document.head.querySelector(THEME_STYLE_SELECTOR)?.getAttribute('data-slatebase-theme') ?? null
+    return document.head.querySelector(THEME_STYLE_SELECTOR)?.getAttribute('data-slatebase-theme')
+      ?? document.documentElement.getAttribute(THEME_MARKER_ATTRIBUTE)
   }
 }
 

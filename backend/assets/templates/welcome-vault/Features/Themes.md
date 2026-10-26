@@ -36,6 +36,9 @@ Weil Themes im Vault liegen, reisen sie mit Backups und mit der [[Features/Git-S
 3. Wähle ein Theme aus der Liste — die Änderung wirkt sofort
 4. Mit **Slatebase (Standard)** kehrst du zum normalen Aussehen zurück
 
+> [!tip] Obsidian (Standard)
+> Neben **Slatebase (Standard)** liefert Slatebase ein zweites Aussehen mit: **Obsidian (Standard)** bildet das Standard-Theme von Obsidian nach — Farben, violetter Akzent, Systemschrift, Überschriften, Tabs, Seitenleiste, Statusleiste unten rechts, Befehlspalette und Einstellungen. Es muss nicht importiert werden und lässt sich nicht löschen. Wie jedes Theme gilt es pro Vault; hell oder dunkel bestimmst du weiter selbst. Obsidian selbst kennt diese Auswahl nicht: In einem Vault, den du auch in Obsidian öffnest, zeigt es sein eigenes Standard-Theme und kann die Auswahl beim nächsten Speichern seiner Darstellungs-Einstellungen überschreiben. Slatebase zeigt dann wieder „Slatebase (Standard)"; wähle das Theme einfach erneut aus.
+
 Wechselt jemand anderes das Theme, während du den Vault offen hast, übernimmt dein Fenster die Änderung automatisch.
 
 ---

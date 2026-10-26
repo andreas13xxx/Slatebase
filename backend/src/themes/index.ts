@@ -4,6 +4,8 @@ export { ThemeService } from './theme-service.js'
 export { ThemeNotFoundError, ThemeTooLargeError, InvalidThemeIdError, AppearanceFileInvalidError } from './errors.js'
 export {
   MAX_THEME_CSS_SIZE,
+  BUILTIN_OBSIDIAN_THEME_ID,
+  isBuiltinThemeId,
   isValidThemeId,
   toThemeId,
   themeIdSchema,

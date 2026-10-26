@@ -13,6 +13,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppContext } from '../state'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
+import { isBuiltinThemeId } from '../plugins/appearance/builtin-themes'
 import { themeInjector } from '../plugins/appearance/theme-injector'
 
 const APPEARANCE_PATH = '.obsidian/appearance.json'
@@ -49,9 +50,15 @@ export function ThemeLifecycle(): null {
           themeInjector.remove()
           return
         }
+        if (isBuiltinThemeId(activeId)) {
+          themeInjector.applyBuiltin(activeId)
+          return
+        }
         const { css } = await apiClient!.loadTheme(vaultId!, activeId)
         if (cancelled || mine !== generation) return
-        themeInjector.apply(activeId, css)
+        // A stylesheet over the size limit is refused and the marker of a previously applied built-in theme would keep
+        // claiming the selection; the vault's choice cannot be shown, so show the default instead of a different theme.
+        if (!themeInjector.apply(activeId, css)) themeInjector.remove()
       } catch (error) {
         if (cancelled || mine !== generation) return
         if (isThemeNotFound(error)) {

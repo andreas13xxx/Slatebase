@@ -138,6 +138,9 @@ describe('themeRoutes', () => {
 
     expect((await app.request(`${base}/active`, json({ themeId: null }))).status).toBe(200)
     expect(selected).toBeNull()
+    expect((await app.request(`${base}/active`, json({ themeId: 'builtin:obsidian' }))).status).toBe(200)
+    expect(selected).toBe('builtin:obsidian')
+    expect((await app.request(`${base}/active`, json({ themeId: 'builtin:other' }))).status).toBe(400)
     expect((await app.request(`${base}/active`, json({ themeId: '../x' }))).status).toBe(400)
     expect((await app.request(`${base}/active`, { method: 'PUT', body: '{' })).status).toBe(400)
   })

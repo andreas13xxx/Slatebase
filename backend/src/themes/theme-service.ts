@@ -7,7 +7,7 @@ import { isNodeError } from '../shared/fs-utils.js'
 import { validateFilePath } from '../vault/index.js'
 import { InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
 import type { IThemeService, ThemeManifest, ThemeManifestInput, ThemeMeta } from './types.js'
-import { MAX_THEME_CSS_SIZE, extractExternalHosts, hasStyleSettingsBlock, isValidThemeId, normalizeManifest } from './validation.js'
+import { MAX_THEME_CSS_SIZE, extractExternalHosts, hasStyleSettingsBlock, isBuiltinThemeId, isValidThemeId, normalizeManifest } from './validation.js'
 
 const THEMES_DIR = '.obsidian/themes'
 
@@ -221,7 +221,9 @@ export class ThemeService implements IThemeService {
   }
 
   async setActiveThemeId(vaultPath: string, themeId: string | null): Promise<void> {
-    if (themeId !== null && !(await this.themeExists(vaultPath, themeId))) throw new ThemeNotFoundError(themeId)
+    if (themeId !== null && !isBuiltinThemeId(themeId) && !(await this.themeExists(vaultPath, themeId))) {
+      throw new ThemeNotFoundError(themeId)
+    }
     await withAppearanceLock(vaultPath, async () => {
       const current = (await readAppearance(vaultPath)) ?? {}
       await writeAppearance(vaultPath, {

@@ -63,6 +63,41 @@ describe('ThemeLifecycle', () => {
     expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('Things')
   })
 
+  it('applies a built-in theme from its id alone, without asking the server for CSS', async () => {
+    const apiClient = createMockApiClient({ getActiveTheme: vi.fn().mockResolvedValue('builtin:obsidian') })
+
+    render(
+      <AppProvider apiClient={apiClient}>
+        <VaultSwitcher vaults={[vaultA]} />
+        <ThemeLifecycle />
+      </AppProvider>,
+    )
+
+    await waitFor(() => expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('builtin:obsidian'))
+    expect(apiClient.loadTheme).not.toHaveBeenCalled()
+    expect(themeTag()).toBeNull()
+  })
+
+  it('falls back to the default look when the selected theme is over the size limit, even after a built-in theme', async () => {
+    themeInjector.applyBuiltin('builtin:obsidian')
+    const apiClient = createMockApiClient({
+      getActiveTheme: vi.fn().mockResolvedValue('Huge'),
+      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(3 * 1024 * 1024 + 1), meta: {} }),
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    render(
+      <AppProvider apiClient={apiClient}>
+        <VaultSwitcher vaults={[vaultA]} />
+        <ThemeLifecycle />
+      </AppProvider>,
+    )
+
+    await waitFor(() => expect(apiClient.loadTheme).toHaveBeenCalledWith('vault-a', 'Huge'))
+    await waitFor(() => expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false))
+    expect(themeTag()).toBeNull()
+  })
+
   it('applies nothing when the vault has no active theme', async () => {
     const apiClient = createMockApiClient()
     render(

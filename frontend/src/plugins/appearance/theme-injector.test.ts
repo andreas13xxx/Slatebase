@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { CSS_CHANGE_EVENT } from './css-change'
 import { ThemeInjector } from './theme-injector'
 
 const themeTag = (): HTMLStyleElement | null => document.head.querySelector('style[data-slatebase-theme]')
@@ -37,6 +38,36 @@ describe('ThemeInjector', () => {
     expect(themeTag()).toBeNull()
     expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false)
     expect(injector.currentThemeId()).toBeNull()
+  })
+
+  it('applies a built-in theme with the marker only and replaces a vault theme tag', () => {
+    const injector = new ThemeInjector()
+    injector.apply('Things', 'a{}')
+    injector.applyBuiltin('builtin:obsidian')
+
+    expect(themeTag()).toBeNull()
+    expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('builtin:obsidian')
+    expect(injector.currentThemeId()).toBe('builtin:obsidian')
+
+    injector.remove()
+    expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false)
+    expect(injector.currentThemeId()).toBeNull()
+  })
+
+  it('lets a vault theme take over from a built-in one and notifies only on a change', async () => {
+    const injector = new ThemeInjector()
+    const listener = vi.fn()
+    window.addEventListener(CSS_CHANGE_EVENT, listener)
+    injector.applyBuiltin('builtin:obsidian')
+    await Promise.resolve()
+    injector.applyBuiltin('builtin:obsidian')
+    await Promise.resolve()
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    injector.apply('Things', 'a{}')
+    expect(themeTag()?.textContent).toBe('a{}')
+    expect(document.documentElement.getAttribute('data-obsidian-theme')).toBe('Things')
+    window.removeEventListener(CSS_CHANGE_EVENT, listener)
   })
 
   it('is a no-op to remove when nothing is applied', () => {

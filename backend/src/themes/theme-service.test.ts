@@ -4,7 +4,15 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppearanceFileInvalidError, InvalidThemeIdError, ThemeNotFoundError, ThemeTooLargeError } from './errors.js'
 import { ThemeService } from './theme-service.js'
-import { MAX_THEME_CSS_SIZE, extractExternalHosts, hasStyleSettingsBlock, isValidThemeId, normalizeManifest } from './validation.js'
+import {
+  BUILTIN_OBSIDIAN_THEME_ID,
+  MAX_THEME_CSS_SIZE,
+  extractExternalHosts,
+  hasStyleSettingsBlock,
+  isBuiltinThemeId,
+  isValidThemeId,
+  normalizeManifest,
+} from './validation.js'
 
 let vault: string
 let service: ThemeService
@@ -111,6 +119,28 @@ describe('ThemeService', () => {
 
     it('refuses to activate a theme that does not exist', async () => {
       await expect(service.setActiveThemeId(vault, 'Ghost')).rejects.toBeInstanceOf(ThemeNotFoundError)
+    })
+
+    it('stores a built-in theme id without a theme folder and keeps the other appearance.json fields', async () => {
+      await fs.mkdir(path.dirname(appearancePath()), { recursive: true })
+      await fs.writeFile(appearancePath(), JSON.stringify({ theme: 'moonstone', enabledCssSnippets: ['a'] }))
+      await service.setActiveThemeId(vault, BUILTIN_OBSIDIAN_THEME_ID)
+      const written = JSON.parse(await fs.readFile(appearancePath(), 'utf-8')) as Record<string, unknown>
+      expect(written).toEqual({ theme: 'moonstone', enabledCssSnippets: ['a'], cssTheme: 'builtin:obsidian' })
+      expect(await service.getActiveThemeId(vault)).toBe('builtin:obsidian')
+    })
+
+    it('keeps a built-in selection when an installed theme is deleted', async () => {
+      await service.saveTheme(vault, 'Things', 'a{}')
+      await service.setActiveThemeId(vault, BUILTIN_OBSIDIAN_THEME_ID)
+      await service.deleteTheme(vault, 'Things')
+      expect(await service.getActiveThemeId(vault)).toBe('builtin:obsidian')
+    })
+
+    it('does not accept the built-in id as a theme folder name', () => {
+      expect(isValidThemeId(BUILTIN_OBSIDIAN_THEME_ID)).toBe(false)
+      expect(isBuiltinThemeId(BUILTIN_OBSIDIAN_THEME_ID)).toBe(true)
+      expect(isBuiltinThemeId('Things')).toBe(false)
     })
 
     it('never overwrites an appearance.json that is not a JSON object', async () => {
