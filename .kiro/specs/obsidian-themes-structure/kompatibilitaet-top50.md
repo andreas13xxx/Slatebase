@@ -51,10 +51,31 @@ Abweichungen von der statischen Einteilung: Blue Topaz („eingeschränkt") und 
 - **Blue Topaz:** Die Theme-Regel `body:not(.obsidian-default-image) .markdown-source-view.mod-cm6 img:not([class*="emoji"]) { display: block }` (Spezifität 0,4,2) trifft auch CodeMirrors unsichtbare `img.cm-widgetBuffer`. Deren eigenes `display: inline` (`.ͼ1 .cm-widgetBuffer`) verliert, jeder Puffer wird zum Block und bricht die Zeile um. Die Regel greift erst, seit der Editor `mod-cm6` trägt (Stufe 2, R1). Behoben mit einer Schutzregel in `live-preview.css` (0,5,1, ohne `!important`, enge Blockzeilen ausgenommen).
 - **Obsidianite:** Die Regel `.markdown-source-view.mod-cm6.is-live-preview .HyperMD-quote, .markdown-preview-view blockquote` gibt **jeder** Zitatzeile Rahmen, Verlauf und 2 em Abstand. Obsidian setzt `HyperMD-quote` ebenfalls pro Zeile, die Darstellung dürfte also dort ähnlich aussehen. Das ist **nicht gegen Obsidian geprüft**. Nicht geändert. Ebenfalls ungeprüft: ob das Theme (dunkel ausgelegt) im Dunkelmodus unauffällig aussieht, hier nur heller Modus.
 
+### Sichtprüfung der Top 10 im Dunkelmodus
+
+Gleiche Instanz und Test-Notiz, `theme-dark` auf `<body>` (Browser-Farbschema „dunkel", Einstellung „system"), Stand nach den Korrekturen unten.
+
+| Rang | Theme | Eindruck |
+|---|---|---|
+| 1 | Minimal | Gut: dunkle Flächen, gedämpfte Überschriften, Callout und Tags stimmig |
+| 2 | Things | Gut: blaue Überschriften mit Trennlinie, Code-Block lesbar |
+| 3 | AnuPpuccin | Gut: türkise Überschriften in Monospace, Schriftbild und Farben stimmig |
+| 4 | Blue Topaz | Gut, Absatz fließt (Fix wirkt); Zitat mit Akzentbalken, Datei-Icons themed |
+| 5 | Obsidian Nord | Gut: Überschriften und Links in Nord-Orange; die Markierung (`==text==`) ist nur schwach lesbar (Theme-Farben) |
+| 6 | Atom | Gut: blaue Überschriften, schlichte Fläche |
+| 7 | Obsidianite | Zitat weiterhin zeilenweise als eigene Kästen (siehe Ursache oben, vermutlich theme-eigen); Statusleiste am unteren Rand blass; sonst stimmig |
+| 8 | Wasp | Gut: gelb-schwarz, Monospace; **vor der Korrektur waren Bezeichner im Codeblock unsichtbar** |
+| 9 | Typewriter | Gut: braune Flächen, türkise Überschriften; Zitat mit etwas mehr Zeilenabstand |
+| 10 | ITS Theme | Gut, wie im hellen Modus: Datei-Icon-Set, Rauten in der Gliederung, Serifen-Überschriften |
+
+**Beim Dunkelmodus gefunden und behoben:** Die Compat-Schicht kannte `--code-normal` nur für den hellen Modus (`#0f172a`). Seit die Theme-Bridge Code-Text damit färbt (`4941251`), bekam ein Theme ohne eigenen Wert dunklen Text auf dunklem Code-Hintergrund. In den Screenshots schwach bei Things und Atom, bei Wasp fehlten `a` und `b` im Codeblock fast ganz. Beide Dunkel-Blöcke der Compat-Schicht definieren die Variable jetzt (`3102638`); in Wasp nachgemessen: `rgb(230, 237, 243)` auf `rgb(25, 25, 25)`. Der Fehler wäre im hellen Modus allein nicht aufgefallen.
+
+Weiter ungeprüft: Tabellen und Code-Block weiter unten in der Notiz, Ränge 11 bis 50 sowie Style-Settings-Optionen.
+
 ## Grenzen
 
 - Nur oberer Teil der Test-Notiz in den Screenshots; Tabelle und Code-Block unterhalb nicht beurteilt.
-- Nur heller Modus. Dunkle Themes (z. B. Obsidian Nord) sind damit nicht in ihrem Hauptmodus gesehen.
+- Die erste Sichtprüfung war nur im hellen Modus; der Dunkelmodus der Top 10 ist im Abschnitt davor nachgeholt.
 - Style-Settings-Optionen, Plugins und Seitenleisten-Details wurden nicht geprüft.
 - Ränge 11 bis 50 wurden nur statisch geprüft.
 - Die Screenshots lagen im Scratch-Verzeichnis der Sitzung und sind nicht erhalten.
@@ -62,8 +83,8 @@ Abweichungen von der statischen Einteilung: Blue Topaz („eingeschränkt") und 
 
 ## Offene Punkte
 
-- Obsidianite gegen echtes Obsidian vergleichen (Zitatdarstellung) und im Dunkelmodus ansehen.
-- Sichtprüfung für Ränge 11 bis 20 und im Dunkelmodus.
+- Obsidianite gegen echtes Obsidian vergleichen (Zitatdarstellung).
+- Sichtprüfung für Ränge 11 bis 20 in beiden Farbmodi.
 - Installation einzelner `obsidian.css`-Themes über den Store gegen echtes GitHub ausprobieren (bisher nur mit Testdoubles und lokalem Server getestet).
 - Weitere Variablen aus der Liste unten binden, sobald ihre Wirkung per Screenshot belegt ist.
 
@@ -96,7 +117,7 @@ Fehlende Treffer nach Bereich (Summe über alle Themes): Workspace/Tabs 9.221, L
 1. **`obsidian.css`-Fallback im Store** (`66b6723`): Fehlt `theme.css`, wird `obsidian.css` geholt; bei solchen Repos darf `manifest.json` fehlen (Katalogname ersetzt es), ein `theme.css`-Repo braucht weiter ein Manifest. Die Update-Prüfung zählt ein fehlendes Remote-Manifest als „unbekannt". Betrifft 9 der Top 50.
 2. **CSS-Grenze 3 MB → 6 MB** (`66b6723`): Backend, Import und Injector, Meldungen, Doku, Tests. Willemstad (5,3 MB) passt damit.
 3. **Blue-Topaz-Fehler** (`f4c50ad`): Schutzregel für `cm-widgetBuffer`, siehe oben. Im Browser nachgeprüft.
-4. **Variablen in `theme-bridge.css` gebunden** (`4941251`): `--text-selection` (Editor-Auswahl und `::selection`), `--scrollbar-bg`/`-thumb-bg`/`-active-thumb-bg`, `--code-normal` (Inline-Code und Codeblock-Zeilen), `--checkbox-color`, `--tab-text-color` und `--tab-text-color-focused-active`. Jede hat in der Compat-Schicht einen Slatebase-gleichen Standardwert, ohne Theme ändert sich nichts. Im Browser mit Obsidian Nord geprüft (Inline-Code, Checkbox, aktiver Tab, Auswahlfarbe); Minimal liefert dieselben Variablen. Die Scrollbalken wurden nur über den Test, nicht im Bild geprüft.
+4. **Variablen in `theme-bridge.css` gebunden** (`4941251`, im Dunkelmodus nachgebessert in `3102638`): `--text-selection` (Editor-Auswahl und `::selection`), `--scrollbar-bg`/`-thumb-bg`/`-active-thumb-bg`, `--code-normal` (Inline-Code und Codeblock-Zeilen), `--checkbox-color`, `--tab-text-color` und `--tab-text-color-focused-active`. Jede hat in der Compat-Schicht einen Slatebase-gleichen Standardwert, ohne Theme ändert sich nichts. Im Browser mit Obsidian Nord geprüft (Inline-Code, Checkbox, aktiver Tab, Auswahlfarbe); Minimal liefert dieselben Variablen. Die Scrollbalken wurden nur über den Test, nicht im Bild geprüft.
 
 **Bewusst nicht gebunden:** die semantischen Farben (`--background-modifier-error`/`-success`), weil die Bridge sie laut ihrem Kopfkommentar absichtlich auslässt, sowie `--titlebar-*`, `--ribbon-*` und alles aus Workspace/Tabs/Leseansicht (Wirkung gemessen als gering oder keine passende Stelle in Slatebase).
 
@@ -104,7 +125,7 @@ Fehlende Treffer nach Bereich (Summe über alle Themes): Workspace/Tabs 9.221, L
 
 1. Weitere Variablen aus der Liste oben bindbar machen, jeweils mit Screenshot-Beleg (zuerst `--background-primary-alt`, `--text-highlight-bg-active`, `--input-shadow`, `--tab-divider-color`).
 2. Editor-Klassen `cm-strong`, `cm-em`, `cm-link`, `cm-url`, `cm-quote`, `cm-header-N` als Marker an den Live-Preview-Dekorationen (R2, 22 bis 30 Themes), vorher mit der Wirkungsprobe der Spec messen.
-3. Sichtprüfung der Ränge 11 bis 20 und beider Farbmodi, bevor weitere Klassen angegangen werden.
+3. Sichtprüfung der Ränge 11 bis 20 in beiden Farbmodi, bevor weitere Klassen angegangen werden.
 4. Workspace-Klassen und Leseansicht weiter nicht angleichen.
 
 ## Rohdaten: alle 50 Themes (statisch)
