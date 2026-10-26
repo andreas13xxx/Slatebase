@@ -74,8 +74,8 @@ describe('ThemeService', () => {
     }
   })
 
-  it('accepts CSS of exactly 3 MB, the limit that admits the larger catalog themes', async () => {
-    expect(MAX_THEME_CSS_SIZE).toBe(3 * 1024 * 1024)
+  it('accepts CSS of exactly 6 MB, the limit that admits the larger catalog themes', async () => {
+    expect(MAX_THEME_CSS_SIZE).toBe(6 * 1024 * 1024)
     const meta = await service.saveTheme(vault, 'Exact', 'a'.repeat(MAX_THEME_CSS_SIZE))
     expect(meta.id).toBe('Exact')
   })

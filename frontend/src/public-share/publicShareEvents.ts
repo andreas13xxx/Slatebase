@@ -11,3 +11,11 @@ export interface OpenPublicShareDetail {
 export function openPublicShareDialog(vaultId: string, filePath: string): void {
   window.dispatchEvent(new CustomEvent<OpenPublicShareDetail>(OPEN_PUBLIC_SHARE_EVENT, { detail: { vaultId, filePath } }))
 }
+
+/** Window event fired after a public link was created or revoked, so link markers can refresh. */
+export const PUBLIC_SHARES_CHANGED_EVENT = 'slatebase:public-shares-changed'
+
+/** Tells listeners (e.g. the file explorer) that the set of public links changed. */
+export function notifyPublicSharesChanged(): void {
+  window.dispatchEvent(new Event(PUBLIC_SHARES_CHANGED_EVENT))
+}

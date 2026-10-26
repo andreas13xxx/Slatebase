@@ -85,6 +85,12 @@
   --text-faint: var(--color-base-50);
   --text-accent: var(--color-accent);
   --interactive-accent: var(--color-accent);
+
+  /* Variables the bridge paints below but the compat layer pins to fixed colors (`:root`, per color scheme). A theme that
+     does not set them would lose its own text color there, so they follow the theme's palette instead, which is what
+     code and tab text did before they were bound. Specificity 0: any theme rule wins. */
+  --code-normal: var(--text-normal);
+  --tab-text-color: var(--text-muted);
 }
 
 :root[data-obsidian-theme] body {
@@ -200,4 +206,52 @@
 
 :root[data-obsidian-theme] .cm-lp-italic {
   color: var(--italic-color);
+}
+
+/* ─── Variables many themes set that Slatebase's own UI did not read yet ──────
+   Counted over the 50 most downloaded themes (2026-10-26): `--text-selection` 44, scrollbars 25–26, `--code-normal` 25,
+   `--tab-text-color*` 18–23, `--checkbox-color` 19. The compat layer already defines each with a Slatebase-matching value
+   on `:root`, so a theme that does not set one changes nothing visible. */
+
+/* Scrollbars (the global rule in index.css uses the border tokens). */
+:root[data-obsidian-theme] ::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+
+:root[data-obsidian-theme] ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-bg);
+}
+
+:root[data-obsidian-theme] ::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-active-thumb-bg);
+}
+
+/* Text selection, in the editor (CodeMirror draws its own selection layer) and elsewhere. */
+:root[data-obsidian-theme] ::selection {
+  background: var(--text-selection);
+}
+
+:root[data-obsidian-theme] .cm-editor .cm-selectionLayer .cm-selectionBackground,
+:root[data-obsidian-theme] .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--text-selection);
+}
+
+/* Code text and the task checkbox's accent. */
+:root[data-obsidian-theme] .cm-lp-inline-code,
+:root[data-obsidian-theme] .cm-lp-code-block-line {
+  color: var(--code-normal);
+}
+
+:root[data-obsidian-theme] .cm-lp-checkbox {
+  accent-color: var(--checkbox-color);
+}
+
+/* Tab bar text (Obsidian's `--tab-text-color*`). */
+:root[data-obsidian-theme] .tab-bar-tab {
+  color: var(--tab-text-color);
+}
+
+:root[data-obsidian-theme] .tab-bar-tab:hover,
+:root[data-obsidian-theme] .tab-bar-tab--active {
+  color: var(--tab-text-color-focused-active);
 }

@@ -115,6 +115,40 @@ describe('theme bridge', () => {
     }
   })
 
+  it('binds the widely used UI variables (selection, scrollbars, code, checkbox, tabs) and only to compat-defined ones', () => {
+    const bound: ReadonlyArray<readonly [string, string, string]> = [
+      [':root[data-obsidian-theme] ::-webkit-scrollbar-track {', 'background', '--scrollbar-bg'],
+      [':root[data-obsidian-theme] ::-webkit-scrollbar-thumb {', 'background', '--scrollbar-thumb-bg'],
+      [':root[data-obsidian-theme] ::-webkit-scrollbar-thumb:hover {', 'background', '--scrollbar-active-thumb-bg'],
+      [':root[data-obsidian-theme] ::selection {', 'background', '--text-selection'],
+      [':root[data-obsidian-theme] .cm-lp-checkbox {', 'accent-color', '--checkbox-color'],
+      [':root[data-obsidian-theme] .tab-bar-tab {', 'color', '--tab-text-color'],
+      [':root[data-obsidian-theme] .tab-bar-tab:hover,\n:root[data-obsidian-theme] .tab-bar-tab--active {', 'color', '--tab-text-color-focused-active'],
+    ]
+    for (const [selector, property, variable] of bound) {
+      expect(ruleBody(bridge, selector), selector).toContain(`${property}: var(${variable})`)
+      expect(compat, `${variable} missing in obsidian-compat.css`).toMatch(new RegExp(`\\n\\s*${variable}:`))
+    }
+    expect(bridge).toMatch(/\.cm-selectionBackground\s*\{\s*background: var\(--text-selection\)/)
+    expect(bridge).toMatch(/\.cm-lp-code-block-line\s*\{\s*color: var\(--code-normal\)/)
+    expect(compat).toMatch(/\n\s*--code-normal:/)
+  })
+
+  it('gives code and tab text a default that follows the theme palette, at specificity 0 so any theme wins', () => {
+    // The compat layer pins both to fixed colors per scheme; without this default a theme that sets neither loses its own text color.
+    const whereBlocks = [...bridge.matchAll(/:where\(:root\[data-obsidian-theme\] body\) \{([^}]*)\}/g)].map((m) => declarations(m[1] as string))
+    const merged = new Map(whereBlocks.flatMap((block) => [...block]))
+    expect(merged.get('--code-normal')).toBe('var(--text-normal)')
+    expect(merged.get('--tab-text-color')).toBe('var(--text-muted)')
+  })
+
+  it('defines --code-normal for the dark scheme too (the bridge paints code text with it)', () => {
+    // Without a dark value a theme that does not set --code-normal gets the light #0f172a on a dark code background.
+    expect(compat.match(/--code-normal:/g)).toHaveLength(3) // light, [data-theme="dark"], prefers-color-scheme: dark
+    expect(compat).toMatch(/\[data-theme="dark"\]\)[\s\S]*?--code-normal: #e6edf3;[\s\S]*?@media \(prefers-color-scheme: dark\)/)
+    expect(compat).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]*?--code-normal: #e6edf3;/)
+  })
+
   it('binds heading typography to the Obsidian heading variables', () => {
     for (let level = 1; level <= 6; level += 1) {
       const body = ruleBody(bridge, `:root[data-obsidian-theme] .cm-lp-h${level} `)

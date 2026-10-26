@@ -93,7 +93,7 @@ describe('ThemeInjector announces css-change', () => {
 
   it('not when a theme is rejected for its size', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    new ThemeInjector().apply('Big', 'a'.repeat(3 * 1024 * 1024 + 1))
+    new ThemeInjector().apply('Big', 'a'.repeat(6 * 1024 * 1024 + 1))
     await flush()
     expect(listener).not.toHaveBeenCalled()
     error.mockRestore()

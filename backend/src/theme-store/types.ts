@@ -24,8 +24,13 @@ export interface CommunityThemeEntry {
 /** Files of one theme repo, fetched from its default branch. */
 export interface RemoteThemeFiles {
   css: string
-  /** Parsed `manifest.json` (a JSON object; field types are not trusted). */
-  manifest: Record<string, unknown>
+  /** Which file the stylesheet came from: `obsidian.css` is the pre-`theme.css` name some older repos still use. */
+  cssFile: 'theme.css' | 'obsidian.css'
+  /**
+   * Parsed `manifest.json` (a JSON object; field types are not trusted). Null only for an `obsidian.css` repo
+   * without a manifest, which predates manifests; a `theme.css` repo without one is an error.
+   */
+  manifest: Record<string, unknown> | null
 }
 
 /** A screenshot, sniffed by its leading bytes. */
@@ -50,7 +55,7 @@ export interface IThemeStoreClient {
   fetchCatalog(): Promise<CommunityThemeEntry[]>
   /** Downloads Obsidian's per-theme download counts, keyed by lower-cased theme name. */
   fetchDownloadCounts(): Promise<Map<string, number>>
-  /** Downloads `theme.css` and `manifest.json` of a theme repo. */
+  /** Downloads `theme.css` (or, failing that, the legacy `obsidian.css`) and `manifest.json` of a theme repo. */
   fetchThemeFiles(repo: string): Promise<RemoteThemeFiles>
   /** Downloads only the remote manifest (for update checks). */
   fetchManifest(repo: string): Promise<Record<string, unknown>>

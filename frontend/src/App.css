@@ -1103,6 +1103,18 @@
   flex: 1;
 }
 
+.tree-node-shared {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--accent);
+}
+
+.tree-node-shared + .tree-node-star {
+  margin-left: 0;
+}
+
 .tree-node-star {
   display: flex;
   align-items: center;

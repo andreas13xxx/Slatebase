@@ -195,7 +195,7 @@ src/
 │   ├── index.ts              — Barrel export for themes module
 │   ├── types.ts              — IThemeService, ThemeManifest, ThemeManifestInput, ThemeMeta
 │   ├── errors.ts             — ThemeNotFoundError, ThemeTooLargeError, InvalidThemeIdError, AppearanceFileInvalidError
-│   ├── validation.ts         — Zod schemas, `isValidThemeId`, `MAX_THEME_CSS_SIZE` (2 MB), `normalizeManifest`, `extractExternalHosts`
+│   ├── validation.ts         — Zod schemas, `isValidThemeId`, `MAX_THEME_CSS_SIZE` (6 MB), `normalizeManifest`, `extractExternalHosts`
 │   ├── theme-service.ts      — ThemeService (read/write via `validateFilePath`, atomic writes with retries, `appearance.json` read-modify-write under a mutex that preserves foreign fields and never overwrites an invalid file)
 │   └── theme-service.test.ts — Unit tests for ThemeService and the validation helpers
 ├── feature-toggle/

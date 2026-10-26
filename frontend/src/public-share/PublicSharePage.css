@@ -1,7 +1,9 @@
 /* Standalone page for public share links. Uses the app's design tokens, so light/dark follows the system. */
 .public-share {
   box-sizing: border-box;
-  min-height: 100vh;
+  /* html, body and #root are overflow:hidden (app shell), so this page scrolls itself. */
+  height: 100%;
+  overflow-y: auto;
   padding: 2rem 1rem 4rem;
   background: var(--bg-base, #fff);
   color: var(--text-primary, #1a1a1a);

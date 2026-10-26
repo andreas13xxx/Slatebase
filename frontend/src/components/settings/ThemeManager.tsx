@@ -80,7 +80,7 @@ export function ThemeManager() {
     if (!themeInjector.apply(themeId, css)) {
       // Refused (over the size limit): leave no previously applied theme behind that no longer matches the selection.
       themeInjector.remove()
-      throw new Error('Das Theme ist zu groß und wird nicht angezeigt (Grenze: 3 MB)')
+      throw new Error('Das Theme ist zu groß und wird nicht angezeigt (Grenze: 6 MB)')
     }
   }, [vaultId, apiClient])
 

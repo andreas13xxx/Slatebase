@@ -829,6 +829,7 @@ body {
   --scrollbar-active-thumb-bg: #484f58;
 
   /* ─── Code (Dark) ────────────────────────────────────────────────────────── */
+  --code-normal: #e6edf3;
   --code-comment: #7a8088;
   --code-function: #58a6ff;
   --code-important: #f85149;
@@ -941,6 +942,7 @@ body {
     --scrollbar-active-thumb-bg: #484f58;
 
     /* ─── Code (Dark) ─────────────────────────────────────────────────────── */
+    --code-normal: #e6edf3;
     --code-comment: #7a8088;
     --code-function: #58a6ff;
     --code-important: #f85149;

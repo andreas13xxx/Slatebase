@@ -82,7 +82,7 @@ describe('ThemeLifecycle', () => {
     themeInjector.applyBuiltin('builtin:obsidian')
     const apiClient = createMockApiClient({
       getActiveTheme: vi.fn().mockResolvedValue('Huge'),
-      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(3 * 1024 * 1024 + 1), meta: {} }),
+      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(6 * 1024 * 1024 + 1), meta: {} }),
     })
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
 

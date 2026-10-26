@@ -133,8 +133,10 @@ export class ThemeStoreClient implements IThemeStoreClient {
   }
 
   async fetchThemeFiles(repo: string): Promise<RemoteThemeFiles> {
-    const [manifest, css] = await Promise.all([this.fetchManifest(repo), this.fetchCss(repo)])
-    return { manifest, css }
+    const [manifest, stylesheet] = await Promise.all([this.fetchManifestOrNull(repo), this.fetchCss(repo)])
+    // Only the pre-manifest `obsidian.css` repos may lack a manifest; a `theme.css` repo without one stays an error.
+    if (manifest === null && stylesheet.file === 'theme.css') throw new ThemeFilesNotFoundError(repo, 'manifest.json')
+    return { manifest, css: stylesheet.css, cssFile: stylesheet.file }
   }
 
   async fetchManifest(repo: string): Promise<Record<string, unknown>> {
@@ -168,12 +170,33 @@ export class ThemeStoreClient implements IThemeStoreClient {
     return contentType === null ? null : { contentType, data: result.body }
   }
 
-  private async fetchCss(repo: string): Promise<string> {
-    return (await this.getRepoFile(repo, 'theme.css', MAX_THEME_CSS_SIZE)).toString('utf-8')
+  /** The manifest, or null when the repo has none (404); every other failure still throws. */
+  private async fetchManifestOrNull(repo: string): Promise<Record<string, unknown> | null> {
+    try {
+      return await this.fetchManifest(repo)
+    } catch (error: unknown) {
+      if (error instanceof ThemeFilesNotFoundError) return null
+      throw error
+    }
+  }
+
+  /** `theme.css`, falling back to the legacy `obsidian.css`; when neither exists the error names `theme.css`. */
+  private async fetchCss(repo: string): Promise<{ css: string; file: 'theme.css' | 'obsidian.css' }> {
+    try {
+      return { css: (await this.getRepoFile(repo, 'theme.css', MAX_THEME_CSS_SIZE)).toString('utf-8'), file: 'theme.css' }
+    } catch (error: unknown) {
+      if (!(error instanceof ThemeFilesNotFoundError)) throw error
+      try {
+        return { css: (await this.getRepoFile(repo, 'obsidian.css', MAX_THEME_CSS_SIZE)).toString('utf-8'), file: 'obsidian.css' }
+      } catch (fallbackError: unknown) {
+        if (fallbackError instanceof ThemeFilesNotFoundError) throw error
+        throw fallbackError
+      }
+    }
   }
 
   /** GETs `<repo>/HEAD/<file>`; 404 and oversize get their own errors, anything else unexpected is a fetch error. */
-  private async getRepoFile(repo: string, file: 'manifest.json' | 'theme.css', maxBytes: number): Promise<Buffer> {
+  private async getRepoFile(repo: string, file: 'manifest.json' | 'theme.css' | 'obsidian.css', maxBytes: number): Promise<Buffer> {
     if (!isValidRepo(repo)) throw new ThemeStoreFetchError(`${this.origin}/${repo}`, 0, 'invalid repo')
     const url = `${this.origin}/${repo}/HEAD/${file}`
     let result: GuardedFetchResult

@@ -7,6 +7,7 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { showToast } from '../components/ToastNotification'
 import { SettingSection, Button } from '../components/settings/ui'
 import { formatShareDate } from './publicShareFormat'
+import { notifyPublicSharesChanged } from './publicShareEvents'
 import './PublicSharesSection.css'
 
 /**
@@ -42,6 +43,7 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
     try {
       await apiClient.revokeMyPublicShare(share.id)
       showToast('success', 'Der Link wurde widerrufen.')
+      notifyPublicSharesChanged()
       await load()
     } catch (err) {
       setError(extractErrorMessage(err, 'Der Link konnte nicht widerrufen werden.'))

@@ -128,7 +128,7 @@ describe('ThemeManager', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const apiClient = createMockApiClient({
       listThemes: vi.fn().mockResolvedValue({ themes: [things], activeThemeId: 'builtin:obsidian' }),
-      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(3 * 1024 * 1024 + 1), meta: things }),
+      loadTheme: vi.fn().mockResolvedValue({ css: 'a'.repeat(6 * 1024 * 1024 + 1), meta: things }),
     })
     renderManager(apiClient)
 

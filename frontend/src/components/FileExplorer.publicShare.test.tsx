@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import type { Dispatch } from 'react'
@@ -8,7 +8,7 @@ import { AppContext, initialState } from '../state'
 import { FeatureContext } from '../state/featureContext'
 import { initialFeatureState } from '../state/featureState'
 import { TabProvider } from '../state/tabContext'
-import { OPEN_PUBLIC_SHARE_EVENT } from '../public-share/publicShareEvents'
+import { notifyPublicSharesChanged, OPEN_PUBLIC_SHARE_EVENT } from '../public-share/publicShareEvents'
 import type { AppAction, DirectoryTree, VaultInfo } from '../types'
 import type { IApiClient } from '../api'
 import { clear as clearWorkspaceStore } from '../state/workspaceStore'
@@ -22,10 +22,13 @@ const tree: DirectoryTree = {
   ],
 }
 
-function renderExplorer(options: { featureEnabled: boolean | null; permission?: VaultInfo['permission'] }) {
+function renderExplorer(options: { featureEnabled: boolean | null; permission?: VaultInfo['permission']; listMyPublicShares?: ReturnType<typeof vi.fn> }) {
   const vault: VaultInfo = { id: 'vault-123', name: 'Test Vault', permission: options.permission ?? 'owner', ownerName: 'admin' }
   const dispatch = vi.fn() as Dispatch<AppAction>
-  const apiClient = { fetchVaultTree: vi.fn().mockResolvedValue(tree) } as unknown as IApiClient
+  const apiClient = {
+    fetchVaultTree: vi.fn().mockResolvedValue(tree),
+    listMyPublicShares: options.listMyPublicShares ?? vi.fn().mockResolvedValue([]),
+  } as unknown as IApiClient
   const explorer = React.createElement(
     AppContext.Provider,
     { value: { state: { ...initialState, vaults: [vault], vaultTrees: { 'vault-123': tree }, vaultTreesLoading: new Set<string>() }, dispatch, apiClient } },
@@ -95,5 +98,55 @@ describe('FileExplorer public link menu item', () => {
     renderExplorer({ featureEnabled: true, permission: 'read' })
     await openMenuFor('readme')
     expect(screen.queryByText('Öffentlichen Link verwalten')).toBeNull()
+  })
+})
+
+const share = (vaultId: string, filePath: string) => ({
+  id: 's1', tokenHint: 'abcd', vaultId, filePath, createdBy: 'admin', createdAt: '2026-10-26T00:00:00Z', passwordProtected: false,
+})
+
+describe('FileExplorer public link marker', () => {
+  async function expandVault() {
+    const user = userEvent.setup()
+    await user.click(screen.getByText('Test Vault'))
+  }
+
+  it('marks only notes that have a public link', async () => {
+    renderExplorer({ featureEnabled: true, listMyPublicShares: vi.fn().mockResolvedValue([share('vault-123', 'readme.md')]) })
+    await expandVault()
+    await waitFor(() => expect(screen.getAllByRole('img', { name: 'Hat einen öffentlichen Link' })).toHaveLength(1))
+    const row = screen.getByText('readme').closest('.tree-node-file')
+    expect(row?.querySelector('.tree-node-shared')).not.toBeNull()
+  })
+
+  it('ignores links of other vaults', async () => {
+    renderExplorer({ featureEnabled: true, listMyPublicShares: vi.fn().mockResolvedValue([share('other', 'readme.md')]) })
+    await expandVault()
+    await act(async () => { await Promise.resolve() })
+    expect(screen.queryByRole('img', { name: 'Hat einen öffentlichen Link' })).toBeNull()
+  })
+
+  it('shows no marker and does not load links when the feature is disabled', async () => {
+    const list = vi.fn().mockResolvedValue([share('vault-123', 'readme.md')])
+    renderExplorer({ featureEnabled: false, listMyPublicShares: list })
+    await expandVault()
+    expect(list).not.toHaveBeenCalled()
+    expect(screen.queryByRole('img', { name: 'Hat einen öffentlichen Link' })).toBeNull()
+  })
+
+  it('refreshes when links change (create, revoke, rename)', async () => {
+    const list = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([share('vault-123', 'readme.md')])
+    renderExplorer({ featureEnabled: true, listMyPublicShares: list })
+    await expandVault()
+    expect(screen.queryByRole('img', { name: 'Hat einen öffentlichen Link' })).toBeNull()
+    act(() => { notifyPublicSharesChanged() })
+    await waitFor(() => expect(screen.getAllByRole('img', { name: 'Hat einen öffentlichen Link' })).toHaveLength(1))
+  })
+
+  it('keeps rendering when loading the links fails', async () => {
+    renderExplorer({ featureEnabled: true, listMyPublicShares: vi.fn().mockRejectedValue(new Error('boom')) })
+    await expandVault()
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByText('readme')).toBeInTheDocument()
   })
 })
