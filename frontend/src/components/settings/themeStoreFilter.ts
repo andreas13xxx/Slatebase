@@ -96,7 +96,7 @@ export function storeErrorMessage(err: unknown, fallback: string): string {
     case 'THEME_FILES_NOT_FOUND':
       return 'Das Theme-Repository enthält keine installierbaren Dateien (theme.css und manifest.json im Hauptverzeichnis).'
     case 'THEME_TOO_LARGE':
-      return 'Das Theme ist größer als 3 MB und kann nicht installiert werden.'
+      return 'Das Theme ist größer als 6 MB und kann nicht installiert werden.'
     case 'THEME_INVALID':
       return 'Das Manifest des Themes ist ungültig oder passt nicht zum Katalogeintrag.'
     case 'UPSTREAM_UNAVAILABLE':

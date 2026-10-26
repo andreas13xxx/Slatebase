@@ -16,8 +16,8 @@
 
 import { notifyCssChange } from './css-change'
 
-/** Maximum allowed theme CSS size in bytes (3 MB) — mirrors the backend limit. */
-const MAX_THEME_CSS_SIZE_BYTES = 3 * 1024 * 1024
+/** Maximum allowed theme CSS size in bytes (6 MB) — mirrors the backend limit. */
+const MAX_THEME_CSS_SIZE_BYTES = 6 * 1024 * 1024
 
 const THEME_STYLE_SELECTOR = 'style[data-slatebase-theme]'
 const SNIPPET_STYLE_SELECTOR = 'style[data-snippet-id]'
@@ -41,7 +41,7 @@ export class ThemeInjector implements IThemeInjector {
   apply(themeId: string, css: string): boolean {
     const byteLength = new TextEncoder().encode(css).length
     if (byteLength > MAX_THEME_CSS_SIZE_BYTES) {
-      console.error(`[theme:${themeId}] exceeds maximum size of 3 MB (${byteLength} bytes). Not injected.`)
+      console.error(`[theme:${themeId}] exceeds maximum size of 6 MB (${byteLength} bytes). Not injected.`)
       return false
     }
 

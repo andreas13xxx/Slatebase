@@ -91,7 +91,7 @@ describe('currentColorMode', () => {
 describe('storeErrorMessage', () => {
   it.each([
     ['THEME_FILES_NOT_FOUND', 'keine installierbaren Dateien'],
-    ['THEME_TOO_LARGE', '3 MB'],
+    ['THEME_TOO_LARGE', '6 MB'],
     ['THEME_INVALID', 'Manifest'],
     ['UPSTREAM_UNAVAILABLE', 'GitHub ist nicht erreichbar'],
     ['THEME_NOT_IN_CATALOG', 'nicht mehr im Katalog'],

@@ -118,7 +118,7 @@ function ThemeItem() {
   useEffect(() => {
     if (!visible || !themeId || !vaultId || !apiClient || builtinName !== undefined) return
     let cancelled = false
-    // listThemes carries metadata only; loadTheme would download the whole stylesheet (up to 3 MB) a second time.
+    // listThemes carries metadata only; loadTheme would download the whole stylesheet (up to 6 MB) a second time.
     apiClient.listThemes(vaultId)
       .then(({ themes }) => {
         const name = themes.find((theme) => theme.id === themeId)?.manifest.name

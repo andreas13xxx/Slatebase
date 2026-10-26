@@ -99,17 +99,17 @@ describe('ThemeInjector', () => {
     expect(order).toEqual(['theme', 'snippet'])
   })
 
-  it('applies CSS of exactly 3 MB', () => {
+  it('applies CSS of exactly 6 MB', () => {
     const injector = new ThemeInjector()
-    expect(injector.apply('Exact', 'a'.repeat(3 * 1024 * 1024))).toBe(true)
+    expect(injector.apply('Exact', 'a'.repeat(6 * 1024 * 1024))).toBe(true)
     expect(themeTag()).not.toBeNull()
   })
 
-  it('rejects CSS above 3 MB without touching the DOM', () => {
+  it('rejects CSS above 6 MB without touching the DOM', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const injector = new ThemeInjector()
 
-    expect(injector.apply('Big', 'a'.repeat(3 * 1024 * 1024 + 1))).toBe(false)
+    expect(injector.apply('Big', 'a'.repeat(6 * 1024 * 1024 + 1))).toBe(false)
     expect(themeTag()).toBeNull()
     expect(document.documentElement.hasAttribute('data-obsidian-theme')).toBe(false)
     expect(error).toHaveBeenCalled()

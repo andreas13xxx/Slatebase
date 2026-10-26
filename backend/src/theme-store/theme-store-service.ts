@@ -6,6 +6,7 @@ import { ThemeNotFoundError, toThemeId } from '../themes/index.js'
 import { KeyedMutex } from '../shared/async-mutex.js'
 import {
   ThemeAlreadyInstalledError,
+  ThemeFilesNotFoundError,
   ThemeIdUnderivableError,
   ThemeManifestMismatchError,
   ThemeNotInCatalogError,
@@ -102,7 +103,9 @@ export class ThemeStoreService implements IThemeStoreService {
     const entry = await this.findEntry(repo)
     const files = await this.client.fetchThemeFiles(repo)
 
-    const manifestName = typeof files.manifest['name'] === 'string' ? files.manifest['name'].trim() : ''
+    // A legacy `obsidian.css` repo has no manifest: the catalog name stands in for it, so the name check is trivially met.
+    const manifest = files.manifest ?? { name: entry.name }
+    const manifestName = typeof manifest['name'] === 'string' ? manifest['name'].trim() : ''
     if (manifestName.toLowerCase() !== entry.name.toLowerCase()) {
       throw new ThemeManifestMismatchError(entry.name, manifestName)
     }
@@ -126,7 +129,7 @@ export class ThemeStoreService implements IThemeStoreService {
         themeId = derived
       }
 
-      const meta = await this.themeService.saveTheme(vaultPath, themeId, files.css, pickManifest(files.manifest))
+      const meta = await this.themeService.saveTheme(vaultPath, themeId, files.css, pickManifest(manifest))
       if (options.activate) await this.themeService.setActiveThemeId(vaultPath, meta.id)
       // The cached update check predates this install (a just-updated theme would still be listed as outdated).
       this.cache.invalidateUpdateCheck(vaultId)
@@ -158,7 +161,9 @@ export class ThemeStoreService implements IThemeStoreService {
       try {
         return { theme, entry, remote: await this.remoteManifest(entry.repo) }
       } catch (error: unknown) {
-        warnings.push(`${entry.name}: ${describeError(error)}`)
+        // Legacy `obsidian.css` themes have no manifest upstream: there is no version to compare, which is "unknown", not a failure.
+        if (error instanceof ThemeFilesNotFoundError) unknown.push(entry.name)
+        else warnings.push(`${entry.name}: ${describeError(error)}`)
         return null
       }
     })

@@ -68,7 +68,7 @@ function createMockClient(overrides: {
 
 const silent: ILogger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined }
 const config = { cacheTtlCatalog: 60_000, cacheTtlManifest: 60_000 }
-const files = (name: string, version = '1.0.0', css = 'body { --x: 1 }'): RemoteThemeFiles => ({ css, manifest: { name, version, author: 'Someone', unknownField: 1 } })
+const files = (name: string, version = '1.0.0', css = 'body { --x: 1 }'): RemoteThemeFiles => ({ css, cssFile: 'theme.css', manifest: { name, version, author: 'Someone', unknownField: 1 } })
 
 let vault: string
 let themes: ThemeService
@@ -177,6 +177,17 @@ describe('install', () => {
     const manifest = JSON.parse(await fs.readFile(path.join(vault, '.obsidian/themes/Things/manifest.json'), 'utf-8')) as Record<string, unknown>
     expect(manifest['unknownField']).toBeUndefined()
     expect(await themes.getActiveThemeId(vault)).toBeNull()
+  })
+
+  it('installs a legacy obsidian.css repo without a manifest, naming the theme after the catalog entry', async () => {
+    const legacy: RemoteThemeFiles = { css: 'body { --old: 1 }', cssFile: 'obsidian.css', manifest: null }
+    const { service } = createService(createMockClient({ files: { 'o/things': legacy } }))
+
+    const meta = await service.install('v1', vault, 'o/things', { replace: false, activate: false })
+
+    expect(meta.id).toBe('Things')
+    expect(meta.manifest.name).toBe('Things')
+    expect(await fs.readFile(path.join(vault, '.obsidian/themes/Things/theme.css'), 'utf-8')).toBe('body { --old: 1 }')
   })
 
   it('activates the theme on request and keeps other appearance.json fields', async () => {
@@ -294,6 +305,16 @@ describe('checkUpdates', () => {
     ])
     expect(result.checked).toBe(2)
     expect(client.calls.manifests.sort()).toEqual(['o/minimal', 'o/things'])
+    expect(result.warnings).toEqual([])
+  })
+
+  it('counts a legacy theme without an upstream manifest as unknown, not as a failed lookup', async () => {
+    await installLocally('Things')
+    const { service } = createService(createMockClient()) // no manifest served → ThemeFilesNotFoundError
+
+    const result = await service.checkUpdates('v1', vault)
+
+    expect(result.unknown).toEqual(['Things'])
     expect(result.warnings).toEqual([])
   })
 

@@ -436,7 +436,7 @@ Themes live in the vault (`.obsidian/themes/<id>/theme.css` + `manifest.json`); 
 | GET | `/vaults/:vaultId/themes` | List themes plus the active theme id |
 | GET/PUT | `/vaults/:vaultId/themes/active` | Read / set the active theme (`{ "themeId": "Name" \| "builtin:obsidian" \| null }`; `builtin:obsidian` is the built-in Obsidian look and needs no theme folder) |
 | GET | `/vaults/:vaultId/themes/:themeId` | Theme CSS and metadata |
-| PUT | `/vaults/:vaultId/themes/:themeId` | Create or overwrite a theme (`{ "css", "manifest"? }`, CSS up to 3 MB) |
+| PUT | `/vaults/:vaultId/themes/:themeId` | Create or overwrite a theme (`{ "css", "manifest"? }`, CSS up to 6 MB) |
 | DELETE | `/vaults/:vaultId/themes/:themeId` | Delete a theme (resets the selection if it was active) |
 | GET | `/theme-store/themes` | Community theme catalog (`{ themes, stale }`; `stale` = GitHub unreachable, last known list) |
 | GET | `/theme-store/screenshot?repo=owner/repo` | Preview image of a catalog theme, served by the backend (PNG/JPEG/GIF/WebP only) |

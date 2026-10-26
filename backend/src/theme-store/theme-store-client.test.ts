@@ -48,6 +48,14 @@ function respond(req: IncomingMessage, res: ServerResponse): void {
   if (url === '/o/array/HEAD/theme.css') return send(200, 'a{}')
   if (url === '/o/nocss/HEAD/manifest.json') return send(200, JSON.stringify({ name: 'NoCss' }))
   if (url === '/o/broken/HEAD/manifest.json') return send(503)
+  if (url === '/o/legacy/HEAD/obsidian.css') return send(200, 'body { --old: 1 }')
+  if (url === '/o/legacyman/HEAD/obsidian.css') return send(200, 'body { --old: 2 }')
+  if (url === '/o/legacyman/HEAD/manifest.json') return send(200, JSON.stringify({ name: 'LegacyMan' }))
+  if (url === '/o/nomanifest/HEAD/theme.css') return send(200, 'a{}')
+  if (url === '/o/bothcss/HEAD/theme.css') return send(200, 'new{}')
+  if (url === '/o/bothcss/HEAD/obsidian.css') return send(200, 'old{}')
+  if (url === '/o/bothcss/HEAD/manifest.json') return send(200, JSON.stringify({ name: 'BothCss' }))
+  if (url === '/o/legacybig/HEAD/obsidian.css') return send(200, Buffer.alloc(MAX_THEME_CSS_SIZE + 1, 'a'), 'text/css')
   send(404)
 }
 
@@ -112,6 +120,20 @@ describe('fetchThemeFiles', () => {
   it('names the missing file when the repo has no theme.css or no manifest.json', async () => {
     await expect(client().fetchThemeFiles('o/nocss')).rejects.toMatchObject({ name: 'ThemeFilesNotFoundError', missing: 'theme.css' })
     await expect(client().fetchThemeFiles('o/none')).rejects.toBeInstanceOf(ThemeFilesNotFoundError)
+  })
+
+  it('falls back to the legacy obsidian.css, with no manifest when the repo has none', async () => {
+    expect(await client().fetchThemeFiles('o/legacy')).toEqual({ css: 'body { --old: 1 }', cssFile: 'obsidian.css', manifest: null })
+    expect(await client().fetchThemeFiles('o/legacyman')).toMatchObject({ cssFile: 'obsidian.css', manifest: { name: 'LegacyMan' } })
+  })
+
+  it('prefers theme.css over obsidian.css', async () => {
+    expect(await client().fetchThemeFiles('o/bothcss')).toMatchObject({ css: 'new{}', cssFile: 'theme.css' })
+  })
+
+  it('still requires a manifest next to a theme.css, and applies the size limit to obsidian.css', async () => {
+    await expect(client().fetchThemeFiles('o/nomanifest')).rejects.toMatchObject({ name: 'ThemeFilesNotFoundError', missing: 'manifest.json' })
+    await expect(client().fetchThemeFiles('o/legacybig')).rejects.toBeInstanceOf(ThemeAssetTooLargeError)
   })
 
   it('rejects a manifest that is not a JSON object', async () => {

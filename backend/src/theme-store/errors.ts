@@ -16,7 +16,7 @@ export class ThemeStoreFetchError extends Error {
 export class ThemeFilesNotFoundError extends Error {
   constructor(
     public readonly repo: string,
-    public readonly missing: 'manifest.json' | 'theme.css',
+    public readonly missing: 'manifest.json' | 'theme.css' | 'obsidian.css',
   ) {
     super(`Repository "${repo}" has no ${missing} at its root`)
     this.name = 'ThemeFilesNotFoundError'
@@ -27,7 +27,7 @@ export class ThemeFilesNotFoundError extends Error {
 export class ThemeAssetTooLargeError extends Error {
   constructor(
     public readonly repo: string,
-    public readonly file: 'manifest.json' | 'theme.css',
+    public readonly file: 'manifest.json' | 'theme.css' | 'obsidian.css',
     public readonly maxBytes: number,
   ) {
     super(`${file} of "${repo}" exceeds the limit of ${maxBytes} bytes`)

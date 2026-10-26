@@ -27,12 +27,12 @@ describe('pickThemeFiles', () => {
     expect(result.ok && result.files.manifest).toBeNull()
   })
 
-  it('accepts a stylesheet of exactly 3 MB', () => {
-    expect(MAX_THEME_CSS_BYTES).toBe(3 * 1024 * 1024)
+  it('accepts a stylesheet of exactly 6 MB', () => {
+    expect(MAX_THEME_CSS_BYTES).toBe(6 * 1024 * 1024)
     expect(pickThemeFiles([file('theme.css', 'a'.repeat(MAX_THEME_CSS_BYTES))]).ok).toBe(true)
   })
 
-  it('rejects a stylesheet above 3 MB', () => {
+  it('rejects a stylesheet above 6 MB', () => {
     const big = file('theme.css', 'a'.repeat(MAX_THEME_CSS_BYTES + 1))
     expect(pickThemeFiles([big]).ok).toBe(false)
   })
