@@ -12,7 +12,7 @@ import { useAppContext } from '../../state'
 import { themeInjector } from '../../plugins/appearance/theme-injector'
 import { extractErrorMessage } from '../../utils/error'
 import { ConfirmModal } from '../ConfirmModal'
-import { deriveThemeId, pickThemeFiles, readManifestFields } from './themeImport'
+import { deriveThemeId, pickThemeFiles, readManifestFields } from './themeImportUtils'
 import './ThemeManager.css'
 
 type Manifest = Awaited<ReturnType<typeof readManifestFields>>

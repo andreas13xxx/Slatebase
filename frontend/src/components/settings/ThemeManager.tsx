@@ -16,7 +16,7 @@ import { extractErrorMessage } from '../../utils/error'
 import { ConfirmModal } from '../ConfirmModal'
 import { StyleSettingsHint } from './StyleSettingsHint'
 import { useStyleSettingsPluginState } from './useStyleSettingsPluginState'
-import { formatThemeSize } from './themeImport'
+import { formatThemeSize } from './themeImportUtils'
 import './ThemeManager.css'
 
 /** Radio value for "no theme" — cannot collide with a theme id (ids start alphanumeric). */
