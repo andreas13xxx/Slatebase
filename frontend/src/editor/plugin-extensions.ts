@@ -42,16 +42,49 @@ interface PluginCompletionEntry {
 const pluginCompartments = new Map<string, PluginCompartmentEntry>()
 const pluginCompletions = new Map<string, PluginCompletionEntry[]>()
 
-// Reference to the active EditorView (set by CodeMirrorEditor when it mounts)
+// The active EditorView plus every currently-mounted one. With Split Panes more
+// than one CodeMirrorEditor is mounted at once, so a single `activeView` that
+// each mount overwrote — and each unmount nulled — meant closing or switching
+// one pane stranded plugins/EditorShim with no editor even though others were
+// still open. `mountedViews` keeps every live view; `activeView` is whichever
+// mounted or was focused last, and clearing one view falls back to another that
+// is still alive instead of nulling globally.
 let activeView: EditorView | null = null
+const mountedViews = new Set<EditorView>()
 
-/**
- * Set the active EditorView instance. Called by CodeMirrorEditor on mount/unmount.
- */
-export function setActiveEditorView(view: EditorView | null): void {
+function publishActiveView(view: EditorView | null): void {
   activeView = view
   // Debug: expose on window for console debugging
   ;(window as unknown as { __slatebaseEditorView?: EditorView | null }).__slatebaseEditorView = view
+}
+
+/**
+ * Set the active EditorView. `setActiveEditorView(view)` registers it as the
+ * active, mounted view (mount or focus). `setActiveEditorView(null)` is a hard
+ * reset that forgets ALL views — used by tests; the mount effect uses
+ * `clearActiveEditorView(view)` on unmount so a sibling pane stays active.
+ */
+export function setActiveEditorView(view: EditorView | null): void {
+  if (view === null) {
+    mountedViews.clear()
+    publishActiveView(null)
+    return
+  }
+  mountedViews.add(view)
+  publishActiveView(view)
+}
+
+/**
+ * Deregister one view on unmount. If it was the active one, fall back to any
+ * other still-mounted view (last inserted) rather than nulling — so closing one
+ * pane doesn't strand plugins when another editor is still open.
+ */
+export function clearActiveEditorView(view: EditorView): void {
+  mountedViews.delete(view)
+  if (activeView !== view) return
+  let fallback: EditorView | null = null
+  for (const v of mountedViews) fallback = v // last wins
+  publishActiveView(fallback)
 }
 
 /**
@@ -430,6 +463,7 @@ export function getActivePluginCompletions(): CompletionSource[] {
 export function resetPluginExtensions(): void {
   pluginCompartments.clear()
   pluginCompletions.clear()
+  mountedViews.clear()
   activeView = null
   activeEditorContainerEl = null
 }

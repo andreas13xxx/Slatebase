@@ -30,10 +30,11 @@ import { highlightColorCompletions } from './live-preview/highlight-color-comple
 import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
+import { registerSyncView, unregisterSyncView, broadcastChanges, remoteSync } from './doc-sync-registry'
 import { applyFormatting as applyFormattingAction } from './formatting'
 import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, createLinkContextMenuHandler, type LivePreviewOptions } from './live-preview'
 import { warnOnce } from '../plugins/compat/log'
-import { setActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
+import { setActiveEditorView, clearActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
 import { editorInfoField, editorEditorField, editorLivePreviewField, livePreviewStateTracker } from './editor-state-fields'
 import { setEditorInfo, setEditorEditor, setEditorLivePreview, type EditorFileInfo } from './editor-state-fields'
 import { EditorShim } from '../plugins/compat/editor-shim'
@@ -338,11 +339,30 @@ export function CodeMirrorEditor({
       codeFolding(),
       markdownFoldService,
       EditorView.updateListener.of((update) => {
-        if (update.docChanged && !update.transactions.some((tr) => tr.annotation(externalContentSync))) {
-          onContentChangeRef.current(update.state.doc.toString())
-        }
+        if (!update.docChanged) return
+        const isRemote = update.transactions.some((tr) => tr.annotation(remoteSync))
+        // A mirrored change from a sibling pane is neither reported nor
+        // re-broadcast — it already came from the registry, and echoing it
+        // would loop between the two views forever.
+        if (isRemote) return
+        const isExternal = update.transactions.some((tr) => tr.annotation(externalContentSync))
+        // Report only genuine local edits; an external reload (vault:change)
+        // must not arm this tab's auto-save or mark its editBuffer dirty.
+        if (!isExternal) onContentChangeRef.current(update.state.doc.toString())
+        // Mirror BOTH local edits and external reloads to sibling panes showing
+        // the same file: the external reload reaches only the active pane's tab
+        // state via the App vault:change handler, so other panes depend on this
+        // CM6-level mirror to catch up.
+        broadcastChanges(tabId, update.view, update.changes)
       }),
       EditorView.domEventHandlers({
+        // With Split Panes several editors are mounted at once; make the one
+        // the user focuses the active view, so commands/EditorShim target the
+        // pane being worked in rather than whichever mounted last.
+        focusin(_event, view) {
+          setActiveEditorView(view)
+          return false
+        },
         paste(event, view) {
           if (readOnlyRef.current) return false
           const onPaste = onImagePasteRef.current
@@ -457,6 +477,8 @@ export function CodeMirrorEditor({
     if (prevTabIdRef.current !== tabId && viewRef.current) {
       commitFocusedWidgetEdit(viewRef.current)
       saveCurrentState(prevTabIdRef.current)
+      unregisterSyncView(prevTabIdRef.current, viewRef.current)
+      clearActiveEditorView(viewRef.current)
       viewRef.current.destroy()
       viewRef.current = null
     }
@@ -492,6 +514,10 @@ export function CodeMirrorEditor({
     })
 
     viewRef.current = view
+
+    // Join the cross-pane mirror group so edits in another pane showing this
+    // same file replay onto this view (and vice versa). See doc-sync-registry.
+    registerSyncView(tabId, view)
 
     // Suppress the browser's native context menu inside the editor in favor
     // of our own (native editing actions + plugin 'editor-menu' items — see
@@ -562,7 +588,8 @@ export function CodeMirrorEditor({
       if (viewRef.current) {
         commitFocusedWidgetEdit(viewRef.current)
         saveCurrentState(tabId)
-        setActiveEditorView(null)
+        unregisterSyncView(tabId, viewRef.current)
+        clearActiveEditorView(viewRef.current)
         setActiveEditorContainerEl(null)
         editorArea?.classList.remove('markdown-source-view')
         viewRef.current.destroy()
