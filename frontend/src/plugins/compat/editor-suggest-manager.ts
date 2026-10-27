@@ -233,17 +233,25 @@ export class EditorSuggestManager {
     if (!this.activeSuggest || index < 0 || index >= this.items.length) return
     const item = this.items[index]
     const suggest = this.activeSuggest
-    // Close BEFORE selectSuggestion — the plugin's handler may trigger editor
-    // changes that would re-fire handleUpdate, and we don't want the old context
-    // to interfere. The `confirming` flag additionally makes any handleUpdate
-    // fired synchronously by selectSuggestion's own edit a no-op, so an inserted
-    // value that happens to match onTrigger() cannot reopen + re-confirm in a loop.
-    this.close()
+    // Hide the popover and stop the trigger loop re-entering, but KEEP the
+    // suggest's `context` alive across selectSuggestion(). Real Obsidian leaves
+    // `this.context` valid for the duration of selectSuggestion() and only clears
+    // it afterwards; plugins (Tasks, Natural Language Dates, Templater date
+    // inserts) read `this.context.start`/`.end` inside selectSuggestion() to know
+    // which trigger range to replace via editor.replaceRange(). Nulling the
+    // context first (the old close()-before-select ordering) left those plugins
+    // with no range: they fell back to replacing the whole line, wiping the text.
+    // The `confirming` flag makes any handleUpdate fired synchronously by
+    // selectSuggestion's own edit a no-op, so an inserted value that happens to
+    // match onTrigger() cannot reopen + re-confirm in a loop. We tear the context
+    // down in `finally`, matching real Obsidian's after-selection close.
+    this.popover.hide()
     this.confirming = true
     try {
       suggest.selectSuggestion(item, evt)
     } finally {
       this.confirming = false
+      this.close()
     }
   }
 
