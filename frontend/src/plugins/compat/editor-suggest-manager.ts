@@ -80,6 +80,14 @@ export class EditorSuggestManager {
   private popover: EditorSuggestPopover
   private deps: EditorSuggestManagerDeps
   private destroyed = false
+  /**
+   * Guards against re-entrant trigger detection while a selection is being
+   * confirmed. `selectSuggestion()` typically dispatches an editor change,
+   * which synchronously re-fires the CM6 ViewPlugin's update() → handleUpdate().
+   * Without this flag a suggest whose insertion itself matches onTrigger() would
+   * reopen and immediately re-confirm, recursing until the stack overflows.
+   */
+  private confirming = false
 
   constructor(deps: EditorSuggestManagerDeps) {
     this.deps = deps
@@ -126,7 +134,7 @@ export class EditorSuggestManager {
    * This is the main trigger detection loop.
    */
   handleUpdate(view: EditorView): void {
-    if (this.destroyed || this.suggests.length === 0) return
+    if (this.destroyed || this.confirming || this.suggests.length === 0) return
 
     const editor = this.deps.getEditor()
     if (!editor) return
@@ -227,9 +235,16 @@ export class EditorSuggestManager {
     const suggest = this.activeSuggest
     // Close BEFORE selectSuggestion — the plugin's handler may trigger editor
     // changes that would re-fire handleUpdate, and we don't want the old context
-    // to interfere.
+    // to interfere. The `confirming` flag additionally makes any handleUpdate
+    // fired synchronously by selectSuggestion's own edit a no-op, so an inserted
+    // value that happens to match onTrigger() cannot reopen + re-confirm in a loop.
     this.close()
-    suggest.selectSuggestion(item, evt)
+    this.confirming = true
+    try {
+      suggest.selectSuggestion(item, evt)
+    } finally {
+      this.confirming = false
+    }
   }
 
   private setSelectedIndex(index: number): void {

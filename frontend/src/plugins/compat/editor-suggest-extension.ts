@@ -71,17 +71,20 @@ const editorSuggestKeymap = Prec.highest(
     },
     {
       key: 'Enter',
-      run: (view) => {
+      run: () => {
         const manager = getEditorSuggestManager()
         if (!manager?.isOpen()) return false
-        // Create a synthetic keyboard event for the plugin's selectSuggestion
+        // Build a synthetic event for the plugin's selectSuggestion (it may read
+        // evt.key), but do NOT dispatch it onto the DOM: re-dispatching a keydown
+        // onto view.contentDOM re-enters this very keymap handler while the popover
+        // is still open, recursing until the stack overflows (and flooding the doc
+        // with newlines on the way). Returning `true` already suppresses the editor's
+        // own Enter (newline insertion); no dispatch is needed.
         const syntheticEvt = new KeyboardEvent('keydown', {
           key: 'Enter',
           bubbles: true,
           cancelable: true,
         })
-        // Prevent the editor from inserting a newline
-        view.contentDOM.dispatchEvent(syntheticEvt)
         return manager.confirmSelection(syntheticEvt)
       },
     },
