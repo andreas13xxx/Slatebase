@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.67.0](https://github.com/andreas13xxx/Slatebase/compare/v0.66.0...v0.67.0) (2026-10-27)
+
+
+### Features
+
+* **public-share:** Marker im Dateibaum für Notizen mit öffentlichem Link ([4c5fcab](https://github.com/andreas13xxx/Slatebase/commit/4c5fcab1a9828c412d5f4addfb99f6e3fb615c32))
+* **themes:** obsidian.css als Fallback im Store, CSS-Grenze auf 6 MB ([66b6723](https://github.com/andreas13xxx/Slatebase/commit/66b67239e647e605a446cef91b92177f63895400))
+* **themes:** obsidian.css-Fallback, 6-MB-Grenze, Bridge-Variablen und Kompatibilitätsprüfung der Top 50 ([10fb791](https://github.com/andreas13xxx/Slatebase/commit/10fb791db323c8cb117d710bbdca01d4ef444ff1))
+* **themes:** Theme-Bridge bindet Auswahl, Scrollbalken, Code, Checkbox und Tab-Text ([4941251](https://github.com/andreas13xxx/Slatebase/commit/4941251b54e9859f421bc35db4d4dda63299f38b))
+
+
+### Bugfixes
+
+* **live-preview:** Widget-Puffer bleiben inline, auch wenn ein Theme img auf block setzt ([f4c50ad](https://github.com/andreas13xxx/Slatebase/commit/f4c50ad414f42f05d377603b093dc3310d9ed39c))
+* **plugin-compat:** stop EditorSuggest Enter from recursing into itself ([9fd8fb7](https://github.com/andreas13xxx/Slatebase/commit/9fd8fb76c9517dbc01c82a42127b4bd42e6ece96))
+* **plugin-compat:** stop EditorSuggest Enter from recursing into itself ([3f37a9f](https://github.com/andreas13xxx/Slatebase/commit/3f37a9feb4c687c66fdb1762b26b70917473c8bb))
+* **public-share:** öffentliche Seite scrollbar machen ([1dd0965](https://github.com/andreas13xxx/Slatebase/commit/1dd0965e7fa3031a4050b43daa65aa4428540cc6))
+* **themes:** --code-normal auch für den Dunkelmodus der Compat-Schicht definieren ([3102638](https://github.com/andreas13xxx/Slatebase/commit/3102638c45179963342dfcae6e2f7906b96af279))
+* **themes:** Code- und Tab-Text folgen der Theme-Palette, Meldung und Log zum obsidian.css-Fallback ([ab68ecc](https://github.com/andreas13xxx/Slatebase/commit/ab68ecceebdebb500e379d334bee4b8a6d6f9396))
+
+
+### Sonstige Änderungen
+
+* **specs:** Dunkelmodus der Top 10 im Kompatibilitätsdokument ([547aa56](https://github.com/andreas13xxx/Slatebase/commit/547aa568d06bbd2378cec34c6fa728231eb6aa21))
+* **specs:** Kompatibilität der 50 meistgeladenen Obsidian-Themes ([06b6564](https://github.com/andreas13xxx/Slatebase/commit/06b65645ad28802501ce669003b3a0832c4aa359))
+* **specs:** Theme-Store-Spec auf obsidian.css-Rückfall und 6-MB-Grenze gebracht ([4b8a70a](https://github.com/andreas13xxx/Slatebase/commit/4b8a70ab708cc763f906057a0df85c0523704bb1))
+
 ## [0.66.0](https://github.com/andreas13xxx/Slatebase/compare/v0.65.0...v0.66.0) (2026-10-26)
 
 
