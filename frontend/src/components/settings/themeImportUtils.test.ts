@@ -6,7 +6,7 @@ import {
   pickThemeFiles,
   readManifestFields,
   toThemeId,
-} from './themeImport'
+} from './themeImportUtils'
 
 const file = (name: string, content = 'a{}'): File => new File([content], name)
 
