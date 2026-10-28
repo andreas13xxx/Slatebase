@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.68.0](https://github.com/andreas13xxx/Slatebase/compare/v0.67.0...v0.68.0) (2026-10-28)
+
+
+### Features
+
+* **editor:** mirror document edits across split panes ([ee79ba9](https://github.com/andreas13xxx/Slatebase/commit/ee79ba9eb7797b6acfb7a076d2ba9ad8fde140b1))
+* **editor:** mirror document edits across split panes ([605dd30](https://github.com/andreas13xxx/Slatebase/commit/605dd307ff3c193072b9945159de66ce8350befc))
+
+
+### Bugfixes
+
+* **plugin-compat:** keep EditorSuggest context alive across selectSuggestion ([392c342](https://github.com/andreas13xxx/Slatebase/commit/392c34295c1159c83b6bdac68722ea55f5841202))
+* **plugin-compat:** keep EditorSuggest context alive across selectSuggestion ([b700da2](https://github.com/andreas13xxx/Slatebase/commit/b700da222a955e4deabcb7f2a7158d578bcd781b))
+* **themes:** rename themeImport.ts to avoid case clash with ThemeImport.tsx ([26dc87a](https://github.com/andreas13xxx/Slatebase/commit/26dc87a061099c29ca82f692dfee0ae3095c577f))
+* **themes:** rename themeImport.ts to themeImportUtils.ts to avoid case clash ([82db682](https://github.com/andreas13xxx/Slatebase/commit/82db682733b11ed946f39bfa6e80ea8c319081f6))
+
+
+### Sonstige Änderungen
+
+* **frontend:** pin CSS files read by tests to LF ([caa5310](https://github.com/andreas13xxx/Slatebase/commit/caa53106935e9502e404a7bcdfee526700a14ef7))
+* **frontend:** pin CSS files read by tests to LF ([6419449](https://github.com/andreas13xxx/Slatebase/commit/641944972df0b9101621be9a07c5972dfe2415fa))
+
 ## [0.67.0](https://github.com/andreas13xxx/Slatebase/compare/v0.66.0...v0.67.0) (2026-10-27)
 
 
