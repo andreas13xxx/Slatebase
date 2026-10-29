@@ -24,6 +24,7 @@ export interface ServerConfigData {
   maxImportFiles?: number
   maxImportDepth?: number
   mcp?: { maxFileSize: number; rateLimit: number }
+  proxy?: { allowedOrigins: string[] }
 }
 
 /** Props for the AdminConfigPage component. */
@@ -81,6 +82,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
   const [importMaxDepth, setImportMaxDepth] = useState('')
   const [mcpMaxFileSize, setMcpMaxFileSize] = useState('')
   const [mcpRateLimit, setMcpRateLimit] = useState('')
+  const [proxyAllowedOrigins, setProxyAllowedOrigins] = useState('')
   /** Keys the server reports as pinned by an environment variable. */
   const [shadowedByEnv, setShadowedByEnv] = useState<string[]>([])
 
@@ -127,6 +129,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
           setImportMaxDepth(String(data.maxImportDepth ?? 10))
           setMcpMaxFileSize(String(data.mcp?.maxFileSize ?? 16777216))
           setMcpRateLimit(String(data.mcp?.rateLimit ?? 60))
+          setProxyAllowedOrigins((data.proxy?.allowedOrigins ?? []).join('\n'))
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -225,6 +228,13 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
       mcp: {
         maxFileSize: parseInt(mcpMaxFileSize, 10),
         rateLimit: parseInt(mcpRateLimit, 10),
+      },
+      proxy: {
+        // Accept both newlines and commas as separators so paste-friendly.
+        allowedOrigins: proxyAllowedOrigins
+          .split(/[\n,]/)
+          .map((o) => o.trim())
+          .filter((o) => o.length > 0),
       },
     }
 
@@ -542,6 +552,27 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
             </div>
           </div>
           {errors.limits && <p className="admin-config-field-error">{errors.limits}</p>}
+        </section>
+
+        {/* Plugin request proxy — SSRF allowlist for the Obsidian requestUrl() proxy */}
+        <section className="admin-config-card">
+          <h2 className="admin-config-card-title">{t('admin.config.proxyTitle')}</h2>
+          <p className="admin-config-hint">{t('admin.config.proxyHint')}</p>
+          <div className="admin-config-field">
+            <label htmlFor="config-proxy-origins">{t('admin.config.proxyAllowedOriginsLabel')}</label>
+            <textarea
+              id="config-proxy-origins"
+              rows={5}
+              value={proxyAllowedOrigins}
+              onChange={(e) => setProxyAllowedOrigins(e.target.value)}
+              disabled={shadowedByEnv.includes('proxy')}
+              placeholder={'api.github.com\nraw.githubusercontent.com\n*.githubusercontent.com'}
+            />
+            <p className="admin-config-hint">{t('admin.config.proxyAllowedOriginsHint')}</p>
+            {shadowedByEnv.includes('proxy') && (
+              <p className="admin-config-hint">{t('admin.config.proxyEnvPinned')}</p>
+            )}
+          </div>
         </section>
 
         {/* Messages */}

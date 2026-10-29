@@ -26,6 +26,7 @@ const ENV_KEYS = [
   'SLATEBASE_SSE_REPLAY_TTL',
   'SLATEBASE_SSE_BATCH_WINDOW',
   'SLATEBASE_SSE_BATCH_MAX',
+  'SLATEBASE_PROXY_ALLOWED_ORIGINS',
 ] as const
 
 afterEach(() => {
@@ -112,6 +113,15 @@ describe('ConfigService', () => {
       expect(config.getWelcomeVaultConfig()).toEqual({
         name: { de: 'Willkommen', en: 'Welcome' },
       })
+    })
+
+    it('seeds the proxy allowlist with the GitHub default hosts', () => {
+      const config = new ConfigService()
+      const proxy = config.getProxyConfig()
+      // Plugin update checks and language-pack downloads hit GitHub.
+      expect(proxy.allowedOrigins).toContain('api.github.com')
+      expect(proxy.allowedOrigins).toContain('raw.githubusercontent.com')
+      expect(proxy.allowedOrigins).toContain('*.githubusercontent.com')
     })
   })
 
@@ -204,6 +214,22 @@ describe('ConfigService', () => {
       const sse = new ConfigService().getSseConfig()
       expect(sse.maxConnections).toBe(1000)
     })
+
+    it('overrides the proxy allowlist from SLATEBASE_PROXY_ALLOWED_ORIGINS', () => {
+      process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'] = 'api.example.com, *.couchdb.example.com'
+
+      const proxy = new ConfigService().getProxyConfig()
+      expect(proxy.allowedOrigins).toEqual(['api.example.com', '*.couchdb.example.com'])
+    })
+
+    it('disables the proxy when SLATEBASE_PROXY_ALLOWED_ORIGINS is set but empty', () => {
+      // An explicitly empty env var pins the list to empty, keeping the proxy
+      // off — the operator opting out wins over the shipped GitHub default.
+      process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'] = ''
+
+      const proxy = new ConfigService().getProxyConfig()
+      expect(proxy.allowedOrigins).toEqual([])
+    })
   })
 })
 
@@ -274,6 +300,29 @@ describe('ConfigService — admin overrides', () => {
     const config = new ConfigService()
     await expect(config.updateOverrides({ port: -1 })).rejects.toThrow()
     expect(config.getServerConfig().port).not.toBe(-1)
+  })
+
+  it('applies an admin override to the proxy allowlist', async () => {
+    const config = new ConfigService()
+    await config.updateOverrides({ proxy: { allowedOrigins: ['tiles.example.com'] } })
+
+    expect(config.getProxyConfig().allowedOrigins).toEqual(['tiles.example.com'])
+    expect(config.getOverrides().proxy?.allowedOrigins).toEqual(['tiles.example.com'])
+  })
+
+  it('lets the environment pin the proxy allowlist over an admin override', async () => {
+    process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'] = 'env-only.example.com'
+    const config = new ConfigService()
+
+    const shadowed = await config.updateOverrides({
+      proxy: { allowedOrigins: ['admin-set.example.com'] },
+    })
+
+    // The SSRF boundary stays with the operator: the env value wins and the
+    // caller is told the admin's value did not take effect.
+    expect(shadowed).toContain('proxy')
+    expect(config.getProxyConfig().allowedOrigins).toEqual(['env-only.example.com'])
+    delete process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS']
   })
 
   it('ignores an unreadable overrides file rather than failing to start', async () => {

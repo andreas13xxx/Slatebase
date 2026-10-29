@@ -138,7 +138,7 @@ Create a new database via CouchDB Admin UI (`http://localhost:5984/_utils`):
 Slatebase automatically routes cross-origin requests through the backend proxy (`/api/v1/proxy`). This means:
 
 - You don't need to configure CORS on CouchDB
-- The proxy allowlist must contain the CouchDB domain (`SLATEBASE_PROXY_ALLOWED_ORIGINS`)
+- The proxy allowlist must contain the CouchDB domain — manage it under **Administration → Server configuration → Plugin proxy** (or via `SLATEBASE_PROXY_ALLOWED_ORIGINS`, which overrides the UI field)
 - Timeout: 30 seconds (sufficient for OneShot)
 
 ### Known Limitations

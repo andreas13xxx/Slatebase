@@ -49,6 +49,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     cleanup: { intervalHours: 24 },
     templates: { directory: 'Templates' },
     upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
+    proxy: { allowedOrigins: ['api.github.com'] },
     welcomeVault: { name: { de: 'Willkommen', en: 'Welcome' } },
     ...overrides,
   }
@@ -63,6 +64,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     getCleanupConfig: () => config.cleanup,
     getTemplatesConfig: () => config.templates,
     getUploadConfig: () => config.upload,
+    getProxyConfig: () => config.proxy,
     getWelcomeVaultConfig: () => config.welcomeVault,
     getOverrides: () => ({}),
     updateOverrides: async () => [],

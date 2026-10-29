@@ -77,6 +77,30 @@ const UploadConfigSchema = z.object({
   maxImagePasteSize: z.number().int().positive().default(10485760),
 })
 
+/**
+ * Default allowlist for the Obsidian plugin request proxy (`POST /api/v1/proxy`).
+ * GitHub hosts are seeded because the most common proxied requests are plugin
+ * update checks and asset/language-pack downloads from GitHub releases and raw
+ * content. An admin can edit this list in the UI; the operator can still pin it
+ * from the environment (`SLATEBASE_PROXY_ALLOWED_ORIGINS`), which wins.
+ */
+export const DEFAULT_PROXY_ALLOWED_ORIGINS: readonly string[] = [
+  'api.github.com',
+  'github.com',
+  'raw.githubusercontent.com',
+  '*.githubusercontent.com',
+]
+
+/**
+ * Obsidian plugin request-proxy configuration. `allowedOrigins` is the SSRF
+ * allowlist the proxy route checks every target URL against — an empty list
+ * disables the route entirely (default-deny, no "allow everything" fallback).
+ * Admin-editable via `PUT /admin/config`, overridable from the environment.
+ */
+const ProxyConfigSchema = z.object({
+  allowedOrigins: z.array(z.string()).default([...DEFAULT_PROXY_ALLOWED_ORIGINS]),
+})
+
 const WelcomeVaultConfigSchema = z.object({
   name: z.object({
     de: z.string().min(1).max(128).default('Willkommen'),
@@ -123,6 +147,7 @@ export const ServerConfigSchema = z.object({
   cleanup: CleanupConfigSchema.prefault({}),
   templates: TemplatesConfigSchema.prefault({}),
   upload: UploadConfigSchema.prefault({}),
+  proxy: ProxyConfigSchema.prefault({}),
   welcomeVault: WelcomeVaultConfigSchema.prefault({}),
 })
 
@@ -138,6 +163,7 @@ export type VersionsConfig = z.infer<typeof VersionsConfigSchema>
 export type CleanupConfig = z.infer<typeof CleanupConfigSchema>
 export type TemplatesConfig = z.infer<typeof TemplatesConfigSchema>
 export type UploadConfig = z.infer<typeof UploadConfigSchema>
+export type ProxyConfig = z.infer<typeof ProxyConfigSchema>
 export type WelcomeVaultConfig = z.infer<typeof WelcomeVaultConfigSchema>
 
 // --- Interface ---
@@ -165,6 +191,7 @@ export type OverridableConfigKey =
   | 'cleanup'
   | 'upload'
   | 'mcp'
+  | 'proxy'
 
 /**
  * Each key is typed `| undefined` rather than merely optional: under
@@ -196,6 +223,8 @@ export interface IConfigService {
   getTemplatesConfig(): TemplatesConfig
   /** Returns the upload configuration section */
   getUploadConfig(): UploadConfig
+  /** Returns the Obsidian plugin request-proxy configuration section */
+  getProxyConfig(): ProxyConfig
   /** Returns the welcome vault configuration section */
   getWelcomeVaultConfig(): WelcomeVaultConfig
   /** Returns the admin-set runtime overrides currently persisted on disk. */
@@ -366,6 +395,10 @@ export class ConfigService implements IConfigService {
     return this.config.upload
   }
 
+  getProxyConfig(): ProxyConfig {
+    return this.config.proxy
+  }
+
   getWelcomeVaultConfig(): WelcomeVaultConfig {
     return this.config.welcomeVault
   }
@@ -525,6 +558,17 @@ export class ConfigService implements IConfigService {
 
     if (Object.keys(sseOverlay).length > 0) {
       overlay['sse'] = sseOverlay
+    }
+
+    // When set (even to an empty string, which keeps the proxy disabled), the
+    // environment pins the proxy allowlist and wins over the admin UI — the
+    // SSRF boundary stays in the operator's hands, not an admin account's.
+    if (process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'] !== undefined) {
+      const origins = process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS']
+        .split(',')
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0)
+      overlay['proxy'] = { allowedOrigins: origins }
     }
 
     return overlay

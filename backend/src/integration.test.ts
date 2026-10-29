@@ -95,6 +95,7 @@ beforeAll(async () => {
         cleanup: { intervalHours: 24 },
         templates: { directory: 'Templates' },
         upload: { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 },
+        proxy: { allowedOrigins: ['api.github.com'] },
         welcomeVault: { name: { de: 'Willkommen', en: 'Welcome' } },
       }
     },
@@ -124,6 +125,9 @@ beforeAll(async () => {
     },
     getUploadConfig() {
       return { maxFileSizeBytes: 104857600, maxFilesPerDrop: 50, maxImagePasteSize: 10485760 }
+    },
+    getProxyConfig() {
+      return { allowedOrigins: ['api.github.com'] }
     },
     getWelcomeVaultConfig() {
       return { name: { de: 'Willkommen', en: 'Welcome' } }

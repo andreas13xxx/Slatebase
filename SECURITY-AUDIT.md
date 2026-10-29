@@ -358,8 +358,14 @@ Real process-level isolation is scoped in the `server-side-plugins` spec.
 compatibility. Mitigations in place:
 
 - Private, loopback and link-local addresses are rejected.
-- URL allowlist via `SLATEBASE_PROXY_ALLOWED_ORIGINS` (comma-separated, `*.domain.com`
-  wildcard prefix). Empty means all external URLs are allowed.
+- URL allowlist (comma-separated hosts, `*.domain.com` wildcard prefix). Default-deny:
+  an empty allowlist disables the route entirely (`403 PROXY_NOT_CONFIGURED`) — there is
+  no "allow everything" fallback. The list is admin-managed (`proxy.allowedOrigins` in the
+  layered server config, Admin UI → Server configuration → Plugin proxy, seeded with GitHub
+  hosts) and validated to bare hostnames/`*.` wildcards (no scheme/path/port). Setting
+  `SLATEBASE_PROXY_ALLOWED_ORIGINS` pins the list over the admin UI and locks the field, so
+  the SSRF boundary stays with the operator. The route reads the allowlist per request, so
+  an admin change takes effect without a restart.
 - 30s timeout, 10 MB request body, 50 MB response body.
 - Session token required — no unauthenticated access.
 

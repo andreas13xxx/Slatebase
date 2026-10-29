@@ -158,7 +158,7 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - Obsidian nutzt Electron's Node.js-Prozess für CORS-freie Requests.
 - Slatebase ist eine Web-App → Browser-CORS gilt.
 - Lösung: `POST /api/v1/proxy` leitet Requests serverseitig weiter.
-- Sicherheit: SSRF-Schutz (private IPs blockiert), URL-Allowlist via `SLATEBASE_PROXY_ALLOWED_ORIGINS` Env-Var (kommasepariert, Wildcard-Prefix `*.domain.com` unterstützt). Leer = alles erlaubt.
+- Sicherheit: SSRF-Schutz (private IPs blockiert), URL-Allowlist (kommasepariert, Wildcard-Prefix `*.domain.com` unterstützt). Default-deny: leere Liste = Proxy aus (`403 PROXY_NOT_CONFIGURED`), **nicht** „alles erlaubt". Die Allowlist ist admin-konfigurierbar (`proxy.allowedOrigins`, Teil der overridable Server-Config: `default.json < server-config.json < env`, Admin-UI unter Server-Konfiguration → Plugin-Proxy, GitHub-Hosts als Default). Die Env-Var `SLATEBASE_PROXY_ALLOWED_ORIGINS` gewinnt weiterhin und sperrt das UI-Feld — die SSRF-Grenze bleibt beim Betreiber. Die Proxy-Route liest die Liste pro Request (`getAllowedOrigins`), eine UI-Änderung greift ohne Neustart.
 - Limits: 30s Timeout, 10MB Request, 50MB Response.
 
 ### CodeBlockProcessor → Gemeinsame Registry, zwei Konsumenten

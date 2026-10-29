@@ -69,7 +69,7 @@ function fakeUpstreamResponse(init: { status?: number; headers?: Record<string, 
 function createTestApp(overrides: Partial<ProxyRoutesDeps> = {}) {
   const defaultDeps: ProxyRoutesDeps = {
     logger: createMockLogger(),
-    allowedOrigins: ['example.com', '*.wildcard.example.com'],
+    getAllowedOrigins: () => ['example.com', '*.wildcard.example.com'],
     rateLimiter: new SlidingWindowRateLimiter(60, 60_000),
     ...overrides,
   }
@@ -104,7 +104,7 @@ describe('proxyRoutes', () => {
 
   describe('default-deny', () => {
     it('returns 403 PROXY_NOT_CONFIGURED when allowedOrigins is empty', async () => {
-      const { app } = createTestApp({ allowedOrigins: [] })
+      const { app } = createTestApp({ getAllowedOrigins: () => [] })
 
       const res = await postProxy(app, { url: 'https://example.com/data' })
 
@@ -112,6 +112,25 @@ describe('proxyRoutes', () => {
       const body = await res.json() as { code: string }
       expect(body.code).toBe('PROXY_NOT_CONFIGURED')
       expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('reads the allowlist per request, so an admin change applies without a restart', async () => {
+      // The allowlist is empty at first, then gets a host added — the same
+      // running route must pick up the new value on the next request.
+      let origins: string[] = []
+      const { app } = createTestApp({ getAllowedOrigins: () => origins })
+
+      const blocked = await postProxy(app, { url: 'https://late.example.com/data' })
+      expect(blocked.status).toBe(403)
+      expect((await blocked.json() as { code: string }).code).toBe('PROXY_NOT_CONFIGURED')
+
+      origins = ['late.example.com']
+      mockDnsResolves(PUBLIC_IP)
+      mockFetch.mockResolvedValueOnce(fakeUpstreamResponse({ body: 'ok' }))
+
+      const allowed = await postProxy(app, { url: 'https://late.example.com/data' })
+      expect(allowed.status).toBe(200)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -196,7 +215,7 @@ describe('proxyRoutes', () => {
   describe('SSRF / private address protection', () => {
     it('blocks a request whose hostname resolves to a private IP', async () => {
       mockDnsResolves(PRIVATE_IP)
-      const { app } = createTestApp({ allowedOrigins: ['internal-looking.example.com'] })
+      const { app } = createTestApp({ getAllowedOrigins: () => ['internal-looking.example.com'] })
 
       const res = await postProxy(app, { url: 'https://internal-looking.example.com/data' })
 
@@ -207,7 +226,7 @@ describe('proxyRoutes', () => {
     })
 
     it('blocks a literal private IP URL outright', async () => {
-      const { app } = createTestApp({ allowedOrigins: ['10.0.0.5'] })
+      const { app } = createTestApp({ getAllowedOrigins: () => ['10.0.0.5'] })
 
       const res = await postProxy(app, { url: 'http://10.0.0.5/data' })
 
@@ -223,7 +242,7 @@ describe('proxyRoutes', () => {
       mockFetch.mockResolvedValueOnce(
         fakeUpstreamResponse({ status: 302, headers: { location: 'https://internal.example.com/data' } }),
       )
-      const { app } = createTestApp({ allowedOrigins: ['example.com', 'internal.example.com'] })
+      const { app } = createTestApp({ getAllowedOrigins: () => ['example.com', 'internal.example.com'] })
 
       const res = await postProxy(app, { url: 'https://example.com/redirect' })
 
@@ -240,7 +259,7 @@ describe('proxyRoutes', () => {
       mockFetch.mockResolvedValueOnce(
         fakeUpstreamResponse({ status: 302, headers: { location: 'https://not-allowed.example.org/data' } }),
       )
-      const { app } = createTestApp({ allowedOrigins: ['example.com'] })
+      const { app } = createTestApp({ getAllowedOrigins: () => ['example.com'] })
 
       const res = await postProxy(app, { url: 'https://example.com/redirect' })
 

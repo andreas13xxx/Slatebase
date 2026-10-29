@@ -76,6 +76,7 @@ function createMockConfigService(): IConfigService {
     getCleanupConfig: () => ({}) as ReturnType<IConfigService['getCleanupConfig']>,
     getTemplatesConfig: () => ({}) as ReturnType<IConfigService['getTemplatesConfig']>,
     getUploadConfig: () => ({}) as ReturnType<IConfigService['getUploadConfig']>,
+    getProxyConfig: () => ({ allowedOrigins: [] }) as ReturnType<IConfigService['getProxyConfig']>,
     getWelcomeVaultConfig: () => ({}) as ReturnType<IConfigService['getWelcomeVaultConfig']>,
     getOverrides: () => ({}),
     updateOverrides: async () => [],
@@ -206,6 +207,75 @@ describe('Admin Routes — Input Validation', () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'admin' }),
+      })
+      expect(res.status).toBe(200)
+    })
+  })
+
+  describe('PUT /admin/config', () => {
+    const baseConfig = {
+      port: 3000,
+      host: '127.0.0.1',
+      logLevel: 'info',
+      maxFileSize: 5242880,
+      allowedOrigins: ['http://localhost:5173'],
+    }
+
+    it('returns 400 when a proxy origin carries a scheme', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          proxy: { allowedOrigins: ['https://api.github.com'] },
+        }),
+      })
+      expect(res.status).toBe(400)
+
+      const body = await res.json() as { code: string }
+      expect(body.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('returns 400 when a proxy origin contains a path', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          proxy: { allowedOrigins: ['api.github.com/repos'] },
+        }),
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('accepts a bare hostname and a "*." wildcard proxy origin', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          proxy: { allowedOrigins: ['api.github.com', '*.githubusercontent.com'] },
+        }),
+      })
+      expect(res.status).toBe(200)
+    })
+
+    it('accepts a single-label host (e.g. a Docker-network CouchDB)', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          proxy: { allowedOrigins: ['couchdb'] },
+        }),
       })
       expect(res.status).toBe(200)
     })

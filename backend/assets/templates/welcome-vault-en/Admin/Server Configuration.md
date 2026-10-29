@@ -55,6 +55,23 @@ Slatebase uses a multi-level configuration system:
 | Max versions per file | Number of stored file versions | 20 |
 | Cleanup interval | How often the cleanup job runs | 24 hours |
 
+### Plugin Proxy
+
+Obsidian plugins use `requestUrl()` for CORS-free requests. Slatebase forwards these server-side through `POST /api/v1/proxy` — **only to the hosts allowed here** (SSRF protection). Manage the list under **Administration → Server configuration → Plugin proxy**.
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Allowed proxy targets | One host per line, `*.` wildcard prefix allowed | GitHub hosts (for plugin updates & language packs) |
+
+- One **host** per line, e.g. `api.github.com` or `*.githubusercontent.com` — no scheme, path, or port.
+- An **empty list disables the proxy** entirely (plugins get `403 PROXY_NOT_CONFIGURED`).
+- Private/internal/loopback addresses stay **blocked** regardless of the list.
+- Changes **apply immediately** — no restart needed.
+- When the `SLATEBASE_PROXY_ALLOWED_ORIGINS` environment variable is set it **wins** and the UI field is locked (the SSRF boundary stays with the operator).
+
+> [!tip] GitHub default
+> The pre-configured GitHub hosts cover the most common plugin requests (update checks, language-pack downloads). For LiveSync (CouchDB) or other services, add their domain.
+
 ---
 
 ## Server Restart
@@ -90,7 +107,7 @@ Important environment variables for server configuration:
 | `SLATEBASE_CSRF_SECRET` | CSRF token secret (min. 32 characters) |
 | `SLATEBASE_MODULE_SECRET_KEY` | Encryption secret for Git-Sync and Mail-Import credentials |
 | `SLATEBASE_TRUSTED_PROXIES` | Comma-separated IP ranges |
-| `SLATEBASE_PROXY_ALLOWED_ORIGINS` | Allowed domains for plugin proxy |
+| `SLATEBASE_PROXY_ALLOWED_ORIGINS` | Allowed domains for plugin proxy — usually managed in the admin UI; when set, it overrides and locks the UI field |
 
 > [!tip] .env File
 > For local development you can use a `.env` file in the backend directory. For production, Docker secrets or your hosting provider's environment variables are recommended.
