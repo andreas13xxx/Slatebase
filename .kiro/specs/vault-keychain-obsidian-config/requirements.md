@@ -91,10 +91,11 @@ Zwei zusammenhängende Ziele:
 
 #### Acceptance Criteria
 
-1. THE App SHALL Einstellungen, die Obsidian in `app.json` oder `appearance.json` führt, im Vault speichern (gelten für alle Benutzer des Vaults).
-2. THE App SHALL rein persönliche Werte (Farbschema, Sprache, Seitenleistenbreite, zuletzt geöffnete Notiz) weiter pro User speichern.
-3. WHERE ein User einen persönlichen Wert gesetzt hat, der einen Vault-Wert überlagert, THE App SHALL das in der UI kennzeichnen.
-4. THE Settings_Panel SHALL für jeden Wert anzeigen, ob er vault- oder userweit gilt.
+1. THE App SHALL Einstellungen, für die es eine Vault-Datei gibt (`app.json`, `appearance.json`, `bookmarks.json`, `hotkeys.json`, `workspaces.json`, `graph.json`), ausschließlich im Vault speichern. Es gibt dafür keine User-Variante und keine Überlagerung (entschieden 2026-10-29).
+2. THE App SHALL die bisherigen User-Werte `lineNumbers`, `readableLineLength` und `spellcheck` aus den User-Preferences entfernen; der Wert kommt aus `app.json` (`showLineNumber`, `readableLineLength`, `spellcheck`). Bisherige User-Werte werden nicht übernommen.
+3. WHERE `app.json` den Schlüssel nicht enthält, THE App SHALL den bisherigen Slatebase-Standard verwenden (`readableLineLength` an, `spellcheck` an, `showLineNumber` aus).
+4. THE App SHALL rein persönliche Werte ohne Vault-Gegenstück (Farbschema, Sprache, Zoom, Seitenleisten- und Kontextpanel-Layout, Diktatsprache, Rechtschreib-Wörterbuch) weiter pro User speichern.
+5. WHEN ein Benutzer mit nur Lesezugriff eine Vault-Einstellung ändern will, THE App SHALL die Änderung ablehnen und das mit einer Meldung begründen.
 
 ### Requirement 8: Qualität
 
