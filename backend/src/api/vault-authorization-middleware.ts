@@ -54,6 +54,9 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   // the links of a vault and previewing what one would include is reserved for writers.
   { method: 'GET', pathPattern: '/public-shares', level: 'write' },
   { method: 'GET', pathPattern: '/public-shares/preview', level: 'write' },
+  // keychainRoutes.ts — the keychain is shared by every plugin of the vault, so reading a value
+  // is reserved for writers; listing the entry IDs (default read) reveals no values.
+  { method: 'GET', pathPattern: '/keychain/:secretId', level: 'write' },
 
   // --- owner instead of the read/write default ---
   // vaultShareRoutes.ts — share management is owner-only, including the GET listing.

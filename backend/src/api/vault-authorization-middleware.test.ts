@@ -354,3 +354,12 @@ describe('public share routes', () => {
     expect(resolveRequiredLevel('DELETE', '/public-shares/abc')).toBe('write')
   })
 })
+
+describe('keychain routes', () => {
+  it('listing IDs needs read access; reading a value and every change need write access', () => {
+    expect(resolveRequiredLevel('GET', '/keychain')).toBe('read')
+    expect(resolveRequiredLevel('GET', '/keychain/openai-key')).toBe('write')
+    expect(resolveRequiredLevel('PUT', '/keychain/openai-key')).toBe('write')
+    expect(resolveRequiredLevel('DELETE', '/keychain/openai-key')).toBe('write')
+  })
+})

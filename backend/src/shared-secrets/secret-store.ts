@@ -10,6 +10,7 @@
  * implementation instead of each reinventing encrypted-at-rest storage.
  */
 
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { IModuleSecretKeyManager } from './secret-key-manager.js'
 import { KeyedJsonFileStore } from '../shared/json-file-store.js'
@@ -23,6 +24,14 @@ export interface IModuleSecretStore {
   setSecret(vaultId: string, moduleId: string, entryId: string, value: string): Promise<void>
   /** Delete a single secret. */
   deleteSecret(vaultId: string, moduleId: string, entryId: string): Promise<void>
+}
+
+/** A store that can also enumerate and drop all entries of one module (used by the keychain). */
+export interface IListableModuleSecretStore extends IModuleSecretStore {
+  /** List the entry IDs of a module in a vault (never the values). */
+  listSecrets(vaultId: string, moduleId: string): Promise<string[]>
+  /** Delete every secret of a module in a vault. */
+  deleteAll(vaultId: string, moduleId: string): Promise<void>
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -66,7 +75,7 @@ function parseSecretsFile(raw: unknown): SecretsFile | null {
   return raw as SecretsFile
 }
 
-export class ModuleSecretStore implements IModuleSecretStore {
+export class ModuleSecretStore implements IListableModuleSecretStore {
   private readonly baseDir: string
   private readonly store: KeyedJsonFileStore<SecretsFile>
 
@@ -117,6 +126,20 @@ export class ModuleSecretStore implements IModuleSecretStore {
       delete data.secrets[entryId]
       return data
     })
+  }
+
+  async listSecrets(vaultId: string, moduleId: string): Promise<string[]> {
+    const data = await this.store.read(this.key(vaultId, moduleId))
+    return Object.keys(data.secrets)
+  }
+
+  async deleteAll(vaultId: string, moduleId: string): Promise<void> {
+    try {
+      await fs.unlink(path.join(this.baseDir, this.key(vaultId, moduleId), SECRETS_FILENAME))
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw err
+    }
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────

@@ -434,3 +434,16 @@ The anonymous reader routes `GET /api/v1/public/s/:token`, `POST …/unlock`, `G
 bypass session auth and CSRF in `auth/middleware.ts` (`isPublicSharePath`: strict token pattern, only those three
 method/path combinations). The link token is the credential; the routes have their own rate limits and answer 404 for
 unknown, expired and revoked links alike (and for everything while the feature is off).
+
+## Addendum — `backend/src/api/keychainRoutes.ts` (Vault keychain, 2026-10-29)
+
+Mounted at `/api/v1/vaults/:vaultId/keychain`. The keychain is shared by every plugin of the vault, so unlike the old
+per-plugin secrets (read-level `PUT`/`DELETE`) reading a value and every change need **write** access; listing the entry
+IDs stays at read and reveals no values. `GET .../keychain/:secretId` is an exception to `write` in
+`VAULT_ROUTE_LEVEL_EXCEPTIONS` (the method default would be read).
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../keychain` | read (IDs only) |
+| GET | `.../keychain/:secretId` | write (exception) |
+| PUT, DELETE | `.../keychain/:secretId` | write |

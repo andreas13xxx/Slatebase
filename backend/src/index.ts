@@ -99,6 +99,8 @@ import { createPublicShareService, createPublicShareStore, createPublicShareVaul
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
+import { KeychainService } from './keychain/index.js'
+import { createKeychainRoutes } from './api/keychainRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
 import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
@@ -187,6 +189,7 @@ if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
 const moduleSecretKeyManager = new ModuleSecretKeyManager(serverConfig.dataDir, logger)
 await moduleSecretKeyManager.loadOrCreate()
 const moduleSecretStore = new ModuleSecretStore(serverConfig.dataDir, moduleSecretKeyManager)
+const keychainService = new KeychainService(moduleSecretStore)
 
 if (!process.env['SLATEBASE_MODULE_SECRET_KEY']) {
   logger.warn(
@@ -750,6 +753,7 @@ const pluginRoutes = createPluginRoutes({
   secretStore: pluginSecretStore,
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
 const snippetRoutes = createSnippetRoutes({
@@ -1236,6 +1240,12 @@ vaultController.setVaultDeletionHook({
     pluginStore.deleteAllForVault(vaultId).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Plugin cleanup failed after vault deletion', { vaultId, error: message })
+    })
+
+    // Clean up the vault's keychain entries (fire-and-forget)
+    keychainService.deleteAllForVault(vaultId).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Keychain cleanup failed after vault deletion', { vaultId, error: message })
     })
 
     // Clean up link index for the deleted vault
