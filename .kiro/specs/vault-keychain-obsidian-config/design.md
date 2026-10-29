@@ -100,3 +100,24 @@ Quelle: eine echte `app.json` aus einem öffentlichen Repo (fengstats/obsidian-c
 | `tabSize` | number | `2` |
 
 **Noch offen in Task 0:** Formate von `bookmarks.json`, `hotkeys.json`, `templates.json`, `daily-notes.json`, `workspaces.json`, `graph.json`, `core-plugins.json`; offizielle Wertebereiche. Diese Prüfung läuft vor Phase 6 beziehungsweise 5.
+
+## Task 0: Formate der weiteren Dateien (Stand 2026-10-29)
+
+Quelle: echte Dateien aus einem öffentlichen Repo (fengstats/obsidian-config) plus Suche. Obsidian dokumentiert keines dieser Formate; es sind interne Dateien, die Obsidian beim Schließen neu schreibt.
+
+| Datei | Form | Stand |
+|---|---|---|
+| `hotkeys.json` | Objekt: Befehls-ID → Array von `{ "modifiers": ["Mod","Shift"], "key": "K" }`; leeres Array = ungebunden | belegt (echte Datei). Modifier laut Plugin-API: `Mod`, `Ctrl`, `Meta`, `Shift`, `Alt`; `Mod` = Cmd auf macOS, sonst Strg |
+| `daily-notes.json` | `{ "folder": "2024", "format": "MM月/MM-DD ddd", "template": "template/diary", "autorun": false }` | belegt. `format` sind Moment-Token (Schrägstrich legt Unterordner an); `template` ist ein Vault-Pfad ohne `.md` |
+| `templates.json` | `{ "folder": "template" }` | belegt für `folder`. Ein Datums- oder Zeitformat steht nicht in der Beispieldatei, ist also ungeprüft |
+| `graph.json` | flach: `collapse-filter`, `search`, `showTags`, `showAttachments`, `hideUnresolved`, `showOrphans`, `collapse-color-groups`, `colorGroups` (Liste von `{query, color}`, Farbe laut Forum `{a, rgb}`), `collapse-display`, `showArrow`, `textFadeMultiplier`, `nodeSizeMultiplier`, `lineSizeMultiplier`, `collapse-forces`, `centerStrength`, `repelStrength`, `linkStrength`, `linkDistance`, `scale`, `close` | belegt, `colorGroups` nur aus Forenbeiträgen |
+| `core-plugins.json` | Objekt: Kernplugin-Name → Boolean (`"file-explorer": true`) | belegt (neuere Obsidian-Versionen; ältere Versionen nutzten laut Erinnerung eine Namensliste, ungeprüft) |
+| `bookmarks.json` | `{ "items": [...] }` | nur die äußere Hülle belegt; die Beispieldatei hatte keine Einträge. Form von Datei-, Ordner-, Such- und Gruppen-Einträgen ungeprüft |
+| `workspaces.json` | Obsidian-intern, enthält ein Feld `active` | nicht belegt, kein öffentlicher Zugriff auf die Struktur |
+
+**Folgen für den Umfang:**
+
+- `workspaces.json`: Slatebases Workspaces sind opake Pane-Bäume des eigenen Editors und haben nichts mit Obsidians Layout-Format gemeinsam. In Obsidians Datei geschrieben könnten sie dort Fehler oder Datenverlust auslösen. Nicht umsetzen.
+- `daily-notes.json`: Slatebase benennt Tagesnotizen fest nach `YYYY-MM-DD.md`. Ein anderes `format` aus der Datei kann nicht umgesetzt werden; nur `folder` und `template` sind abbildbar. Beim Schreiben setzt Slatebase `format` auf `YYYY-MM-DD`, falls der Schlüssel fehlt, und lässt einen vorhandenen Wert unangetastet.
+- `template` in `daily-notes.json` ist ein Vault-Pfad, Slatebases `dailyNoteTemplateName` nur ein Dateiname im Vorlagenordner. Abbildung: `template = <Vorlagenordner>/<Name ohne .md>`; liegt die Vorlage aus der Datei außerhalb des Vorlagenordners, kann Slatebase sie nicht auswählen.
+- `hotkeys.json`: Slatebases Befehls-IDs (`slatebase:...`) sind nicht die von Obsidian. Eigene IDs in Obsidians Datei zu schreiben ist unerprobt.
