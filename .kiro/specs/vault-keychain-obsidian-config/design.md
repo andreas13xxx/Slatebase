@@ -65,3 +65,38 @@ Schnitt: Was Obsidian in `app.json`/`appearance.json` hat, liegt im Vault. Pers�
 ## Tests
 
 Pro Phase: Backend-Unit (Service, Migration, Lock/Merge), Route-Tests mit Berechtigungen, Frontend-Komponenten inklusive axe (Timeout 30 s auf dem 2-Kern-Host), Plugin-Compat-Tests für `secretStorage` und `getConfig`. Vor dem Push zusätzlich Tests der Aufrufer geänderter Funktionen (z. B. `plugins/compat`).
+
+## Task 0: Ergebnisse (Stand 2026-10-29)
+
+Quelle: eine echte `app.json` aus einem öffentlichen Repo (fengstats/obsidian-config) und der Code. Die offizielle Doku wurde nicht erreicht; Wertebereiche, die nur aus Beispielen stammen, sind unten markiert.
+
+**Korrektur zur Ausgangslage.** Mehrere Werte sind heute nicht fest im Code, sondern schon konfigurierbar:
+
+- `.slatebase/config.json` (`backend/src/vault-config/`, UI `VaultConfigSection.tsx`) hält `templatesDirectory`, `dailyNotesDirectory`, `dailyNoteTemplateName`, `attachmentsDirectory`, `uniqueNoteDirectory`. Das ist das Gegenstück zu `templates.json`, `daily-notes.json` und `attachmentFolderPath`.
+- `readableLineLength`, `lineNumbers`, `spellcheck`, `workspaces`, `graph` liegen als `UserVaultSettings` pro User und Vault in den Preferences. Die UI erreicht sie bewusst nur über Kontextmenü und Befehlspalette, nicht über das Settings-Panel.
+- Wirklich fest (nur Defaults in `vault-shim.ts:762` `getConfig`): `newFileLocation`, `newLinkFormat`, `useMarkdownLinks`, `defaultViewMode`, `livePreview`, `strictLineBreaks`, `showFrontmatter`, `foldHeading`, `foldIndent`, `updateInternalLinks`. Link-Erzeugung liest `useMarkdownLinks`/`newLinkFormat` bereits über `getConfig` (`file-manager-shim.ts:136`).
+
+**Folge für die Spec:**
+
+- Requirement 5.3 gilt nur für die wirklich festen Werte plus `attachmentFolderPath`.
+- `.slatebase/config.json` wird nicht entfernt. Offen: Quelle der Wahrheit pro Wert (Obsidian-Datei oder Slatebase-Config), Umgang mit Konflikten. Entscheidung steht aus.
+- `alwaysUpdateLinks` ist heute fest `true` und nicht abschaltbar (`FileManager.renameFile()`); ein Schalter bräuchte einen Eingriff im Backend.
+
+**Bestätigte `app.json`-Schlüssel (echte Datei):**
+
+| Schlüssel | Typ | Beispielwerte |
+|---|---|---|
+| `newFileLocation` | string | `"current"` (weitere: `"root"`, `"folder"`, aus Code/Beispiel, ungeprüft) |
+| `newFileFolderPath` | string | `"00 Inbox"` |
+| `attachmentFolderPath` | string | `"./attachments"`, `"./"` |
+| `useMarkdownLinks` | boolean | `true` |
+| `newLinkFormat` | string | `"relative"` (weitere: `"shortest"`, `"absolute"`) |
+| `alwaysUpdateLinks` | boolean | `true` |
+| `readableLineLength` | boolean | `true` |
+| `defaultViewMode` | string | `"source"` (weiter: `"preview"`) |
+| `livePreview`, `strictLineBreaks`, `showFrontmatter`, `foldHeading`, `foldIndent`, `spellcheck`, `showLineNumber` | boolean | |
+| `trashOption` | string | `"local"` |
+| `promptDelete` | boolean | |
+| `tabSize` | number | `2` |
+
+**Noch offen in Task 0:** Formate von `bookmarks.json`, `hotkeys.json`, `templates.json`, `daily-notes.json`, `workspaces.json`, `graph.json`, `core-plugins.json`; offizielle Wertebereiche. Diese Prüfung läuft vor Phase 6 beziehungsweise 5.
