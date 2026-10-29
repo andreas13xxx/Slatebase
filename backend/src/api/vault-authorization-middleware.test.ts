@@ -28,6 +28,8 @@ import type { IImportService } from '../import/index.js'
 import type { IPluginService } from '../plugin/index.js'
 import type { IKeychainService } from '../keychain/index.js'
 import { createKeychainRoutes } from './keychainRoutes.js'
+import type { IAppConfigService } from '../obsidian-config/index.js'
+import { createAppConfigRoutes } from './appConfigRoutes.js'
 import type { ISnippetStore } from '../snippets/index.js'
 import type { IPluginStoreService } from '../plugin-store/index.js'
 import type { ISearchService, IReplaceService } from '../search/index.js'
@@ -210,6 +212,9 @@ app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 const keychainRoutes = createKeychainRoutes({ keychainService: stub<IKeychainService>('keychainService'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/keychain', keychainRoutes)
 
+const appConfigRoutes = createAppConfigRoutes({ appConfigService: stub<IAppConfigService>('appConfigService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
+app.route('/api/v1/vaults/:vaultId/app-config', appConfigRoutes)
+
 const snippetRoutes = createSnippetRoutes({ snippetStore: stub<ISnippetStore>('snippetStore'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
 
@@ -366,5 +371,12 @@ describe('keychain routes', () => {
     expect(resolveRequiredLevel('GET', '/keychain/openai-key')).toBe('write')
     expect(resolveRequiredLevel('PUT', '/keychain/openai-key')).toBe('write')
     expect(resolveRequiredLevel('DELETE', '/keychain/openai-key')).toBe('write')
+  })
+})
+
+describe('app-config routes', () => {
+  it('reading needs read access, changing needs write access (the file applies to every user of the vault)', () => {
+    expect(resolveRequiredLevel('GET', '/app-config')).toBe('read')
+    expect(resolveRequiredLevel('PATCH', '/app-config')).toBe('write')
   })
 })

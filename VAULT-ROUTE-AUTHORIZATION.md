@@ -443,3 +443,13 @@ IDs stays at read and reveals no values. `GET .../keychain/:secretId` is an exce
 | GET | `.../keychain` | read (IDs only) |
 | GET | `.../keychain/:secretId` | write (exception) |
 | PUT, DELETE | `.../keychain/:secretId` | write |
+
+## Addendum — `backend/src/api/appConfigRoutes.ts` (Vault `app.json`, 2026-10-29)
+
+Mounted at `/api/v1/vaults/:vaultId/app-config`. The file is `.obsidian/app.json` and applies to every user of the vault,
+so it follows the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS`.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../app-config` | read |
+| PATCH | `.../app-config` | write |
