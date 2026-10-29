@@ -14,14 +14,6 @@ export interface VaultConfig {
   /** Filename of the daily note template (relative to templatesDirectory). Default: "daily.md". */
   dailyNoteTemplateName: string
   /**
-   * Directory for new attachments (relative to vault root). Empty string = same
-   * folder as the note being edited (Slatebase's long-standing default, so an
-   * unconfigured vault sees no change in behavior). A non-empty value pins every
-   * upload — drag-drop, paste, and "Insert attachment" — to that one directory
-   * regardless of which note is open, mirroring Obsidian's "specified folder" mode.
-   */
-  attachmentsDirectory: string
-  /**
    * Directory for new unique notes (relative to vault root). Empty string =
    * vault root. A unique note is created with a timestamp prefix name
    * (`YYYYMMDDHHmmss`), Obsidian's Zettelkasten convention — the folder is the
@@ -40,7 +32,6 @@ export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   templatesDirectory: 'Templates',
   dailyNotesDirectory: '',
   dailyNoteTemplateName: 'daily.md',
-  attachmentsDirectory: '',
   uniqueNoteDirectory: '',
   activityRetentionDays: 90,
 }

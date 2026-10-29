@@ -1,0 +1,194 @@
+/**
+ * vaultAppConfigStore — the open vault's `.obsidian/app.json`, Obsidian's main vault settings.
+ *
+ * The file lives in the vault, so a value is the same for everyone who opens it: there is no
+ * per-user copy and no override. Where the file does not contain a key the default below applies;
+ * keys this app does not know are kept in the snapshot (plugins read them through
+ * `vault.getConfig()`).
+ *
+ * Writes are optimistic: the snapshot changes at once, the PATCH follows, and a refused or failed
+ * write puts the previous value back and rejects, so the caller can say why. Changing a value needs
+ * write access to the vault.
+ *
+ * @module state/vaultAppConfigStore
+ */
+
+import { useSyncExternalStore } from 'react'
+import type { IApiClient } from '../api'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+/** The keys this app understands, with their value types. */
+export interface AppConfigValues {
+  newFileLocation: 'root' | 'current' | 'folder'
+  newFileFolderPath: string
+  attachmentFolderPath: string
+  useMarkdownLinks: boolean
+  newLinkFormat: 'shortest' | 'relative' | 'absolute'
+  alwaysUpdateLinks: boolean
+  readableLineLength: boolean
+  defaultViewMode: 'source' | 'preview'
+  livePreview: boolean
+  strictLineBreaks: boolean
+  showFrontmatter: boolean
+  foldHeading: boolean
+  foldIndent: boolean
+  spellcheck: boolean
+  showLineNumber: boolean
+}
+
+export type AppConfigKey = keyof AppConfigValues
+
+/**
+ * Applied where `app.json` has no such key. These are Slatebase's earlier defaults, so a vault
+ * without the file behaves as before (`spellcheck` is on, unlike in a fresh Obsidian vault).
+ * `attachmentFolderPath: './'` means "next to the note".
+ */
+export const DEFAULT_APP_CONFIG: AppConfigValues = {
+  newFileLocation: 'root',
+  newFileFolderPath: '',
+  attachmentFolderPath: './',
+  useMarkdownLinks: false,
+  newLinkFormat: 'shortest',
+  alwaysUpdateLinks: true,
+  readableLineLength: true,
+  defaultViewMode: 'source',
+  livePreview: true,
+  strictLineBreaks: false,
+  showFrontmatter: false,
+  foldHeading: true,
+  foldIndent: true,
+  spellcheck: true,
+  showLineNumber: false,
+}
+
+const KNOWN_KEYS = Object.keys(DEFAULT_APP_CONFIG) as AppConfigKey[]
+
+/** Path of the file, as reported by `vault:change` events. */
+export const APP_CONFIG_PATH = '.obsidian/app.json'
+
+// ─── Internal State ──────────────────────────────────────────────────────────
+
+let activeVaultId: string | null = null
+let apiClient: IApiClient | null = null
+/** Raw fields of the file (known and unknown keys). */
+let fileFields: Record<string, unknown> = {}
+/** Defaults merged with the file's values; what consumers read. Replaced on every change. */
+let snapshot: Record<string, unknown> = { ...DEFAULT_APP_CONFIG }
+/** Bumped on every switch and every applied response, so a slow older response cannot win. */
+let generation = 0
+
+const subscribers = new Set<() => void>()
+
+function typeMatches(key: AppConfigKey, value: unknown): boolean {
+  return typeof value === typeof DEFAULT_APP_CONFIG[key]
+}
+
+/** The file's value if it has the right type, else the default; keys this app does not know pass through. */
+function merge(fields: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...fields, ...DEFAULT_APP_CONFIG }
+  for (const key of KNOWN_KEYS) {
+    if (key in fields && typeMatches(key, fields[key])) merged[key] = fields[key]
+  }
+  return merged
+}
+
+function apply(fields: Record<string, unknown>): void {
+  fileFields = fields
+  snapshot = merge(fields)
+  for (const cb of subscribers) cb()
+}
+
+// ─── Reading ─────────────────────────────────────────────────────────────────
+
+function subscribe(cb: () => void): () => void {
+  subscribers.add(cb)
+  return () => { subscribers.delete(cb) }
+}
+
+/** One value of the active vault's app.json (default if the file has none). */
+export function getAppConfigValue<K extends AppConfigKey>(key: K): AppConfigValues[K] {
+  return snapshot[key] as AppConfigValues[K]
+}
+
+/** Any key of the file, known or not (`vault.getConfig()` for plugins); null if absent and without a default. */
+export function getAppConfigRaw(key: string): unknown {
+  return key in snapshot ? snapshot[key] : null
+}
+
+/** Subscribes a component to one value. */
+export function useAppConfigValue<K extends AppConfigKey>(key: K): AppConfigValues[K] {
+  return useSyncExternalStore(subscribe, () => getAppConfigValue(key), () => getAppConfigValue(key))
+}
+
+// ─── Writing ─────────────────────────────────────────────────────────────────
+
+/**
+ * Changes known keys of the active vault's app.json. `null` removes a key (back to the default).
+ * Rejects with the server's error (typically: no write access); the previous values are restored.
+ */
+export async function updateAppConfig(patch: { [K in AppConfigKey]?: AppConfigValues[K] | null }): Promise<void> {
+  const vaultId = activeVaultId
+  if (vaultId === null || apiClient === null) throw new Error('Kein Vault aktiv')
+
+  const before = fileFields
+  const optimistic = { ...fileFields }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete optimistic[key]
+    else if (value !== undefined) optimistic[key] = value
+  }
+  const mine = ++generation
+  apply(optimistic)
+
+  try {
+    const saved = await apiClient.patchAppConfig(vaultId, patch)
+    if (activeVaultId === vaultId && mine === generation) apply(saved)
+  } catch (error) {
+    if (activeVaultId === vaultId && mine === generation) apply(before)
+    throw error
+  }
+}
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+/** Connects the store to the API client. Called on login / app mount. */
+export function initialize(client: IApiClient): void {
+  apiClient = client
+}
+
+/** Re-reads the file of the active vault. A failed read keeps what is shown (unknown, not "gone"). */
+export async function refreshAppConfig(vaultId: string): Promise<void> {
+  if (apiClient === null || vaultId !== activeVaultId) return
+  const mine = ++generation
+  try {
+    const fields = await apiClient.getAppConfig(vaultId)
+    if (activeVaultId === vaultId && mine === generation) apply(fields)
+  } catch {
+    // Keep the current values; the next change event or vault switch retries.
+  }
+}
+
+/** Switches to another vault: defaults at once, then the vault's file. */
+export async function setActiveVault(vaultId: string | null): Promise<void> {
+  if (vaultId === activeVaultId) return
+  activeVaultId = vaultId
+  generation++
+  apply({})
+  if (vaultId !== null) await refreshAppConfig(vaultId)
+}
+
+/** Disconnects on logout. */
+export function disconnect(): void {
+  apiClient = null
+  activeVaultId = null
+  generation++
+  apply({})
+}
+
+/**
+ * Resets all module state. Test helper.
+ * @internal
+ */
+export function _reset(): void {
+  disconnect()
+}

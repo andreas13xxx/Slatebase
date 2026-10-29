@@ -565,9 +565,6 @@ export type UserUiSettingsPatch = {
  * through context menus and the command palette, not the settings panel.
  */
 export interface UserVaultSettings {
-  lineNumbers: boolean
-  readableLineLength: boolean
-  spellcheck: boolean
   /** Dictionary the spellchecker loads (see `editor/spellcheck/protocol.ts`). */
   spellcheckLanguage: string
   /** Dictation language for voice transcription: a Whisper code or 'auto'. */
@@ -615,8 +612,6 @@ export interface VaultConfig {
   templatesDirectory: string
   dailyNotesDirectory: string
   dailyNoteTemplateName: string
-  /** Directory for new attachments. Empty = same folder as the note being edited. */
-  attachmentsDirectory: string
   /** Directory for new unique notes (timestamp-prefixed). Empty = vault root. */
   uniqueNoteDirectory?: string
 }
@@ -762,6 +757,12 @@ export interface IApiClient {
   loadSettings(vaultId: string, pluginId: string): Promise<unknown | null>
   /** Save a plugin's settings. */
   saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void>
+
+  // --- Vault app.json (Obsidian's main vault settings) ---
+  /** All fields of the vault's `.obsidian/app.json` (an empty object if the file does not exist). */
+  getAppConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Change known keys of `.obsidian/app.json`; `null` removes a key. Needs write access. Returns the file's fields afterwards. */
+  patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
 
   // --- Vault Keychain ---
   /** List the keychain entry IDs of a vault (NOT the values). */
@@ -1442,6 +1443,18 @@ export class ApiClient implements IApiClient {
   /** Save a plugin's settings. */
   async saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void> {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, data)
+  }
+
+  // --- Vault app.json ---
+
+  async getAppConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/app-config`)
+    return result.config
+  }
+
+  async patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/app-config`, patch)
+    return result.config
   }
 
   // --- Vault Keychain ---

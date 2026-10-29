@@ -181,33 +181,32 @@ describe('PreferencesStore — UI and per-vault settings', () => {
   describe('per-vault settings', () => {
     it('returns defaults for a vault the user has never configured', async () => {
       const settings = await store.getVaultSettings('user-1', 'vault-1')
-      expect(settings.lineNumbers).toBe(false)
-      expect(settings.readableLineLength).toBe(true)
+      expect(settings.saveAudioAttachment).toBe(false)
       expect(settings.zoom).toBe(1)
     })
 
     it('keeps settings separate per vault for the same user', async () => {
-      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true, zoom: 1.5 })
-      await store.saveVaultSettings('user-1', 'vault-2', { lineNumbers: false })
+      await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true, zoom: 1.5 })
+      await store.saveVaultSettings('user-1', 'vault-2', { saveAudioAttachment: false })
 
-      expect((await store.getVaultSettings('user-1', 'vault-1')).lineNumbers).toBe(true)
+      expect((await store.getVaultSettings('user-1', 'vault-1')).saveAudioAttachment).toBe(true)
       expect((await store.getVaultSettings('user-1', 'vault-1')).zoom).toBe(1.5)
-      expect((await store.getVaultSettings('user-1', 'vault-2')).lineNumbers).toBe(false)
+      expect((await store.getVaultSettings('user-1', 'vault-2')).saveAudioAttachment).toBe(false)
       expect((await store.getVaultSettings('user-1', 'vault-2')).zoom).toBe(1)
     })
 
     it('keeps the same vault separate per user', async () => {
-      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
-      expect((await store.getVaultSettings('user-2', 'vault-1')).lineNumbers).toBe(false)
+      await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true })
+      expect((await store.getVaultSettings('user-2', 'vault-1')).saveAudioAttachment).toBe(false)
     })
 
     it('merges a partial patch without clearing untouched fields', async () => {
       await store.saveVaultSettings('user-1', 'vault-1', { zoom: 1.25 })
-      await store.saveVaultSettings('user-1', 'vault-1', { spellcheck: false })
+      await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true })
 
       const settings = await store.getVaultSettings('user-1', 'vault-1')
       expect(settings.zoom).toBe(1.25)
-      expect(settings.spellcheck).toBe(false)
+      expect(settings.saveAudioAttachment).toBe(true)
     })
 
     it('stores opaque client-owned blobs verbatim', async () => {
@@ -217,27 +216,27 @@ describe('PreferencesStore — UI and per-vault settings', () => {
     })
 
     it('removes a vault entry for the named users when the vault is deleted', async () => {
-      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
-      await store.saveVaultSettings('user-2', 'vault-1', { lineNumbers: true })
+      await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true })
+      await store.saveVaultSettings('user-2', 'vault-1', { saveAudioAttachment: true })
 
       await store.deleteVaultSettings('vault-1', ['user-1', 'user-2'])
 
-      expect((await store.getVaultSettings('user-1', 'vault-1')).lineNumbers).toBe(false)
-      expect((await store.getVaultSettings('user-2', 'vault-1')).lineNumbers).toBe(false)
+      expect((await store.getVaultSettings('user-1', 'vault-1')).saveAudioAttachment).toBe(false)
+      expect((await store.getVaultSettings('user-2', 'vault-1')).saveAudioAttachment).toBe(false)
     })
 
     it('leaves other vaults untouched when one is deleted', async () => {
-      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
-      await store.saveVaultSettings('user-1', 'vault-2', { lineNumbers: true })
+      await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true })
+      await store.saveVaultSettings('user-1', 'vault-2', { saveAudioAttachment: true })
 
       await store.deleteVaultSettings('vault-1', ['user-1'])
 
-      expect((await store.getVaultSettings('user-1', 'vault-2')).lineNumbers).toBe(true)
+      expect((await store.getVaultSettings('user-1', 'vault-2')).saveAudioAttachment).toBe(true)
     })
 
     it('does not disturb the other preference buckets', async () => {
       await store.saveKeybindings('user-1', [{ commandId: 'a', shortcut: 'Ctrl+A' }])
-      await store.saveVaultSettings('user-1', 'vault-1', { lineNumbers: true })
+      await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true })
       await store.saveUiSettings('user-1', { statusBarVisible: false })
 
       expect(await store.getKeybindings('user-1')).toEqual([{ commandId: 'a', shortcut: 'Ctrl+A' }])

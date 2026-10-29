@@ -38,7 +38,7 @@ vi.mock('./api', () => {
     loadFeatures = mockLoadFeatures
     getCsrfToken = vi.fn().mockReturnValue(null)
     getVersion = vi.fn().mockResolvedValue({ version: '1.0.0' })
-    getVaultConfig = vi.fn().mockResolvedValue({ templatesDirectory: '', dailyNotesDirectory: '', dailyNoteTemplateName: '', attachmentsDirectory: '' })
+    getVaultConfig = vi.fn().mockResolvedValue({ templatesDirectory: '', dailyNotesDirectory: '', dailyNoteTemplateName: '' })
     getSseTicket = vi.fn().mockResolvedValue({ ticket: 'mock-ticket' })
     probeSession = vi.fn().mockResolvedValue('alive')
   }

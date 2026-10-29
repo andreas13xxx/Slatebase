@@ -53,11 +53,11 @@ describe('vaultSettingsStore', () => {
       initialize(client)
 
       await setActiveVault('vault-1')
-      updateVaultSettings({ lineNumbers: true })
-      expect(getVaultSettings().lineNumbers).toBe(true)
+      updateVaultSettings({ saveAudioAttachment: true })
+      expect(getVaultSettings().saveAudioAttachment).toBe(true)
 
       await setActiveVault('vault-2')
-      expect(getVaultSettings().lineNumbers).toBe(false)
+      expect(getVaultSettings().saveAudioAttachment).toBe(false)
     })
 
     it('loads the server copy when switching to a vault', async () => {
@@ -70,15 +70,15 @@ describe('vaultSettingsStore', () => {
     })
 
     it('ignores writes while no vault is active', () => {
-      updateVaultSettings({ lineNumbers: true })
-      expect(getVaultSettings().lineNumbers).toBe(false)
+      updateVaultSettings({ saveAudioAttachment: true })
+      expect(getVaultSettings().saveAudioAttachment).toBe(false)
     })
 
     it('falls back to defaults when the vault is deselected', async () => {
-      const client = createMockApiClient({ 'vault-1': { lineNumbers: true } })
+      const client = createMockApiClient({ 'vault-1': { saveAudioAttachment: true } })
       initialize(client)
       await setActiveVault('vault-1')
-      expect(getVaultSettings().lineNumbers).toBe(true)
+      expect(getVaultSettings().saveAudioAttachment).toBe(true)
 
       await setActiveVault(null)
 
@@ -94,13 +94,13 @@ describe('vaultSettingsStore', () => {
 
       vi.useFakeTimers()
       try {
-        updateVaultSettings({ lineNumbers: true })
+        updateVaultSettings({ saveAudioAttachment: true })
         await vi.advanceTimersByTimeAsync(800)
       } finally {
         vi.useRealTimers()
       }
 
-      expect(client.saveVaultSettings).toHaveBeenCalledWith('vault-1', { lineNumbers: true })
+      expect(client.saveVaultSettings).toHaveBeenCalledWith('vault-1', { saveAudioAttachment: true })
     })
 
     it('flushes a change made just before switching vaults', async () => {
@@ -110,7 +110,7 @@ describe('vaultSettingsStore', () => {
 
       vi.useFakeTimers()
       try {
-        updateVaultSettings({ lineNumbers: true })
+        updateVaultSettings({ saveAudioAttachment: true })
         // Switch away before the debounce elapses — the queued patch belongs to
         // vault-1 and must still reach the server.
         const switched = setActiveVault('vault-2')
@@ -120,8 +120,8 @@ describe('vaultSettingsStore', () => {
         vi.useRealTimers()
       }
 
-      expect(client.saveVaultSettings).toHaveBeenCalledWith('vault-1', { lineNumbers: true })
-      expect(client._stored('vault-1')?.lineNumbers).toBe(true)
+      expect(client.saveVaultSettings).toHaveBeenCalledWith('vault-1', { saveAudioAttachment: true })
+      expect(client._stored('vault-1')?.saveAudioAttachment).toBe(true)
     })
 
     it('coalesces rapid changes into one request', async () => {
@@ -131,7 +131,7 @@ describe('vaultSettingsStore', () => {
 
       vi.useFakeTimers()
       try {
-        updateVaultSettings({ lineNumbers: true })
+        updateVaultSettings({ saveAudioAttachment: true })
         updateVaultSettings({ spellcheck: false })
         await vi.advanceTimersByTimeAsync(800)
       } finally {
@@ -140,7 +140,7 @@ describe('vaultSettingsStore', () => {
 
       expect(client.saveVaultSettings).toHaveBeenCalledTimes(1)
       expect(client.saveVaultSettings).toHaveBeenCalledWith('vault-1', {
-        lineNumbers: true,
+        saveAudioAttachment: true,
         spellcheck: false,
       })
     })
@@ -153,11 +153,11 @@ describe('vaultSettingsStore', () => {
       await setActiveVault('vault-1')
 
       client.getVaultSettings.mockResolvedValueOnce({
-        settings: { ...structuredClone(DEFAULT_VAULT_SETTINGS), lineNumbers: true },
+        settings: { ...structuredClone(DEFAULT_VAULT_SETTINGS), saveAudioAttachment: true },
       })
       await refreshFromServer('vault-1')
 
-      expect(getVaultSettings().lineNumbers).toBe(true)
+      expect(getVaultSettings().saveAudioAttachment).toBe(true)
     })
 
     it('ignores a refresh for a vault that is no longer active', async () => {

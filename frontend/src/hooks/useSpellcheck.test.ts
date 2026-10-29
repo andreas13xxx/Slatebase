@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useSpellcheck } from './useSpellcheck'
 import {
@@ -6,13 +6,32 @@ import {
   setActiveVault,
   updateVaultSettings,
 } from '../state/vaultSettingsStore'
+import {
+  _reset as resetAppConfig,
+  initialize as initializeAppConfig,
+  setActiveVault as setActiveAppConfigVault,
+} from '../state/vaultAppConfigStore'
+import type { IApiClient } from '../api'
 
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 describe('useSpellcheck', () => {
+  /** Whether it runs is a vault setting (`spellcheck` in app.json); the dictionary stays personal. */
+  let appJson: Record<string, unknown>
+
   beforeEach(async () => {
     resetVaultSettings()
+    resetAppConfig()
+    appJson = {}
+    initializeAppConfig({
+      getAppConfig: vi.fn(async () => ({ ...appJson })),
+      patchAppConfig: vi.fn(async (_vaultId: string, patch: Record<string, unknown>) => {
+        appJson = { ...appJson, ...patch }
+        return { ...appJson }
+      }),
+    } as unknown as IApiClient)
     await setActiveVault('vault-1')
+    await setActiveAppConfigVault('vault-1')
   })
 
   describe('initial state', () => {
@@ -21,23 +40,28 @@ describe('useSpellcheck', () => {
       expect(result.current.enabled).toBe(true)
     })
 
-    it('reads the active vault’s stored value', () => {
-      updateVaultSettings({ spellcheck: false })
+    it('reads spellcheck from the vault’s app.json', async () => {
+      appJson = { spellcheck: false }
+      await setActiveAppConfigVault(null)
+      await setActiveAppConfigVault('vault-1')
       const { result } = renderHook(() => useSpellcheck())
       expect(result.current.enabled).toBe(false)
     })
   })
 
   describe('toggle', () => {
-    it('toggles from enabled to disabled', () => {
+    it('toggles from enabled to disabled and writes app.json', async () => {
       const { result } = renderHook(() => useSpellcheck())
 
       act(() => { result.current.toggle() })
       expect(result.current.enabled).toBe(false)
+      await waitFor(() => expect(appJson).toEqual({ spellcheck: false }))
     })
 
-    it('toggles from disabled to enabled', () => {
-      updateVaultSettings({ spellcheck: false })
+    it('toggles from disabled to enabled', async () => {
+      appJson = { spellcheck: false }
+      await setActiveAppConfigVault(null)
+      await setActiveAppConfigVault('vault-1')
       const { result } = renderHook(() => useSpellcheck())
 
       act(() => { result.current.toggle() })

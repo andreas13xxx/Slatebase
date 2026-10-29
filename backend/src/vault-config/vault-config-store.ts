@@ -29,9 +29,6 @@ function sanitizeConfig(raw: unknown): Partial<VaultConfig> {
   if (typeof parsed.dailyNoteTemplateName === 'string') {
     result.dailyNoteTemplateName = parsed.dailyNoteTemplateName
   }
-  if (typeof parsed.attachmentsDirectory === 'string') {
-    result.attachmentsDirectory = parsed.attachmentsDirectory
-  }
   if (typeof parsed.activityRetentionDays === 'number' && Number.isInteger(parsed.activityRetentionDays)) {
     result.activityRetentionDays = parsed.activityRetentionDays
   }
@@ -67,7 +64,6 @@ export class VaultConfigStore implements IVaultConfigService {
       templatesDirectory: stored.templatesDirectory ?? this.globalTemplatesDirectory,
       dailyNotesDirectory: stored.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: stored.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
-      attachmentsDirectory: stored.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
       uniqueNoteDirectory: stored.uniqueNoteDirectory ?? DEFAULT_VAULT_CONFIG.uniqueNoteDirectory,
       activityRetentionDays: stored.activityRetentionDays ?? DEFAULT_VAULT_CONFIG.activityRetentionDays,
     }
@@ -78,7 +74,6 @@ export class VaultConfigStore implements IVaultConfigService {
       templatesDirectory: config.templatesDirectory ?? current.templatesDirectory ?? this.globalTemplatesDirectory,
       dailyNotesDirectory: config.dailyNotesDirectory ?? current.dailyNotesDirectory ?? DEFAULT_VAULT_CONFIG.dailyNotesDirectory,
       dailyNoteTemplateName: config.dailyNoteTemplateName ?? current.dailyNoteTemplateName ?? DEFAULT_VAULT_CONFIG.dailyNoteTemplateName,
-      attachmentsDirectory: config.attachmentsDirectory ?? current.attachmentsDirectory ?? DEFAULT_VAULT_CONFIG.attachmentsDirectory,
       activityRetentionDays: config.activityRetentionDays ?? current.activityRetentionDays ?? DEFAULT_VAULT_CONFIG.activityRetentionDays,
     }))
     return merged as VaultConfig

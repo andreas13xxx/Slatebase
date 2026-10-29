@@ -11,6 +11,8 @@
  * Text is inserted into the active CM6 editor via `view.dispatch` — the same
  * mechanism the `editor:*` commands use, so undo history stays correct.
  */
+import { resolveAttachmentTargetDir } from '../../utils/internalLink'
+import { getAppConfigValue } from '../../state/vaultAppConfigStore'
 import type { IApiClient } from '../../api'
 import { getActiveEditorView } from '../plugin-extensions'
 import { DictationRecorder, DictationRecorderError, type IDictationRecorder } from './dictation-recorder'
@@ -137,12 +139,8 @@ export class DictationController {
 
   /** Uploads the recording to the vault's attachments dir; returns an embed string. */
   private async saveAttachment(ctx: DictationContext, blob: Blob, contentType: string): Promise<string | null> {
-    let attachmentsDir: string
-    try {
-      attachmentsDir = (await ctx.apiClient.getVaultConfig(ctx.vaultId)).attachmentsDirectory
-    } catch {
-      attachmentsDir = ''
-    }
+    // No note is involved here, so a path relative to the note resolves against the vault root.
+    const attachmentsDir = resolveAttachmentTargetDir(getAppConfigValue('attachmentFolderPath'), '')
     const name = dictationAttachmentName(new Date(), contentType)
     const file = new File([blob], name, { type: contentType })
     const { uploaded } = await ctx.apiClient.uploadFiles(ctx.vaultId, [file], attachmentsDir)

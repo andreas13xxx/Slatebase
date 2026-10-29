@@ -21,12 +21,22 @@ export function buildInternalLinkText(fileName: string): string {
  * Resolves the vault-relative directory new attachments (drag-drop, paste,
  * "Insert attachment") should upload into.
  *
- * `configuredDir` is the vault's `attachmentsDirectory` setting: when set, every
- * attachment goes there regardless of which note is open. Left empty, it falls
- * back to `notePath`'s own folder — Slatebase's original, still-default behavior.
+ * `attachmentFolderPath` is the vault's setting from `.obsidian/app.json`, written the way
+ * Obsidian writes it:
+ *   - `"/"`            the vault root
+ *   - `""` or `"./"`   the folder of the open note (the default)
+ *   - `"./name"`       the subfolder `name` of the open note's folder
+ *   - anything else    that folder, relative to the vault root
  */
-export function resolveAttachmentTargetDir(configuredDir: string, notePath: string): string {
-  const trimmed = configuredDir.trim()
-  if (trimmed) return trimmed
-  return notePath.includes('/') ? notePath.slice(0, notePath.lastIndexOf('/')) : ''
+export function resolveAttachmentTargetDir(attachmentFolderPath: string, notePath: string): string {
+  const configured = attachmentFolderPath.trim()
+  const noteDir = notePath.includes('/') ? notePath.slice(0, notePath.lastIndexOf('/')) : ''
+  if (configured === '/') return ''
+  if (configured === '' || configured === './') return noteDir
+  if (configured.startsWith('./')) {
+    const sub = configured.slice(2).replace(/^\/+|\/+$/g, '')
+    if (sub === '') return noteDir
+    return noteDir ? `${noteDir}/${sub}` : sub
+  }
+  return configured.replace(/^\/+|\/+$/g, '')
 }

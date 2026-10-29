@@ -113,21 +113,19 @@ export const DEFAULT_UI_SETTINGS: UserUiSettings = {
 // ─── Per-Vault Settings ──────────────────────────────────────────────────────
 
 /**
- * Settings scoped to one user *and* one vault. Reading preferences like line
- * numbers or a graph layout belong to the person, not to everyone who can open
- * the vault — but they are worth remembering per vault, because a code-heavy
- * vault and a prose vault want different answers.
+ * Settings scoped to one user *and* one vault. Personal preferences like the spellcheck
+ * dictionary or a panel layout belong to the person, not to everyone who can open the
+ * vault — but they are worth remembering per vault, because a German notebook and an
+ * English one want different answers.
+ *
+ * Settings Obsidian keeps in the vault (`app.json`: line numbers, readable line length,
+ * whether spellcheck runs) are not here: where a vault setting exists there is no per-user
+ * copy of it.
  *
  * Not exposed in the settings panel by design: these are reached through the
  * editor context menu, the toolbar context menu and the command palette.
  */
 export interface UserVaultSettings {
-  /** Editor gutter line numbers. */
-  lineNumbers: boolean
-  /** Constrain the editor to a readable measure. */
-  readableLineLength: boolean
-  /** Spellchecking in the editor. */
-  spellcheck: boolean
   /**
    * Dictionary the spellchecker loads. The client owns the language codes
    * (see `editor/spellcheck/protocol.ts`), so this is stored as a bounded
@@ -202,9 +200,6 @@ export type UserVaultSettingsPatch = {
 
 /** Defaults applied when a user has never changed a setting in a vault. */
 export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
-  lineNumbers: false,
-  readableLineLength: true,
-  spellcheck: true,
   spellcheckLanguage: 'de',
   transcriptionLanguage: 'auto',
   saveAudioAttachment: false,

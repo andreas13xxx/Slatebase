@@ -8,6 +8,7 @@ import {
 import type { IDictationRecorder, DictationRecorderResult } from './dictation-recorder'
 import { DictationRecorderError } from './dictation-recorder'
 import type { IApiClient } from '../../api'
+import { _reset as resetAppConfig, initialize as initializeAppConfig, setActiveVault } from '../../state/vaultAppConfigStore'
 
 // Mock the active editor view. Each test sets what getActiveEditorView returns.
 const dispatch = vi.fn()
@@ -40,7 +41,7 @@ function makeRecorder(result: DictationRecorderResult = { blob: new Blob(['x'], 
 function makeApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
   return {
     transcribe: vi.fn().mockResolvedValue({ text: 'transcribed' }),
-    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'T', dailyNotesDirectory: '', dailyNoteTemplateName: '', attachmentsDirectory: 'Attachments' }),
+    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'T', dailyNotesDirectory: '', dailyNoteTemplateName: '' }),
     uploadFiles: vi.fn().mockResolvedValue({ uploaded: [{ fileName: 'dictation-x.webm', path: 'Attachments/dictation-x.webm' }] }),
     ...overrides,
   } as unknown as IApiClient
@@ -120,6 +121,10 @@ describe('DictationController', () => {
   })
 
   it('saves the audio attachment and appends an embed when saveAudio is on', async () => {
+    // The attachment folder comes from the vault's app.json (`attachmentFolderPath`).
+    resetAppConfig()
+    initializeAppConfig({ getAppConfig: vi.fn().mockResolvedValue({ attachmentFolderPath: 'Attachments' }) } as unknown as IApiClient)
+    await setActiveVault('vault-1')
     const recorder = makeRecorder()
     const api = makeApiClient({
       transcribe: vi.fn().mockResolvedValue({ text: 'note' }),

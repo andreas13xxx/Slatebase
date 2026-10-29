@@ -24,6 +24,7 @@ import { ThemesSection } from './ThemesSection'
 import { GitSyncSection } from './GitSyncSection'
 import { MailImportSection } from './MailImportSection'
 import { KeychainSection } from './KeychainSection'
+import { EditorFilesSection } from './EditorFilesSection'
 import { PublicSharesSection } from '../../public-share/PublicSharesSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
@@ -132,6 +133,8 @@ function renderSection(
         return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
       }
       return <VaultConfigSection apiClient={apiClient} vaultId={selectedVaultId} />
+    case 'editor-files':
+      return <EditorFilesSection />
     case 'keychain':
       return <KeychainSection />
     case 'themes':

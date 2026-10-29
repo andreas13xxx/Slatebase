@@ -33,7 +33,6 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   const [templatesDir, setTemplatesDir] = useState('')
   const [dailyNotesDir, setDailyNotesDir] = useState('')
   const [dailyNoteTemplateName, setDailyNoteTemplateName] = useState('')
-  const [attachmentsDir, setAttachmentsDir] = useState('')
   const [uniqueNoteDir, setUniqueNoteDir] = useState('')
 
   // "Aktive Datei im Explorer verfolgen" used to live here. It is an account
@@ -52,7 +51,6 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setTemplatesDir(cfg.templatesDirectory)
         setDailyNotesDir(cfg.dailyNotesDirectory)
         setDailyNoteTemplateName(cfg.dailyNoteTemplateName)
-        setAttachmentsDir(cfg.attachmentsDirectory)
         setUniqueNoteDir(cfg.uniqueNoteDirectory ?? '')
         setError(null)
       } catch (err: unknown) {
@@ -78,14 +76,12 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         templatesDirectory: templatesDir.trim(),
         dailyNotesDirectory: dailyNotesDir.trim(),
         dailyNoteTemplateName: dailyNoteTemplateName.trim(),
-        attachmentsDirectory: attachmentsDir.trim(),
         uniqueNoteDirectory: uniqueNoteDir.trim(),
       })
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
       setDailyNoteTemplateName(updated.dailyNoteTemplateName)
-      setAttachmentsDir(updated.attachmentsDirectory)
       setUniqueNoteDir(updated.uniqueNoteDirectory ?? '')
       showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
@@ -97,13 +93,12 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     } finally {
       setSaving(false)
     }
-  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName, attachmentsDir, uniqueNoteDir])
+  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName, uniqueNoteDir])
 
   const hasChanges = config !== null && (
     templatesDir.trim() !== config.templatesDirectory ||
     dailyNotesDir.trim() !== config.dailyNotesDirectory ||
     dailyNoteTemplateName.trim() !== config.dailyNoteTemplateName ||
-    attachmentsDir.trim() !== config.attachmentsDirectory ||
     uniqueNoteDir.trim() !== (config.uniqueNoteDirectory ?? '')
   )
 
@@ -166,24 +161,6 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
             value={dailyNoteTemplateName}
             onChange={(e) => setDailyNoteTemplateName(e.target.value)}
             placeholder="daily.md"
-            disabled={saving}
-          />
-        </div>
-
-        <div className="settings-field">
-          <label htmlFor="vault-attachments-dir" className="settings-field-label">
-            Anhänge-Verzeichnis
-          </label>
-          <p className="settings-field-hint">
-            Relativer Pfad im Vault, in den neue Anhänge (Drag &amp; Drop, Einfügen aus der Zwischenablage, „Anhang einfügen“) hochgeladen werden. Leer = gleicher Ordner wie die gerade geöffnete Notiz.
-          </p>
-          <input
-            id="vault-attachments-dir"
-            type="text"
-            className="settings-field-input"
-            value={attachmentsDir}
-            onChange={(e) => setAttachmentsDir(e.target.value)}
-            placeholder="(gleicher Ordner wie die Notiz)"
             disabled={saving}
           />
         </div>

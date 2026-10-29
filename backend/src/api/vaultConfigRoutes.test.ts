@@ -65,7 +65,7 @@ describe('Vault Config Routes', () => {
   describe('GET /vaults/:vaultId/config', () => {
     it('returns the vault config on success', async () => {
       const vaultConfigService = createMockVaultConfigService({
-        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md', attachmentsDirectory: 'Attachments', uniqueNoteDirectory: 'Zettel', activityRetentionDays: 90 }),
+        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md', uniqueNoteDirectory: 'Zettel', activityRetentionDays: 90 }),
       })
       const app = createTestApp({ vaultConfigService })
 
@@ -116,7 +116,7 @@ describe('Vault Config Routes', () => {
       expect(res.status).toBe(400)
     })
 
-    it('persists attachmentsDirectory', async () => {
+    it('no longer takes attachmentsDirectory: it moved to attachmentFolderPath in the vault\'s app.json', async () => {
       let savedPartial: Partial<VaultConfig> | undefined
       const vaultConfigService = createMockVaultConfigService({
         saveConfig: async (_vaultId, partial) => {
@@ -129,25 +129,11 @@ describe('Vault Config Routes', () => {
       const res = await app.request('/api/v1/vaults/vault-1/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachmentsDirectory: 'Attachments' }),
+        body: JSON.stringify({ attachmentsDirectory: 'Attachments', dailyNotesDirectory: 'Journal' }),
       })
 
       expect(res.status).toBe(200)
-      const body = await res.json() as VaultConfig
-      expect(body.attachmentsDirectory).toBe('Attachments')
-      expect(savedPartial?.attachmentsDirectory).toBe('Attachments')
-    })
-
-    it('rejects an attachments directory with parent traversal', async () => {
-      const app = createTestApp()
-
-      const res = await app.request('/api/v1/vaults/vault-1/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachmentsDirectory: '../outside' }),
-      })
-
-      expect(res.status).toBe(400)
+      expect(savedPartial).toEqual({ dailyNotesDirectory: 'Journal' })
     })
   })
 })

@@ -31,12 +31,12 @@ Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Diff), dann Comm
 - [ ] 4. Checkpoint: Keychain komplett, danach ersten Commit-Block prüfen
 
 - [ ] 5. app.json
-  - [ ] 5.1 `shared/app-config-file.ts` und Route `app-config`, Tests
-  - [ ] 5.2 `VaultConfigContext`; feste Werte im Code per Grep finden und umstellen
-  - [ ] 5.3 `vault.getConfig()` / `setConfig()` im Shim
-  - [ ] 5.4 UI-Sektion „Editor und Dateien"
-  - [ ] 5.5 Einmalige Migration `.slatebase/config.json` → `app.json` (`attachmentFolderPath`), Anhangsordner aus `app.json` lesen; Vorlagen und Tagesnotizen folgen in 6.3, sobald die Formate von `templates.json` und `daily-notes.json` geprüft sind
-  - [ ] 5.6 `lineNumbers`, `readableLineLength`, `spellcheck` aus den User-Preferences entfernen, Hooks lesen `app.json`
+  - [x] 5.1 `shared/obsidian-config-file.ts`, `obsidian-config/app-config.ts` und Route `app-config`, Tests
+  - [x] 5.2 `vaultAppConfigStore` + `AppConfigLifecycle`; Anhangsordner, Zeilennummern, Zeilenlänge, Rechtschreibprüfung lesen daraus. Linkformat, neue-Notiz-Ort und Ansichtsmodus setzt der Editor nicht um (eigene Spec)
+  - [x] 5.3 `vault.getConfig()` liest app.json (`setConfig` gibt es im Shim nicht und ist in Obsidian nicht öffentlich)
+  - [x] 5.4 UI-Sektion „Editor und Dateien" (Anhänge, Zeilenlänge, Zeilennummern, Rechtschreibprüfung)
+  - [x] 5.5 Einmalige Migration `.slatebase/config.json` → `app.json` (`attachmentFolderPath`), Anhangsordner aus `app.json` lesen; Vorlagen und Tagesnotizen folgen in 6.3, sobald die Formate von `templates.json` und `daily-notes.json` geprüft sind
+  - [x] 5.6 `lineNumbers`, `readableLineLength`, `spellcheck` aus den User-Preferences entfernen, Hooks lesen `app.json`
   - _Requirements: 5_
 
 - [ ] 6. Weitere Vault_Files

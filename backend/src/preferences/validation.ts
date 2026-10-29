@@ -88,9 +88,6 @@ const opaqueBlobSchema = z.record(z.string().max(128), z.unknown()).nullable()
 
 /** Per-user, per-vault settings. Partial for the same reason as UI settings. */
 export const saveVaultSettingsSchema = z.object({
-  lineNumbers: z.boolean().optional(),
-  readableLineLength: z.boolean().optional(),
-  spellcheck: z.boolean().optional(),
   spellcheckLanguage: z.string().max(16).optional(),
   transcriptionLanguage: z.string().max(16).optional(),
   saveAudioAttachment: z.boolean().optional(),

@@ -6,6 +6,7 @@
  * Validates paths to reject traversal attacks (../, null bytes, absolute paths).
  */
 
+import { getAppConfigRaw, getAppConfigValue } from '../../../state/vaultAppConfigStore';
 import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
 import type { DataWriteOptions, EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
@@ -744,39 +745,17 @@ export class VaultShim implements IVaultShim {
   }
 
   /**
-   * Get an Obsidian vault configuration value.
-   * Returns sensible defaults for known config keys since Slatebase
-   * does not have an equivalent per-vault config system for these values.
+   * Get an Obsidian vault configuration value, read from the vault's `.obsidian/app.json`.
+   * A key the file does not contain gets Slatebase's default (see DEFAULT_APP_CONFIG); a key
+   * that is neither in the file nor has a default is `null`.
    *
-   * Known keys:
-   * - "defaultViewMode": "source" | "preview" (default: "source")
-   * - "showLineNumber": boolean (default: false)
-   * - "spellcheck": boolean (default: false)
-   * - "readableLineLength": boolean (default: true)
-   * - "updateInternalLinks": boolean (default: true) — the setting this key
-   *   reflects (rewrite wikilinks vault-wide on rename/move) always runs
-   *   server-side in Slatebase, unconditionally; there is no way to actually
-   *   turn it off, so the queryable value is fixed at true rather than backed
-   *   by a real toggle. See FileManager.renameFile().
+   * One value is not backed by the file: "updateInternalLinks" is fixed at true, because the
+   * setting it reflects (rewrite wikilinks vault-wide on rename/move) always runs server-side
+   * and cannot be turned off. See FileManager.renameFile().
    */
   getConfig(key: string): unknown {
-    const defaults: Record<string, unknown> = {
-      defaultViewMode: 'source',
-      showLineNumber: false,
-      spellcheck: false,
-      readableLineLength: true,
-      livePreview: true,
-      strictLineBreaks: false,
-      showFrontmatter: false,
-      foldHeading: true,
-      foldIndent: true,
-      newFileLocation: 'root',
-      newLinkFormat: 'shortest',
-      useMarkdownLinks: false,
-      attachmentFolderPath: './',
-      updateInternalLinks: true,
-    };
-    return defaults[key] ?? null;
+    if (key === 'updateInternalLinks') return true;
+    return getAppConfigRaw(key);
   }
 
   /**
@@ -826,8 +805,7 @@ export class VaultShim implements IVaultShim {
    * Get an available (non-conflicting) path for saving an attachment.
    * Returns a path that doesn't conflict with existing files.
    *
-   * Respects the vault's configured attachments directory (Einstellungen →
-   * Vault-Konfiguration), same as Slatebase's own drag-drop/paste/"Anhang
+   * Respects the vault's `attachmentFolderPath` (`.obsidian/app.json`), same as Slatebase's own drag-drop/paste/"Anhang
    * einfügen" upload paths — so a plugin computing where to save e.g. a pasted
    * image (via this method) agrees with where the native UI would put it. Async
    * to match real Obsidian's `Vault.getAvailablePathForAttachments`, which is
@@ -838,13 +816,7 @@ export class VaultShim implements IVaultShim {
    * @returns A vault-relative path for the attachment
    */
   async getAvailablePathForAttachments(filename: string, sourcePath?: string): Promise<string> {
-    let configuredDir = '';
-    try {
-      configuredDir = (await this.apiClient.getVaultConfig(this.vaultId)).attachmentsDirectory;
-    } catch {
-      // Vault config unavailable — fall back to the source file's own folder.
-    }
-    const dir = resolveAttachmentTargetDir(configuredDir, sourcePath ?? '');
+    const dir = resolveAttachmentTargetDir(getAppConfigValue('attachmentFolderPath'), sourcePath ?? '');
     const basePath = dir ? `${dir}/${filename}` : filename;
 
     // Check if file exists and append number if needed

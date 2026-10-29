@@ -101,7 +101,7 @@ import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVau
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
 import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService } from './obsidian-config/index.js'
+import { AppConfigService, migrateVaultConfigToObsidianFiles } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -754,7 +754,8 @@ const pluginRoutes = createPluginRoutes({
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
-app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService: new AppConfigService(), accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const appConfigService = new AppConfigService()
+app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
 const snippetRoutes = createSnippetRoutes({
@@ -1142,6 +1143,8 @@ await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snip
 // Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
 // Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
+// Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
+await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, logger })
 await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.

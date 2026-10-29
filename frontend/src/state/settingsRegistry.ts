@@ -48,6 +48,7 @@ export const SETTINGS_SECTIONS: ISettingsSectionDef[] = [
   // Vault
   { id: 'vault-config', labelKey: 'settings.sections.vaultConfig', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'plugins', labelKey: 'settings.sections.plugins', category: 'vault', requiresAdmin: false, requiresVault: true, feature: 'obsidian-plugin-compat' },
+  { id: 'editor-files', labelKey: 'settings.sections.editorFiles', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'keychain', labelKey: 'settings.sections.keychain', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'themes', labelKey: 'settings.sections.themes', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'css-snippets', labelKey: 'settings.sections.cssSnippets', category: 'vault', requiresAdmin: false, requiresVault: true },

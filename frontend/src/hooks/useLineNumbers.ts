@@ -1,15 +1,15 @@
 /**
- * useLineNumbers — editor gutter line numbers, stored per user and per vault.
+ * useLineNumbers — editor gutter line numbers.
  *
- * Was a device-local `localStorage` flag shared across every vault. It now
- * lives in `vaultSettingsStore`, so the setting follows the account and each
- * vault remembers its own answer — a code-heavy vault usually wants line
- * numbers where a prose vault does not.
+ * A vault setting: it lives in the vault's `.obsidian/app.json` (`showLineNumber`), the same
+ * file Obsidian reads, so it is the same for everyone who opens the vault and changing it needs
+ * write access. It used to be stored per user and vault.
  *
  * Reached through the editor context menu, not the settings panel.
  */
 import { useCallback } from 'react'
-import { useVaultSetting, updateVaultSettings, getVaultSettings } from '../state/vaultSettingsStore'
+import { toggleAppConfigFlag } from './appConfigToggle'
+import { useAppConfigValue } from '../state/vaultAppConfigStore'
 
 /** Return value of the useLineNumbers hook. */
 export interface UseLineNumbersReturn {
@@ -21,12 +21,12 @@ export interface UseLineNumbersReturn {
 
 /** Toggles line numbers from outside React (command palette, context menu). */
 export function toggleLineNumbers(): void {
-  updateVaultSettings({ lineNumbers: !getVaultSettings().lineNumbers })
+  toggleAppConfigFlag('showLineNumber')
 }
 
 /** Line numbers state for the active vault. */
 export function useLineNumbers(): UseLineNumbersReturn {
-  const enabled = useVaultSetting('lineNumbers')
+  const enabled = useAppConfigValue('showLineNumber')
   const toggle = useCallback(() => { toggleLineNumbers() }, [])
   return { enabled, toggle }
 }
