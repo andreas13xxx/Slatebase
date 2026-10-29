@@ -79,7 +79,7 @@ Quelle: eine echte `app.json` aus einem öffentlichen Repo (fengstats/obsidian-c
 **Folge für die Spec:**
 
 - Requirement 5.3 gilt nur für die wirklich festen Werte plus `attachmentFolderPath`.
-- `.slatebase/config.json` wird nicht entfernt. Offen: Quelle der Wahrheit pro Wert (Obsidian-Datei oder Slatebase-Config), Umgang mit Konflikten. Entscheidung steht aus.
+- `.slatebase/config.json` wird nicht entfernt, behält aber nur Slatebase-eigene Werte. Entschieden (2026-10-29): Obsidian-Dateien sind die Quelle der Wahrheit; `config.json` wird einmalig migriert (Requirement 5.7 bis 5.9). Die Migration schreibt `templates.json`, `daily-notes.json` und `app.json` (`attachmentFolderPath`), ohne vorhandene Werte zu überschreiben.
 - `alwaysUpdateLinks` ist heute fest `true` und nicht abschaltbar (`FileManager.renameFile()`); ein Schalter bräuchte einen Eingriff im Backend.
 
 **Bestätigte `app.json`-Schlüssel (echte Datei):**

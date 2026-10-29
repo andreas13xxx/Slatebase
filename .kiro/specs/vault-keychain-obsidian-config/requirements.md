@@ -72,6 +72,10 @@ Zwei zusammenhängende Ziele:
 5. THE Plugin-Shim `vault.getConfig()` / `setConfig()` SHALL dieselben Werte liefern und schreiben.
 6. WHEN die Datei außerhalb geändert wird (Sync, Obsidian), THE App SHALL beim nächsten Laden den neuen Stand verwenden.
 
+7. THE Obsidian-Dateien (`app.json`, `templates.json`, `daily-notes.json`) SHALL die Quelle der Wahrheit für Werte sein, die Obsidian kennt; `.slatebase/config.json` behält nur Slatebase-eigene Werte (z. B. `uniqueNoteDirectory`).
+8. WHEN `.slatebase/config.json` Werte enthält, die Obsidian-Dateien abdecken, THE Migration SHALL sie einmalig in die Obsidian-Dateien übernehmen, ohne dort vorhandene Werte zu überschreiben, und die übernommenen Felder aus `config.json` entfernen.
+9. THE Migration SHALL idempotent sein und `config.json` erst nach erfolgreichem Schreiben der Obsidian-Dateien ändern.
+
 ### Requirement 6: Weitere Vault_Files auswerten
 
 #### Acceptance Criteria

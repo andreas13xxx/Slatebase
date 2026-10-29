@@ -35,6 +35,7 @@ Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Diff), dann Comm
   - [ ] 5.2 `VaultConfigContext`; feste Werte im Code per Grep finden und umstellen
   - [ ] 5.3 `vault.getConfig()` / `setConfig()` im Shim
   - [ ] 5.4 UI-Sektion „Editor und Dateien"
+  - [ ] 5.5 Einmalige Migration `.slatebase/config.json` → Obsidian-Dateien, `VaultConfigSection` auf die neue Quelle umstellen (benötigt die Formate von `templates.json` und `daily-notes.json` aus Task 0)
   - _Requirements: 5_
 
 - [ ] 6. Weitere Vault_Files
