@@ -351,6 +351,11 @@ export const en: TranslationShape = {
       versionsMaxPerFileLabel: 'Max versions per file',
       versionsMaxPerFileHint: '0 = no versioning, 1–100 = versions kept per file',
       versionsMaxPerFileError: 'Must be between 0 and 100.',
+      proxyTitle: 'Plugin proxy',
+      proxyHint: 'Obsidian plugins use requestUrl() for CORS-free requests. These are forwarded server-side through the proxy — only to the hosts allowed here. An empty list disables the proxy entirely. Applies immediately, no restart needed.',
+      proxyAllowedOriginsLabel: 'Allowed proxy targets (hosts)',
+      proxyAllowedOriginsHint: 'One host per line. Wildcard prefix "*." allowed (e.g. *.githubusercontent.com). No scheme, path, or port. Private/internal addresses stay blocked. GitHub hosts are set by default (plugin updates and language packs).',
+      proxyEnvPinned: 'Pinned by the SLATEBASE_PROXY_ALLOWED_ORIGINS environment variable — this field is therefore locked. Remove the variable to manage the proxy here.',
     },
     audit: {
       title: 'Audit log',

@@ -62,6 +62,7 @@ function createMockConfigService(overrides?: {
     getCleanupConfig: vi.fn().mockReturnValue({ intervalHours: overrides?.intervalHours ?? 24 }),
     getTemplatesConfig: vi.fn().mockReturnValue({ directory: 'Templates' }),
     getUploadConfig: vi.fn().mockReturnValue({}),
+    getProxyConfig: vi.fn().mockReturnValue({ allowedOrigins: ['api.github.com'] }),
     getWelcomeVaultConfig: vi.fn().mockReturnValue({ name: { de: 'Willkommen', en: 'Welcome' } }),
     getOverrides: vi.fn().mockReturnValue({}),
     updateOverrides: vi.fn().mockResolvedValue([]),

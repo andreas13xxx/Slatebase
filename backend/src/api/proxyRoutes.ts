@@ -50,8 +50,12 @@ interface ApiError {
 /** Dependencies for the proxy routes. */
 export interface ProxyRoutesDeps {
   logger: ILogger
-  /** Allowlist of URL patterns (from `SLATEBASE_PROXY_ALLOWED_ORIGINS`). Empty = proxy disabled. */
-  allowedOrigins: string[]
+  /**
+   * Returns the current allowlist of URL patterns. Read per request (not
+   * captured once at construction) so an admin's change via `PUT /admin/config`
+   * takes effect immediately, without a server restart. Empty = proxy disabled.
+   */
+  getAllowedOrigins: () => string[]
   /** Per-user rate limiter — shared instance so `destroy()` can be called during shutdown. */
   rateLimiter: SlidingWindowRateLimiter
 }
@@ -277,7 +281,7 @@ async function readLimitedBody(response: Response, maxBytes: number): Promise<Bu
  * Requires authentication middleware to be applied upstream.
  */
 export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
-  const { logger, allowedOrigins, rateLimiter } = deps
+  const { logger, getAllowedOrigins, rateLimiter } = deps
   const app = new Hono()
 
   /**
@@ -289,6 +293,9 @@ export function createProxyRoutes(deps: ProxyRoutesDeps): Hono {
    */
   app.post('/proxy', async (c: Context) => {
     const session = c.get('session') as SessionContext
+
+    // Read once per request so an admin's allowlist change applies without a restart.
+    const allowedOrigins = getAllowedOrigins()
 
     if (allowedOrigins.length === 0) {
       return c.json(

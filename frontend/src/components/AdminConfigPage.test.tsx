@@ -247,6 +247,9 @@ describe('AdminConfigPage', () => {
             maxImagePasteSize: 10485760,
           },
           mcp: { maxFileSize: 16777216, rateLimit: 60 },
+          // SAMPLE_CONFIG has no proxy section, so the form submits an empty
+          // allowlist (which keeps the proxy disabled).
+          proxy: { allowedOrigins: [] },
         }),
       }))
     })
@@ -296,5 +299,46 @@ describe('AdminConfigPage', () => {
     })
   })
 
+  it('shows the proxy allowlist from the loaded config, one host per line', async () => {
+    mockFetchWithVersion(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_CONFIG,
+          proxy: { allowedOrigins: ['api.github.com', '*.githubusercontent.com'] },
+        }),
+        { status: 200 },
+      ),
+    )
+    renderAdminConfigPage(createMockApiClient())
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Erlaubte Proxy-Ziele (Hosts)')).toBeInTheDocument()
+    })
+
+    const field = screen.getByLabelText('Erlaubte Proxy-Ziele (Hosts)') as HTMLTextAreaElement
+    expect(field.value).toBe('api.github.com\n*.githubusercontent.com')
+    expect(field.disabled).toBe(false)
+  })
+
+  it('locks the proxy field when the server reports it pinned by an env var', async () => {
+    mockFetchWithVersion(
+      new Response(JSON.stringify(SAMPLE_CONFIG), { status: 200 }),
+      new Response(JSON.stringify({ message: 'OK', shadowedByEnv: ['proxy'] }), { status: 200 }),
+    )
+    const user = userEvent.setup()
+    renderAdminConfigPage(createMockApiClient())
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Erlaubte Proxy-Ziele (Hosts)')).toBeInTheDocument()
+    })
+    // Not locked before a save tells us the env pins it.
+    expect((screen.getByLabelText('Erlaubte Proxy-Ziele (Hosts)') as HTMLTextAreaElement).disabled).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: 'Konfiguration speichern' }))
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('Erlaubte Proxy-Ziele (Hosts)') as HTMLTextAreaElement).disabled).toBe(true)
+    })
+  })
 
 })

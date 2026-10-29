@@ -55,6 +55,23 @@ Slatebase nutzt ein mehrstufiges Konfigurationssystem:
 | Max. Versionen pro Datei | Anzahl gespeicherter Dateiversionen | 20 |
 | Cleanup-Intervall | Wie oft der Cleanup-Job läuft | 24 Stunden |
 
+### Plugin-Proxy
+
+Obsidian-Plugins nutzen `requestUrl()` für CORS-freie Anfragen. Slatebase leitet diese serverseitig über `POST /api/v1/proxy` weiter — **nur an die hier erlaubten Hosts** (SSRF-Schutz). Die Liste pflegst du unter **Administration → Server-Konfiguration → Plugin-Proxy**.
+
+| Einstellung | Beschreibung | Standard |
+|-------------|--------------|----------|
+| Erlaubte Proxy-Ziele | Ein Host pro Zeile, Wildcard-Präfix `*.` erlaubt | GitHub-Hosts (für Plugin-Updates & Sprachpakete) |
+
+- Ein **Host** pro Zeile, z. B. `api.github.com` oder `*.githubusercontent.com` — kein Schema, kein Pfad, kein Port.
+- Eine **leere Liste deaktiviert den Proxy** vollständig (Plugins erhalten `403 PROXY_NOT_CONFIGURED`).
+- Private/interne/Loopback-Adressen bleiben **immer** blockiert, unabhängig von der Liste.
+- Änderungen **greifen sofort** — kein Neustart nötig.
+- Ist die Umgebungsvariable `SLATEBASE_PROXY_ALLOWED_ORIGINS` gesetzt, **gewinnt sie** und das UI-Feld ist gesperrt (die SSRF-Grenze bleibt beim Server-Betreiber).
+
+> [!tip] GitHub-Standard
+> Die vorkonfigurierten GitHub-Hosts decken die häufigsten Plugin-Anfragen ab (Update-Prüfungen, Sprachpaket-Downloads). Für LiveSync (CouchDB) oder andere Dienste ergänze deren Domain.
+
 ---
 
 ## Server neustarten
@@ -90,7 +107,7 @@ Wichtige Umgebungsvariablen für die Server-Konfiguration:
 | `SLATEBASE_CSRF_SECRET` | CSRF-Token-Secret (min. 32 Zeichen) |
 | `SLATEBASE_MODULE_SECRET_KEY` | Verschlüsselungs-Secret für Git-Sync- und Mail-Import-Zugangsdaten |
 | `SLATEBASE_TRUSTED_PROXIES` | Kommaseparierte IP-Bereiche |
-| `SLATEBASE_PROXY_ALLOWED_ORIGINS` | Erlaubte Domains für Plugin-Proxy |
+| `SLATEBASE_PROXY_ALLOWED_ORIGINS` | Erlaubte Domains für Plugin-Proxy — normalerweise über die Admin-UI gepflegt; gesetzt überschreibt und sperrt sie das UI-Feld |
 
 > [!tip] .env-Datei
 > Für lokale Entwicklung kannst du eine `.env`-Datei im Backend-Verzeichnis verwenden. Für Produktion empfehlen sich Docker-Secrets oder die Umgebungsvariablen deines Hosting-Providers.

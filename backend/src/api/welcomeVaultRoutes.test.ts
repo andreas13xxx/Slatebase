@@ -96,6 +96,7 @@ function createMockConfigService(overrides: Partial<IConfigService> = {}): IConf
     getCleanupConfig: () => ({} as ReturnType<IConfigService['getCleanupConfig']>),
     getTemplatesConfig: () => ({} as ReturnType<IConfigService['getTemplatesConfig']>),
     getUploadConfig: () => ({} as ReturnType<IConfigService['getUploadConfig']>),
+    getProxyConfig: () => ({ allowedOrigins: [] } as ReturnType<IConfigService['getProxyConfig']>),
     getWelcomeVaultConfig: () => ({
       name: { de: 'Willkommen', en: 'Welcome' },
     }),

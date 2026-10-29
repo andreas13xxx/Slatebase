@@ -1061,16 +1061,16 @@ const welcomeVaultRoutes = createWelcomeVaultRoutes({
 app.route('/api/v1', welcomeVaultRoutes)
 
 // Proxy route — CORS-free HTTP forwarding for Obsidian plugin compat (requestUrl).
-// Default-deny: an empty allowlist (the unset-env default) disables the route entirely,
-// see PROXY_NOT_CONFIGURED in proxyRoutes.ts — there is no "allow everything public" fallback.
+// The allowlist comes from the layered config (default.json < server-config.json < env),
+// read per request so an admin's change via PUT /admin/config applies without a restart.
+// Default-deny: an empty allowlist disables the route entirely, see PROXY_NOT_CONFIGURED
+// in proxyRoutes.ts — there is no "allow everything public" fallback. The env var
+// SLATEBASE_PROXY_ALLOWED_ORIGINS still wins and pins the list beyond the admin UI.
 import { createProxyRoutes } from './api/proxyRoutes.js'
-const proxyAllowedOrigins = process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS']
-  ? process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS'].split(',').map(s => s.trim())
-  : []
 const proxyRateLimiter = new SlidingWindowRateLimiter(60, 60_000)
 const proxyRoutes = createProxyRoutes({
   logger,
-  allowedOrigins: proxyAllowedOrigins,
+  getAllowedOrigins: () => config.getProxyConfig().allowedOrigins,
   rateLimiter: proxyRateLimiter,
 })
 app.route('/api/v1', proxyRoutes)

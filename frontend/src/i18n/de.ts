@@ -345,6 +345,11 @@ export const de = {
       versionsMaxPerFileLabel: 'Max. Versionen pro Datei',
       versionsMaxPerFileHint: '0 = keine Versionierung, 1–100 = aufbewahrte Versionen pro Datei',
       versionsMaxPerFileError: 'Muss zwischen 0 und 100 liegen.',
+      proxyTitle: 'Plugin-Proxy',
+      proxyHint: 'Obsidian-Plugins nutzen requestUrl() für CORS-freie Anfragen. Diese werden serverseitig über den Proxy weitergeleitet — nur an die hier erlaubten Hosts. Eine leere Liste deaktiviert den Proxy vollständig. Greift sofort, kein Neustart nötig.',
+      proxyAllowedOriginsLabel: 'Erlaubte Proxy-Ziele (Hosts)',
+      proxyAllowedOriginsHint: 'Ein Host pro Zeile. Wildcard-Präfix "*." erlaubt (z. B. *.githubusercontent.com). Kein Schema, kein Pfad, kein Port. Private/interne Adressen bleiben immer blockiert. GitHub-Hosts sind standardmäßig gesetzt (Plugin-Updates und Sprachpakete).',
+      proxyEnvPinned: 'Per Umgebungsvariable SLATEBASE_PROXY_ALLOWED_ORIGINS festgelegt — dieses Feld ist daher gesperrt. Entfernen Sie die Variable, um den Proxy hier zu verwalten.',
     },
     audit: {
       title: 'Audit-Log',

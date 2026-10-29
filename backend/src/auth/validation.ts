@@ -133,6 +133,27 @@ export const serverConfigUpdateSchema = z.object({
       .int('MCP rate limit must be an integer')
       .positive('MCP rate limit must be greater than 0'),
   }).optional(),
+  proxy: z.object({
+    // Each entry is a bare hostname or a "*." wildcard prefix — no scheme, no
+    // path, no port, no whitespace. The proxy route matches on url.hostname
+    // (lower-cased), so anything else is dead weight at best and misleading at
+    // worst. Validating here keeps junk out of the SSRF allowlist. Single-label
+    // hosts (e.g. `couchdb` on a Docker network) are allowed — a dotted TLD is
+    // not required, so a LAN/container CouchDB target works from the UI too.
+    allowedOrigins: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1, 'Proxy origin must not be empty')
+          .max(253, 'Proxy origin is too long')
+          .regex(
+            /^(\*\.)?([a-z0-9]([a-z0-9-]*[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i,
+            'Proxy origin must be a hostname or "*." wildcard (no scheme, path, or port)',
+          ),
+      )
+      .max(100, 'At most 100 proxy origins are allowed'),
+  }).optional(),
 })
 
 // --- Inferred Types ---
