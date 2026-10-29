@@ -169,12 +169,20 @@ Dateisystemzugriff folgt. Wer liest oder schreibt, braucht zusätzlich
 - **CSRF secret:** env `SLATEBASE_CSRF_SECRET` → `data/.csrf-secret` → generated. A startup
   warning is emitted at `warn` level when the env var is unset, because a generated secret
   does not survive a container restart without persistent storage.
-- **Plugin secrets:** server-side, AES-256-GCM per value, key via HKDF from
-  `SLATEBASE_PLUGIN_SECRET_KEY` or `data/.plugin-secret-key`. The frontend uses a
-  write-through cache; the localStorage fallback only activates when the backend is
-  unreachable.
-- **Git-Sync / Mail-Import credentials:** same pattern via `shared-secrets/`, key from
-  `SLATEBASE_MODULE_SECRET_KEY` or `data/.module-secret-key`.
+- **Vault keychain (plugin secrets, `app.secretStorage`):** server-side in
+  `data/module-secrets/<vaultId>/keychain/`, AES-256-GCM per value, via `shared-secrets/`
+  (key from `SLATEBASE_MODULE_SECRET_KEY` or `data/.module-secret-key`). Never stored in the
+  vault. The frontend keeps a write-through cache and no longer has a localStorage fallback.
+  Entries are shared by every plugin of the vault (as in Obsidian), which widens what one
+  malicious plugin can read compared with the former per-plugin store; the plugin sandbox's
+  network rules are the barrier against exfiltration. Listing entry names needs read access,
+  reading a value and every change need write access (`VAULT-ROUTE-AUTHORIZATION.md`).
+  Limits: 200 entries per vault, 10 KB per value, IDs `[a-z0-9]` with single hyphens.
+- **Legacy plugin secrets:** `data/plugins/<vaultId>/<pluginId>/secrets.json` is moved into the
+  keychain at startup (`keychain/legacy-migration.ts`), key from `SLATEBASE_PLUGIN_SECRET_KEY` or
+  `data/.plugin-secret-key`; the file is deleted only after every entry is stored. Entries that
+  cannot be decrypted are dropped with a warning.
+- **Git-Sync / Mail-Import credentials:** same store via `shared-secrets/`, same key.
 
 ---
 

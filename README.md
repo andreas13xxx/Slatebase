@@ -72,7 +72,7 @@ All settings live in `docker.env`. Key options:
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Port exposed on the host |
 | `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | Your public URL (for CORS) |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret — **set this!** |
-| `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts Git-Sync / Mail-Import credentials — set if you use either |
+| `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts the vault keychain, Git-Sync and Mail-Import credentials — set if you use any of them |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Reverse proxy IPs/CIDRs for real client IPs |
 | `SLATEBASE_COOKIE_SECURE` | `auto` | `Secure` attribute on the session cookie: `auto` detects HTTPS via a trusted proxy, or force `true`/`false` |
 | `SLATEBASE_MAX_FILE_SIZE` | `5242880` | Max upload size in bytes (5 MB) |
@@ -112,8 +112,8 @@ Slatebase uses three secrets in production. Without them it falls back to a valu
 | Variable | Purpose |
 |----------|---------|
 | `SLATEBASE_CSRF_SECRET` | HMAC-based CSRF token generation. Without it, all user sessions break on server restart. |
-| `SLATEBASE_MODULE_SECRET_KEY` | Encrypts Git-Sync remote credentials and Mail-Import mailbox passwords at rest. Falls back to a key file in the data directory, so set this if that directory is not durable. Only required if you use Git-Sync or Mail-Import. |
-| `SLATEBASE_PLUGIN_SECRET_KEY` | Encrypts secrets plugins store via Obsidian's SecretStorage API. Falls back to a key file in the data directory, so set this if that directory is not durable. Only required if you use plugins that store credentials. |
+| `SLATEBASE_MODULE_SECRET_KEY` | Encrypts the vault keychain (secrets of plugins), Git-Sync remote credentials and Mail-Import mailbox passwords at rest. Falls back to a key file in the data directory, so set this if that directory is not durable. Only required if you use plugins that store credentials, Git-Sync or Mail-Import. |
+| `SLATEBASE_PLUGIN_SECRET_KEY` | Legacy: only read once at startup to move secrets that plugins stored before the vault keychain existed into the keychain. Keep it set (or keep `data/.plugin-secret-key`) until that migration has run; it is not needed afterwards. |
 
 **Generate a secure secret:**
 
@@ -415,7 +415,7 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | POST | `/vaults/:vaultId/plugins/update-all` | Update all plugins |
 | POST | `/proxy` | CORS-free HTTP proxy for plugin `requestUrl` (SSRF-protected, allowlisted) |
 
-Plugins are stored the way Obsidian stores them: files and settings in `<vault>/.obsidian/plugins/<id>/`, the enabled ones in `<vault>/.obsidian/community-plugins.json`. A plugin that Obsidian or a sync put there appears in the list on its own. It does **not** start by itself: the server's approval (permissions, compatibility) is kept outside the vault in `data/plugins/<vaultId>/_registry.json`, and a plugin only runs while it is both approved there and enabled in `community-plugins.json`. Disabling it in Obsidian therefore switches it off here too; enabling it only in Obsidian does not switch it on. Installing, deleting and activating need write access to the vault, since plugin code runs in every user's browser. Secrets stay encrypted under `data/plugins/<vaultId>/<pluginId>/secrets.json`. Installing, updating, deleting and activating a plugin publish a `vault:change` event for the other users and tabs of the vault, whose plugin page then refreshes on its own; a plugin that is already running is never reloaded by that and picks the change up on the next page load. A plugin's `data.json` does not publish it (plugins write it while they run) — it has its own `plugin-settings:change` event.
+Plugins are stored the way Obsidian stores them: files and settings in `<vault>/.obsidian/plugins/<id>/`, the enabled ones in `<vault>/.obsidian/community-plugins.json`. A plugin that Obsidian or a sync put there appears in the list on its own. It does **not** start by itself: the server's approval (permissions, compatibility) is kept outside the vault in `data/plugins/<vaultId>/_registry.json`, and a plugin only runs while it is both approved there and enabled in `community-plugins.json`. Disabling it in Obsidian therefore switches it off here too; enabling it only in Obsidian does not switch it on. Installing, deleting and activating need write access to the vault, since plugin code runs in every user's browser. Secrets that plugins store (Obsidian's `app.secretStorage`) go to the vault's keychain: named entries shared by all plugins of the vault, encrypted on the server under `data/module-secrets/<vaultId>/keychain/` and never written into the vault, so Git-Sync and other devices do not see them. You manage them under Settings → Vault → Schlüsselbund; reading a value and changing entries need write access to the vault, collaborators with read access see the names only. Every active plugin can read every entry, as in Obsidian. Secrets from the former per-plugin store are moved into the keychain at startup (colliding names get a `<pluginId>-` prefix). Installing, updating, deleting and activating a plugin publish a `vault:change` event for the other users and tabs of the vault, whose plugin page then refreshes on its own; a plugin that is already running is never reloaded by that and picks the change up on the next page load. A plugin's `data.json` does not publish it (plugins write it while they run) — it has its own `plugin-settings:change` event.
 
 ### CSS Snippets
 

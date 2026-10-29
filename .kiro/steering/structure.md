@@ -80,6 +80,7 @@ src/
 │   ├── welcomeVaultRoutes.ts — POST /api/v1/welcome-vault (on-demand tutorial vault creation, rate-limited)
 │   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
 │   ├── gitSyncRoutes.ts      — Per-vault git-sync routes (remotes CRUD, branch, generate-ssh-key, status, sync-now); feature-gated on `git-sync`
+│   ├── keychainRoutes.ts     — Vault keychain routes at `/vaults/:vaultId/keychain` (list IDs = read access; get value, put, delete = write access)
 │   ├── mailImportRoutes.ts   — Per-vault IMAP config routes (CRUD, mailbox-tree, status, import-now); feature-gated on `mail-import`
 │   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
 │   ├── propertyTypeRoutes.ts — Property-type registry CRUD (GET/PUT /vaults/:vaultId/property-types, PUT /vaults/:vaultId/property-types/:key)
@@ -164,11 +165,10 @@ src/
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
 │   ├── errors.ts             — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
 │   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
-│   ├── secret-key-manager.ts — PluginSecretKeyManager (encryption key for plugin secrets at rest: env `SLATEBASE_PLUGIN_SECRET_KEY` → file → generate, same pattern as CsrfSecretManager; HKDF-SHA256 down to an AES-256 key)
-│   ├── secret-store.ts   — PluginSecretStore (`data/plugins/<vaultId>/<pluginId>/secrets.json`, each value encrypted individually with AES-256-GCM; `listSecrets()` returns IDs only, never values)
-│   ├── installed-plugin-store.ts — InstalledPluginStore (plugin files + `data.json` in the vault at `.obsidian/plugins/<id>/`, enabled ids in `.obsidian/community-plugins.json`; registry and secrets stay under `data/plugins/<vaultId>/`; symlinks leaving the vault are treated as absent; takes a vault-path resolver; atomic writes); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift. The atomic write retries on EPERM/EACCES (Windows file locking from OneDrive sync or antivirus), then unlinks and retries, then falls back to a direct write — a transient lock must never surface as a lost write
+│   ├── secret-key-manager.ts — PluginSecretKeyManager (legacy: only decrypts the former per-plugin secrets for `keychain/legacy-migration.ts`; encryption key: env `SLATEBASE_PLUGIN_SECRET_KEY` → file → generate, same pattern as CsrfSecretManager; HKDF-SHA256 down to an AES-256 key)
+│   ├── installed-plugin-store.ts — InstalledPluginStore (plugin files + `data.json` in the vault at `.obsidian/plugins/<id>/`, enabled ids in `.obsidian/community-plugins.json`; the registry stays under `data/plugins/<vaultId>/`; symlinks leaving the vault are treated as absent; takes a vault-path resolver; atomic writes); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift. The atomic write retries on EPERM/EACCES (Windows file locking from OneDrive sync or antivirus), then unlinks and retries, then falls back to a direct write — a transient lock must never surface as a lost write
 │   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
-│   ├── legacy-migration.ts   — One-time, non-destructive copy of the old `data/plugins/<vaultId>/<id>/` files into the vault (marker file `.migrated-to-vault`; registry and secrets are not moved)
+│   ├── legacy-migration.ts   — One-time, non-destructive copy of the old `data/plugins/<vaultId>/<id>/` files into the vault (marker file `.migrated-to-vault`; the registry is not moved)
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
 │   ├── plugin-installer.test.ts — Unit tests for PluginInstaller
 │   ├── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; mirrors activation into the vault's `community-plugins.json`: a plugin counts as active only while approved in the registry AND listed there); `saveSettings()` publishes a `plugin-settings:change` broadcast so other tabs/devices reload instead of drifting
@@ -254,10 +254,14 @@ src/
 │   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory, dailyNoteTemplateName, attachmentsDirectory — empty means „same folder as the edited note", Slatebase's long-standing default, so an unconfigured vault behaves unchanged)
 │   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
 │   └── vault-config-store.ts — VaultConfigStore (per-vault .slatebase/config.json via shared `KeyedJsonFileStore`; `saveConfig` merges through `mutate()` to avoid losing concurrent partial updates)
-├── shared-secrets/            — Encrypted at-rest credential storage shared by git-sync and mail-import. Generalizes `plugin/secret-store.ts` from (vaultId, pluginId, secretId) to (vaultId, moduleId, entryId) so backend modules don't each reinvent it.
+├── shared-secrets/            — Encrypted at-rest credential storage shared by git-sync, mail-import and the vault keychain, keyed by (vaultId, moduleId, entryId) so backend modules don't each reinvent it.
 │   ├── index.ts               — Barrel export for shared-secrets module
 │   ├── secret-key-manager.ts  — ModuleSecretKeyManager (AES-256 key: env → file → generate, HKDF-SHA256; same pattern as CsrfSecretManager)
-│   └── secret-store.ts        — ModuleSecretStore (`data/module-secrets/<vaultId>/<moduleId>/secrets.json`, each value AES-256-GCM encrypted individually)
+│   └── secret-store.ts        — ModuleSecretStore (`data/module-secrets/<vaultId>/<moduleId>/secrets.json`, each value AES-256-GCM encrypted individually; `listSecrets()` returns IDs only, `deleteAll()` drops a module's file)
+├── keychain/                  — Vault keychain: named secrets shared by all plugins of a vault (Obsidian's `app.secretStorage`), stored through ModuleSecretStore with `moduleId` `keychain`.
+│   ├── index.ts               — Barrel export for keychain module
+│   ├── keychain-service.ts    — KeychainService (IDs `[a-z0-9]` with single hyphens, max 128 chars; max 200 entries per vault, 10 KB per value; `deleteAllForVault` on vault deletion)
+│   └── legacy-migration.ts    — migratePluginSecretsToKeychain (startup: moves `data/plugins/<vaultId>/<pluginId>/secrets.json` into the keychain; normalizes IDs, shares equal values, prefixes colliding names with `<pluginId>-`, idempotent, deletes the old file only after success)
 ├── git-sync/                  — Per-vault git synchronization with external remotes. Feature toggle `git-sync` (cold).
 │   ├── index.ts               — Barrel export for git-sync module
 │   ├── types.ts               — GitSyncRemoteConfig, GitSyncVaultData, GitSyncRemoteStatus, GitAuthMethod ('https-token' | 'ssh-key'). The branch is vault-level (one working directory = one checkout), each remote has its own URL, credentials and interval
@@ -453,7 +457,7 @@ src/
 │       ├── setting-tab.ts — PluginSettingTab, Setting, SettingGroup (1.11+ grouped settings with optional search/extra-button header — a real extendable class, since plugins subclass it and `class X extends undefined` throws at bundle parse time), UI components, DOM extensions, icon registry, Modal, Plugin class (synchronous global registration). `Setting` also has the three undocumented 1.13 row-action methods some official plugins declare and call themselves (missing from the published `obsidian.d.ts`): `setIcon()` (leading row icon), `setAction()` (whole row clickable), `setNavigable()` (same plus a chevron, for rows that open another page) — `setAction`/`setNavigable` share one click/keyboard-activation binding, later calls just swap the callback
 │       ├── setting-tab-registry.ts — Tracks which plugins registered a PluginSettingTab (via addSettingTab), so the Plugin Management UI can mount tab.containerEl
 │       ├── declarative-settings-renderer.ts — Renders Obsidian 1.13+ `getSettingDefinitions()` declarative settings arrays (group/list/page/controls) into Setting/*Component UI
-│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`. `sanitizeHTMLToDom()` strips inline event-handler attributes and `javascript:`/dangerous `data:` URLs, not just `<script>` tags. `renderComponentIcon()` is `ExtraButtonComponent.setIcon()`'s Lucide/custom-SVG resolver (same logic `ButtonComponent.setIcon()` in `setting-tab.ts` implements separately) — `Setting`/`SettingGroup`'s `addExtraButton()` construct a real `ExtraButtonComponent`, so all three call sites share one implementation.
+│       ├── obsidian-api-extensions.ts — Extended APIs: Events, Scope, Keymap, SecretStorage (one write-through-cached instance per vault via `getVaultSecretStorage`, backed by the keychain API), utility functions, MarkdownPreviewRenderer, DOM globals (async loaded as supplement) + `OBSIDIAN_API_VERSION` behind `requireApiVersion()`. `Scope.handleKey()` and the module-level `Keymap` scope stack really dispatch (a single global keydown listener walks the stack) instead of only collecting handlers — inert until a plugin calls `app.keymap.pushScope()`. `sanitizeHTMLToDom()` strips inline event-handler attributes and `javascript:`/dangerous `data:` URLs, not just `<script>` tags. `renderComponentIcon()` is `ExtraButtonComponent.setIcon()`'s Lucide/custom-SVG resolver (same logic `ButtonComponent.setIcon()` in `setting-tab.ts` implements separately) — `Setting`/`SettingGroup`'s `addExtraButton()` construct a real `ExtraButtonComponent`, so all three call sites share one implementation.
 │       ├── metadata-parser.ts — `parseMetadata()`: the single producer of Obsidian-shaped `CachedMetadata` from raw Markdown — headings, embeds, sections, listItems, footnotes/footnoteRefs, referenceLinks, frontmatterLinks alongside frontmatter/tags/links/blocks. Best-effort CommonMark approximation (same bar as `parseBlocks`/`scanFencedCodeBlocks`), not a spec-compliant parser
 │       ├── editor-shim.ts — EditorShim (Obsidian Editor API; backend priority CM6 EditorView → textarea → internal buffer; setEditorViewAccessor wired once at vault init). Instantiate via `EditorShim.create()`, not `new`: that wraps it in the same non-emulated-access Proxy every other shim has, so an undocumented `editor.*` is a logged, enumerable gap rather than a bare TypeError thrown from inside plugin code
 │       ├── editor-suggest-manager.ts — EditorSuggestManager (module-level singleton: registry of EditorSuggest instances, trigger-detection state machine, async generation guard, open/close lifecycle)
@@ -780,6 +784,7 @@ src/
 │   │   ├── ThemeImport.tsx             — Import tab: theme.css (+ optional manifest.json) via file picker / drag & drop; checks for an existing theme right before saving
 │   │   ├── themeImport.ts              — Pure import helpers (pick theme.css/manifest.json, derive a safe theme id, read manifest fields)
 │   │   ├── GitSyncSection.tsx          — Per-vault git-sync: shared local branch + one or more remotes (URL, auth method, interval, SSH deploy key, sync-now, last-run line). Owner only, gated on the `git-sync` toggle
+│   │   ├── KeychainSection.tsx         — Vault keychain: list entry names (values masked, shown on request), add, replace, delete with confirmation; collaborators with read access see names only. Reloads the shared SecretStorage so running plugins see the change
 │   │   ├── MailImportSection.tsx       — Per-vault IMAP mailboxes polled server-side and imported as Markdown notes (host/port/credentials, mailbox tree picker, target folder, interval, import-now). Owner only, gated on `mail-import`
 │   │   ├── syncStatusFormat.ts         — Shared "last run" formatting for both sync sections (git-sync adds `conflict` to the result vocabulary) — one place instead of a verbatim copy in each
 │   │   ├── KeybindingsSection.tsx     — Configurable keyboard shortcuts; one SettingSection card per category (table, inline recording, conflict detection)
@@ -930,9 +935,7 @@ What stays on the server, outside the vault (a trust decision of this server, no
 ```
 data/plugins/
 └── <vaultId>/
-    ├── _registry.json        — Plugin registry (status, permissions, compatibility per plugin)
-    └── <pluginId>/
-        └── secrets.json      — Plugin secrets (SecretStorage API), each value AES-256-GCM encrypted; key from `SLATEBASE_PLUGIN_SECRET_KEY` or `data/.plugin-secret-key`
+    └── _registry.json        — Plugin registry (status, permissions, compatibility per plugin)
 ```
 
 - **Activation**: A plugin runs only while it is `active` in `_registry.json` (approved here) AND listed in `community-plugins.json`. A plugin that merely appears in the vault never starts on its own; disabling it in Obsidian switches it off here.
