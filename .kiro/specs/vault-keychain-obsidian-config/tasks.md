@@ -35,7 +35,8 @@ Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Diff), dann Comm
   - [ ] 5.2 `VaultConfigContext`; feste Werte im Code per Grep finden und umstellen
   - [ ] 5.3 `vault.getConfig()` / `setConfig()` im Shim
   - [ ] 5.4 UI-Sektion „Editor und Dateien"
-  - [ ] 5.5 Einmalige Migration `.slatebase/config.json` → Obsidian-Dateien, `VaultConfigSection` auf die neue Quelle umstellen (benötigt die Formate von `templates.json` und `daily-notes.json` aus Task 0)
+  - [ ] 5.5 Einmalige Migration `.slatebase/config.json` → `app.json` (`attachmentFolderPath`), Anhangsordner aus `app.json` lesen; Vorlagen und Tagesnotizen folgen in 6.3, sobald die Formate von `templates.json` und `daily-notes.json` geprüft sind
+  - [ ] 5.6 `lineNumbers`, `readableLineLength`, `spellcheck` aus den User-Preferences entfernen, Hooks lesen `app.json`
   - _Requirements: 5_
 
 - [ ] 6. Weitere Vault_Files
@@ -47,8 +48,8 @@ Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Diff), dann Comm
   - _Requirements: 6_
 
 - [ ] 7. Geltungsbereich
-  - [ ] 7.1 Leserang User > Vault > Standard, Preferences nur noch als Überlagerung
-  - [ ] 7.2 Badges „Vault" / „Nur ich" in den Einstellungen
+  - [ ] 7.1 User-Preferences auf Werte ohne Vault-Gegenstück beschränken (Rest der Phasen 5 und 6 entfernt die übrigen)
+  - [ ] 7.2 Ablehnung mit Meldung für Leser ohne Schreibrecht
   - _Requirements: 7_
 
 - [ ] 8. Doku

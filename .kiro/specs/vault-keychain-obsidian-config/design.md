@@ -58,7 +58,7 @@ Formate werden pro Datei vor der Umsetzung geprüft (wie Task 0). Migration der 
 
 ## Geltungsbereich (Punkt 5)
 
-Schnitt: Was Obsidian in `app.json`/`appearance.json` hat, liegt im Vault. Persönliches bleibt pro User. Die Preferences-Datei hält danach nur noch Überlagerungen. Leserang: User-Wert vor Vault-Wert vor Standard. In der UI trägt jedes Feld ein Badge „Vault" oder „Nur ich".
+Schnitt (entschieden 2026-10-29): Gibt es eine Vault-Datei für einen Wert, liegt er nur dort, ohne User-Variante und ohne Überlagerung. Persönliches ohne Vault-Gegenstück bleibt pro User. `lineNumbers`, `readableLineLength` und `spellcheck` fallen aus den User-Preferences weg; die Werte kommen aus `app.json`, fehlt der Schlüssel, gilt der bisherige Slatebase-Standard. Reihenfolge: Vault-Wert vor Standard. Ein Leser ohne Schreibrecht kann diese Werte nicht mehr für sich allein umschalten.
 
 **Risiko:** Bisher ändert ein User seine Ansicht nur für sich. Nach der Umstellung ändert ein Schreibberechtigter z. B. den Anhangsordner für alle. Deshalb nur schreibberechtigte Rollen, und die Felder zeigen den Geltungsbereich.
 
