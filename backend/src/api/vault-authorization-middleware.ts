@@ -39,11 +39,9 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   // community-plugins.json) and run in every user's browser, so installing, deleting and
   // activating need write access (they fall through to the write default). What stays at read:
   // a plugin's own settings (data.json), which plugins write while they run — a read-only
-  // collaborator's plugin would otherwise fail on every save — and the secrets, which are
-  // server-side and not vault content.
+  // collaborator's plugin would otherwise fail on every save. (Secrets are no longer per plugin:
+  // see the keychain exception below.)
   { method: 'PUT', pathPattern: '/plugins/:pluginId/settings', level: 'read' },
-  { method: 'PUT', pathPattern: '/plugins/:pluginId/secrets/:secretId', level: 'read' },
-  { method: 'DELETE', pathPattern: '/plugins/:pluginId/secrets/:secretId', level: 'read' },
   // pluginStoreRoutes.ts (vault-scoped) — installing and updating write plugin code into the
   // vault, so store-install, update-all and update need write access (default). Only the update
   // check, which changes nothing, stays at read.

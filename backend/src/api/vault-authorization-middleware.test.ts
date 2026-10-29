@@ -25,7 +25,9 @@ import type { IVaultRegistry, IVaultShareRegistry, VaultRegistryEntry, VaultShar
 import type { IVaultService, IVaultAccessControl } from '../business/index.js'
 import { VaultAccessControlService } from '../business/index.js'
 import type { IImportService } from '../import/index.js'
-import type { IPluginService, IPluginSecretStore } from '../plugin/index.js'
+import type { IPluginService } from '../plugin/index.js'
+import type { IKeychainService } from '../keychain/index.js'
+import { createKeychainRoutes } from './keychainRoutes.js'
 import type { ISnippetStore } from '../snippets/index.js'
 import type { IPluginStoreService } from '../plugin-store/index.js'
 import type { ISearchService, IReplaceService } from '../search/index.js'
@@ -202,8 +204,11 @@ const routeModules = [
 const router = createRouter(routeModules)
 app.route('/api/v1', router)
 
-const pluginRoutes = createPluginRoutes({ pluginService: stub<IPluginService>('pluginService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger, secretStore: stub<IPluginSecretStore>('pluginSecretStore') })
+const pluginRoutes = createPluginRoutes({ pluginService: stub<IPluginService>('pluginService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+
+const keychainRoutes = createKeychainRoutes({ keychainService: stub<IKeychainService>('keychainService'), logger: silentLogger })
+app.route('/api/v1/vaults/:vaultId/keychain', keychainRoutes)
 
 const snippetRoutes = createSnippetRoutes({ snippetStore: stub<ISnippetStore>('snippetStore'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)

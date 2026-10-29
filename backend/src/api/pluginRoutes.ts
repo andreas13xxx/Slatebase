@@ -19,8 +19,6 @@ import type { IVaultRegistry } from '../vault/registry.js'
 import type { ILogger } from '../logger/index.js'
 import type { IEventBus } from '../realtime/types.js'
 import { COMMUNITY_PLUGINS_PATH, pluginManifestPath, publishVaultChange } from './vaultChangeEvents.js'
-import type { IPluginSecretStore } from '../plugin/secret-store.js'
-import { SecretLimitExceededError, SecretTooLargeError } from '../plugin/secret-store.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -63,24 +61,6 @@ const pluginIdParamSchema = z.object({
 })
 
 /**
- * Schema for secret ID path parameter.
- * Alphanumeric + hyphens + underscores, max 128 chars.
- */
-const secretIdParamSchema = z.object({
-  secretId: z.string()
-    .min(1, 'secretId must not be empty')
-    .max(128, 'secretId must not exceed 128 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid secret ID: must contain only letters, digits, hyphens, and underscores'),
-})
-
-/**
- * Schema for PUT secret request body.
- */
-const setSecretBodySchema = z.object({
-  value: z.string().min(1, 'Secret value must not be empty'),
-})
-
-/**
  * Validates a vaultId param via the zod schema and returns an error response if invalid.
  * Returns null if validation passes.
  */
@@ -105,7 +85,6 @@ export interface PluginRouteDependencies {
   vaultRegistry: IVaultRegistry
   eventBus: IEventBus
   logger: ILogger
-  secretStore?: IPluginSecretStore
 }
 
 // ─── Factory Function ────────────────────────────────────────────────────────
@@ -119,7 +98,7 @@ export interface PluginRouteDependencies {
  * @returns A Hono instance with plugin management routes registered.
  */
 export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
-  const { pluginService, accessControl, eventBus, logger, secretStore } = deps
+  const { pluginService, accessControl, eventBus, logger } = deps
   const publish = (c: Context, vaultId: string, path: string, action: 'saved' | 'deleted'): Promise<void> =>
     publishVaultChange({ eventBus, accessControl, logger }, c, vaultId, path, action)
   const app = new Hono()
@@ -465,157 +444,6 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
       }
 
       await pluginService.saveSettings(vaultId, pluginId, rawBody)
-      return c.body(null, 204)
-    } catch (error) {
-      return handlePluginError(c, error, logger)
-    }
-  })
-
-  // ─── Plugin Secrets Routes ─────────────────────────────────────────────────
-
-  // GET /:pluginId/secrets — List secret IDs (NOT values)
-  app.get('/:pluginId/secrets', async (c: Context): Promise<Response> => {
-    if (!secretStore) {
-      return c.json(createApiError('NOT_CONFIGURED', 'Plugin secret storage is not configured'), 503)
-    }
-
-    const vaultId = c.req.param('vaultId') as string
-    const pluginId = c.req.param('pluginId') as string
-
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
-
-    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
-    if (!pluginIdParsed.success) {
-      const firstIssue = pluginIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    try {
-      const ids = await secretStore.listSecrets(vaultId, pluginId)
-      return c.json({ ids }, 200)
-    } catch (error) {
-      return handlePluginError(c, error, logger)
-    }
-  })
-
-  // GET /:pluginId/secrets/:secretId — Get decrypted secret value
-  app.get('/:pluginId/secrets/:secretId', async (c: Context): Promise<Response> => {
-    if (!secretStore) {
-      return c.json(createApiError('NOT_CONFIGURED', 'Plugin secret storage is not configured'), 503)
-    }
-
-    const vaultId = c.req.param('vaultId') as string
-    const pluginId = c.req.param('pluginId') as string
-    const secretId = c.req.param('secretId') as string
-
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
-
-    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
-    if (!pluginIdParsed.success) {
-      const firstIssue = pluginIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const secretIdParsed = secretIdParamSchema.safeParse({ secretId })
-    if (!secretIdParsed.success) {
-      const firstIssue = secretIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid secret ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    try {
-      const value = await secretStore.getSecret(vaultId, pluginId, secretId)
-      if (value === null) {
-        return c.json(createApiError('SECRET_NOT_FOUND', `Secret "${secretId}" not found`), 404)
-      }
-      return c.json({ value }, 200)
-    } catch (error) {
-      return handlePluginError(c, error, logger)
-    }
-  })
-
-  // PUT /:pluginId/secrets/:secretId — Set/update a secret
-  app.put('/:pluginId/secrets/:secretId', async (c: Context): Promise<Response> => {
-    if (!secretStore) {
-      return c.json(createApiError('NOT_CONFIGURED', 'Plugin secret storage is not configured'), 503)
-    }
-
-    const vaultId = c.req.param('vaultId') as string
-    const pluginId = c.req.param('pluginId') as string
-    const secretId = c.req.param('secretId') as string
-
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
-
-    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
-    if (!pluginIdParsed.success) {
-      const firstIssue = pluginIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const secretIdParsed = secretIdParamSchema.safeParse({ secretId })
-    if (!secretIdParsed.success) {
-      const firstIssue = secretIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid secret ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    try {
-      const body = await c.req.json()
-      const parsed = setSecretBodySchema.safeParse(body)
-      if (!parsed.success) {
-        const firstIssue = parsed.error.issues[0]
-        const message = firstIssue ? firstIssue.message : 'Invalid request body'
-        return c.json(createApiError('VALIDATION_ERROR', message), 400)
-      }
-
-      await secretStore.setSecret(vaultId, pluginId, secretId, parsed.data.value)
-      return c.body(null, 204)
-    } catch (error) {
-      if (error instanceof SecretLimitExceededError) {
-        return c.json(createApiError('SECRET_LIMIT_EXCEEDED', error.message), 409)
-      }
-      if (error instanceof SecretTooLargeError) {
-        return c.json(createApiError('SECRET_TOO_LARGE', error.message), 413)
-      }
-      return handlePluginError(c, error, logger)
-    }
-  })
-
-  // DELETE /:pluginId/secrets/:secretId — Delete a secret
-  app.delete('/:pluginId/secrets/:secretId', async (c: Context): Promise<Response> => {
-    if (!secretStore) {
-      return c.json(createApiError('NOT_CONFIGURED', 'Plugin secret storage is not configured'), 503)
-    }
-
-    const vaultId = c.req.param('vaultId') as string
-    const pluginId = c.req.param('pluginId') as string
-    const secretId = c.req.param('secretId') as string
-
-    const vaultIdError = validateVaultIdParam(c, vaultId)
-    if (vaultIdError) return vaultIdError
-
-    const pluginIdParsed = pluginIdParamSchema.safeParse({ pluginId })
-    if (!pluginIdParsed.success) {
-      const firstIssue = pluginIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid plugin ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    const secretIdParsed = secretIdParamSchema.safeParse({ secretId })
-    if (!secretIdParsed.success) {
-      const firstIssue = secretIdParsed.error.issues[0]
-      const message = firstIssue ? firstIssue.message : 'Invalid secret ID'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    try {
-      await secretStore.deleteSecret(vaultId, pluginId, secretId)
       return c.body(null, 204)
     } catch (error) {
       return handlePluginError(c, error, logger)

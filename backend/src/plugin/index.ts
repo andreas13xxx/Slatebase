@@ -4,7 +4,6 @@ export { InstalledPluginStore } from './installed-plugin-store.js'
 export { PluginInstaller, PluginInstallError, compareSemver } from './plugin-installer.js'
 export { PluginService } from './plugin-service.js'
 export { migrateLegacyPlugins, LEGACY_PLUGINS_MIGRATED_MARKER } from './legacy-migration.js'
-export { PluginSecretStore, SecretLimitExceededError, SecretTooLargeError } from './secret-store.js'
 export { PluginSecretKeyManager, PluginSecretKeyError } from './secret-key-manager.js'
 export {
   PluginNotFoundError,
@@ -25,5 +24,4 @@ export type {
 export type { IPluginInstaller, PluginInstallResult } from './plugin-installer.js'
 export type { IPluginService } from './plugin-service.js'
 export type { VaultPathResolver } from './installed-plugin-store.js'
-export type { IPluginSecretStore } from './secret-store.js'
 export type { IPluginSecretKeyManager } from './secret-key-manager.js'

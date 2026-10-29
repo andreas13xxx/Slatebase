@@ -51,7 +51,7 @@ import { LinkIndexCache, LinkMigrationService } from './link-index/index.js'
 import type { ILinkIndex } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
-import { InstalledPluginStore, PluginInstaller, PluginService, migrateLegacyPlugins, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
+import { InstalledPluginStore, PluginInstaller, PluginService, migrateLegacyPlugins, PluginSecretKeyManager } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore, migrateLegacySnippets } from './snippets/index.js'
 import { ThemeService } from './themes/index.js'
@@ -99,7 +99,7 @@ import { createPublicShareService, createPublicShareStore, createPublicShareVaul
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
-import { KeychainService } from './keychain/index.js'
+import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -175,7 +175,6 @@ if (!process.env['SLATEBASE_CSRF_SECRET']) {
 // --- Plugin Secret Key Manager ---
 const pluginSecretKeyManager = new PluginSecretKeyManager(serverConfig.dataDir, logger)
 await pluginSecretKeyManager.loadOrCreate()
-const pluginSecretStore = new PluginSecretStore(serverConfig.dataDir, pluginSecretKeyManager)
 
 if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
   logger.warn(
@@ -750,7 +749,6 @@ const pluginRoutes = createPluginRoutes({
   vaultRegistry,
   eventBus,
   logger,
-  secretStore: pluginSecretStore,
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
@@ -1140,6 +1138,8 @@ vaultRegistryReady = true
 await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
 // Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
+// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
+await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.
 // Held in a named const because the MCP tool handlers (4c above) reuse it via

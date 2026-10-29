@@ -212,10 +212,6 @@ customization, not just content), not an oversight. All 7 mutating routes are th
 | GET | `/:pluginId/styles` | `.../plugins/:pluginId/styles` | `pluginRoutes.ts:469` | read | `pluginRoutes.ts:484` |
 | GET | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | `pluginRoutes.ts:511` | read | `pluginRoutes.ts:526` |
 | PUT | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | `pluginRoutes.ts:550` | **read** — Exception | `pluginRoutes.ts:565` |
-| GET | `/:pluginId/secrets` | `.../plugins/:pluginId/secrets` | `pluginRoutes.ts:600` | read | `pluginRoutes.ts:618` |
-| GET | `/:pluginId/secrets/:secretId` | `.../plugins/:pluginId/secrets/:secretId` | `pluginRoutes.ts:632` | read | `pluginRoutes.ts:658` |
-| PUT | `/:pluginId/secrets/:secretId` | `.../plugins/:pluginId/secrets/:secretId` | `pluginRoutes.ts:675` | **read** — Exception | `pluginRoutes.ts:701` |
-| DELETE | `/:pluginId/secrets/:secretId` | `.../plugins/:pluginId/secrets/:secretId` | `pluginRoutes.ts:729` | **read** — Exception | `pluginRoutes.ts:755` |
 
 ## 17. `backend/src/api/snippetRoutes.ts`
 

@@ -14,3 +14,5 @@ export {
   MAX_KEYCHAIN_ENTRIES,
   isValidKeychainSecretId,
 } from './keychain-service.js'
+export { migratePluginSecretsToKeychain, normalizeSecretId } from './legacy-migration.js'
+export type { KeychainMigrationOptions, KeychainMigrationResult } from './legacy-migration.js'
