@@ -763,15 +763,15 @@ export interface IApiClient {
   /** Save a plugin's settings. */
   saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void>
 
-  // --- Plugin Secrets ---
-  /** List secret IDs for a plugin (NOT the values). */
-  listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>
-  /** Get a decrypted plugin secret value. */
-  getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>
-  /** Set/update a plugin secret. */
-  setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>
-  /** Delete a plugin secret. */
-  deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void>
+  // --- Vault Keychain ---
+  /** List the keychain entry IDs of a vault (NOT the values). */
+  listKeychainSecrets(vaultId: string): Promise<string[]>
+  /** Get a decrypted keychain value; null if the entry does not exist. Needs write access to the vault. */
+  getKeychainSecret(vaultId: string, secretId: string): Promise<string | null>
+  /** Create or replace a keychain entry. */
+  setKeychainSecret(vaultId: string, secretId: string, value: string): Promise<void>
+  /** Delete a keychain entry. */
+  deleteKeychainSecret(vaultId: string, secretId: string): Promise<void>
 
   /** Load the plugin registry for a vault. */
   loadRegistry(vaultId: string): Promise<PluginRegistryData>
@@ -1444,16 +1444,16 @@ export class ApiClient implements IApiClient {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, data)
   }
 
-  // --- Plugin Secrets ---
+  // --- Vault Keychain ---
 
-  async listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]> {
-    const result = await this.request<{ ids: string[] }>('GET', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets`)
+  async listKeychainSecrets(vaultId: string): Promise<string[]> {
+    const result = await this.request<{ ids: string[] }>('GET', `/api/v1/vaults/${vaultId}/keychain`)
     return result.ids
   }
 
-  async getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null> {
+  async getKeychainSecret(vaultId: string, secretId: string): Promise<string | null> {
     const headers = this.buildHeaders('GET', false)
-    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`, { method: 'GET', headers })
+    const response = await fetch(`/api/v1/vaults/${vaultId}/keychain/${encodeURIComponent(secretId)}`, { method: 'GET', headers })
 
     if (response.status === 401) {
       await this.handleAuthFailure()
@@ -1472,12 +1472,12 @@ export class ApiClient implements IApiClient {
     return result.value
   }
 
-  async setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void> {
-    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`, { value })
+  async setKeychainSecret(vaultId: string, secretId: string, value: string): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/keychain/${encodeURIComponent(secretId)}`, { value })
   }
 
-  async deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> {
-    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`)
+  async deleteKeychainSecret(vaultId: string, secretId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/keychain/${encodeURIComponent(secretId)}`)
   }
 
   /** Load the plugin registry for a vault. */

@@ -1,0 +1,6 @@
+
+.plugin-management-keychain-hint {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}

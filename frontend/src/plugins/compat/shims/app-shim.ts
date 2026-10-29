@@ -14,7 +14,8 @@ import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-ga
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
 import { warnNoOp, warnOnce } from '../log';
-import { Keymap, Scope, SecretStorage } from '../obsidian-api-extensions';
+import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
+import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
 import { resolveActiveTheme } from '../body-classes';
 
@@ -229,7 +230,7 @@ export class AppShim implements IAppShim {
     metadataCache: IMetadataCacheShim;
     pluginId: string;
     commandRegistry?: ICommandRegistry;
-    apiClient?: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> };
+    apiClient?: KeychainApiClient;
     vaultId?: string;
     pluginManager?: {
       /** Re-fetch manifest data for installed plugins from the backend. */
@@ -243,23 +244,13 @@ export class AppShim implements IAppShim {
     };
   }) {
     this.vault = options.vault;
-    const legacyPrefix = `slatebase-vault-${options.vault.getName()}-secret:`;
-    if (options.apiClient && options.vaultId) {
-      this.secretStorage = new SecretStorage({
-        apiClient: options.apiClient,
-        vaultId: options.vaultId,
-        pluginId: options.pluginId,
-        legacyPrefix,
-      });
-      this.secretStorage.initialize().catch(() => { /* degraded mode */ });
-    } else {
-      this.secretStorage = new SecretStorage({
-        apiClient: { listPluginSecrets: async () => [], getPluginSecret: async () => null, setPluginSecret: async () => {}, deletePluginSecret: async () => {} },
-        vaultId: '',
-        pluginId: options.pluginId,
-        legacyPrefix,
-      });
-    }
+    // One keychain per vault, shared by all plugins (Obsidian's secretStorage is vault-wide, too).
+    this.secretStorage = options.apiClient && options.vaultId
+      ? getVaultSecretStorage(options.apiClient, options.vaultId)
+      : new SecretStorage({
+          apiClient: { listKeychainSecrets: async () => [], getKeychainSecret: async () => null, setKeychainSecret: async () => {} },
+          vaultId: '',
+        });
     // Scoped per-plugin: `on`/`onLayoutReady` bind options.pluginId into a
     // closure so any callback registered through this plugin's `app.workspace`
     // (and its deferred/event-triggered invocations) is tagged correctly for
@@ -502,9 +493,8 @@ export class AppShim implements IAppShim {
   }
 
   /**
-   * SecretStorage (Obsidian API since 1.11.4) — vault-scoped, backed by a
-   * server-side AES-256-GCM encrypted store; localStorage is only a legacy-
-   * migration/offline fallback, not the source of truth.
+   * SecretStorage (Obsidian API since 1.11.4) — vault-scoped, backed by the
+   * vault keychain (server-side, AES-256-GCM encrypted), shared by all plugins.
    * Assigned in the constructor, not here — see the field-initializer-ordering
    * note above `this.commands = createCommandManager(...)`: this needs
    * `this.vault`, which isn't set yet when field initializers run.
@@ -632,7 +622,7 @@ export class AppShim implements IAppShim {
     metadataCache: IMetadataCacheShim;
     pluginId: string;
     commandRegistry?: ICommandRegistry;
-    apiClient?: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> };
+    apiClient?: KeychainApiClient;
     vaultId?: string;
     pluginManager?: {
       loadManifests(): Promise<void>;

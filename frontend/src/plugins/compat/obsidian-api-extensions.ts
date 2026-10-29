@@ -166,170 +166,84 @@ export class Events {
   }
 }
 
+/** The slice of the API client the vault keychain needs (see `IApiClient`). */
+export interface KeychainApiClient {
+  listKeychainSecrets(vaultId: string): Promise<string[]>
+  getKeychainSecret(vaultId: string, secretId: string): Promise<string | null>
+  setKeychainSecret(vaultId: string, secretId: string, value: string): Promise<void>
+}
+
+/** Obsidian's secret ID format: lowercase letters and digits, groups separated by single hyphens. */
+const KEYCHAIN_SECRET_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
 /**
  * SecretStorage — Obsidian API since 1.11.4. Stores API keys/tokens outside a
  * plugin's regular `data.json`. Exposed as `app.secretStorage`, and paired
  * with `SecretComponent` (setting-tab.ts) for the settings-UI side.
  *
- * Real Obsidian encrypts this at rest via the OS keychain; Slatebase stores
- * secrets server-side, encrypted at rest with AES-256-GCM. The frontend uses a
- * write-through cache pattern: reads are synchronous (from cache), writes
- * update the cache immediately and fire an async PUT to the backend.
+ * Backed by the vault keychain: named secrets shared by every plugin of the
+ * vault, stored server-side and encrypted at rest (never in the vault). The
+ * frontend uses a write-through cache: reads are synchronous (from cache),
+ * writes update the cache immediately and fire an async PUT. One instance per
+ * vault is shared by all plugins (see {@link getVaultSecretStorage}).
  */
 export class SecretStorage extends Events {
   private readonly cache: Map<string, string> = new Map()
   private initPromise: Promise<void> | null = null
-  private readonly apiClient: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> }
+  private readonly apiClient: KeychainApiClient
   private readonly vaultId: string
-  private readonly pluginId: string
-  private readonly legacyPrefix: string
 
-  constructor(options: {
-    apiClient: { listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>; getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>; setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>; deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> }
-    vaultId: string
-    pluginId: string
-    legacyPrefix: string
-  }) {
+  constructor(options: { apiClient: KeychainApiClient; vaultId: string }) {
     super()
     this.apiClient = options.apiClient
     this.vaultId = options.vaultId
-    this.pluginId = options.pluginId
-    this.legacyPrefix = options.legacyPrefix
   }
 
   /** Eagerly loads all secrets from the backend into the cache. */
   initialize(): Promise<void> {
     if (this.initPromise) return this.initPromise
-    this.initPromise = this.doInitialize()
+    this.initPromise = this.load()
     return this.initPromise
   }
 
-  private async doInitialize(): Promise<void> {
+  /** Re-reads every secret from the backend, e.g. after the settings page changed the keychain. */
+  async reload(): Promise<void> {
+    this.initPromise = this.load()
+    return this.initPromise
+  }
+
+  private async load(): Promise<void> {
     try {
-      const ids = await this.apiClient.listPluginSecrets(this.vaultId, this.pluginId)
+      const ids = await this.apiClient.listKeychainSecrets(this.vaultId)
+      const fresh = new Map<string, string>()
       for (const id of ids) {
-        const value = await this.apiClient.getPluginSecret(this.vaultId, this.pluginId, id)
-        if (value !== null) {
-          this.cache.set(id, value)
-        }
+        const value = await this.apiClient.getKeychainSecret(this.vaultId, id)
+        if (value !== null) fresh.set(id, value)
       }
-      if (ids.length === 0) {
-        await this.migrateLegacySecrets()
-      }
+      // A read-only collaborator may list the IDs but not read the values: degraded mode, the cache stays empty.
+      const removed = [...this.cache.keys()].filter((id) => !fresh.has(id))
+      this.cache.clear()
+      for (const [id, value] of fresh) this.cache.set(id, value)
+      for (const id of removed) this.trigger('change', id)
     } catch {
-      this.loadFromLocalStorageFallback()
-    }
-  }
-
-  private cryptoKeyPromise: Promise<CryptoKey> | null = null
-
-  private async getCryptoKey(): Promise<CryptoKey> {
-    if (this.cryptoKeyPromise) return this.cryptoKeyPromise
-    this.cryptoKeyPromise = (async () => {
-      const encoder = new TextEncoder()
-      const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(`slatebase-secret-storage:${this.vaultId}:${this.pluginId}`),
-        'PBKDF2',
-        false,
-        ['deriveKey'],
-      )
-      return crypto.subtle.deriveKey(
-        {
-          name: 'PBKDF2',
-          salt: encoder.encode(`slatebase-secret-storage-salt:${this.vaultId}:${this.pluginId}`),
-          iterations: 100000,
-          hash: 'SHA-256',
-        },
-        keyMaterial,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt', 'decrypt'],
-      )
-    })()
-    return this.cryptoKeyPromise
-  }
-
-  private bytesToBase64(bytes: Uint8Array): string {
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-    return btoa(binary)
-  }
-
-  private base64ToBytes(base64: string): Uint8Array {
-    const binary = atob(base64)
-    const out = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
-    return out
-  }
-
-  private async encryptForLocalStorage(plain: string): Promise<string> {
-    const key = await this.getCryptoKey()
-    const iv = crypto.getRandomValues(new Uint8Array(12))
-    const data = new TextEncoder().encode(plain)
-    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, data as BufferSource)
-    return `enc:v1:${this.bytesToBase64(iv)}:${this.bytesToBase64(new Uint8Array(cipher))}`
-  }
-
-  private async decryptFromLocalStorage(encoded: string): Promise<string | null> {
-    if (!encoded.startsWith('enc:v1:')) return null
-    const parts = encoded.split(':')
-    if (parts.length !== 4) return null
-    const iv = this.base64ToBytes(parts[2])
-    const cipher = this.base64ToBytes(parts[3])
-    const key = await this.getCryptoKey()
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, cipher as BufferSource)
-    return new TextDecoder().decode(plain)
-  }
-
-  private async migrateLegacySecrets(): Promise<void> {
-    const keysToMigrate: Array<{ id: string; value: string; storageKey: string }> = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const storageKey = localStorage.key(i)
-      if (storageKey?.startsWith(this.legacyPrefix)) {
-        const id = storageKey.slice(this.legacyPrefix.length)
-        const value = localStorage.getItem(storageKey)
-        if (value !== null) {
-          keysToMigrate.push({ id, value, storageKey })
-        }
-      }
-    }
-    for (const entry of keysToMigrate) {
-      try {
-        const maybeDecrypted = await this.decryptFromLocalStorage(entry.value).catch(() => null)
-        const valueToPersist = maybeDecrypted ?? entry.value
-        await this.apiClient.setPluginSecret(this.vaultId, this.pluginId, entry.id, valueToPersist)
-        this.cache.set(entry.id, valueToPersist)
-        localStorage.removeItem(entry.storageKey)
-      } catch { /* keep in localStorage on failure */ }
-    }
-  }
-
-  private loadFromLocalStorageFallback(): void {
-    for (let i = 0; i < localStorage.length; i++) {
-      const storageKey = localStorage.key(i)
-      if (storageKey?.startsWith(this.legacyPrefix)) {
-        const id = storageKey.slice(this.legacyPrefix.length)
-        const value = localStorage.getItem(storageKey)
-        if (value !== null) {
-          this.decryptFromLocalStorage(value)
-            .then((decrypted) => this.cache.set(id, decrypted ?? value))
-            .catch(() => this.cache.set(id, value))
-        }
-      }
+      // Degraded mode: keep whatever is cached; secrets cannot be read or written right now.
     }
   }
 
   setSecret(id: string, secret: string): void {
+    if (!KEYCHAIN_SECRET_ID_PATTERN.test(id)) {
+      throw new Error(`Invalid secret ID "${id}": use lowercase letters, digits and single hyphens`)
+    }
+    const previous = this.cache.get(id)
     this.cache.set(id, secret)
     this.trigger('change', id)
-    this.apiClient.setPluginSecret(this.vaultId, this.pluginId, id, secret).catch(async () => {
-      try {
-        const encrypted = await this.encryptForLocalStorage(secret)
-        localStorage.setItem(`${this.legacyPrefix}${id}`, encrypted)
-      } catch {
-        // Last-resort failure path: keep behavior non-throwing and avoid cleartext persistence.
-      }
+    this.apiClient.setKeychainSecret(this.vaultId, id, secret).catch((error: unknown) => {
+      // The server did not take it (read-only vault, limit, network): do not pretend it is stored.
+      if (this.cache.get(id) !== secret) return
+      if (previous === undefined) this.cache.delete(id)
+      else this.cache.set(id, previous)
+      this.trigger('change', id)
+      console.warn(`[SecretStorage] Could not store secret "${id}":`, error)
     })
   }
 
@@ -340,6 +254,24 @@ export class SecretStorage extends Events {
   listSecrets(): string[] {
     return Array.from(this.cache.keys())
   }
+}
+
+const vaultSecretStorages = new Map<string, SecretStorage>()
+
+/** The shared SecretStorage of a vault; created and loaded on first use. */
+export function getVaultSecretStorage(apiClient: KeychainApiClient, vaultId: string): SecretStorage {
+  let storage = vaultSecretStorages.get(vaultId)
+  if (!storage) {
+    storage = new SecretStorage({ apiClient, vaultId })
+    vaultSecretStorages.set(vaultId, storage)
+    storage.initialize().catch(() => { /* degraded mode */ })
+  }
+  return storage
+}
+
+/** Tells running plugins that the keychain of a vault changed outside their own `setSecret()` calls. */
+export function reloadVaultSecretStorage(vaultId: string): Promise<void> {
+  return vaultSecretStorages.get(vaultId)?.reload() ?? Promise.resolve()
 }
 
 // ─── Scope & Keymap ──────────────────────────────────────────────────────────────
