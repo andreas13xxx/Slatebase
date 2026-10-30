@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.70.0](https://github.com/andreas13xxx/Slatebase/compare/v0.69.0...v0.70.0) (2026-10-30)
+
+
+### Features
+
+* **admin:** session lifetime and SSE limits in admin config, live CORS ([c03d8ff](https://github.com/andreas13xxx/Slatebase/commit/c03d8ff05858e54f1b4eb5945a8ad20560e60284))
+* **admin:** session lifetime and SSE limits in admin config, live CORS ([4dd5a92](https://github.com/andreas13xxx/Slatebase/commit/4dd5a925ab342958f9c4345d8982f4cd87d1ae8f))
+
 ## [0.69.0](https://github.com/andreas13xxx/Slatebase/compare/v0.68.0...v0.69.0) (2026-10-30)
 
 
