@@ -279,7 +279,9 @@ All routes under `/api/v1`. Authentication required (session cookie or Bearer to
 | POST | `/vaults/:vaultId/import/folder` | Import folder |
 | DELETE | `/vaults/:vaultId/content?path=` | Delete file/folder (moves to trash) |
 | GET | `/vaults/:vaultId/statistics` | File/folder count and total size |
-| GET/PUT | `/vaults/:vaultId/config` | Per-vault config (templates, daily notes, attachments directory) |
+| GET/PUT | `/vaults/:vaultId/config` | Per-vault config: template folder, daily-note folder and template (read from / written to `.obsidian/templates.json` and `.obsidian/daily-notes.json`), unique-note folder, activity retention |
+| GET/PATCH | `/vaults/:vaultId/app-config` | The vault's `.obsidian/app.json` (attachment folder, readable line length, line numbers, spellcheck on/off, …); unknown keys are kept, a file that is not a JSON object is never overwritten |
+| GET/PUT/DELETE | `/vaults/:vaultId/keychain[/:secretId]` | Vault keychain (named secrets shared by the vault's plugins); listing names needs read access, values and changes need write access |
 
 ### Trash, Versions & Templates
 

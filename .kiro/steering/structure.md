@@ -254,7 +254,7 @@ src/
 │   ├── index.ts              — Barrel export for vault-config module
 │   ├── types.ts              — IVaultConfigService, VaultConfig (templatesDirectory, dailyNotesDirectory, dailyNoteTemplateName, attachmentsDirectory — empty means „same folder as the edited note", Slatebase's long-standing default, so an unconfigured vault behaves unchanged)
 │   ├── validation.ts         — Zod schema (updateVaultConfigSchema)
-│   └── vault-config-store.ts — VaultConfigStore (per-vault .slatebase/config.json via shared `KeyedJsonFileStore`; `saveConfig` merges through `mutate()` to avoid losing concurrent partial updates)
+│   └── vault-config-store.ts — VaultConfigStore: template folder, daily-note folder and daily-note template come from / go to the vault's `.obsidian/templates.json` and `daily-notes.json` (via `NoteConfigService`; `dailyNoteTemplate` is a vault path with `.md`, `dailyNoteFormat` is read-only); `uniqueNoteDirectory` and `activityRetentionDays` stay in `.slatebase/config.json` (per-vault via shared `KeyedJsonFileStore`; `saveConfig` merges through `mutate()` so concurrent partial updates are not lost). An invalid Obsidian file refuses the save before anything else is written
 ├── shared-secrets/            — Encrypted at-rest credential storage shared by git-sync, mail-import and the vault keychain, keyed by (vaultId, moduleId, entryId) so backend modules don't each reinvent it.
 │   ├── index.ts               — Barrel export for shared-secrets module
 │   ├── secret-key-manager.ts  — ModuleSecretKeyManager (AES-256 key: env → file → generate, HKDF-SHA256; same pattern as CsrfSecretManager)
