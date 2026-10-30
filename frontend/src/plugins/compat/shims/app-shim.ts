@@ -18,6 +18,8 @@ import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian
 import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
 import { resolveActiveTheme } from '../body-classes';
+import { getRegisteredExtensionTypeMap, registerExtensionsForPlugin } from '../file-view-registry';
+import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -579,6 +581,56 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * viewRegistry — Obsidian-internal registry mapping a file extension to the
+   * view type that opens it (undocumented; not in the public obsidian.d.ts).
+   * Plugins read `app.viewRegistry.typeByExtension` to learn which file types
+   * the app can actually open — notebook-navigator uses it to populate its
+   * "supported files" filter, falling back to a hard-coded md/canvas/base/pdf
+   * list when the registry is absent.
+   *
+   * Without a real object here the AppShim proxy handed back a truthy no-op
+   * *function*, so `app.viewRegistry?.typeByExtension` resolved to `undefined`
+   * and every file type beyond that fallback list (images, audio, video)
+   * silently dropped out of the navigator's view, and the generic
+   * "non-emulated" warning fired on every load.
+   *
+   * `typeByExtension` is a getter so it always reflects the current set of
+   * plugin-registered extensions (see `file-view-registry.ts`) on top of the
+   * built-in types Slatebase itself renders. Plugin registrations win over the
+   * built-ins, matching real Obsidian where a plugin claiming an extension
+   * replaces the default handler.
+   */
+  readonly viewRegistry = {
+    get typeByExtension(): Record<string, string> {
+      const map: Record<string, string> = { md: 'markdown', canvas: 'canvas', base: 'bases' }
+      const addAll = (exts: readonly string[], viewType: string): void => {
+        for (const ext of exts) map[ext.replace(/^\./, '').toLowerCase()] = viewType
+      }
+      addAll(IMAGE_EXTENSIONS, 'image')
+      addAll(PDF_EXTENSIONS, 'pdf')
+      addAll(AUDIO_EXTENSIONS, 'audio')
+      addAll(VIDEO_EXTENSIONS, 'video')
+      // Plugin-registered extensions win over the built-ins.
+      Object.assign(map, getRegisteredExtensionTypeMap())
+      return map
+    },
+    getTypeByExtension(extension: string): string | undefined {
+      return this.typeByExtension[extension.replace(/^\./, '').toLowerCase()]
+    },
+    isExtensionRegistered(extension: string): boolean {
+      return this.getTypeByExtension(extension) !== undefined
+    },
+    registerExtensions(extensions: string[], viewType: string): void {
+      registerExtensionsForPlugin(extensions, viewType, 'unknown')
+    },
+    unregisterExtensions(_extensions: string[]): void {
+      // Obsidian removes individual extensions; Slatebase's registry prunes by
+      // owning plugin on unload, so a standalone unregister here is a no-op.
+      warnNoOp('viewRegistry', 'unregisterExtensions')
+    },
+  }
+
+  /**
    * Register a plugin instance in the plugins map.
    * Makes the plugin accessible via `app.plugins.plugins[id]` and `app.plugins.getPlugin(id)`.
    *
@@ -657,6 +709,7 @@ export class AppShim implements IAppShim {
       'keymap',
       'scope',
       'metadataTypeManager',
+      'viewRegistry',
       'isMobile',
       'appId',
       'secretStorage',

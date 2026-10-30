@@ -423,6 +423,54 @@ describe('AppShim', () => {
     });
   });
 
+  describe('viewRegistry', () => {
+    it('is a real object (not the gap no-op) with a typeByExtension map', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+
+      // The whole point: `if (app.viewRegistry)` must not trip the gap warning,
+      // and `?.typeByExtension` must resolve to a real object, not undefined.
+      expect(app.viewRegistry).toBeTypeOf('object');
+      expect(app.viewRegistry.typeByExtension).toBeTypeOf('object');
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('typeByExtension maps the built-in file types Slatebase renders', () => {
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      const map = app.viewRegistry.typeByExtension;
+
+      expect(map['md']).toBe('markdown');
+      expect(map['canvas']).toBe('canvas');
+      expect(map['base']).toBe('bases');
+      expect(map['png']).toBe('image');
+      expect(map['pdf']).toBe('pdf');
+      expect(map['mp3']).toBe('audio');
+      expect(map['mp4']).toBe('video');
+      // keys are extension-only (no dot), matching Obsidian
+      expect(Object.keys(map).every((k) => !k.startsWith('.'))).toBe(true);
+    });
+
+    it('getTypeByExtension / isExtensionRegistered tolerate a leading dot and casing', () => {
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+
+      expect(app.viewRegistry.getTypeByExtension('.PNG')).toBe('image');
+      expect(app.viewRegistry.isExtensionRegistered('md')).toBe(true);
+      expect(app.viewRegistry.isExtensionRegistered('nope')).toBe(false);
+    });
+
+    it('reflects plugin-registered extensions, which win over the built-ins', async () => {
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      const { registerExtensionsForPlugin, unregisterExtensionsForPlugin } = await import('../file-view-registry');
+      try {
+        registerExtensionsForPlugin(['excalidraw'], 'excalidraw-view', 'excalidraw');
+        expect(app.viewRegistry.typeByExtension['excalidraw']).toBe('excalidraw-view');
+        expect(app.viewRegistry.isExtensionRegistered('excalidraw')).toBe(true);
+      } finally {
+        unregisterExtensionsForPlugin('excalidraw');
+      }
+    });
+  });
+
   describe('theme helpers through the plugin-facing proxy', () => {
     afterEach(() => {
       document.documentElement.removeAttribute('data-theme');
