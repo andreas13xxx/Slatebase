@@ -1234,7 +1234,7 @@ function AppContent() {
                   <RealtimeConnectionIndicator />
                   <UserMenu
                     onNavigate={handleNavigate}
-                    onOpenSettings={() => setSettingsOpen(true)}
+                    onOpenSettings={() => { setSettingsInitialNav(undefined); setSettingsOpen(true) }}
                     onLogout={handleLogout}
                     hasVaultSelected={state.selectedVaultId !== null}
                     onImportFile={handleImportFile}

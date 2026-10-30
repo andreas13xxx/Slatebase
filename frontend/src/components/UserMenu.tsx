@@ -23,7 +23,7 @@ export interface UserMenuProps {
 /**
  * User avatar and dropdown menu component.
  * Shows the current user's initials/avatar and provides navigation
- * to profile, sessions, admin pages, and vault operations.
+ * to settings, admin pages, and vault operations.
  */
 export function UserMenu({ onNavigate, onOpenSettings, onLogout, hasVaultSelected, onImportFile, onImportFolder, onExportVault }: UserMenuProps) {
   const { authState } = useAuthContext()

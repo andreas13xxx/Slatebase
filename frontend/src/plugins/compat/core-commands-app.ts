@@ -51,7 +51,7 @@ import { findHeadingSectionAtCursor, sanitizeFileNameFromHeading, extractRangeTo
 
 /** Pages the CommandPalette / core commands can navigate to (mirrors CommandPaletteContainer's NavigablePage). */
 export type NavigablePage =
-  | 'profile' | 'sessions' | 'chat' | 'mcp-tokens'
+  | 'chat' | 'mcp-tokens'
   | 'admin-users' | 'admin-vaults' | 'admin-config' | 'admin-audit' | 'admin-logs'
   | 'trash' | 'plugins'
 
