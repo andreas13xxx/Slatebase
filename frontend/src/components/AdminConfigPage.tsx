@@ -25,6 +25,9 @@ export interface ServerConfigData {
   maxImportDepth?: number
   mcp?: { maxFileSize: number; rateLimit: number }
   proxy?: { allowedOrigins: string[] }
+  sessionDurationHours?: number
+  sessionMaxLifetimeDays?: number
+  sse?: { maxConnections: number; maxPerUser: number }
 }
 
 /** Props for the AdminConfigPage component. */
@@ -83,6 +86,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
   const [mcpMaxFileSize, setMcpMaxFileSize] = useState('')
   const [mcpRateLimit, setMcpRateLimit] = useState('')
   const [proxyAllowedOrigins, setProxyAllowedOrigins] = useState('')
+  const [sessionDurationHours, setSessionDurationHours] = useState('')
+  const [sessionMaxLifetimeDays, setSessionMaxLifetimeDays] = useState('')
+  const [sseMaxConnections, setSseMaxConnections] = useState('')
+  const [sseMaxPerUser, setSseMaxPerUser] = useState('')
   /** Keys the server reports as pinned by an environment variable. */
   const [shadowedByEnv, setShadowedByEnv] = useState<string[]>([])
 
@@ -130,6 +137,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
           setMcpMaxFileSize(String(data.mcp?.maxFileSize ?? 16777216))
           setMcpRateLimit(String(data.mcp?.rateLimit ?? 60))
           setProxyAllowedOrigins((data.proxy?.allowedOrigins ?? []).join('\n'))
+          setSessionDurationHours(String(data.sessionDurationHours ?? 24))
+          setSessionMaxLifetimeDays(String(data.sessionMaxLifetimeDays ?? 7))
+          setSseMaxConnections(String(data.sse?.maxConnections ?? 1000))
+          setSseMaxPerUser(String(data.sse?.maxPerUser ?? 3))
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -188,6 +199,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
       ['Import-Tiefe', parseInt(importMaxDepth, 10), 100],
       ['MCP-Dateigröße', parseInt(mcpMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
       ['MCP-Rate-Limit', parseInt(mcpRateLimit, 10), Number.MAX_SAFE_INTEGER],
+      ['Session-Dauer', parseInt(sessionDurationHours, 10), 8760],
+      ['Session-Lebensdauer', parseInt(sessionMaxLifetimeDays, 10), 365],
+      ['SSE-Verbindungen', parseInt(sseMaxConnections, 10), 100000],
+      ['SSE pro Nutzer', parseInt(sseMaxPerUser, 10), 1000],
     ]
     const invalid = positiveFields.filter(([, value, max]) => isNaN(value) || value < 1 || value > max)
     if (invalid.length > 0) {
@@ -235,6 +250,12 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
           .split(/[\n,]/)
           .map((o) => o.trim())
           .filter((o) => o.length > 0),
+      },
+      sessionDurationHours: parseInt(sessionDurationHours, 10),
+      sessionMaxLifetimeDays: parseInt(sessionMaxLifetimeDays, 10),
+      sse: {
+        maxConnections: parseInt(sseMaxConnections, 10),
+        maxPerUser: parseInt(sseMaxPerUser, 10),
       },
     }
 
@@ -572,6 +593,62 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
             {shadowedByEnv.includes('proxy') && (
               <p className="admin-config-hint">{t('admin.config.proxyEnvPinned')}</p>
             )}
+          </div>
+        </section>
+
+        {/* Sessions & Realtime */}
+        <section className="admin-config-card">
+          <h2 className="admin-config-card-title">{t('admin.config.sessionsRealtimeTitle')}</h2>
+          <p className="admin-config-hint">{t('admin.config.sessionsRealtimeHint')}</p>
+          <div className="admin-config-grid">
+            <div className="admin-config-field">
+              <label htmlFor="config-session-duration">{t('admin.config.sessionDurationLabel')}</label>
+              <input
+                id="config-session-duration"
+                type="number"
+                min={1}
+                max={8760}
+                value={sessionDurationHours}
+                onChange={(e) => setSessionDurationHours(e.target.value)}
+              />
+              <p className="admin-config-hint">{t('admin.config.sessionDurationHint')}</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-session-lifetime">{t('admin.config.sessionLifetimeLabel')}</label>
+              <input
+                id="config-session-lifetime"
+                type="number"
+                min={1}
+                max={365}
+                value={sessionMaxLifetimeDays}
+                onChange={(e) => setSessionMaxLifetimeDays(e.target.value)}
+              />
+              <p className="admin-config-hint">{t('admin.config.sessionLifetimeHint')}</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-sse-max-connections">{t('admin.config.sseMaxConnectionsLabel')}</label>
+              <input
+                id="config-sse-max-connections"
+                type="number"
+                min={1}
+                max={100000}
+                value={sseMaxConnections}
+                onChange={(e) => setSseMaxConnections(e.target.value)}
+              />
+              <p className="admin-config-hint">{t('admin.config.sseMaxConnectionsHint')}</p>
+            </div>
+            <div className="admin-config-field">
+              <label htmlFor="config-sse-max-per-user">{t('admin.config.sseMaxPerUserLabel')}</label>
+              <input
+                id="config-sse-max-per-user"
+                type="number"
+                min={1}
+                max={1000}
+                value={sseMaxPerUser}
+                onChange={(e) => setSseMaxPerUser(e.target.value)}
+              />
+              <p className="admin-config-hint">{t('admin.config.sseMaxPerUserHint')}</p>
+            </div>
           </div>
         </section>
 

@@ -154,7 +154,41 @@ export const serverConfigUpdateSchema = z.object({
       )
       .max(100, 'At most 100 proxy origins are allowed'),
   }).optional(),
-})
+  // Session lifetime. Sliding duration (how long an idle session stays valid)
+  // must not exceed the absolute max lifetime — enforced with a cross-field
+  // refine so a nonsensical pair can't be persisted.
+  sessionDurationHours: z
+    .number()
+    .positive('Session duration must be greater than 0')
+    .max(8760, 'Session duration must be at most 8760 hours (1 year)')
+    .optional(),
+  sessionMaxLifetimeDays: z
+    .number()
+    .positive('Session max lifetime must be greater than 0')
+    .max(365, 'Session max lifetime must be at most 365 days')
+    .optional(),
+  sse: z.object({
+    maxConnections: z
+      .number()
+      .int('SSE max connections must be an integer')
+      .positive('SSE max connections must be greater than 0')
+      .max(100000, 'SSE max connections must be at most 100000'),
+    maxPerUser: z
+      .number()
+      .int('SSE max per user must be an integer')
+      .positive('SSE max per user must be greater than 0')
+      .max(1000, 'SSE max per user must be at most 1000'),
+  }).optional(),
+}).refine(
+  (c) =>
+    c.sessionDurationHours === undefined ||
+    c.sessionMaxLifetimeDays === undefined ||
+    c.sessionDurationHours <= c.sessionMaxLifetimeDays * 24,
+  {
+    message: 'Session duration must not exceed the absolute max lifetime',
+    path: ['sessionDurationHours'],
+  },
+)
 
 // --- Inferred Types ---
 

@@ -186,12 +186,15 @@ export type OverridableConfigKey =
   | 'maxImportFileSize'
   | 'maxImportFiles'
   | 'maxImportDepth'
+  | 'sessionDurationHours'
+  | 'sessionMaxLifetimeDays'
   | 'trash'
   | 'versions'
   | 'cleanup'
   | 'upload'
   | 'mcp'
   | 'proxy'
+  | 'sse'
 
 /**
  * Each key is typed `| undefined` rather than merely optional: under
@@ -199,7 +202,14 @@ export type OverridableConfigKey =
  * `undefined` for absent optional fields, and a plain `Partial<>` would reject it.
  */
 export type ServerConfigOverrides = {
-  [K in OverridableConfigKey]?: ServerConfig[K] | undefined
+  // `sse` is the one section an admin overrides partially: the UI exposes only
+  // the two operational fields (maxConnections/maxPerUser), while the internal
+  // ones (heartbeat/replay/batch) keep their configured values via the deep
+  // merge. So it takes a Partial<SseConfig>, not the full object the mapped
+  // type below would demand.
+  [K in Exclude<OverridableConfigKey, 'sse'>]?: ServerConfig[K] | undefined
+} & {
+  sse?: Partial<SseConfig> | undefined
 }
 
 // --- Interface ---

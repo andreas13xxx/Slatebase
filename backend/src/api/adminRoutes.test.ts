@@ -212,7 +212,7 @@ describe('Admin Routes — Input Validation', () => {
     })
   })
 
-  describe('PUT /admin/config', () => {
+  describe('PUT /admin/config — proxy', () => {
     const baseConfig = {
       port: 3000,
       host: '127.0.0.1',
@@ -278,6 +278,65 @@ describe('Admin Routes — Input Validation', () => {
         }),
       })
       expect(res.status).toBe(200)
+    })
+  })
+
+  describe('PUT /admin/config — session & SSE', () => {
+    const baseConfig = {
+      port: 3000,
+      host: '127.0.0.1',
+      logLevel: 'info',
+      maxFileSize: 5242880,
+      allowedOrigins: ['http://localhost:5173'],
+    }
+
+    it('accepts valid session and SSE overrides', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          sessionDurationHours: 12,
+          sessionMaxLifetimeDays: 14,
+          sse: { maxConnections: 500, maxPerUser: 5 },
+        }),
+      })
+      expect(res.status).toBe(200)
+    })
+
+    it('rejects a session duration that exceeds the absolute max lifetime', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          // 48h sliding window against a 1-day (24h) absolute cap is contradictory.
+          sessionDurationHours: 48,
+          sessionMaxLifetimeDays: 1,
+        }),
+      })
+      expect(res.status).toBe(400)
+
+      const body = await res.json() as { code: string }
+      expect(body.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('rejects an SSE maxPerUser above the cap', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/admin/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...baseConfig,
+          sse: { maxConnections: 500, maxPerUser: 5000 },
+        }),
+      })
+      expect(res.status).toBe(400)
     })
   })
 

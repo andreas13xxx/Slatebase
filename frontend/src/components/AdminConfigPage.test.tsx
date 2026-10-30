@@ -250,6 +250,10 @@ describe('AdminConfigPage', () => {
           // SAMPLE_CONFIG has no proxy section, so the form submits an empty
           // allowlist (which keeps the proxy disabled).
           proxy: { allowedOrigins: [] },
+          // SAMPLE_CONFIG omits these, so the form submits the shipped defaults.
+          sessionDurationHours: 24,
+          sessionMaxLifetimeDays: 7,
+          sse: { maxConnections: 1000, maxPerUser: 3 },
         }),
       }))
     })

@@ -70,7 +70,7 @@ All settings live in `docker.env`. Key options:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SLATEBASE_EXTERNAL_PORT` | `8080` | Port exposed on the host |
-| `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | Your public URL (for CORS) |
+| `SLATEBASE_ALLOWED_ORIGINS` | `http://localhost:8080` | Your public URL (for CORS). Also editable in Admin → Server configuration and now applied without a restart |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret — **set this!** |
 | `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts the vault keychain, Git-Sync and Mail-Import credentials — set if you use any of them |
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Reverse proxy IPs/CIDRs for real client IPs |
