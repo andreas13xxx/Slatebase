@@ -20,8 +20,12 @@ import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 export interface IModuleSecretStore {
   /** Get a decrypted secret value. Returns null if not found. */
   getSecret(vaultId: string, moduleId: string, entryId: string): Promise<string | null>
-  /** Set (create or update) an encrypted secret. */
-  setSecret(vaultId: string, moduleId: string, entryId: string, value: string): Promise<void>
+  /**
+   * Set (create or update) an encrypted secret. With `maxEntries`, adding a NEW entry to a module that
+   * already holds that many throws {@link ModuleSecretLimitError}; the check runs inside the write lock, so
+   * concurrent writers cannot exceed the limit. Replacing an existing entry is always allowed.
+   */
+  setSecret(vaultId: string, moduleId: string, entryId: string, value: string, maxEntries?: number): Promise<void>
   /** Delete a single secret. */
   deleteSecret(vaultId: string, moduleId: string, entryId: string): Promise<void>
 }
@@ -58,6 +62,15 @@ export class ModuleSecretTooLargeError extends Error {
   constructor(entryId: string) {
     super(`Secret "${entryId}" exceeds the maximum size of ${MAX_SECRET_VALUE_BYTES} bytes`)
     this.name = 'ModuleSecretTooLargeError'
+  }
+}
+
+export class ModuleSecretLimitError extends Error {
+  public readonly code = 'SECRET_LIMIT_EXCEEDED'
+
+  constructor(moduleId: string, maxEntries: number) {
+    super(`Module "${moduleId}" has reached the maximum of ${maxEntries} secrets`)
+    this.name = 'ModuleSecretLimitError'
   }
 }
 
@@ -106,7 +119,7 @@ export class ModuleSecretStore implements IListableModuleSecretStore {
     }
   }
 
-  async setSecret(vaultId: string, moduleId: string, entryId: string, value: string): Promise<void> {
+  async setSecret(vaultId: string, moduleId: string, entryId: string, value: string, maxEntries?: number): Promise<void> {
     const size = Buffer.byteLength(value, 'utf-8')
     if (size > MAX_SECRET_VALUE_BYTES) {
       throw new ModuleSecretTooLargeError(entryId)
@@ -116,6 +129,9 @@ export class ModuleSecretStore implements IListableModuleSecretStore {
     const encrypted = this.keyManager.encrypt(value)
 
     await this.store.mutate(this.key(vaultId, moduleId), (data) => {
+      if (maxEntries !== undefined && !(entryId in data.secrets) && Object.keys(data.secrets).length >= maxEntries) {
+        throw new ModuleSecretLimitError(moduleId, maxEntries)
+      }
       data.secrets[entryId] = encrypted
       return data
     })

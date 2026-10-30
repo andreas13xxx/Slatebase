@@ -269,6 +269,14 @@ export function getVaultSecretStorage(apiClient: KeychainApiClient, vaultId: str
   return storage
 }
 
+/**
+ * Forgets every vault's decrypted secrets. Called when the session ends: the cache holds values the
+ * server only hands out to users with write access, so it must not outlive the login that loaded it.
+ */
+export function disconnectVaultSecretStorages(): void {
+  vaultSecretStorages.clear()
+}
+
 /** Tells running plugins that the keychain of a vault changed outside their own `setSecret()` calls. */
 export function reloadVaultSecretStorage(vaultId: string): Promise<void> {
   return vaultSecretStorages.get(vaultId)?.reload() ?? Promise.resolve()

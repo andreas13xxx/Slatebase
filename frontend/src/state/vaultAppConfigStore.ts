@@ -125,26 +125,43 @@ export function useAppConfigValue<K extends AppConfigKey>(key: K): AppConfigValu
 
 /**
  * Changes known keys of the active vault's app.json. `null` removes a key (back to the default).
- * Rejects with the server's error (typically: no write access); the previous values are restored.
+ * Rejects with the server's error (typically: no write access); the keys of this change go back to
+ * what they were before it.
+ *
+ * The rollback is per key and only for keys that still hold this change's value: a second change that
+ * was made meanwhile (and may have succeeded or failed on its own) is neither undone nor resurrected.
  */
 export async function updateAppConfig(patch: { [K in AppConfigKey]?: AppConfigValues[K] | null }): Promise<void> {
   const vaultId = activeVaultId
   if (vaultId === null || apiClient === null) throw new Error('Kein Vault aktiv')
 
-  const before = fileFields
+  const entries = Object.entries(patch).filter(([, value]) => value !== undefined) as [string, unknown][]
+  const previous = new Map(entries.map(([key]) => [key, key in fileFields ? { value: fileFields[key] } : null]))
+
   const optimistic = { ...fileFields }
-  for (const [key, value] of Object.entries(patch)) {
+  for (const [key, value] of entries) {
     if (value === null) delete optimistic[key]
-    else if (value !== undefined) optimistic[key] = value
+    else optimistic[key] = value
   }
   const mine = ++generation
   apply(optimistic)
 
   try {
     const saved = await apiClient.patchAppConfig(vaultId, patch)
+    // Only the newest change may adopt the server's copy: an older response predates the newer optimistic values.
     if (activeVaultId === vaultId && mine === generation) apply(saved)
   } catch (error) {
-    if (activeVaultId === vaultId && mine === generation) apply(before)
+    if (activeVaultId === vaultId) {
+      const restored = { ...fileFields }
+      for (const [key, value] of entries) {
+        const stillMine = value === null ? !(key in restored) : restored[key] === value
+        if (!stillMine) continue
+        const before = previous.get(key)
+        if (before === null || before === undefined) delete restored[key]
+        else restored[key] = before.value
+      }
+      apply(restored)
+    }
     throw error
   }
 }

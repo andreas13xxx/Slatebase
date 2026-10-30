@@ -5,7 +5,7 @@
  * inside the vault itself.
  */
 
-import type { IListableModuleSecretStore } from '../shared-secrets/index.js'
+import { ModuleSecretLimitError, type IListableModuleSecretStore } from '../shared-secrets/index.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -77,11 +77,13 @@ export class KeychainService implements IKeychainService {
 
   async set(vaultId: string, secretId: string, value: string): Promise<void> {
     this.assertValidId(secretId)
-    const ids = await this.store.listSecrets(vaultId, KEYCHAIN_MODULE_ID)
-    if (!ids.includes(secretId) && ids.length >= MAX_KEYCHAIN_ENTRIES) {
-      throw new KeychainLimitExceededError()
+    try {
+      // The limit is checked inside the store's write lock, so concurrent writers cannot exceed it.
+      await this.store.setSecret(vaultId, KEYCHAIN_MODULE_ID, secretId, value, MAX_KEYCHAIN_ENTRIES)
+    } catch (error) {
+      if (error instanceof ModuleSecretLimitError) throw new KeychainLimitExceededError()
+      throw error
     }
-    await this.store.setSecret(vaultId, KEYCHAIN_MODULE_ID, secretId, value)
   }
 
   async delete(vaultId: string, secretId: string): Promise<void> {

@@ -93,6 +93,16 @@ describe('KeychainService', () => {
     expect(await service.get('v1', 'k0')).toBe('changed')
   }, 60_000)
 
+  it('does not exceed the entry limit when writers race', async () => {
+    for (let i = 0; i < MAX_KEYCHAIN_ENTRIES - 1; i++) await service.set('v1', `k${i}`, 'x')
+
+    const results = await Promise.allSettled(Array.from({ length: 5 }, (_, i) => service.set('v1', `race-${i}`, 'x')))
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter((r) => r.status === 'rejected' && r.reason instanceof KeychainLimitExceededError)).toHaveLength(4)
+    expect(await service.list('v1')).toHaveLength(MAX_KEYCHAIN_ENTRIES)
+  }, 60_000)
+
   it('deletes every entry of a vault and tolerates a vault without any', async () => {
     await service.set('v1', 'a', '1')
     await service.deleteAllForVault('v1')

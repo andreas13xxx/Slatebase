@@ -3,7 +3,7 @@ import { mkdtemp, rm, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ModuleSecretKeyManager } from './secret-key-manager.js'
-import { ModuleSecretStore, ModuleSecretTooLargeError } from './secret-store.js'
+import { ModuleSecretLimitError, ModuleSecretStore, ModuleSecretTooLargeError } from './secret-store.js'
 
 // ─── Mock Logger ─────────────────────────────────────────────────────────────
 
@@ -148,5 +148,53 @@ describe('ModuleSecretStore', () => {
 
     expect(await store.getSecret('vault-1', 'git-sync', 'remote-a')).toBe('token-a')
     expect(await store.getSecret('vault-1', 'mail-import', 'account-a')).toBe('password-a')
+  })
+})
+
+describe('ModuleSecretStore — listing, limits and removal', () => {
+  let dataDir: string
+  let store: ModuleSecretStore
+
+  beforeEach(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), 'module-secret-list-'))
+    const keys = new ModuleSecretKeyManager(dataDir, createMockLogger())
+    await keys.loadOrCreate()
+    store = new ModuleSecretStore(dataDir, keys)
+  })
+
+  afterEach(async () => {
+    await rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('lists entry IDs of one module only, never values', async () => {
+    await store.setSecret('v1', 'm1', 'a', 'secret-a')
+    await store.setSecret('v1', 'm1', 'b', 'secret-b')
+    await store.setSecret('v1', 'm2', 'c', 'secret-c')
+
+    expect((await store.listSecrets('v1', 'm1')).sort()).toEqual(['a', 'b'])
+    expect(await store.listSecrets('v1', 'm2')).toEqual(['c'])
+    expect(await store.listSecrets('v2', 'm1')).toEqual([])
+  })
+
+  it('refuses a new entry beyond maxEntries but still replaces an existing one', async () => {
+    await store.setSecret('v1', 'm1', 'a', '1', 2)
+    await store.setSecret('v1', 'm1', 'b', '2', 2)
+
+    await expect(store.setSecret('v1', 'm1', 'c', '3', 2)).rejects.toBeInstanceOf(ModuleSecretLimitError)
+    await expect(store.setSecret('v1', 'm1', 'a', 'changed', 2)).resolves.toBeUndefined()
+
+    expect(await store.getSecret('v1', 'm1', 'a')).toBe('changed')
+    expect((await store.listSecrets('v1', 'm1')).sort()).toEqual(['a', 'b'])
+  })
+
+  it('deleteAll drops a module in one vault and tolerates a module without a file', async () => {
+    await store.setSecret('v1', 'm1', 'a', '1')
+    await store.setSecret('v1', 'm2', 'b', '2')
+
+    await store.deleteAll('v1', 'm1')
+    await expect(store.deleteAll('v1', 'never-existed')).resolves.toBeUndefined()
+
+    expect(await store.listSecrets('v1', 'm1')).toEqual([])
+    expect(await store.getSecret('v1', 'm2', 'b')).toBe('2')
   })
 })

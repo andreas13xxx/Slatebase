@@ -1,5 +1,6 @@
 // Integration tests for vaultConfigRoutes — GET/PUT /vaults/:vaultId/config
 
+import { ObsidianConfigFileInvalidError } from '../shared/obsidian-config-file.js'
 import { describe, it, expect } from 'vitest'
 import { Hono } from 'hono'
 import type { SessionContext } from '../auth/index.js'
@@ -128,6 +129,24 @@ describe('Vault Config Routes', () => {
         body: JSON.stringify({ dailyNoteTemplate: '/etc/daily.md' }),
       })
       expect(absolute.status).toBe(400)
+    })
+
+    it('answers 409 with the reason when one of the vault\'s Obsidian files is not valid JSON', async () => {
+      const vaultConfigService = createMockVaultConfigService({
+        saveConfig: async () => { throw new ObsidianConfigFileInvalidError('daily-notes.json') },
+      })
+      const app = createTestApp({ vaultConfigService })
+
+      const res = await app.request('/api/v1/vaults/vault-1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailyNotesDirectory: 'Journal' }),
+      })
+
+      expect(res.status).toBe(409)
+      const body = await res.json() as { code: string; message: string }
+      expect(body.code).toBe('OBSIDIAN_CONFIG_INVALID')
+      expect(body.message).toContain('daily-notes.json')
     })
 
     it('no longer takes attachmentsDirectory: it moved to attachmentFolderPath in the vault\'s app.json', async () => {

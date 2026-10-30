@@ -5,12 +5,17 @@
  *
  * The file lives in the vault (`.obsidian/app.json`), so it is re-read when the vault changes and
  * whenever the server reports a change to it (`vault:change`, e.g. from Obsidian or a sync).
+ *
+ * It is only mounted while someone is logged in, so unmounting it is the end of the session: the app.json
+ * snapshot and the decrypted keychain caches are dropped then, and the next login starts from the server.
  */
 import { useEffect } from 'react'
 import { useAppContext } from '../state'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
+import { disconnectVaultSecretStorages } from '../plugins/compat/obsidian-api-extensions'
 import {
   APP_CONFIG_PATH,
+  disconnect as disconnectAppConfig,
   initialize as initializeAppConfig,
   refreshAppConfig,
   setActiveVault as setActiveAppConfigVault,
@@ -19,6 +24,11 @@ import {
 export function AppConfigLifecycle(): null {
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
+
+  useEffect(() => () => {
+    disconnectAppConfig()
+    disconnectVaultSecretStorages()
+  }, [])
 
   useEffect(() => {
     if (apiClient) initializeAppConfig(apiClient)

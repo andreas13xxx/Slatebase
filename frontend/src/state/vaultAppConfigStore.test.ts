@@ -116,6 +116,48 @@ describe('vaultAppConfigStore', () => {
     expect(getAppConfigValue('spellcheck')).toBe(true)
   })
 
+  it('rolls back each failed change on its own when two fail in a row', async () => {
+    const client = createClient({ v1: { spellcheck: true, showLineNumber: false } })
+    client.patchAppConfig.mockRejectedValue(new Error('Kein Schreibzugriff'))
+    connect(client)
+    await setActiveVault('v1')
+
+    const first = updateAppConfig({ spellcheck: false })
+    const second = updateAppConfig({ showLineNumber: true })
+    await expect(first).rejects.toThrow()
+    await expect(second).rejects.toThrow()
+
+    expect(getAppConfigValue('spellcheck')).toBe(true)
+    expect(getAppConfigValue('showLineNumber')).toBe(false)
+  })
+
+  it('keeps a later change that succeeded when an earlier one fails', async () => {
+    const client = createClient({ v1: { spellcheck: true, showLineNumber: false } })
+    client.patchAppConfig.mockRejectedValueOnce(new Error('Kein Schreibzugriff'))
+    connect(client)
+    await setActiveVault('v1')
+
+    const first = updateAppConfig({ spellcheck: false })
+    const second = updateAppConfig({ showLineNumber: true })
+    await expect(first).rejects.toThrow()
+    await second
+
+    expect(getAppConfigValue('spellcheck')).toBe(true)
+    expect(getAppConfigValue('showLineNumber')).toBe(true)
+  })
+
+  it('restores a key that was absent by removing it again', async () => {
+    const client = createClient({ v1: {} })
+    client.patchAppConfig.mockRejectedValueOnce(new Error('nope'))
+    connect(client)
+    await setActiveVault('v1')
+
+    await expect(updateAppConfig({ defaultViewMode: 'preview' })).rejects.toThrow()
+
+    expect(getAppConfigRaw('defaultViewMode')).toBe(DEFAULT_APP_CONFIG.defaultViewMode)
+    expect(getAppConfigValue('defaultViewMode')).toBe('source')
+  })
+
   it('rejects a write while no vault is active', async () => {
     connect(createClient())
     await expect(updateAppConfig({ spellcheck: false })).rejects.toThrow(/Kein Vault/)
