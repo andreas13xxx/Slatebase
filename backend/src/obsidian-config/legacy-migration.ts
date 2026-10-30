@@ -7,7 +7,7 @@
 //   dailyNotesDirectory     →  daily-notes.json  folder
 //   dailyNoteTemplateName   →  daily-notes.json  template               (<templates folder>/<name>, without .md)
 //
-// A value that equals the default is not written (the default applies anyway). An existing value in
+// Every value is written, also one that equals the default. An existing value in
 // the Obsidian file always wins and is never overwritten. The old fields are removed only after the
 // Obsidian files hold the values, so a failure at any point keeps them and is retried on the next
 // start. Idempotent: without the old fields nothing happens.
@@ -26,9 +26,6 @@ const CONFIG_PATH = path.join('.slatebase', 'config.json')
 
 /** The fields of config.json that Obsidian's files own now. */
 const LEGACY_KEYS = ['attachmentsDirectory', 'templatesDirectory', 'dailyNotesDirectory', 'dailyNoteTemplateName'] as const
-
-/** The template file name that already is the default. */
-const DEFAULT_DAILY_TEMPLATE_NAME = 'daily.md'
 
 export interface VaultConfigMigrationResult {
   /** Vaults whose old fields were moved (or dropped because the Obsidian files already had a value). */
@@ -82,17 +79,15 @@ export async function migrateVaultConfigToObsidianFiles(deps: {
       const note = await noteConfigService.get(vault.storagePath)
       const noteChanges: NoteConfigPatch = {}
       const legacyTemplates = typeof config['templatesDirectory'] === 'string' ? config['templatesDirectory'].trim() : ''
-      if (legacyTemplates !== '' && legacyTemplates !== defaultTemplatesDirectory && note.templatesFolder === null) {
+      if (legacyTemplates !== '' && note.templatesFolder === null) {
         noteChanges.templatesFolder = legacyTemplates
       }
       const legacyDaily = typeof config['dailyNotesDirectory'] === 'string' ? config['dailyNotesDirectory'].trim() : ''
       if (legacyDaily !== '' && note.dailyFolder === null) noteChanges.dailyFolder = legacyDaily
       if (typeof config['dailyNoteTemplateName'] === 'string' && note.dailyTemplate === null) {
         const name = config['dailyNoteTemplateName'].trim()
-        if (name !== DEFAULT_DAILY_TEMPLATE_NAME) {
-          const folder = legacyTemplates || note.templatesFolder || defaultTemplatesDirectory
-          noteChanges.dailyTemplate = name === '' ? '' : `${folder}/${name}`
-        }
+        const folder = legacyTemplates || note.templatesFolder || defaultTemplatesDirectory
+        noteChanges.dailyTemplate = name === '' ? '' : `${folder}/${name}`
       }
       if (Object.keys(noteChanges).length > 0) await noteConfigService.patch(vault.storagePath, noteChanges)
 

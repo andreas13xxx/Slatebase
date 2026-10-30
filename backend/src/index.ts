@@ -101,7 +101,7 @@ import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVau
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
 import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService, NoteConfigService, migrateVaultConfigToObsidianFiles } from './obsidian-config/index.js'
+import { AppConfigService, NoteConfigService, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -1151,6 +1151,8 @@ await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, plugi
 // Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
 await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
+// Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.
+await migrateUserVaultSettingsToAppConfig({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
 await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.
