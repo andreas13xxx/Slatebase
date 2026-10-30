@@ -694,20 +694,6 @@ export function CommandPaletteContainer({
     })
 
     commands.push({
-      id: 'slatebase:navigate-profile',
-      name: 'Profil',
-      callback: () => onNavigate('profile'),
-      pluginId: 'slatebase',
-    })
-
-    commands.push({
-      id: 'slatebase:navigate-sessions',
-      name: 'Sitzungen',
-      callback: () => onNavigate('sessions'),
-      pluginId: 'slatebase',
-    })
-
-    commands.push({
       id: 'slatebase:navigate-my-vaults',
       name: 'Meine Vaults',
       callback: () => onOpenSettings({ category: 'account', section: 'my-vaults' }),
