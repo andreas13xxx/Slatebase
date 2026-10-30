@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.69.0](https://github.com/andreas13xxx/Slatebase/compare/v0.68.0...v0.69.0) (2026-10-30)
+
+
+### Features
+
+* **admin:** make plugin proxy allowlist admin-configurable ([463091b](https://github.com/andreas13xxx/Slatebase/commit/463091b69435149efe00481e846958ca66351fe7))
+* **admin:** make plugin proxy allowlist admin-configurable ([cff4828](https://github.com/andreas13xxx/Slatebase/commit/cff482827cde516d0b5309f070245a56a629cf9e))
+* **app-config:** app.json des Vaults lesen und schreiben (Phase 5.1) ([ecb7d0a](https://github.com/andreas13xxx/Slatebase/commit/ecb7d0aebdc79edcb5a3627a2d00b881d7c27907))
+* **app-config:** Vault-Einstellungen aus app.json, keine User-Variante (Phase 5.2 bis 5.6) ([3859a99](https://github.com/andreas13xxx/Slatebase/commit/3859a99c6a97a53472aba1865ff83e96d8a7360e))
+* **keychain:** Plugin-Secrets in den Schlüsselbund migrieren, alte Routen entfernen (Phase 2) ([144a3e8](https://github.com/andreas13xxx/Slatebase/commit/144a3e888ee5d1972351e62ca6e91d5a9c103b44))
+* **keychain:** Plugin-Shim und Einstellungen für den Schlüsselbund (Phase 3) ([2183a05](https://github.com/andreas13xxx/Slatebase/commit/2183a05da4cf53fd5eb53f7a690dd31b0955c2f0))
+* **keychain:** Vault-Schlüsselbund im Backend (Phase 1) ([c087c16](https://github.com/andreas13xxx/Slatebase/commit/c087c16c13aef477a92ae1b034a06b4ff83954c6))
+* **vault-config:** Vorlagen und Tagesnotizen aus templates.json und daily-notes.json (Phase 6.3) ([26fa71e](https://github.com/andreas13xxx/Slatebase/commit/26fa71e597761ca9e4fb78f06f3b0fe4f9e13382))
+* Vault-Schlüsselbund und Vault-Einstellungen aus Obsidian-Dateien ([231a287](https://github.com/andreas13xxx/Slatebase/commit/231a2870103caf1d28ce375b53ec4ee3c7946c32))
+
+
+### Bugfixes
+
+* **deps:** Backend-Lockfile um shared-contracts-Abhängigkeiten ergänzt ([f277961](https://github.com/andreas13xxx/Slatebase/commit/f2779612914e3d18a5a5fc1846733aed6578e206))
+* Review-Findings zu PR [#304](https://github.com/andreas13xxx/Slatebase/issues/304) (Logout-Cache, 409, Rollback, Limit, Tests) ([75bb047](https://github.com/andreas13xxx/Slatebase/commit/75bb04709664bc6e527b740ada2de870b2f75bbe))
+
+
+### Sonstige Änderungen
+
+* **backend:** .npmrc mit install-links=true gegen Dependabot-Lockfile-Fehler ([69a72a6](https://github.com/andreas13xxx/Slatebase/commit/69a72a6d4e1398886322707f2e586eda81f22f9f))
+* **backend:** .npmrc mit install-links=true gegen Dependabot-Lockfile-Fehler ([b024a05](https://github.com/andreas13xxx/Slatebase/commit/b024a05675deeefbe27b3b02bd5630a63eea22f1))
+* bump the minor-patch group in /backend with 6 updates ([1f5efa5](https://github.com/andreas13xxx/Slatebase/commit/1f5efa55082e547c7b0ddda356a358fc56256667))
+* bump the minor-patch group in /backend with 6 updates ([c9a51b2](https://github.com/andreas13xxx/Slatebase/commit/c9a51b236fbbbcd328cbb6eddcf9da1fd5408c79))
+* bump the minor-patch group in /frontend with 6 updates ([12aaca8](https://github.com/andreas13xxx/Slatebase/commit/12aaca8dcc3971ceef2b703d1d895641337265a0))
+* bump the minor-patch group in /frontend with 6 updates ([e25fcb1](https://github.com/andreas13xxx/Slatebase/commit/e25fcb1a49ffc2a415250840e8ecd438952c7f16))
+* **keychain:** Doku zum Vault-Schlüsselbund nachgezogen ([21380fc](https://github.com/andreas13xxx/Slatebase/commit/21380fcd2c5cf17fe4cfdc99d2d2992c66067736))
+* Phasen 7 und 8 abgeschlossen, Doku zu app-config, Keychain und Vault-Konfiguration ([7ded384](https://github.com/andreas13xxx/Slatebase/commit/7ded3845c8ed43944f603b07d846bc251f016f8f))
+* **specs:** design.md und tasks.md zur Entscheidung "keine User-Variante" ([649d729](https://github.com/andreas13xxx/Slatebase/commit/649d72964f6dc94781960bf7d8af31c71f66cc6a))
+* **specs:** Formate von hotkeys, daily-notes, templates, graph, core-plugins belegt ([8b5069e](https://github.com/andreas13xxx/Slatebase/commit/8b5069e0e21c9360587a36b5486c1ca3683dd785))
+* **specs:** Keine User-Variante, wo es eine Vault-Einstellung gibt ([b54b7a0](https://github.com/andreas13xxx/Slatebase/commit/b54b7a007aed3fb28412131afe18bd5ba64f5786))
+* **specs:** Obsidian-Dateien als Quelle der Wahrheit, config.json wird migriert ([ce6eda5](https://github.com/andreas13xxx/Slatebase/commit/ce6eda5265f20ca9f950e0559e1fb585db6725cc))
+* **specs:** Spec für Vault-Schlüsselbund und Obsidian-Konfiguration ([5dbc991](https://github.com/andreas13xxx/Slatebase/commit/5dbc991175881e5f57ef5021f423b241f2b9a110))
+* **specs:** Task-0-Ergebnisse zur app.json und Korrektur der Ausgangslage ([d756a79](https://github.com/andreas13xxx/Slatebase/commit/d756a79d9e3585b034864d98b968576240ad7b70))
+
 ## [0.68.0](https://github.com/andreas13xxx/Slatebase/compare/v0.67.0...v0.68.0) (2026-10-28)
 
 
