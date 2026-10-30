@@ -89,8 +89,8 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     saveFavorites: vi.fn().mockResolvedValue({ entries: [] }),
     getKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
     saveKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
-    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '' }),
-    saveVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '' }),
+    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: 'Templates/daily.md', dailyNoteFormat: null }),
+    saveVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: 'Templates/daily.md', dailyNoteFormat: null }),
     ...overrides,
   } as IApiClient
 }
@@ -239,6 +239,40 @@ describe('dailyNoteService', () => {
       expect(result).toBe('2024-06-15.md')
       expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2024-06-15.md', '# 2024-06-15\n\n## Tasks\n')
 
+      vi.useRealTimers()
+    })
+
+    it('loads the template from the vault path in daily-notes.json, also outside the templates folder', async () => {
+      const fetchFileContent = vi.fn()
+        .mockRejectedValueOnce({ code: 'NOT_FOUND', message: 'File not found' })
+        .mockResolvedValueOnce({ path: 'Meta/tag.md', name: 'tag.md', content: 'Tag {{title}}', size: 5, encoding: 'utf-8', isBinary: false, isTruncated: false })
+      const apiClient = createMockApiClient({
+        fetchFileContent,
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: 'Meta/tag.md', dailyNoteFormat: null }),
+      })
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2024, 5, 15))
+      await createDailyNoteService(apiClient).openOrCreate('vault1', '')
+
+      expect(fetchFileContent).toHaveBeenNthCalledWith(2, 'vault1', 'Meta/tag.md')
+      expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2024-06-15.md', 'Tag 2024-06-15')
+      vi.useRealTimers()
+    })
+
+    it('does not look for a template when the vault wants none', async () => {
+      const fetchFileContent = vi.fn().mockRejectedValueOnce({ code: 'NOT_FOUND', message: 'File not found' })
+      const apiClient = createMockApiClient({
+        fetchFileContent,
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: '', dailyNoteFormat: null }),
+      })
+
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2024, 5, 15))
+      await createDailyNoteService(apiClient).openOrCreate('vault1', '')
+
+      expect(fetchFileContent).toHaveBeenCalledTimes(1)
+      expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2024-06-15.md', '')
       vi.useRealTimers()
     })
 

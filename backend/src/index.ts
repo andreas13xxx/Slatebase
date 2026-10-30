@@ -101,7 +101,7 @@ import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVau
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
 import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService, migrateVaultConfigToObsidianFiles } from './obsidian-config/index.js'
+import { AppConfigService, NoteConfigService, migrateVaultConfigToObsidianFiles } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -825,10 +825,12 @@ app.route('/api/v1', uploadRoutes)
 
 // Template route registration (auth middleware applies via /api/v1/* pattern)
 const templatesConfig = config.getTemplatesConfig()
+const noteConfigService = new NoteConfigService()
 const vaultConfigStore = new VaultConfigStore(
   (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
   templatesConfig.directory,
   logger,
+  noteConfigService,
 )
 const templateService = new TemplateService(templatesConfig.directory, vaultManager, logger, vaultConfigStore)
 const templateRoutes = createTemplateRoutes({
@@ -1144,7 +1146,7 @@ await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snip
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
 // Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
-await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, logger })
+await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
 await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.

@@ -41,7 +41,7 @@ function makeRecorder(result: DictationRecorderResult = { blob: new Blob(['x'], 
 function makeApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
   return {
     transcribe: vi.fn().mockResolvedValue({ text: 'transcribed' }),
-    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'T', dailyNotesDirectory: '', dailyNoteTemplateName: '' }),
+    getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'T', dailyNotesDirectory: '', dailyNoteTemplate: '', dailyNoteFormat: null }),
     uploadFiles: vi.fn().mockResolvedValue({ uploaded: [{ fileName: 'dictation-x.webm', path: 'Attachments/dictation-x.webm' }] }),
     ...overrides,
   } as unknown as IApiClient

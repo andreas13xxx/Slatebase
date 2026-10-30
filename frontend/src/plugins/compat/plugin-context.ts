@@ -798,9 +798,7 @@ export function PluginProvider({
       const dailyNotesPlugin = app?.internalPlugins?.plugins?.['daily-notes']
       if (dailyNotesPlugin?.instance?.options) {
         dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
-        dailyNotesPlugin.instance.options.template = config.dailyNoteTemplateName
-          ? `${config.templatesDirectory}/${config.dailyNoteTemplateName}`
-          : ''
+        dailyNotesPlugin.instance.options.template = config.dailyNoteTemplate
       }
     }).catch(() => { /* vault config unavailable — keep defaults */ })
 
@@ -1132,9 +1130,7 @@ export function PluginProvider({
             // eslint-disable-next-line react-hooks/immutability
             dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
             // eslint-disable-next-line react-hooks/immutability
-            dailyNotesPlugin.instance.options.template = config.dailyNoteTemplateName
-              ? `${config.templatesDirectory}/${config.dailyNoteTemplateName}`
-              : ''
+            dailyNotesPlugin.instance.options.template = config.dailyNoteTemplate
           }
         } catch {
           // Vault config unavailable — keep defaults (folder='')

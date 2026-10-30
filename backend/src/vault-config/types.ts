@@ -1,18 +1,29 @@
 /**
  * Per-vault configuration data models.
- * Persisted as `.slatebase/config.json` inside each vault's data directory.
+ *
+ * The template folder and the daily-note settings live in the vault's Obsidian files
+ * (`.obsidian/templates.json`, `.obsidian/daily-notes.json`), the source of truth; the rest is
+ * Slatebase-only and persisted as `.slatebase/config.json`.
  */
 
 // ─── Data Model ──────────────────────────────────────────────────────────────
 
 /** Per-vault configuration settings. */
 export interface VaultConfig {
-  /** Directory for note templates (relative to vault root). Default: "Templates". */
+  /** Directory for note templates (relative to vault root). `templates.json` `folder`. Default: "Templates". */
   templatesDirectory: string
-  /** Directory for daily notes (relative to vault root). Empty string = vault root. */
+  /** Directory for daily notes (relative to vault root). `daily-notes.json` `folder`. Empty string = vault root. */
   dailyNotesDirectory: string
-  /** Filename of the daily note template (relative to templatesDirectory). Default: "daily.md". */
-  dailyNoteTemplateName: string
+  /**
+   * Vault path of the daily note template, with `.md`. `daily-notes.json` `template`. Empty string =
+   * no template. Default: "<templatesDirectory>/daily.md".
+   */
+  dailyNoteTemplate: string
+  /**
+   * The Moment pattern `daily-notes.json` names daily notes by, or null if the file does not say.
+   * Read-only: Slatebase always names them `YYYY-MM-DD.md`.
+   */
+  dailyNoteFormat: string | null
   /**
    * Directory for new unique notes (relative to vault root). Empty string =
    * vault root. A unique note is created with a timestamp prefix name
@@ -31,7 +42,8 @@ export interface VaultConfig {
 export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   templatesDirectory: 'Templates',
   dailyNotesDirectory: '',
-  dailyNoteTemplateName: 'daily.md',
+  dailyNoteTemplate: 'Templates/daily.md',
+  dailyNoteFormat: null,
   uniqueNoteDirectory: '',
   activityRetentionDays: 90,
 }

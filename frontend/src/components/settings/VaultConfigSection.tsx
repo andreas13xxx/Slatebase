@@ -32,7 +32,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   // Form state
   const [templatesDir, setTemplatesDir] = useState('')
   const [dailyNotesDir, setDailyNotesDir] = useState('')
-  const [dailyNoteTemplateName, setDailyNoteTemplateName] = useState('')
+  const [dailyNoteTemplate, setDailyNoteTemplate] = useState('')
   const [uniqueNoteDir, setUniqueNoteDir] = useState('')
 
   // "Aktive Datei im Explorer verfolgen" used to live here. It is an account
@@ -50,7 +50,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setConfig(cfg)
         setTemplatesDir(cfg.templatesDirectory)
         setDailyNotesDir(cfg.dailyNotesDirectory)
-        setDailyNoteTemplateName(cfg.dailyNoteTemplateName)
+        setDailyNoteTemplate(cfg.dailyNoteTemplate)
         setUniqueNoteDir(cfg.uniqueNoteDirectory ?? '')
         setError(null)
       } catch (err: unknown) {
@@ -75,13 +75,13 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
       const updated = await apiClient.saveVaultConfig(vaultId, {
         templatesDirectory: templatesDir.trim(),
         dailyNotesDirectory: dailyNotesDir.trim(),
-        dailyNoteTemplateName: dailyNoteTemplateName.trim(),
+        dailyNoteTemplate: dailyNoteTemplate.trim(),
         uniqueNoteDirectory: uniqueNoteDir.trim(),
       })
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
-      setDailyNoteTemplateName(updated.dailyNoteTemplateName)
+      setDailyNoteTemplate(updated.dailyNoteTemplate)
       setUniqueNoteDir(updated.uniqueNoteDirectory ?? '')
       showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
@@ -93,12 +93,12 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     } finally {
       setSaving(false)
     }
-  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplateName, uniqueNoteDir])
+  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplate, uniqueNoteDir])
 
   const hasChanges = config !== null && (
     templatesDir.trim() !== config.templatesDirectory ||
     dailyNotesDir.trim() !== config.dailyNotesDirectory ||
-    dailyNoteTemplateName.trim() !== config.dailyNoteTemplateName ||
+    dailyNoteTemplate.trim() !== config.dailyNoteTemplate ||
     uniqueNoteDir.trim() !== (config.uniqueNoteDirectory ?? '')
   )
 
@@ -110,7 +110,10 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     <div className="vault-config-section">
       {error && <p className="settings-error">{error}</p>}
 
-      <SettingSection title="Verzeichnisse">
+      <SettingSection
+        title="Verzeichnisse"
+        description="Vorlagen- und Tagesnotizen-Ordner und die Tagesnotiz-Vorlage stehen in den Obsidian-Dateien .obsidian/templates.json und .obsidian/daily-notes.json, der Rest in .slatebase/config.json."
+      >
         <div className="settings-field">
           <label htmlFor="vault-templates-dir" className="settings-field-label">
             Vorlagen-Verzeichnis
@@ -152,18 +155,25 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
             Tagesnotiz-Vorlage
           </label>
           <p className="settings-field-hint">
-            Dateiname der Vorlage im Vorlagen-Verzeichnis, die für neue Tagesnotizen verwendet wird. Standard: <code>daily.md</code>
+            Pfad der Vorlage im Vault für neue Tagesnotizen, zum Beispiel <code>Templates/daily.md</code>. Leer = keine Vorlage.
           </p>
           <input
             id="vault-daily-note-template"
             type="text"
             className="settings-field-input"
-            value={dailyNoteTemplateName}
-            onChange={(e) => setDailyNoteTemplateName(e.target.value)}
-            placeholder="daily.md"
+            value={dailyNoteTemplate}
+            onChange={(e) => setDailyNoteTemplate(e.target.value)}
+            placeholder="Templates/daily.md"
             disabled={saving}
           />
         </div>
+
+        {config?.dailyNoteFormat != null && config.dailyNoteFormat !== 'YYYY-MM-DD' && (
+          <p className="settings-error" role="status">
+            Die Tagesnotizen-Einstellung dieses Vaults (Obsidian) benennt Notizen nach <code>{config.dailyNoteFormat}</code>.
+            Slatebase legt sie immer als <code>JJJJ-MM-TT.md</code> an und kann dieses Format nicht verwenden.
+          </p>
+        )}
 
         <div className="settings-field">
           <label htmlFor="vault-unique-note-dir" className="settings-field-label">

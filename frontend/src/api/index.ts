@@ -611,7 +611,12 @@ export interface TranscribeOptions {
 export interface VaultConfig {
   templatesDirectory: string
   dailyNotesDirectory: string
-  dailyNoteTemplateName: string
+  /**
+   * Vault path of the daily note template, with `.md` (`daily-notes.json` `template`). Empty = no template.
+   */
+  dailyNoteTemplate: string
+  /** The Moment pattern the vault's `daily-notes.json` names daily notes by; null if it does not say. Read-only. */
+  dailyNoteFormat: string | null
   /** Directory for new unique notes (timestamp-prefixed). Empty = vault root. */
   uniqueNoteDirectory?: string
 }

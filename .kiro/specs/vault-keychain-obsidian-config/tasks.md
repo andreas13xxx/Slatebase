@@ -41,10 +41,10 @@ Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Diff), dann Comm
 
 - [ ] 6. Weitere Vault_Files
   - [ ] 6.1 `obsidian-config/` mit gemeinsamem Lock-/Merge-Helfer
-  - [ ] 6.2 `bookmarks.json`, danach `hotkeys.json` inklusive Migration aus User-Preferences
-  - [ ] 6.3 `templates.json`, `daily-notes.json`
-  - [ ] 6.4 `workspaces.json`
-  - [ ] 6.5 `graph.json` und `core-plugins.json` (lesen)
+  - [-] 6.2 `bookmarks.json`, `hotkeys.json`: nicht umgesetzt (Bookmark-Format ohne echte Datei mit Einträgen unbekannt; Slatebase-Befehls-IDs sind nicht Obsidians)
+  - [x] 6.3 `templates.json`, `daily-notes.json` (inklusive Migration aus `config.json`; `VaultConfig.dailyNoteTemplate` ist jetzt ein Vault-Pfad)
+  - [-] 6.4 `workspaces.json`: nicht umsetzen (Slatebase-Pane-Bäume sind nicht Obsidians Layout-Format)
+  - [-] 6.5 `graph.json` und `core-plugins.json`: zurückgestellt (kleiner Nutzen)
   - _Requirements: 6_
 
 - [ ] 7. Geltungsbereich
