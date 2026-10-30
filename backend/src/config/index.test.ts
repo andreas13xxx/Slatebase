@@ -325,6 +325,28 @@ describe('ConfigService — admin overrides', () => {
     delete process.env['SLATEBASE_PROXY_ALLOWED_ORIGINS']
   })
 
+  it('applies session duration and max-lifetime overrides', async () => {
+    const config = new ConfigService()
+    await config.updateOverrides({ sessionDurationHours: 12, sessionMaxLifetimeDays: 14 })
+
+    expect(config.getServerConfig().sessionDurationHours).toBe(12)
+    expect(config.getServerConfig().sessionMaxLifetimeDays).toBe(14)
+  })
+
+  it('merges a partial SSE override without resetting the internal fields', async () => {
+    const config = new ConfigService()
+    const before = config.getSseConfig()
+    await config.updateOverrides({ sse: { maxConnections: 42, maxPerUser: 9 } })
+
+    const after = config.getSseConfig()
+    expect(after.maxConnections).toBe(42)
+    expect(after.maxPerUser).toBe(9)
+    // Internal fields the admin UI never sends keep their configured values.
+    expect(after.heartbeatInterval).toBe(before.heartbeatInterval)
+    expect(after.replayBufferSize).toBe(before.replayBufferSize)
+    expect(after.batchMax).toBe(before.batchMax)
+  })
+
   it('ignores an unreadable overrides file rather than failing to start', async () => {
     await writeFile(path.join(dataDir, 'server-config.json'), '{not json', 'utf-8')
     const config = new ConfigService()

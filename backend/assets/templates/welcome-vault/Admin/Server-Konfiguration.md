@@ -43,9 +43,17 @@ Slatebase nutzt ein mehrstufiges Konfigurationssystem:
 
 | Einstellung | Beschreibung | Standard |
 |-------------|--------------|----------|
-| Session-Dauer | Wie lange eine Session gültig ist | 24 Stunden |
+| Session-Dauer | Gleitende Gültigkeit einer inaktiven Session (Stunden), im Admin-Menü einstellbar | 24 Stunden |
+| Max. Session-Lebensdauer | Absolute Obergrenze unabhängig von Aktivität (Tage), im Admin-Menü einstellbar; muss ≥ Session-Dauer sein | 7 Tage |
 | Rate-Limiting | Max. Login-Versuche pro Zeitfenster | 5 pro 15 Min |
 | Trusted Proxies | IP-Bereiche vertrauenswürdiger Proxies | Keine |
+
+### Echtzeit (SSE)
+
+| Einstellung | Beschreibung | Standard |
+|-------------|--------------|----------|
+| SSE-Verbindungen (gesamt) | Maximale gleichzeitige Echtzeit-Verbindungen über alle Nutzer, im Admin-Menü einstellbar | 1000 |
+| SSE-Verbindungen pro Nutzer | Pro Nutzer meist = offene Browser-Tabs, im Admin-Menü einstellbar | 3 |
 
 ### Papierkorb & Versionen
 

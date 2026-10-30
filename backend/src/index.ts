@@ -615,7 +615,11 @@ app.use(
   cors({
     origin: (origin, c) => {
       if (c.req.path === '/.well-known/mcp.json') return origin || '*'
-      return serverConfig.allowedOrigins.includes(origin) ? origin : null
+      // Read the live config per request (not the start-up `serverConfig`
+      // snapshot) so an admin's allowedOrigins change via PUT /admin/config
+      // applies without a server restart — same per-request pattern the proxy
+      // allowlist uses.
+      return config.getServerConfig().allowedOrigins.includes(origin) ? origin : null
     },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-Id'],

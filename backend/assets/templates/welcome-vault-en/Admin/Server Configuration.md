@@ -43,9 +43,17 @@ Slatebase uses a multi-level configuration system:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Session duration | How long a session remains valid | 24 hours |
+| Session duration | Sliding validity of an idle session (hours), editable in the admin menu | 24 hours |
+| Max session lifetime | Absolute cap regardless of activity (days), editable in the admin menu; must be ≥ session duration | 7 days |
 | Rate limiting | Max login attempts per time window | 5 per 15 min |
 | Trusted proxies | IP ranges of trusted proxies | None |
+
+### Realtime (SSE)
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| SSE connections (total) | Maximum concurrent realtime connections across all users, editable in the admin menu | 1000 |
+| SSE connections per user | Per user, usually = open browser tabs, editable in the admin menu | 3 |
 
 ### Trash & Versions
 
