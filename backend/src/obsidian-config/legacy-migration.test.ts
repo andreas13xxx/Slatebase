@@ -112,12 +112,19 @@ describe('migrateVaultConfigToObsidianFiles', () => {
       expect(await readJson(join(root, '.slatebase', 'config.json'))).toEqual({ uniqueNoteDirectory: 'Zettel' })
     })
 
-    it('writes nothing for values that equal the defaults, but still drops the old fields', async () => {
+    it('also writes values that equal the defaults, and drops the old fields', async () => {
       await writeSlatebaseConfig(root, { templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplateName: 'daily.md' })
 
       await run(root)
 
-      await expect(readFile(join(root, '.obsidian', 'templates.json'), 'utf-8')).rejects.toThrow()
+      expect((await readJson(join(root, '.obsidian', 'templates.json')))['folder']).toBe('Templates')
+      expect((await readJson(join(root, '.obsidian', 'daily-notes.json')))['template']).toBe('Templates/daily')
+      expect(await readJson(join(root, '.slatebase', 'config.json'))).toEqual({})
+    })
+
+    it('does not pin the default daily template name when there is no templates folder of its own', async () => {
+      await writeSlatebaseConfig(root, { dailyNoteTemplateName: 'daily.md' })
+      await run(root)
       await expect(readFile(join(root, '.obsidian', 'daily-notes.json'), 'utf-8')).rejects.toThrow()
       expect(await readJson(join(root, '.slatebase', 'config.json'))).toEqual({})
     })

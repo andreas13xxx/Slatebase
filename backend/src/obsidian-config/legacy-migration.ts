@@ -7,7 +7,8 @@
 //   dailyNotesDirectory     →  daily-notes.json  folder
 //   dailyNoteTemplateName   →  daily-notes.json  template               (<templates folder>/<name>, without .md)
 //
-// A value that equals the default is not written (the default applies anyway). An existing value in
+// Every value is written, also one that equals the default, except the default daily template name
+// without a templates folder of its own (it would pin a path that may not exist). An existing value in
 // the Obsidian file always wins and is never overwritten. The old fields are removed only after the
 // Obsidian files hold the values, so a failure at any point keeps them and is retried on the next
 // start. Idempotent: without the old fields nothing happens.
@@ -82,16 +83,17 @@ export async function migrateVaultConfigToObsidianFiles(deps: {
       const note = await noteConfigService.get(vault.storagePath)
       const noteChanges: NoteConfigPatch = {}
       const legacyTemplates = typeof config['templatesDirectory'] === 'string' ? config['templatesDirectory'].trim() : ''
-      if (legacyTemplates !== '' && legacyTemplates !== defaultTemplatesDirectory && note.templatesFolder === null) {
+      if (legacyTemplates !== '' && note.templatesFolder === null) {
         noteChanges.templatesFolder = legacyTemplates
       }
       const legacyDaily = typeof config['dailyNotesDirectory'] === 'string' ? config['dailyNotesDirectory'].trim() : ''
       if (legacyDaily !== '' && note.dailyFolder === null) noteChanges.dailyFolder = legacyDaily
       if (typeof config['dailyNoteTemplateName'] === 'string' && note.dailyTemplate === null) {
         const name = config['dailyNoteTemplateName'].trim()
-        if (name !== DEFAULT_DAILY_TEMPLATE_NAME) {
-          const folder = legacyTemplates || note.templatesFolder || defaultTemplatesDirectory
-          noteChanges.dailyTemplate = name === '' ? '' : `${folder}/${name}`
+        const explicitFolder = legacyTemplates || note.templatesFolder
+        // The default name without a templates folder of its own would only pin a path that may not exist.
+        if (explicitFolder || name !== DEFAULT_DAILY_TEMPLATE_NAME) {
+          noteChanges.dailyTemplate = name === '' ? '' : `${explicitFolder || defaultTemplatesDirectory}/${name}`
         }
       }
       if (Object.keys(noteChanges).length > 0) await noteConfigService.patch(vault.storagePath, noteChanges)
