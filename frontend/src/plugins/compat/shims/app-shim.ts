@@ -18,7 +18,7 @@ import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian
 import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
 import { resolveActiveTheme } from '../body-classes';
-import { getRegisteredExtensionTypeMap, registerExtensionsForPlugin } from '../file-view-registry';
+import { getRegisteredExtensionTypeMap } from '../file-view-registry';
 import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
 
 /** The shape of Obsidian's internal `app.commands`. */
@@ -620,8 +620,14 @@ export class AppShim implements IAppShim {
     isExtensionRegistered(extension: string): boolean {
       return this.getTypeByExtension(extension) !== undefined
     },
-    registerExtensions(extensions: string[], viewType: string): void {
-      registerExtensionsForPlugin(extensions, viewType, 'unknown')
+    registerExtensions(_extensions: string[], _viewType: string): void {
+      // The supported path is `Plugin.registerExtensions()`, wired with the
+      // owning plugin id in plugin-context.ts. A registration through the
+      // shared `app.viewRegistry` here carries no plugin id, so it could never
+      // be pruned on unload (it would leak under a synthetic owner and
+      // accumulate across vault switches). A visible no-op is the honest
+      // answer rather than a silent leak.
+      warnNoOp('viewRegistry', 'registerExtensions')
     },
     unregisterExtensions(_extensions: string[]): void {
       // Obsidian removes individual extensions; Slatebase's registry prunes by
