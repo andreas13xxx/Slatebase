@@ -18,6 +18,9 @@ not a symlink. Every backend consumer must agree on this one form:
 
 - `backend/Dockerfile` build stage (line 52) and prod stage (line 70): `npm ci [--omit=dev] --install-links`
 - CI `backend` and `e2e` jobs (`.github/workflows/ci.yml`): `npm ci --install-links`
+- `backend/.npmrc` sets `install-links=true`, so Dependabot and a plain `npm install` in `backend/`
+  generate the lockfile in the same packed form (without it, Dependabot PRs fail with
+  `Missing: moment/yaml from lock file`).
 - The **frontend never uses `--install-links`** — it stays symlinked (plain `npm ci`).
 
 The two forms are mutually exclusive on npm 11: a lockfile generated with `--install-links`
