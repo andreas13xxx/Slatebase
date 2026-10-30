@@ -163,8 +163,6 @@ export const en: TranslationShape = {
     adminConfig: 'Server configuration',
     adminAudit: 'Audit log',
     adminLogs: 'Server logs',
-    vaultSharing: 'Shares',
-    vaultDeletion: 'Delete vault',
     mcpTokens: 'MCP Tokens',
     plugins: 'Plugins',
     trash: 'Trash',

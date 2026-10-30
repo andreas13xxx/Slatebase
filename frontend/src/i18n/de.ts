@@ -157,8 +157,6 @@ export const de = {
     adminConfig: 'Serverkonfiguration',
     adminAudit: 'Audit-Log',
     adminLogs: 'Server-Logs',
-    vaultSharing: 'Freigaben',
-    vaultDeletion: 'Vault löschen',
     mcpTokens: 'MCP-Tokens',
     plugins: 'Plugins',
     trash: 'Papierkorb',
