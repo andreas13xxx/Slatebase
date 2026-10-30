@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.71.0](https://github.com/andreas13xxx/Slatebase/compare/v0.70.0...v0.71.0) (2026-10-30)
+
+
+### Features
+
+* **ui:** add palette commands for profile and sessions settings ([8afb5e1](https://github.com/andreas13xxx/Slatebase/commit/8afb5e18c6ba1b24fbb4b9f641dfd457069d15bd))
+* **ui:** add palette commands for profile and sessions settings ([0286f81](https://github.com/andreas13xxx/Slatebase/commit/0286f8173c5dbe3cc951699d581c866f1503366d))
+* **ui:** replace user menu page entries with a Settings item ([9951431](https://github.com/andreas13xxx/Slatebase/commit/99514317292ac9d79cb1e54b8ae48e49d8c305d2))
+* **ui:** replace user menu page entries with a Settings item ([ed883ac](https://github.com/andreas13xxx/Slatebase/commit/ed883acfe194901e32f2b4aa608da9da579d617e))
+* **vault-config:** migrate all legacy settings into Obsidian files at start ([d089fda](https://github.com/andreas13xxx/Slatebase/commit/d089fda75a005bd1ce0adba8dbfff862bfc41407))
+* **vault-config:** migrate all legacy settings into Obsidian files at start ([f635a42](https://github.com/andreas13xxx/Slatebase/commit/f635a428a06cd29a8d0aa03ab8ef1cb872dd41fe))
+
+
+### Bugfixes
+
+* **plugin-compat:** emulate app.viewRegistry.typeByExtension ([c6b1607](https://github.com/andreas13xxx/Slatebase/commit/c6b1607cbb4962b526715ae85ab7246db1960bac))
+* **plugin-compat:** emulate app.viewRegistry.typeByExtension ([2726034](https://github.com/andreas13xxx/Slatebase/commit/272603467a1cce8e5501d0c6aa39f238eedaa8ba))
+* **plugin-compat:** make app.viewRegistry.registerExtensions a visible no-op ([47599a7](https://github.com/andreas13xxx/Slatebase/commit/47599a7e36955fa88076021542fbf18c91312540))
+* **ui:** address review findings for the user menu settings entry ([b424710](https://github.com/andreas13xxx/Slatebase/commit/b424710e0787d342641bcecf72a8bf5564378b08))
+* **vault-config:** address review findings of the settings migration ([d7ceae1](https://github.com/andreas13xxx/Slatebase/commit/d7ceae15bea9c0e80261bf70a38a4c429734193b))
+
+
+### Sonstige Änderungen
+
+* **ui:** remove unused VaultSharing page and its page labels ([11d4113](https://github.com/andreas13xxx/Slatebase/commit/11d411353956a4a1695905aa1a6fcac57c25d8f6))
+* **ui:** translate settings palette commands and cover them with tests ([58a60ec](https://github.com/andreas13xxx/Slatebase/commit/58a60ec803403daec8bda499f1d909f0861acc9d))
+
 ## [0.70.0](https://github.com/andreas13xxx/Slatebase/compare/v0.69.0...v0.70.0) (2026-10-30)
 
 
