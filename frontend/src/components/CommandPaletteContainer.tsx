@@ -29,6 +29,7 @@ import { ReleaseNotesModal } from './ReleaseNotesModal'
 import { DebugInfoModal } from './DebugInfoModal'
 import { matchesShortcut } from '../state/keybindingsStore'
 import { useTranslation } from '../i18n'
+import { buildSettingsNavCommands } from './settingsNavCommands'
 import { showToast } from './ToastNotification'
 import { extractErrorMessage } from '../utils/error'
 import type { Command } from '../plugins/compat/command-registry'
@@ -693,26 +694,7 @@ export function CommandPaletteContainer({
       pluginId: 'slatebase',
     })
 
-    commands.push({
-      id: 'slatebase:navigate-profile',
-      name: 'Profil',
-      callback: () => onOpenSettings({ category: 'account', section: 'profile' }),
-      pluginId: 'slatebase',
-    })
-
-    commands.push({
-      id: 'slatebase:navigate-sessions',
-      name: 'Sitzungen',
-      callback: () => onOpenSettings({ category: 'account', section: 'sessions' }),
-      pluginId: 'slatebase',
-    })
-
-    commands.push({
-      id: 'slatebase:navigate-my-vaults',
-      name: 'Meine Vaults',
-      callback: () => onOpenSettings({ category: 'account', section: 'my-vaults' }),
-      pluginId: 'slatebase',
-    })
+    commands.push(...buildSettingsNavCommands(t, onOpenSettings))
 
     if (isEnabled('chat')) {
       commands.push({
