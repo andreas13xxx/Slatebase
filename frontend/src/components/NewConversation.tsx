@@ -23,7 +23,7 @@ const SEARCH_DEBOUNCE_MS = 300
 /**
  * Dialog component for creating a new conversation.
  * Provides user search with autocomplete, participant chips, and validation.
- * Reuses the debounced search pattern from VaultSharing.tsx.
+ * Uses a debounced user search.
  */
 export function NewConversation({ onClose }: NewConversationProps) {
   const { dispatch } = useChatContext()
