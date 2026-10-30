@@ -76,15 +76,11 @@ import { PageLoadingFallback } from './components/PageLoadingFallback'
 // Standalone settings/admin pages — code-split (AP8). Each is only ever
 // reachable via renderSettingsPage() below, never on the initial vault/editor
 // path, so none of them belong in the main chunk.
-const ProfilePage = lazy(() => import('./components/ProfilePage').then((m) => ({ default: m.ProfilePage })))
-const SessionsPage = lazy(() => import('./components/SessionsPage').then((m) => ({ default: m.SessionsPage })))
 const AdminUsersPage = lazy(() => import('./components/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
 const AdminConfigPage = lazy(() => import('./components/AdminConfigPage').then((m) => ({ default: m.AdminConfigPage })))
 const AdminAuditPage = lazy(() => import('./components/AdminAuditPage').then((m) => ({ default: m.AdminAuditPage })))
 const AdminLogsPage = lazy(() => import('./components/AdminLogsPage').then((m) => ({ default: m.AdminLogsPage })))
 const AdminVaultsPage = lazy(() => import('./components/AdminVaultsPage').then((m) => ({ default: m.AdminVaultsPage })))
-const VaultSharing = lazy(() => import('./components/VaultSharing').then((m) => ({ default: m.VaultSharing })))
-const VaultDeletionWorkflow = lazy(() => import('./components/VaultDeletionWorkflow').then((m) => ({ default: m.VaultDeletionWorkflow })))
 const ChatPage = lazy(() => import('./components/ChatPage').then((m) => ({ default: m.ChatPage })))
 const MyVaultsPage = lazy(() => import('./components/MyVaultsPage').then((m) => ({ default: m.MyVaultsPage })))
 const McpTokensPage = lazy(() => import('./components/McpTokensPage').then((m) => ({ default: m.McpTokensPage })))
@@ -115,8 +111,8 @@ import { useWorkspaceRestore, LAST_VAULT_KEY, getInitialPaneTree } from './hooks
 import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import { requestReveal } from './state/revealFileBridge'
 import {
-  User, Settings, Shield, FileText, Clock,
-  Database, Share2, Trash2, Server,
+  Settings, Shield, FileText,
+  Database, Trash2, Server,
   PanelRight, PanelLeft, X, MessageCircle, Key, ScrollText, Plug,
 } from 'lucide-react'
 import './App.css'
@@ -139,16 +135,12 @@ const restoredPaneTree = getInitialPaneTree()
 /** Available navigation pages in the app (opened as tabs in the main content area). */
 export type AppPage =
   | 'my-vaults'
-  | 'profile'
-  | 'sessions'
   | 'chat'
   | 'admin-users'
   | 'admin-vaults'
   | 'admin-config'
   | 'admin-audit'
   | 'admin-logs'
-  | 'vault-sharing'
-  | 'vault-deletion'
   | 'mcp-tokens'
   | 'plugins'
   | 'trash'
@@ -156,16 +148,12 @@ export type AppPage =
 /** Translation keys for navigation pages. */
 const PAGE_LABEL_KEYS: Record<AppPage, string> = {
   'my-vaults': 'pages.myVaults',
-  profile: 'pages.profile',
-  sessions: 'pages.sessions',
   chat: 'pages.chat',
   'admin-users': 'pages.adminUsers',
   'admin-vaults': 'pages.adminVaults',
   'admin-config': 'pages.adminConfig',
   'admin-audit': 'pages.adminAudit',
   'admin-logs': 'pages.adminLogs',
-  'vault-sharing': 'pages.vaultSharing',
-  'vault-deletion': 'pages.vaultDeletion',
   'mcp-tokens': 'pages.mcpTokens',
   plugins: 'pages.plugins',
   trash: 'pages.trash',
@@ -174,16 +162,12 @@ const PAGE_LABEL_KEYS: Record<AppPage, string> = {
 /** Icons for settings pages. */
 const PAGE_ICONS: Partial<Record<AppPage, React.ReactNode>> = {
   'my-vaults': <Database size={13} />,
-  profile: <User size={13} />,
-  sessions: <Clock size={13} />,
   chat: <MessageCircle size={13} />,
   'admin-users': <Shield size={13} />,
   'admin-vaults': <Server size={13} />,
   'admin-config': <Settings size={13} />,
   'admin-audit': <FileText size={13} />,
   'admin-logs': <ScrollText size={13} />,
-  'vault-sharing': <Share2 size={13} />,
-  'vault-deletion': <Trash2 size={13} />,
   'mcp-tokens': <Key size={13} />,
   plugins: <Plug size={13} />,
   trash: <Trash2 size={13} />,
@@ -811,8 +795,6 @@ function AppContent() {
   function renderSettingsPage(page: AppPage) {
     switch (page) {
       case 'my-vaults': return <MyVaultsPage apiClient={apiClient} />
-      case 'profile': return <ProfilePage apiClient={apiClient} />
-      case 'sessions': return <SessionsPage apiClient={apiClient} />
       case 'chat':
         if (!isEnabled('chat')) return <FeatureDisabledHint featureName="Chat" />
         return <ChatPage />
@@ -821,21 +803,6 @@ function AppContent() {
       case 'admin-config': return <AdminConfigPage apiClient={apiClient} />
       case 'admin-audit': return <AdminAuditPage />
       case 'admin-logs': return <AdminLogsPage />
-      case 'vault-sharing':
-        return state.selectedVaultId
-          ? <VaultSharing apiClient={apiClient} vaultId={state.selectedVaultId} />
-          : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
-      case 'vault-deletion':
-        return state.selectedVaultId
-          ? <VaultDeletionWorkflow
-              apiClient={apiClient}
-              vaultId={state.selectedVaultId}
-              onComplete={() => {
-                loadVaults(dispatch, apiClient)
-                handleCloseSettingsTab('vault-deletion')
-              }}
-            />
-          : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
       case 'mcp-tokens':
         if (!isEnabled('mcp')) return <FeatureDisabledHint featureName="MCP" />
         return <McpTokensPage apiClient={apiClient} />
@@ -1267,6 +1234,7 @@ function AppContent() {
                   <RealtimeConnectionIndicator />
                   <UserMenu
                     onNavigate={handleNavigate}
+                    onOpenSettings={() => setSettingsOpen(true)}
                     onLogout={handleLogout}
                     hasVaultSelected={state.selectedVaultId !== null}
                     onImportFile={handleImportFile}
