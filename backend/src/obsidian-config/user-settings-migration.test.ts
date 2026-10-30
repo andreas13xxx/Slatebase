@@ -12,9 +12,9 @@ describe('migrateUserVaultSettingsToAppConfig', () => {
   let root: string
   let vault: string
   const service = new AppConfigService()
-  const run = () => migrateUserVaultSettingsToAppConfig({
+  const run = (load: () => Promise<unknown> = async () => [{ id: 'v1', name: 'v1', storagePath: vault }]) => migrateUserVaultSettingsToAppConfig({
     dataDir: root,
-    vaultRegistry: { load: async () => [{ id: 'v1', name: 'v1', storagePath: vault }] } as unknown as Pick<IVaultRegistry, 'load'>,
+    vaultRegistry: { load } as unknown as Pick<IVaultRegistry, 'load'>,
     appConfigService: service,
     logger,
   })
@@ -76,6 +76,22 @@ describe('migrateUserVaultSettingsToAppConfig', () => {
     await writePrefs('u1', { v1: { lineNumbers: true } })
 
     expect(await run()).toEqual({ vaults: 0, cleanedFiles: 0 })
+    expect((await readJson(prefFile('u1')))['vaultSettings']).toEqual({ v1: { lineNumbers: true } })
+  })
+
+  it('leaves values that are not booleans alone', async () => {
+    await writePrefs('u1', { v1: { lineNumbers: 'true', spellcheck: false } })
+
+    await run()
+
+    expect(await readJson(join(vault, '.obsidian', 'app.json'))).toEqual({ spellcheck: false })
+    expect((await readJson(prefFile('u1')))['vaultSettings']).toEqual({ v1: { lineNumbers: 'true' } })
+  })
+
+  it('does not throw when the vault registry cannot be loaded', async () => {
+    await writePrefs('u1', { v1: { lineNumbers: true } })
+
+    expect(await run(async () => { throw new Error('registry broken') })).toEqual({ vaults: 0, cleanedFiles: 0 })
     expect((await readJson(prefFile('u1')))['vaultSettings']).toEqual({ v1: { lineNumbers: true } })
   })
 

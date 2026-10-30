@@ -10,7 +10,9 @@
 // set one, the most recently changed preference file wins. A value that app.json already has always
 // wins and is never overwritten. The old keys are removed from a preference file only after
 // app.json holds the value, so a failure keeps them and is retried on the next start. Idempotent:
-// without the old keys nothing happens.
+// without the old keys nothing happens. Only boolean values are moved or removed; anything else in
+// those keys is left alone. It runs before the server listens, so no preference write can race the
+// cleanup; the file is re-read right before it is rewritten all the same.
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -18,9 +20,10 @@ import type { ILogger } from '../logger/index.js'
 import { isMissing, withRetry } from '../shared/fs-retry.js'
 import { writeJsonFileAtomic } from '../shared/json-file-store.js'
 import type { IVaultRegistry } from '../vault/registry.js'
+import { isRecord } from '../preferences/preferences-store.js'
 import type { AppConfigRequest, IAppConfigService } from './app-config.js'
 
-const USER_KEYS = { lineNumbers: 'showLineNumber', readableLineLength: 'readableLineLength', spellcheck: 'spellcheck' } as const
+const USER_KEYS = { lineNumbers: 'showLineNumber', readableLineLength: 'readableLineLength', spellcheck: 'spellcheck' } as const satisfies Record<string, keyof AppConfigRequest>
 type UserKey = keyof typeof USER_KEYS
 
 export interface UserSettingsMigrationResult {
@@ -36,11 +39,7 @@ interface PreferenceFile {
   data: Record<string, unknown>
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-async function readPreferenceFiles(usersDir: string): Promise<PreferenceFile[]> {
+async function readPreferenceFiles(usersDir: string, only?: string): Promise<PreferenceFile[]> {
   let names: string[]
   try {
     names = await withRetry(() => fs.readdir(usersDir))
@@ -49,7 +48,7 @@ async function readPreferenceFiles(usersDir: string): Promise<PreferenceFile[]> 
     throw error
   }
   const files: PreferenceFile[] = []
-  for (const name of names.filter((n) => n.endsWith('-preferences.json'))) {
+  for (const name of names.filter((n) => n.endsWith('-preferences.json') && (only === undefined || n === only))) {
     const file = path.join(usersDir, name)
     try {
       const data: unknown = JSON.parse(await withRetry(() => fs.readFile(file, 'utf-8')))
@@ -85,44 +84,56 @@ export async function migrateUserVaultSettingsToAppConfig(deps: {
     return isRecord(entry) ? entry : null
   }
 
-  const migratedVaultIds = new Set<string>()
-  for (const vault of await vaultRegistry.load()) {
-    try {
-      const patch: Record<string, boolean> = {}
-      for (const key of Object.keys(USER_KEYS) as UserKey[]) {
-        for (const pref of files) {
-          const value = vaultSettingsOf(pref, vault.id)?.[key]
-          if (typeof value === 'boolean') {
-            patch[USER_KEYS[key]] = value
-            break
+  const handled = new Map<string, Set<UserKey>>()
+  try {
+    for (const vault of await vaultRegistry.load()) {
+      try {
+        const patch: AppConfigRequest = {}
+        const keys = new Set<UserKey>()
+        for (const key of Object.keys(USER_KEYS) as UserKey[]) {
+          for (const pref of files) {
+            const value = vaultSettingsOf(pref, vault.id)?.[key]
+            if (typeof value === 'boolean') {
+              patch[USER_KEYS[key]] = value
+              keys.add(key)
+              break
+            }
           }
         }
-      }
-      if (Object.keys(patch).length === 0) continue
+        if (keys.size === 0) continue
 
-      const existing = await appConfigService.get(vault.storagePath)
-      const missing = Object.fromEntries(Object.entries(patch).filter(([key]) => typeof existing[key] !== 'boolean'))
-      if (Object.keys(missing).length > 0) {
-        await appConfigService.patch(vault.storagePath, missing as AppConfigRequest)
-        result.vaults++
-        logger.info('Moved user settings into the vault\'s app.json', { vaultId: vault.id, moved: Object.keys(missing) })
+        const existing = await appConfigService.get(vault.storagePath)
+        const missing: AppConfigRequest = {}
+        for (const key of keys) {
+          if (typeof existing[USER_KEYS[key]] !== 'boolean') missing[USER_KEYS[key]] = patch[USER_KEYS[key]]
+        }
+        if (Object.keys(missing).length > 0) {
+          await appConfigService.patch(vault.storagePath, missing)
+          result.vaults++
+          logger.info('Moved user settings into the vault\'s app.json', { vaultId: vault.id, moved: Object.keys(missing) })
+        }
+        handled.set(vault.id, keys)
+      } catch (error: unknown) {
+        logger.error('User settings migration failed, will retry on next start', {
+          vaultId: vault.id, error: error instanceof Error ? error.message : String(error),
+        })
       }
-      migratedVaultIds.add(vault.id)
-    } catch (error: unknown) {
-      logger.error('User settings migration failed, will retry on next start', {
-        vaultId: vault.id, error: error instanceof Error ? error.message : String(error),
-      })
     }
+  } catch (error: unknown) {
+    logger.error('User settings migration failed, will retry on next start', { error: error instanceof Error ? error.message : String(error) })
+    return result
   }
 
-  for (const pref of files) {
+  for (const stale of files) {
     try {
+      const [pref] = await readPreferenceFiles(path.dirname(stale.file), path.basename(stale.file))
+      if (pref === undefined) continue
       let changed = false
-      for (const vaultId of migratedVaultIds) {
+      for (const vaultId of handled.keys()) {
         const entry = vaultSettingsOf(pref, vaultId)
         if (entry === null) continue
         for (const key of Object.keys(USER_KEYS)) {
-          if (key in entry) {
+          if (typeof entry[key] === 'boolean') {
             delete entry[key]
             changed = true
           }
@@ -133,7 +144,7 @@ export async function migrateUserVaultSettingsToAppConfig(deps: {
         result.cleanedFiles++
       }
     } catch (error: unknown) {
-      logger.error('Could not remove migrated keys from a preference file', { file: pref.file, error: error instanceof Error ? error.message : String(error) })
+      logger.error('Could not remove migrated keys from a preference file', { file: stale.file, error: error instanceof Error ? error.message : String(error) })
     }
   }
   return result
