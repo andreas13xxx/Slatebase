@@ -289,3 +289,17 @@ export function getViewTypeForExtension(extension: string): string | null {
   const normalized = extension.toLowerCase().replace(/^\./, '')
   return extensionMap.get(normalized)?.viewType ?? null
 }
+
+/**
+ * Snapshot of every plugin-registered extension → viewType mapping.
+ *
+ * Backs `app.viewRegistry.typeByExtension` in the AppShim. Returns a plain
+ * object (not the live Map) so a reader can't mutate the registry, and keys are
+ * normalized (no leading dot), matching what Obsidian's internal
+ * `viewRegistry.typeByExtension` exposes.
+ */
+export function getRegisteredExtensionTypeMap(): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [ext, entry] of extensionMap) out[ext] = entry.viewType
+  return out
+}
