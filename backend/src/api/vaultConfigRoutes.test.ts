@@ -1,5 +1,6 @@
 // Integration tests for vaultConfigRoutes — GET/PUT /vaults/:vaultId/config
 
+import { ObsidianConfigFileInvalidError } from '../shared/obsidian-config-file.js'
 import { describe, it, expect } from 'vitest'
 import { Hono } from 'hono'
 import type { SessionContext } from '../auth/index.js'
@@ -65,20 +66,20 @@ describe('Vault Config Routes', () => {
   describe('GET /vaults/:vaultId/config', () => {
     it('returns the vault config on success', async () => {
       const vaultConfigService = createMockVaultConfigService({
-        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplateName: 'custom-daily.md', attachmentsDirectory: 'Attachments', uniqueNoteDirectory: 'Zettel', activityRetentionDays: 90 }),
+        getConfig: async () => ({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplate: 'Vorlagen/custom-daily.md', dailyNoteFormat: null, uniqueNoteDirectory: 'Zettel', activityRetentionDays: 90 }),
       })
       const app = createTestApp({ vaultConfigService })
 
       const res = await app.request('/api/v1/vaults/vault-1/config')
       expect(res.status).toBe(200)
       const body = await res.json() as VaultConfig
-      expect(body.dailyNoteTemplateName).toBe('custom-daily.md')
+      expect(body.dailyNoteTemplate).toBe('Vorlagen/custom-daily.md')
     })
 
   })
 
   describe('PUT /vaults/:vaultId/config', () => {
-    it('persists dailyNoteTemplateName along with the other fields', async () => {
+    it('persists the daily note template and the Slatebase-only fields along with the others', async () => {
       let savedPartial: Partial<VaultConfig> | undefined
       const vaultConfigService = createMockVaultConfigService({
         saveConfig: async (_vaultId, partial) => {
@@ -94,29 +95,61 @@ describe('Vault Config Routes', () => {
         body: JSON.stringify({
           templatesDirectory: 'Templates',
           dailyNotesDirectory: 'Journal',
-          dailyNoteTemplateName: 'my-daily-template.md',
+          dailyNoteTemplate: 'Templates/my-daily-template.md',
+          uniqueNoteDirectory: 'Zettel',
+          activityRetentionDays: 30,
         }),
       })
 
       expect(res.status).toBe(200)
       const body = await res.json() as VaultConfig
-      expect(body.dailyNoteTemplateName).toBe('my-daily-template.md')
-      expect(savedPartial?.dailyNoteTemplateName).toBe('my-daily-template.md')
+      expect(body.dailyNoteTemplate).toBe('Templates/my-daily-template.md')
+      expect(savedPartial).toEqual({
+        templatesDirectory: 'Templates',
+        dailyNotesDirectory: 'Journal',
+        dailyNoteTemplate: 'Templates/my-daily-template.md',
+        uniqueNoteDirectory: 'Zettel',
+        activityRetentionDays: 30,
+      })
     })
 
-    it('rejects a template name containing a path separator', async () => {
+    it('rejects a daily note template with parent traversal or an absolute path', async () => {
       const app = createTestApp()
 
       const res = await app.request('/api/v1/vaults/vault-1/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyNoteTemplateName: 'sub/daily.md' }),
+        body: JSON.stringify({ dailyNoteTemplate: '../daily.md' }),
       })
-
       expect(res.status).toBe(400)
+
+      const absolute = await app.request('/api/v1/vaults/vault-1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailyNoteTemplate: '/etc/daily.md' }),
+      })
+      expect(absolute.status).toBe(400)
     })
 
-    it('persists attachmentsDirectory', async () => {
+    it('answers 409 with the reason when one of the vault\'s Obsidian files is not valid JSON', async () => {
+      const vaultConfigService = createMockVaultConfigService({
+        saveConfig: async () => { throw new ObsidianConfigFileInvalidError('daily-notes.json') },
+      })
+      const app = createTestApp({ vaultConfigService })
+
+      const res = await app.request('/api/v1/vaults/vault-1/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailyNotesDirectory: 'Journal' }),
+      })
+
+      expect(res.status).toBe(409)
+      const body = await res.json() as { code: string; message: string }
+      expect(body.code).toBe('OBSIDIAN_CONFIG_INVALID')
+      expect(body.message).toContain('daily-notes.json')
+    })
+
+    it('no longer takes attachmentsDirectory: it moved to attachmentFolderPath in the vault\'s app.json', async () => {
       let savedPartial: Partial<VaultConfig> | undefined
       const vaultConfigService = createMockVaultConfigService({
         saveConfig: async (_vaultId, partial) => {
@@ -129,25 +162,11 @@ describe('Vault Config Routes', () => {
       const res = await app.request('/api/v1/vaults/vault-1/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachmentsDirectory: 'Attachments' }),
+        body: JSON.stringify({ attachmentsDirectory: 'Attachments', dailyNotesDirectory: 'Journal' }),
       })
 
       expect(res.status).toBe(200)
-      const body = await res.json() as VaultConfig
-      expect(body.attachmentsDirectory).toBe('Attachments')
-      expect(savedPartial?.attachmentsDirectory).toBe('Attachments')
-    })
-
-    it('rejects an attachments directory with parent traversal', async () => {
-      const app = createTestApp()
-
-      const res = await app.request('/api/v1/vaults/vault-1/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachmentsDirectory: '../outside' }),
-      })
-
-      expect(res.status).toBe(400)
+      expect(savedPartial).toEqual({ dailyNotesDirectory: 'Journal' })
     })
   })
 })

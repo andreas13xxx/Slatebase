@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { SecretComponent, DisplayValueComponent, Setting } from './setting-tab'
-import { SecretStorage } from './obsidian-api-extensions'
+import { SecretStorage, getVaultSecretStorage } from './obsidian-api-extensions'
 
 describe('SecretComponent (Obsidian 1.11.4+)', () => {
   it('renders a password-type input', () => {
@@ -65,60 +65,99 @@ describe('Setting.addComponent()/addDisplayValue() (Obsidian 1.11.0+/1.13.1+)', 
 })
 
 describe('SecretStorage (Obsidian 1.11.4+)', () => {
-  function createMockApiClient() {
-    const secrets = new Map<string, string>()
+  function createMockApiClient(initial: Record<string, string> = {}) {
+    const secrets = new Map<string, string>(Object.entries(initial))
     return {
-      listPluginSecrets: async () => Array.from(secrets.keys()),
-      getPluginSecret: async (_v: string, _p: string, id: string) => secrets.get(id) ?? null,
-      setPluginSecret: async (_v: string, _p: string, id: string, value: string) => { secrets.set(id, value) },
-      deletePluginSecret: async (_v: string, _p: string, id: string) => { secrets.delete(id) },
+      secrets,
+      listKeychainSecrets: async () => Array.from(secrets.keys()),
+      getKeychainSecret: async (_v: string, id: string) => secrets.get(id) ?? null,
+      setKeychainSecret: async (_v: string, id: string, value: string) => { secrets.set(id, value) },
     }
   }
 
-  function createStorage(prefix = 'test-secret-prefix:') {
-    return new SecretStorage({
-      apiClient: createMockApiClient(),
-      vaultId: 'test-vault',
-      pluginId: 'test-plugin',
-      legacyPrefix: prefix,
-    })
-  }
-
   it('setSecret()/getSecret() round-trip via cache', () => {
-    const storage = createStorage()
+    const storage = new SecretStorage({ apiClient: createMockApiClient(), vaultId: 'v1' })
     storage.setSecret('api-key', 'sk-xyz')
     expect(storage.getSecret('api-key')).toBe('sk-xyz')
     expect(storage.getSecret('missing')).toBeNull()
   })
 
-  it('listSecrets() returns only ids for this instance', () => {
-    const storage = createStorage('test-secret-list:')
-    const other = createStorage('test-secret-other:')
+  it('writes through to the API', async () => {
+    const apiClient = createMockApiClient()
+    const storage = new SecretStorage({ apiClient, vaultId: 'v1' })
+    storage.setSecret('k', 'v')
+    await Promise.resolve()
+    expect(apiClient.secrets.get('k')).toBe('v')
+  })
+
+  it('listSecrets() returns the ids of the vault', () => {
+    const storage = new SecretStorage({ apiClient: createMockApiClient(), vaultId: 'v1' })
     storage.setSecret('a', '1')
     storage.setSecret('b', '2')
-    other.setSecret('c', '3')
     expect(storage.listSecrets().sort()).toEqual(['a', 'b'])
   })
 
   it('setSecret() triggers a change event', () => {
-    const storage = createStorage('test-secret-change:')
+    const storage = new SecretStorage({ apiClient: createMockApiClient(), vaultId: 'v1' })
     const changed: string[] = []
     storage.on('change', (id) => changed.push(id as string))
     storage.setSecret('k', 'v')
     expect(changed).toEqual(['k'])
   })
 
-  it('initialize() loads secrets from the API into cache', async () => {
-    const apiClient = createMockApiClient()
-    await apiClient.setPluginSecret('test-vault', 'test-plugin', 'existing', 'val1')
+  it('rejects IDs outside the Obsidian format', () => {
+    const storage = new SecretStorage({ apiClient: createMockApiClient(), vaultId: 'v1' })
+    for (const id of ['Key', 'a_b', 'a--b', '-a', '']) expect(() => storage.setSecret(id, 'x')).toThrow(/Invalid secret ID/)
+  })
 
-    const storage = new SecretStorage({
-      apiClient,
-      vaultId: 'test-vault',
-      pluginId: 'test-plugin',
-      legacyPrefix: 'test-init:',
-    })
+  it('takes back the cached value when the server refuses it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const apiClient = { ...createMockApiClient({ k: 'old' }), setKeychainSecret: async () => { throw new Error('403') } }
+    const storage = new SecretStorage({ apiClient, vaultId: 'v1' })
+    await storage.initialize()
+    const changed: string[] = []
+    storage.on('change', (id) => changed.push(id as string))
+
+    storage.setSecret('k', 'new')
+    expect(storage.getSecret('k')).toBe('new')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(storage.getSecret('k')).toBe('old')
+    expect(changed).toEqual(['k', 'k'])
+    warn.mockRestore()
+  })
+
+  it('initialize() loads secrets from the API into cache', async () => {
+    const storage = new SecretStorage({ apiClient: createMockApiClient({ existing: 'val1' }), vaultId: 'v1' })
     await storage.initialize()
     expect(storage.getSecret('existing')).toBe('val1')
+  })
+
+  it('reload() picks up changes made elsewhere and announces removed entries', async () => {
+    const apiClient = createMockApiClient({ a: '1', b: '2' })
+    const storage = new SecretStorage({ apiClient, vaultId: 'v1' })
+    await storage.initialize()
+    const changed: string[] = []
+    storage.on('change', (id) => changed.push(id as string))
+
+    apiClient.secrets.delete('b')
+    apiClient.secrets.set('c', '3')
+    await storage.reload()
+
+    expect(storage.listSecrets().sort()).toEqual(['a', 'c'])
+    expect(changed).toEqual(['b'])
+  })
+
+  it('stays usable (empty) when the API is unavailable', async () => {
+    const apiClient = { ...createMockApiClient(), listKeychainSecrets: async () => { throw new Error('offline') } }
+    const storage = new SecretStorage({ apiClient, vaultId: 'v1' })
+    await expect(storage.initialize()).resolves.toBeUndefined()
+    expect(storage.listSecrets()).toEqual([])
+  })
+
+  it('getVaultSecretStorage() shares one instance per vault', () => {
+    const apiClient = createMockApiClient()
+    expect(getVaultSecretStorage(apiClient, 'shared-vault')).toBe(getVaultSecretStorage(apiClient, 'shared-vault'))
+    expect(getVaultSecretStorage(apiClient, 'other-vault')).not.toBe(getVaultSecretStorage(apiClient, 'shared-vault'))
   })
 })

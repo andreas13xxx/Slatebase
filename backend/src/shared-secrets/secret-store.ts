@@ -10,6 +10,7 @@
  * implementation instead of each reinventing encrypted-at-rest storage.
  */
 
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { IModuleSecretKeyManager } from './secret-key-manager.js'
 import { KeyedJsonFileStore } from '../shared/json-file-store.js'
@@ -19,10 +20,22 @@ import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 export interface IModuleSecretStore {
   /** Get a decrypted secret value. Returns null if not found. */
   getSecret(vaultId: string, moduleId: string, entryId: string): Promise<string | null>
-  /** Set (create or update) an encrypted secret. */
-  setSecret(vaultId: string, moduleId: string, entryId: string, value: string): Promise<void>
+  /**
+   * Set (create or update) an encrypted secret. With `maxEntries`, adding a NEW entry to a module that
+   * already holds that many throws {@link ModuleSecretLimitError}; the check runs inside the write lock, so
+   * concurrent writers cannot exceed the limit. Replacing an existing entry is always allowed.
+   */
+  setSecret(vaultId: string, moduleId: string, entryId: string, value: string, maxEntries?: number): Promise<void>
   /** Delete a single secret. */
   deleteSecret(vaultId: string, moduleId: string, entryId: string): Promise<void>
+}
+
+/** A store that can also enumerate and drop all entries of one module (used by the keychain). */
+export interface IListableModuleSecretStore extends IModuleSecretStore {
+  /** List the entry IDs of a module in a vault (never the values). */
+  listSecrets(vaultId: string, moduleId: string): Promise<string[]>
+  /** Delete every secret of a module in a vault. */
+  deleteAll(vaultId: string, moduleId: string): Promise<void>
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -52,6 +65,15 @@ export class ModuleSecretTooLargeError extends Error {
   }
 }
 
+export class ModuleSecretLimitError extends Error {
+  public readonly code = 'SECRET_LIMIT_EXCEEDED'
+
+  constructor(moduleId: string, maxEntries: number) {
+    super(`Module "${moduleId}" has reached the maximum of ${maxEntries} secrets`)
+    this.name = 'ModuleSecretLimitError'
+  }
+}
+
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 /** Empty secrets file, returned as the default for a module with none set yet. */
@@ -66,7 +88,7 @@ function parseSecretsFile(raw: unknown): SecretsFile | null {
   return raw as SecretsFile
 }
 
-export class ModuleSecretStore implements IModuleSecretStore {
+export class ModuleSecretStore implements IListableModuleSecretStore {
   private readonly baseDir: string
   private readonly store: KeyedJsonFileStore<SecretsFile>
 
@@ -97,7 +119,7 @@ export class ModuleSecretStore implements IModuleSecretStore {
     }
   }
 
-  async setSecret(vaultId: string, moduleId: string, entryId: string, value: string): Promise<void> {
+  async setSecret(vaultId: string, moduleId: string, entryId: string, value: string, maxEntries?: number): Promise<void> {
     const size = Buffer.byteLength(value, 'utf-8')
     if (size > MAX_SECRET_VALUE_BYTES) {
       throw new ModuleSecretTooLargeError(entryId)
@@ -107,6 +129,9 @@ export class ModuleSecretStore implements IModuleSecretStore {
     const encrypted = this.keyManager.encrypt(value)
 
     await this.store.mutate(this.key(vaultId, moduleId), (data) => {
+      if (maxEntries !== undefined && !(entryId in data.secrets) && Object.keys(data.secrets).length >= maxEntries) {
+        throw new ModuleSecretLimitError(moduleId, maxEntries)
+      }
       data.secrets[entryId] = encrypted
       return data
     })
@@ -117,6 +142,20 @@ export class ModuleSecretStore implements IModuleSecretStore {
       delete data.secrets[entryId]
       return data
     })
+  }
+
+  async listSecrets(vaultId: string, moduleId: string): Promise<string[]> {
+    const data = await this.store.read(this.key(vaultId, moduleId))
+    return Object.keys(data.secrets)
+  }
+
+  async deleteAll(vaultId: string, moduleId: string): Promise<void> {
+    try {
+      await fs.unlink(path.join(this.baseDir, this.key(vaultId, moduleId), SECRETS_FILENAME))
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw err
+    }
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────

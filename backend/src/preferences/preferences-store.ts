@@ -105,9 +105,6 @@ function sanitizeVaultSettings(raw: unknown): UserVaultSettings {
   const zoom = parsed['zoom']
 
   return {
-    lineNumbers: bool('lineNumbers', DEFAULT_VAULT_SETTINGS.lineNumbers),
-    readableLineLength: bool('readableLineLength', DEFAULT_VAULT_SETTINGS.readableLineLength),
-    spellcheck: bool('spellcheck', DEFAULT_VAULT_SETTINGS.spellcheck),
     spellcheckLanguage: typeof parsed['spellcheckLanguage'] === 'string' && parsed['spellcheckLanguage'].length <= 16
       ? parsed['spellcheckLanguage']
       : DEFAULT_VAULT_SETTINGS.spellcheckLanguage,

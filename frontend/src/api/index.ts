@@ -565,9 +565,6 @@ export type UserUiSettingsPatch = {
  * through context menus and the command palette, not the settings panel.
  */
 export interface UserVaultSettings {
-  lineNumbers: boolean
-  readableLineLength: boolean
-  spellcheck: boolean
   /** Dictionary the spellchecker loads (see `editor/spellcheck/protocol.ts`). */
   spellcheckLanguage: string
   /** Dictation language for voice transcription: a Whisper code or 'auto'. */
@@ -614,9 +611,12 @@ export interface TranscribeOptions {
 export interface VaultConfig {
   templatesDirectory: string
   dailyNotesDirectory: string
-  dailyNoteTemplateName: string
-  /** Directory for new attachments. Empty = same folder as the note being edited. */
-  attachmentsDirectory: string
+  /**
+   * Vault path of the daily note template, with `.md` (`daily-notes.json` `template`). Empty = no template.
+   */
+  dailyNoteTemplate: string
+  /** The Moment pattern the vault's `daily-notes.json` names daily notes by; null if it does not say. Read-only. */
+  dailyNoteFormat: string | null
   /** Directory for new unique notes (timestamp-prefixed). Empty = vault root. */
   uniqueNoteDirectory?: string
 }
@@ -763,15 +763,21 @@ export interface IApiClient {
   /** Save a plugin's settings. */
   saveSettings(vaultId: string, pluginId: string, data: unknown): Promise<void>
 
-  // --- Plugin Secrets ---
-  /** List secret IDs for a plugin (NOT the values). */
-  listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]>
-  /** Get a decrypted plugin secret value. */
-  getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null>
-  /** Set/update a plugin secret. */
-  setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void>
-  /** Delete a plugin secret. */
-  deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void>
+  // --- Vault app.json (Obsidian's main vault settings) ---
+  /** All fields of the vault's `.obsidian/app.json` (an empty object if the file does not exist). */
+  getAppConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Change known keys of `.obsidian/app.json`; `null` removes a key. Needs write access. Returns the file's fields afterwards. */
+  patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+
+  // --- Vault Keychain ---
+  /** List the keychain entry IDs of a vault (NOT the values). */
+  listKeychainSecrets(vaultId: string): Promise<string[]>
+  /** Get a decrypted keychain value; null if the entry does not exist. Needs write access to the vault. */
+  getKeychainSecret(vaultId: string, secretId: string): Promise<string | null>
+  /** Create or replace a keychain entry. */
+  setKeychainSecret(vaultId: string, secretId: string, value: string): Promise<void>
+  /** Delete a keychain entry. */
+  deleteKeychainSecret(vaultId: string, secretId: string): Promise<void>
 
   /** Load the plugin registry for a vault. */
   loadRegistry(vaultId: string): Promise<PluginRegistryData>
@@ -1444,16 +1450,28 @@ export class ApiClient implements IApiClient {
     await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/settings`, data)
   }
 
-  // --- Plugin Secrets ---
+  // --- Vault app.json ---
 
-  async listPluginSecrets(vaultId: string, pluginId: string): Promise<string[]> {
-    const result = await this.request<{ ids: string[] }>('GET', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets`)
+  async getAppConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/app-config`)
+    return result.config
+  }
+
+  async patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/app-config`, patch)
+    return result.config
+  }
+
+  // --- Vault Keychain ---
+
+  async listKeychainSecrets(vaultId: string): Promise<string[]> {
+    const result = await this.request<{ ids: string[] }>('GET', `/api/v1/vaults/${vaultId}/keychain`)
     return result.ids
   }
 
-  async getPluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<string | null> {
+  async getKeychainSecret(vaultId: string, secretId: string): Promise<string | null> {
     const headers = this.buildHeaders('GET', false)
-    const response = await fetch(`/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`, { method: 'GET', headers })
+    const response = await fetch(`/api/v1/vaults/${vaultId}/keychain/${encodeURIComponent(secretId)}`, { method: 'GET', headers })
 
     if (response.status === 401) {
       await this.handleAuthFailure()
@@ -1472,12 +1490,12 @@ export class ApiClient implements IApiClient {
     return result.value
   }
 
-  async setPluginSecret(vaultId: string, pluginId: string, secretId: string, value: string): Promise<void> {
-    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`, { value })
+  async setKeychainSecret(vaultId: string, secretId: string, value: string): Promise<void> {
+    await this.request<void>('PUT', `/api/v1/vaults/${vaultId}/keychain/${encodeURIComponent(secretId)}`, { value })
   }
 
-  async deletePluginSecret(vaultId: string, pluginId: string, secretId: string): Promise<void> {
-    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/plugins/${pluginId}/secrets/${encodeURIComponent(secretId)}`)
+  async deleteKeychainSecret(vaultId: string, secretId: string): Promise<void> {
+    await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}/keychain/${encodeURIComponent(secretId)}`)
   }
 
   /** Load the plugin registry for a vault. */

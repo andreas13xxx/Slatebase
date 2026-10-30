@@ -212,10 +212,6 @@ customization, not just content), not an oversight. All 7 mutating routes are th
 | GET | `/:pluginId/styles` | `.../plugins/:pluginId/styles` | `pluginRoutes.ts:469` | read | `pluginRoutes.ts:484` |
 | GET | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | `pluginRoutes.ts:511` | read | `pluginRoutes.ts:526` |
 | PUT | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | `pluginRoutes.ts:550` | **read** — Exception | `pluginRoutes.ts:565` |
-| GET | `/:pluginId/secrets` | `.../plugins/:pluginId/secrets` | `pluginRoutes.ts:600` | read | `pluginRoutes.ts:618` |
-| GET | `/:pluginId/secrets/:secretId` | `.../plugins/:pluginId/secrets/:secretId` | `pluginRoutes.ts:632` | read | `pluginRoutes.ts:658` |
-| PUT | `/:pluginId/secrets/:secretId` | `.../plugins/:pluginId/secrets/:secretId` | `pluginRoutes.ts:675` | **read** — Exception | `pluginRoutes.ts:701` |
-| DELETE | `/:pluginId/secrets/:secretId` | `.../plugins/:pluginId/secrets/:secretId` | `pluginRoutes.ts:729` | **read** — Exception | `pluginRoutes.ts:755` |
 
 ## 17. `backend/src/api/snippetRoutes.ts`
 
@@ -434,3 +430,26 @@ The anonymous reader routes `GET /api/v1/public/s/:token`, `POST …/unlock`, `G
 bypass session auth and CSRF in `auth/middleware.ts` (`isPublicSharePath`: strict token pattern, only those three
 method/path combinations). The link token is the credential; the routes have their own rate limits and answer 404 for
 unknown, expired and revoked links alike (and for everything while the feature is off).
+
+## Addendum — `backend/src/api/keychainRoutes.ts` (Vault keychain, 2026-10-29)
+
+Mounted at `/api/v1/vaults/:vaultId/keychain`. The keychain is shared by every plugin of the vault, so unlike the old
+per-plugin secrets (read-level `PUT`/`DELETE`) reading a value and every change need **write** access; listing the entry
+IDs stays at read and reveals no values. `GET .../keychain/:secretId` is an exception to `write` in
+`VAULT_ROUTE_LEVEL_EXCEPTIONS` (the method default would be read).
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../keychain` | read (IDs only) |
+| GET | `.../keychain/:secretId` | write (exception) |
+| PUT, DELETE | `.../keychain/:secretId` | write |
+
+## Addendum — `backend/src/api/appConfigRoutes.ts` (Vault `app.json`, 2026-10-29)
+
+Mounted at `/api/v1/vaults/:vaultId/app-config`. The file is `.obsidian/app.json` and applies to every user of the vault,
+so it follows the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS`.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../app-config` | read |
+| PATCH | `.../app-config` | write |

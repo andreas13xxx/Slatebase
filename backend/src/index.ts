@@ -51,7 +51,7 @@ import { LinkIndexCache, LinkMigrationService } from './link-index/index.js'
 import type { ILinkIndex } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
-import { InstalledPluginStore, PluginInstaller, PluginService, migrateLegacyPlugins, PluginSecretKeyManager, PluginSecretStore } from './plugin/index.js'
+import { InstalledPluginStore, PluginInstaller, PluginService, migrateLegacyPlugins, PluginSecretKeyManager } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
 import { SnippetStore, migrateLegacySnippets } from './snippets/index.js'
 import { ThemeService } from './themes/index.js'
@@ -99,6 +99,10 @@ import { createPublicShareService, createPublicShareStore, createPublicShareVaul
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
+import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
+import { createKeychainRoutes } from './api/keychainRoutes.js'
+import { AppConfigService, NoteConfigService, migrateVaultConfigToObsidianFiles } from './obsidian-config/index.js'
+import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
 import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
@@ -173,7 +177,6 @@ if (!process.env['SLATEBASE_CSRF_SECRET']) {
 // --- Plugin Secret Key Manager ---
 const pluginSecretKeyManager = new PluginSecretKeyManager(serverConfig.dataDir, logger)
 await pluginSecretKeyManager.loadOrCreate()
-const pluginSecretStore = new PluginSecretStore(serverConfig.dataDir, pluginSecretKeyManager)
 
 if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
   logger.warn(
@@ -187,6 +190,7 @@ if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
 const moduleSecretKeyManager = new ModuleSecretKeyManager(serverConfig.dataDir, logger)
 await moduleSecretKeyManager.loadOrCreate()
 const moduleSecretStore = new ModuleSecretStore(serverConfig.dataDir, moduleSecretKeyManager)
+const keychainService = new KeychainService(moduleSecretStore)
 
 if (!process.env['SLATEBASE_MODULE_SECRET_KEY']) {
   logger.warn(
@@ -747,9 +751,11 @@ const pluginRoutes = createPluginRoutes({
   vaultRegistry,
   eventBus,
   logger,
-  secretStore: pluginSecretStore,
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
+const appConfigService = new AppConfigService()
+app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
 const snippetRoutes = createSnippetRoutes({
@@ -819,10 +825,12 @@ app.route('/api/v1', uploadRoutes)
 
 // Template route registration (auth middleware applies via /api/v1/* pattern)
 const templatesConfig = config.getTemplatesConfig()
+const noteConfigService = new NoteConfigService()
 const vaultConfigStore = new VaultConfigStore(
   (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
   templatesConfig.directory,
   logger,
+  noteConfigService,
 )
 const templateService = new TemplateService(templatesConfig.directory, vaultManager, logger, vaultConfigStore)
 const templateRoutes = createTemplateRoutes({
@@ -1136,6 +1144,10 @@ vaultRegistryReady = true
 await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
 // Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
+// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
+// Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
+await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
+await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.
 // Held in a named const because the MCP tool handlers (4c above) reuse it via
@@ -1236,6 +1248,12 @@ vaultController.setVaultDeletionHook({
     pluginStore.deleteAllForVault(vaultId).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Plugin cleanup failed after vault deletion', { vaultId, error: message })
+    })
+
+    // Clean up the vault's keychain entries (fire-and-forget)
+    keychainService.deleteAllForVault(vaultId).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Keychain cleanup failed after vault deletion', { vaultId, error: message })
     })
 
     // Clean up link index for the deleted vault

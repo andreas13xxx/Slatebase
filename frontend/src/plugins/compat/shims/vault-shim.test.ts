@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
 import type { TFile, TAbstractFile } from '../types';
+import { _reset as resetAppConfig, initialize as initializeAppConfig, setActiveVault } from '../../../state/vaultAppConfigStore';
 import { VaultShim, validatePath, treeNodeToTFile, treeNodeToTFolder } from './vault-shim';
 
 /**
@@ -196,34 +197,37 @@ describe('VaultShim', () => {
   });
 
   describe('getAvailablePathForAttachments()', () => {
-    it("falls back to the source note's own folder when the vault has no configured attachments directory", async () => {
-      apiClient = createMockApiClient({
-        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplateName: 'daily.md', attachmentsDirectory: '' }),
-      });
+    /** The folder comes from the vault's app.json (`attachmentFolderPath`); a missing key means "next to the note". */
+    async function useAppConfig(fields: Record<string, unknown>): Promise<void> {
+      resetAppConfig();
+      initializeAppConfig({ getAppConfig: vi.fn().mockResolvedValue(fields) } as unknown as IApiClient);
+      await setActiveVault('vault-123');
       vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+    }
 
-      const result = await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md');
-      expect(result).toBe('notes/image.png');
+    it("uses the source note's own folder when app.json has no attachmentFolderPath", async () => {
+      await useAppConfig({});
+      expect(await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md')).toBe('notes/image.png');
     });
 
-    it("uses the vault's configured attachments directory regardless of the source note's folder", async () => {
-      apiClient = createMockApiClient({
-        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplateName: 'daily.md', attachmentsDirectory: 'Attachments' }),
-      });
-      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
-
-      const result = await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md');
-      expect(result).toBe('Attachments/image.png');
+    it("uses the source note's folder for './'", async () => {
+      await useAppConfig({ attachmentFolderPath: './' });
+      expect(await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md')).toBe('notes/image.png');
     });
 
-    it('falls back to the source folder when the vault config request fails', async () => {
-      apiClient = createMockApiClient({
-        getVaultConfig: vi.fn().mockRejectedValue(new Error('network error')),
-      });
-      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+    it("uses the configured folder regardless of the source note's folder", async () => {
+      await useAppConfig({ attachmentFolderPath: 'Attachments' });
+      expect(await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md')).toBe('Attachments/image.png');
+    });
 
-      const result = await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md');
-      expect(result).toBe('notes/image.png');
+    it("puts attachments in a subfolder of the note's folder for './name'", async () => {
+      await useAppConfig({ attachmentFolderPath: './attachments' });
+      expect(await vault.getAvailablePathForAttachments('image.png', 'notes/hello.md')).toBe('notes/attachments/image.png');
+    });
+
+    it("puts attachments in the vault root for '/'", async () => {
+      await useAppConfig({ attachmentFolderPath: '/' });
+      expect(await vault.getAvailablePathForAttachments('unique-image.png', 'notes/hello.md')).toBe('unique-image.png');
     });
   });
 

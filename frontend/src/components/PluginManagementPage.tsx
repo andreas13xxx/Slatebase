@@ -1,3 +1,4 @@
+import './PluginManagementPage.css'
 import { useState, useEffect, useCallback, useRef, useContext } from 'react'
 import { createPortal } from 'react-dom'
 import type { IApiClient, PluginInstallResult, PluginManifest, PluginRegistryData } from '../api'
@@ -750,6 +751,9 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
 
       {activeTab === 'installed' ? (
         <>
+          <p className="plugin-management-keychain-hint">
+            Aktive Plugins können alle Einträge im Schlüsselbund dieses Vaults lesen (Einstellungen → Vault → Schlüsselbund).
+          </p>
           <div className="plugin-management-update-actions">
             <button
               className="plugin-management-check-updates-button"

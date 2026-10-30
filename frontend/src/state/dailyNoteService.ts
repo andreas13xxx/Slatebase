@@ -143,24 +143,24 @@ export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService
         // File does not exist (404) — proceed to create
       }
 
-      // 2. Try loading daily note template from the vault's template directory
-      // First get the template directory and template name from vault config
-      let templateDir = 'Templates'
-      let templateName = 'daily.md'
+      // 2. Try loading the daily note template: a vault path from the vault's daily-notes.json
+      // (empty = the vault wants no template)
+      let templatePath = 'Templates/daily.md'
       try {
         const vaultConfig = await apiClient.getVaultConfig(vaultId)
-        templateDir = vaultConfig.templatesDirectory || 'Templates'
-        templateName = vaultConfig.dailyNoteTemplateName || 'daily.md'
+        templatePath = vaultConfig.dailyNoteTemplate
       } catch {
         // Use default if config unavailable
       }
 
       let templateContent = ''
-      try {
-        const templateFile = await apiClient.fetchFileContent(vaultId, `${templateDir}/${templateName}`)
-        templateContent = templateFile.content
-      } catch {
-        // No template found — use empty content
+      if (templatePath !== '') {
+        try {
+          const templateFile = await apiClient.fetchFileContent(vaultId, templatePath)
+          templateContent = templateFile.content
+        } catch {
+          // No template found — use empty content
+        }
       }
 
       // 3. Replace placeholders in template content

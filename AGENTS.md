@@ -75,10 +75,10 @@ Filesystem-based, no database. All under `backend/data/`:
 - `users/`, `sessions/`, `shares.json` — Auth data
 - `audit/` — Append-only JSONL (daily rotation)
 - `chat/`, `mcp/tokens/`, `plugins/<vaultId>/`, `features.json`
-- About `plugins/<vaultId>/` — server-side plugin data only: `_registry.json` (permissions, compatibility, approval) and `<pluginId>/secrets.json`. The plugins themselves are vault content like themes: `<vault>/.obsidian/plugins/<id>/` (files + `data.json`), enabled ones in `<vault>/.obsidian/community-plugins.json`. A plugin runs only while approved in `_registry.json` **and** listed there; never make a plugin that merely appears in the vault start on its own. The old plugin files under `plugins/<vaultId>/<id>/` are migrated at startup and no longer read
+- About `plugins/<vaultId>/` — server-side plugin data only: `_registry.json` (permissions, compatibility, approval). Plugin secrets are not there any more: they live in the vault keychain (`module-secrets/<vaultId>/keychain/`). The plugins themselves are vault content like themes: `<vault>/.obsidian/plugins/<id>/` (files + `data.json`), enabled ones in `<vault>/.obsidian/community-plugins.json`. A plugin runs only while approved in `_registry.json` **and** listed there; never make a plugin that merely appears in the vault start on its own. The old plugin files under `plugins/<vaultId>/<id>/` are migrated at startup and no longer read
 - `server-config.json` — admin overrides from `PUT /admin/config`. Precedence: `config/default.json` < this file < `SLATEBASE_*` env
 - `users/<userId>-preferences.json` — recent files, bookmarks (`favorites`), keybindings, `uiSettings` (account-wide), `vaultSettings[vaultId]` (per user *and* vault)
-- Encrypted secrets, AES-256-GCM per value: plugins in `plugins/<vaultId>/<pluginId>/secrets.json` (key from `SLATEBASE_PLUGIN_SECRET_KEY`, else `data/.plugin-secret-key`); git-sync and mail-import credentials in `module-secrets/<vaultId>/<moduleId>/secrets.json`
+- Encrypted secrets, AES-256-GCM per value, key from `SLATEBASE_MODULE_SECRET_KEY`, else `data/.module-secret-key`: `module-secrets/<vaultId>/<moduleId>/secrets.json` for git-sync, mail-import and the vault keychain (`moduleId` `keychain`; IDs `[a-z0-9]` with single hyphens; names are shared by all plugins of the vault). `SLATEBASE_PLUGIN_SECRET_KEY` / `.plugin-secret-key` only decrypt the former per-plugin files once, in `keychain/legacy-migration.ts`
 
 ## Common Pitfalls
 
@@ -100,6 +100,7 @@ Filesystem-based, no database. All under `backend/data/`:
 - Vite proxy requires backend on port 3000
 - Frontend uses Zod 4, backend Zod 3 — the versions are not shared
 - User settings are server-backed, never `localStorage`-only: account-wide through `state/userSettingsStore`, per-vault through `state/vaultSettingsStore`. `localStorage` is a cache, not the source of truth
+- Where Obsidian keeps a setting in the vault there is no per-user copy (this also holds for the template folder and the daily-note folder/template: `templates.json`, `daily-notes.json`, no longer `.slatebase/config.json`): `readableLineLength`, `showLineNumber`, `spellcheck` (on/off), `attachmentFolderPath` and the other `app.json` keys live in `<vault>/.obsidian/app.json` (`obsidian-config/`, `state/vaultAppConfigStore`), the same for everyone who opens the vault, changing them needs write access. Don't add such a value to `vaultSettings`
 - A store's `initialize()` must treat an empty server response as authoritative *unless* `hasSyncedBefore()` is false (`state/preferenceSync.ts`)
 - Preference writes publish `preferences:change` over SSE carrying the writer's `X-Client-Id` as `originId`, so the originating tab skips its own echo
 - A feature-gated settings section needs `feature:` in `state/settingsRegistry.ts` — nav and content area both derive the gate from there; `App.tsx`'s standalone page routes are a separate path

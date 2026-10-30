@@ -14,6 +14,7 @@ import type { IVaultAccessControl } from '../business/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import { updateVaultConfigSchema } from '../vault-config/validation.js'
+import { ObsidianConfigFileInvalidError } from '../shared/obsidian-config-file.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -87,15 +88,22 @@ export function createVaultConfigRoutes(deps: VaultConfigRoutesDeps): Hono {
       if (result.data.dailyNotesDirectory !== undefined) {
         partial.dailyNotesDirectory = result.data.dailyNotesDirectory
       }
-      if (result.data.dailyNoteTemplateName !== undefined) {
-        partial.dailyNoteTemplateName = result.data.dailyNoteTemplateName
+      if (result.data.dailyNoteTemplate !== undefined) {
+        partial.dailyNoteTemplate = result.data.dailyNoteTemplate
       }
-      if (result.data.attachmentsDirectory !== undefined) {
-        partial.attachmentsDirectory = result.data.attachmentsDirectory
+      if (result.data.uniqueNoteDirectory !== undefined) {
+        partial.uniqueNoteDirectory = result.data.uniqueNoteDirectory
+      }
+      if (result.data.activityRetentionDays !== undefined) {
+        partial.activityRetentionDays = result.data.activityRetentionDays
       }
       const config = await vaultConfigService.saveConfig(vaultId, partial)
       return c.json(config, 200)
     } catch (error) {
+      if (error instanceof ObsidianConfigFileInvalidError) {
+        // One of the vault's Obsidian files is not valid JSON: nothing was written, and the user can fix the file.
+        return c.json(createApiError('OBSIDIAN_CONFIG_INVALID', error.message), 409)
+      }
       logger.error('Failed to save vault config', { vaultId, userId: session.userId, error: String(error) })
       return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
     }

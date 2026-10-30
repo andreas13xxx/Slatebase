@@ -1,11 +1,12 @@
 /**
  * useReadableLineLength — constrains the editor to a readable measure.
- * Stored per user and per vault; see useLineNumbers for the reasoning.
+ * A vault setting stored in `.obsidian/app.json`; see useLineNumbers for the reasoning.
  *
  * Reached through the editor context menu, not the settings panel.
  */
 import { useCallback } from 'react'
-import { useVaultSetting, updateVaultSettings, getVaultSettings } from '../state/vaultSettingsStore'
+import { toggleAppConfigFlag } from './appConfigToggle'
+import { useAppConfigValue } from '../state/vaultAppConfigStore'
 
 /** Return value of the useReadableLineLength hook. */
 export interface UseReadableLineLengthReturn {
@@ -17,12 +18,12 @@ export interface UseReadableLineLengthReturn {
 
 /** Toggles from outside React (command palette, context menu). */
 export function toggleReadableLineLength(): void {
-  updateVaultSettings({ readableLineLength: !getVaultSettings().readableLineLength })
+  toggleAppConfigFlag('readableLineLength')
 }
 
 /** Readable-line-length state for the active vault. */
 export function useReadableLineLength(): UseReadableLineLengthReturn {
-  const enabled = useVaultSetting('readableLineLength')
+  const enabled = useAppConfigValue('readableLineLength')
   const toggle = useCallback(() => { toggleReadableLineLength() }, [])
   return { enabled, toggle }
 }

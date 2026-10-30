@@ -1,0 +1,47 @@
+.keychain-section__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.keychain-section__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.keychain-section__item:last-child {
+  border-bottom: none;
+}
+
+.keychain-section__id {
+  flex: 0 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-monospace);
+}
+
+.keychain-section__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+}
+
+.keychain-section__edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.keychain-section__edit .password-input {
+  flex: 1 1 200px;
+}
+
+.keychain-section__empty {
+  color: var(--text-muted);
+}

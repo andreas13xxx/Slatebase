@@ -1,26 +1,29 @@
 /**
  * Per-vault configuration data models.
- * Persisted as `.slatebase/config.json` inside each vault's data directory.
+ *
+ * The template folder and the daily-note settings live in the vault's Obsidian files
+ * (`.obsidian/templates.json`, `.obsidian/daily-notes.json`), the source of truth; the rest is
+ * Slatebase-only and persisted as `.slatebase/config.json`.
  */
 
 // ─── Data Model ──────────────────────────────────────────────────────────────
 
 /** Per-vault configuration settings. */
 export interface VaultConfig {
-  /** Directory for note templates (relative to vault root). Default: "Templates". */
+  /** Directory for note templates (relative to vault root). `templates.json` `folder`. Default: "Templates". */
   templatesDirectory: string
-  /** Directory for daily notes (relative to vault root). Empty string = vault root. */
+  /** Directory for daily notes (relative to vault root). `daily-notes.json` `folder`. Empty string = vault root. */
   dailyNotesDirectory: string
-  /** Filename of the daily note template (relative to templatesDirectory). Default: "daily.md". */
-  dailyNoteTemplateName: string
   /**
-   * Directory for new attachments (relative to vault root). Empty string = same
-   * folder as the note being edited (Slatebase's long-standing default, so an
-   * unconfigured vault sees no change in behavior). A non-empty value pins every
-   * upload — drag-drop, paste, and "Insert attachment" — to that one directory
-   * regardless of which note is open, mirroring Obsidian's "specified folder" mode.
+   * Vault path of the daily note template, with `.md`. `daily-notes.json` `template`. Empty string =
+   * no template. Default: "<templatesDirectory>/daily.md".
    */
-  attachmentsDirectory: string
+  dailyNoteTemplate: string
+  /**
+   * The Moment pattern `daily-notes.json` names daily notes by, or null if the file does not say.
+   * Read-only: Slatebase always names them `YYYY-MM-DD.md`.
+   */
+  dailyNoteFormat: string | null
   /**
    * Directory for new unique notes (relative to vault root). Empty string =
    * vault root. A unique note is created with a timestamp prefix name
@@ -39,8 +42,8 @@ export interface VaultConfig {
 export const DEFAULT_VAULT_CONFIG: VaultConfig = {
   templatesDirectory: 'Templates',
   dailyNotesDirectory: '',
-  dailyNoteTemplateName: 'daily.md',
-  attachmentsDirectory: '',
+  dailyNoteTemplate: 'Templates/daily.md',
+  dailyNoteFormat: null,
   uniqueNoteDirectory: '',
   activityRetentionDays: 90,
 }

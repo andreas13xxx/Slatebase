@@ -25,7 +25,11 @@ import type { IVaultRegistry, IVaultShareRegistry, VaultRegistryEntry, VaultShar
 import type { IVaultService, IVaultAccessControl } from '../business/index.js'
 import { VaultAccessControlService } from '../business/index.js'
 import type { IImportService } from '../import/index.js'
-import type { IPluginService, IPluginSecretStore } from '../plugin/index.js'
+import type { IPluginService } from '../plugin/index.js'
+import type { IKeychainService } from '../keychain/index.js'
+import { createKeychainRoutes } from './keychainRoutes.js'
+import type { IAppConfigService } from '../obsidian-config/index.js'
+import { createAppConfigRoutes } from './appConfigRoutes.js'
 import type { ISnippetStore } from '../snippets/index.js'
 import type { IPluginStoreService } from '../plugin-store/index.js'
 import type { ISearchService, IReplaceService } from '../search/index.js'
@@ -202,8 +206,14 @@ const routeModules = [
 const router = createRouter(routeModules)
 app.route('/api/v1', router)
 
-const pluginRoutes = createPluginRoutes({ pluginService: stub<IPluginService>('pluginService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger, secretStore: stub<IPluginSecretStore>('pluginSecretStore') })
+const pluginRoutes = createPluginRoutes({ pluginService: stub<IPluginService>('pluginService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
+
+const keychainRoutes = createKeychainRoutes({ keychainService: stub<IKeychainService>('keychainService'), logger: silentLogger })
+app.route('/api/v1/vaults/:vaultId/keychain', keychainRoutes)
+
+const appConfigRoutes = createAppConfigRoutes({ appConfigService: stub<IAppConfigService>('appConfigService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
+app.route('/api/v1/vaults/:vaultId/app-config', appConfigRoutes)
 
 const snippetRoutes = createSnippetRoutes({ snippetStore: stub<ISnippetStore>('snippetStore'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
@@ -352,5 +362,21 @@ describe('public share routes', () => {
     expect(resolveRequiredLevel('POST', '/public-shares')).toBe('write')
     expect(resolveRequiredLevel('PUT', '/public-shares/abc')).toBe('write')
     expect(resolveRequiredLevel('DELETE', '/public-shares/abc')).toBe('write')
+  })
+})
+
+describe('keychain routes', () => {
+  it('listing IDs needs read access; reading a value and every change need write access', () => {
+    expect(resolveRequiredLevel('GET', '/keychain')).toBe('read')
+    expect(resolveRequiredLevel('GET', '/keychain/openai-key')).toBe('write')
+    expect(resolveRequiredLevel('PUT', '/keychain/openai-key')).toBe('write')
+    expect(resolveRequiredLevel('DELETE', '/keychain/openai-key')).toBe('write')
+  })
+})
+
+describe('app-config routes', () => {
+  it('reading needs read access, changing needs write access (the file applies to every user of the vault)', () => {
+    expect(resolveRequiredLevel('GET', '/app-config')).toBe('read')
+    expect(resolveRequiredLevel('PATCH', '/app-config')).toBe('write')
   })
 })

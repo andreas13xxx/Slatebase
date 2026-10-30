@@ -22,6 +22,7 @@ import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
 import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
 import { resolveAttachmentTargetDir } from '../utils/internalLink'
+import { getAppConfigValue } from '../state/vaultAppConfigStore'
 import './TabContent.css'
 
 /**
@@ -234,17 +235,9 @@ export function TabContent() {
    * cached — this mirrors TemplateSelector/dailyNoteService, and uploads aren't
    * hot-path enough to justify a cache.
    */
-  const resolveTargetDir = useCallback(async (vaultId: string, filePath: string): Promise<string> => {
-    if (!apiClient) return resolveAttachmentTargetDir('', filePath)
-    try {
-      const config = await apiClient.getVaultConfig(vaultId)
-      return resolveAttachmentTargetDir(config.attachmentsDirectory, filePath)
-    } catch {
-      // Vault config unavailable — fall back to the note's own folder rather than
-      // blocking the upload.
-      return resolveAttachmentTargetDir('', filePath)
-    }
-  }, [apiClient])
+  const resolveTargetDir = useCallback(async (_vaultId: string, filePath: string): Promise<string> => {
+    return resolveAttachmentTargetDir(getAppConfigValue('attachmentFolderPath'), filePath)
+  }, [])
 
   /** Handle external file drops in EditMode — uploads to the resolved attachments directory. */
   const handleExternalFileDrop = useCallback(async (files: File[]) => {

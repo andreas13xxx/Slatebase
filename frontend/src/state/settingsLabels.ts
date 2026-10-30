@@ -19,6 +19,8 @@ export const SECTION_LABELS: Record<SettingsSection, string> = {
   'delete-account': 'Konto löschen',
   'plugins': 'Plugins',
   'vault-config': 'Vault-Konfiguration',
+  'editor-files': 'Editor und Dateien',
+  'keychain': 'Schlüsselbund',
   'themes': 'Themes',
   'css-snippets': 'CSS-Snippets',
   'git-sync': 'Git-Synchronisation',

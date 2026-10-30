@@ -1,12 +1,15 @@
 /**
  * vaultSettingsStore — settings scoped to one user *and* one vault.
  *
- * Backs the editor toggles (line numbers, readable line length, spellcheck),
- * the app zoom, the knowledge-graph configuration and the two panel layouts.
- * These are personal reading preferences, not vault content — a shared vault
- * must not force one member's zoom level on everyone — but they are worth
- * remembering per vault, because a code-heavy vault and a prose vault want
- * different answers.
+ * Backs the spellcheck and dictation languages, the app zoom, the knowledge-graph
+ * configuration and the two panel layouts. These are personal preferences, not
+ * vault content — a shared vault must not force one member's zoom level on
+ * everyone — but they are worth remembering per vault, because a German notebook
+ * and an English one want different answers.
+ *
+ * Settings Obsidian keeps in the vault (line numbers, readable line length, whether
+ * spellcheck runs) are not here: they live in `.obsidian/app.json`, see
+ * `vaultAppConfigStore`. Where a vault setting exists there is no per-user copy.
  *
  * Deliberately absent from the settings panel: every one of these is reached
  * through a context menu or the command palette, which is where people already
@@ -36,9 +39,6 @@ const SYNC_STORE_KEY = 'vaultSettings'
 
 /** Mirrors the backend's `DEFAULT_VAULT_SETTINGS`. */
 export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
-  lineNumbers: false,
-  readableLineLength: true,
-  spellcheck: true,
   spellcheckLanguage: 'de',
   transcriptionLanguage: 'auto',
   saveAudioAttachment: false,
@@ -71,9 +71,6 @@ function normalize(raw: unknown): UserVaultSettings {
   const parsed = raw as Partial<UserVaultSettings>
 
   return {
-    lineNumbers: parsed.lineNumbers ?? DEFAULT_VAULT_SETTINGS.lineNumbers,
-    readableLineLength: parsed.readableLineLength ?? DEFAULT_VAULT_SETTINGS.readableLineLength,
-    spellcheck: parsed.spellcheck ?? DEFAULT_VAULT_SETTINGS.spellcheck,
     spellcheckLanguage: parsed.spellcheckLanguage ?? DEFAULT_VAULT_SETTINGS.spellcheckLanguage,
     transcriptionLanguage: parsed.transcriptionLanguage ?? DEFAULT_VAULT_SETTINGS.transcriptionLanguage,
     saveAudioAttachment: parsed.saveAudioAttachment ?? DEFAULT_VAULT_SETTINGS.saveAudioAttachment,
