@@ -14,55 +14,26 @@
  */
 
 import { useSyncExternalStore } from 'react'
+import {
+  APP_CONFIG_DEFAULTS,
+  describeAppConfigDeviations,
+  mergeAppConfig,
+  type AppConfigKey,
+  type AppConfigValues,
+} from '@slatebase/shared-contracts'
 import type { IApiClient } from '../api'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** The keys this app understands, with their value types. */
-export interface AppConfigValues {
-  newFileLocation: 'root' | 'current' | 'folder'
-  newFileFolderPath: string
-  attachmentFolderPath: string
-  useMarkdownLinks: boolean
-  newLinkFormat: 'shortest' | 'relative' | 'absolute'
-  alwaysUpdateLinks: boolean
-  readableLineLength: boolean
-  defaultViewMode: 'source' | 'preview'
-  livePreview: boolean
-  strictLineBreaks: boolean
-  showFrontmatter: boolean
-  foldHeading: boolean
-  foldIndent: boolean
-  spellcheck: boolean
-  showLineNumber: boolean
-}
-
-export type AppConfigKey = keyof AppConfigValues
+/** The keys this app understands, with their value types (one table, shared with the backend). */
+export type { AppConfigKey, AppConfigValues }
 
 /**
- * Applied where `app.json` has no such key. These are Slatebase's earlier defaults, so a vault
- * without the file behaves as before (`spellcheck` is on, unlike in a fresh Obsidian vault).
- * `attachmentFolderPath: './'` means "next to the note".
+ * Applied where `app.json` has no such key: Obsidian's default where it is known (table in
+ * shared-contracts, documented in docs/app-json.md). `attachmentFolderPath: './'` means "next to
+ * the note".
  */
-export const DEFAULT_APP_CONFIG: AppConfigValues = {
-  newFileLocation: 'root',
-  newFileFolderPath: '',
-  attachmentFolderPath: './',
-  useMarkdownLinks: false,
-  newLinkFormat: 'shortest',
-  alwaysUpdateLinks: true,
-  readableLineLength: true,
-  defaultViewMode: 'source',
-  livePreview: true,
-  strictLineBreaks: false,
-  showFrontmatter: false,
-  foldHeading: true,
-  foldIndent: true,
-  spellcheck: true,
-  showLineNumber: false,
-}
-
-const KNOWN_KEYS = Object.keys(DEFAULT_APP_CONFIG) as AppConfigKey[]
+export const DEFAULT_APP_CONFIG = APP_CONFIG_DEFAULTS as unknown as AppConfigValues
 
 /** Path of the file, as reported by `vault:change` events. */
 export const APP_CONFIG_PATH = '.obsidian/app.json'
@@ -80,22 +51,22 @@ let generation = 0
 
 const subscribers = new Set<() => void>()
 
-function typeMatches(key: AppConfigKey, value: unknown): boolean {
-  return typeof value === typeof DEFAULT_APP_CONFIG[key]
-}
+/** Deviations already written to the console, so a refresh does not repeat them. */
+const reportedDeviations = new Set<string>()
 
-/** The file's value if it has the right type, else the default; keys this app does not know pass through. */
-function merge(fields: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...fields, ...DEFAULT_APP_CONFIG }
-  for (const key of KNOWN_KEYS) {
-    if (key in fields && typeMatches(key, fields[key])) merged[key] = fields[key]
+/** Warns once per session about what the file contains that Slatebase does not expect. */
+function reportDeviations(vaultId: string, fields: Record<string, unknown>): void {
+  for (const { key, reason } of describeAppConfigDeviations(fields)) {
+    const id = `${vaultId}\0${key}\0${reason}`
+    if (reportedDeviations.has(id)) continue
+    reportedDeviations.add(id)
+    console.warn(`[app.json] ${key}: ${reason}`)
   }
-  return merged
 }
 
 function apply(fields: Record<string, unknown>): void {
   fileFields = fields
-  snapshot = merge(fields)
+  snapshot = mergeAppConfig(fields)
   for (const cb of subscribers) cb()
 }
 
@@ -179,7 +150,10 @@ export async function refreshAppConfig(vaultId: string): Promise<void> {
   const mine = ++generation
   try {
     const fields = await apiClient.getAppConfig(vaultId)
-    if (activeVaultId === vaultId && mine === generation) apply(fields)
+    if (activeVaultId === vaultId && mine === generation) {
+      reportDeviations(vaultId, fields)
+      apply(fields)
+    }
   } catch {
     // Keep the current values; the next change event or vault switch retries.
   }

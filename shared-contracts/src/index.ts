@@ -15,3 +15,4 @@ export type {
 } from './vault.js'
 
 export * from './bases/index.js'
+export * from './app-config.js'

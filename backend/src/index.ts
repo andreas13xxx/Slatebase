@@ -101,7 +101,7 @@ import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVau
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
 import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService, NoteConfigService, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
+import { AppConfigService, DeviationReporter, NoteConfigService, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -758,7 +758,7 @@ const pluginRoutes = createPluginRoutes({
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
-const appConfigService = new AppConfigService()
+const appConfigService = new AppConfigService(new DeviationReporter(logger))
 app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)

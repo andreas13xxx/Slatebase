@@ -105,7 +105,8 @@ export async function migrateUserVaultSettingsToAppConfig(deps: {
         const existing = await appConfigService.get(vault.storagePath)
         const missing: AppConfigRequest = {}
         for (const key of keys) {
-          if (typeof existing[USER_KEYS[key]] !== 'boolean') missing[USER_KEYS[key]] = patch[USER_KEYS[key]]
+          const value = patch[USER_KEYS[key]]
+          if (typeof existing[USER_KEYS[key]] !== 'boolean' && value !== undefined) missing[USER_KEYS[key]] = value
         }
         if (Object.keys(missing).length > 0) {
           await appConfigService.patch(vault.storagePath, missing)

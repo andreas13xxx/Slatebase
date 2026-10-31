@@ -3,7 +3,9 @@
  * Typed access to the JSON config files Obsidian keeps in `<vault>/.obsidian/`.
  */
 
-export type { IAppConfigService, AppConfigRequest } from './app-config.js'
+export type { IAppConfigService, AppConfigRequest, AppConfigValue } from './app-config.js'
+export { DeviationReporter, noopDeviationReporter, shortValue } from './deviation-reporter.js'
+export type { ConfigDeviation, IDeviationReporter } from './deviation-reporter.js'
 export { AppConfigService, appConfigRequestSchema } from './app-config.js'
 export { migrateVaultConfigToObsidianFiles } from './legacy-migration.js'
 export type { VaultConfigMigrationResult } from './legacy-migration.js'

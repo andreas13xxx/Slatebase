@@ -55,7 +55,7 @@ export function createAppConfigRoutes(deps: AppConfigRouteDependencies): Hono {
     const vaultPath = vaultPathOf(c)
     if (vaultPath === null) return c.json(apiError('VAULT_NOT_FOUND', 'Vault not found'), 404)
     try {
-      return c.json({ config: await appConfigService.get(vaultPath) }, 200)
+      return c.json({ config: await appConfigService.get(vaultPath, c.req.param('vaultId')) }, 200)
     } catch (error) {
       return handleError(c, error)
     }
