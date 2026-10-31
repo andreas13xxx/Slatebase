@@ -57,12 +57,12 @@ export class PluginInstallError extends Error {
  * Handles ZIP upload processing and plugin installation.
  *
  * Installation logic:
- * 1. Validate ZIP size ≤ 5 MB
+ * 1. Validate ZIP size ≤ PLUGIN_LIMITS.maxZipBytes (50 MB)
  * 2. Extract ZIP into memory
  * 3. Find manifest.json + main.js (in root or single subdirectory)
  * 4. Validate manifest (Zod schema)
  * 5. Check bundle integrity (warn about eval, new Function, document.write)
- * 6. Calculate total extracted size — reject if > 10 MB
+ * 6. Calculate total extracted size — reject if > PLUGIN_LIMITS.maxExtractedBytes (100 MB)
  * 7. Check if plugin already installed:
  *    - Not installed → fresh install
  *    - Installed with lower version → upgrade (preserve data.json)
@@ -84,7 +84,7 @@ export class PluginInstaller implements IPluginInstaller {
     // Step 1: Validate ZIP size
     if (zipBuffer.length > MAX_ZIP_SIZE) {
       throw new PluginInstallError(
-        `ZIP file exceeds maximum size of ${formatPluginLimit(MAX_ZIP_SIZE)} (actual: ${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB)`,
+        `ZIP file exceeds maximum size of ${formatPluginLimit(MAX_ZIP_SIZE)} (actual: ${formatPluginLimit(zipBuffer.length)}, ${zipBuffer.length} bytes)`,
         'ZIP_TOO_LARGE',
       )
     }
@@ -283,7 +283,7 @@ export class PluginInstaller implements IPluginInstaller {
   }
 
   /**
-   * Validate that total extracted size does not exceed 10 MB.
+   * Validate that total extracted size does not exceed PLUGIN_LIMITS.maxExtractedBytes.
    * @throws PluginInstallError if total size exceeds limit.
    */
   private validateExtractedSize(entries: AdmZip.IZipEntry[]): void {
@@ -296,7 +296,7 @@ export class PluginInstaller implements IPluginInstaller {
 
     if (totalSize > MAX_EXTRACTED_SIZE) {
       throw new PluginInstallError(
-        `Extracted content exceeds maximum size of ${formatPluginLimit(MAX_EXTRACTED_SIZE)} (actual: ${(totalSize / 1024 / 1024).toFixed(2)} MB)`,
+        `Extracted content exceeds maximum size of ${formatPluginLimit(MAX_EXTRACTED_SIZE)} (actual: ${formatPluginLimit(totalSize)}, ${totalSize} bytes)`,
         'EXTRACTED_TOO_LARGE',
       )
     }

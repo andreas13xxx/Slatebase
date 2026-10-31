@@ -179,6 +179,16 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     if (vaultIdError) return vaultIdError
 
     try {
+      // Refuse an oversized upload from its declared length before the body is read into memory
+      // (the multipart envelope adds a little to the file itself).
+      const declaredLength = Number(c.req.header('content-length'))
+      if (Number.isFinite(declaredLength) && declaredLength > PLUGIN_LIMITS.maxZipBytes + 1024 * 1024) {
+        return c.json(
+          createApiError('FILE_TOO_LARGE', `ZIP file exceeds maximum size of ${formatPluginLimit(PLUGIN_LIMITS.maxZipBytes)} (declared: ${formatPluginLimit(declaredLength)}, ${declaredLength} bytes)`),
+          413,
+        )
+      }
+
       const body = await c.req.parseBody()
       const file = body['file']
 
@@ -401,7 +411,7 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     }
   })
 
-  // PUT /:pluginId/settings — Save settings (max 1 MB)
+  // PUT /:pluginId/settings — Save settings (max PLUGIN_LIMITS.maxSettingsBytes)
   app.put('/:pluginId/settings', async (c: Context): Promise<Response> => {
     const vaultId = c.req.param('vaultId') as string
     const pluginId = c.req.param('pluginId') as string

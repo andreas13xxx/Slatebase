@@ -137,7 +137,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
 
   /**
    * Saves plugin settings (data.json) atomically.
-   * Validates that settings do not exceed 1 MB.
+   * Validates that settings do not exceed PLUGIN_LIMITS.maxSettingsBytes.
    */
   async saveSettings(vaultId: string, pluginId: string, data: string): Promise<void> {
     const size = Buffer.byteLength(data, 'utf-8')

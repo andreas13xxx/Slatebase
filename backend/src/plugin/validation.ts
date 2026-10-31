@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
+import { PLUGIN_LIMITS, formatPluginLimit } from '@slatebase/shared-contracts'
 
 // ─── Plugin ID Validation ────────────────────────────────────────────────────
 
@@ -54,9 +54,9 @@ export const pluginManifestSchema = z.object({
 
 /**
  * Schema for validating plugin settings (data.json content).
- * Must be a JSON string not exceeding 1 MB (1,048,576 bytes).
+ * Must be a JSON string not exceeding PLUGIN_LIMITS.maxSettingsBytes (10 MB).
  */
-export const pluginSettingsSchema = z.string().max(1_048_576, 'Plugin settings must not exceed 1 MB')
+export const pluginSettingsSchema = z.string().max(PLUGIN_LIMITS.maxSettingsBytes, `Plugin settings must not exceed ${formatPluginLimit(PLUGIN_LIMITS.maxSettingsBytes)}`)
 
 /**
  * Schema for validating the plugin registry (_registry.json).
