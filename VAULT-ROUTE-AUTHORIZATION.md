@@ -475,3 +475,13 @@ Mounted at `/api/v1/vaults/:vaultId/graph-config` (`.obsidian/graph.json`) and `
 | GET | `.../graph-config`, `.../bookmarks-config` | read |
 | PATCH | `.../graph-config`, `.../bookmarks-config` | write |
 
+## Addendum — `hotkeysConfigRoutes.ts` (2026-10-31)
+
+Mounted at `/api/v1/vaults/:vaultId/hotkeys-config` (`.obsidian/hotkeys.json`). The file applies to every user of the
+vault and follows the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS`.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../hotkeys-config` | read |
+| PATCH | `.../hotkeys-config` | write |
+

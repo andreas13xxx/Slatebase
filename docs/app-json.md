@@ -142,8 +142,41 @@ counts as remove + add for the sync merge. The limit is 5000 (was 50). The bookm
 user on the server; that list is only read now: the first time a vault whose file has no bookmarks is
 opened on a device, its entries are written into the file.
 
+## hotkeys.json
+
+API: `GET/PATCH /api/v1/vaults/:vaultId/hotkeys-config`. Store: `state/keybindingsStore`. UI: Settings →
+Tastaturkürzel (search, record, add a second shortcut, remove one, reset, conflicts).
+
+```json
+{ "editor:toggle-bold": [ { "modifiers": ["Mod"], "key": "B" } ],
+  "app:open-settings": [] }
+```
+
+Command ID → list of `{ modifiers, key }`. A command the file does not name has its default; an empty
+list unbinds it. Modifiers are `Mod` (Ctrl, Cmd on macOS), `Ctrl`, `Meta`, `Shift`, `Alt`; letters are upper
+case, the space bar is `" "`. Seen in real files: `Mod`, `Shift`, `Alt`, `Ctrl`, letters, `Tab`, arrows; `Meta`
+and other special keys are assumed.
+
+**Command IDs.** Where Obsidian has the command, Slatebase uses its ID (`OBSIDIAN_COMMAND_ALIASES` in
+shared-contracts: `command-palette:open`, `app:open-settings`, `switcher:open`, `global-search:open`,
+`app:go-back`/`app:go-forward`, `workspace:next-tab`/`previous-tab`, `markdown:toggle-preview`, `daily-notes`,
+`graph:open`, …). Other Slatebase commands keep `slatebase:…`; plugin commands use their own ID, so they can
+be bound through the file. The aliases are from docs and the command palette, not all verified in a real vault.
+
+**Behaviour.**
+- A default shortcut gives way when the file binds the same keys to another command.
+- Several shortcuts per command are kept; writing a command replaces its list with the readable entries, so an
+  entry Slatebase could not read (reported in the console) is dropped when that command is changed.
+- Changes are written after half a second; a failed write is kept and tried again after 30 s.
+- Reset all resets Slatebase's own commands only; other commands' entries stay.
+- The old per-user bindings are written into the file once per vault and device, for commands the file does
+  not name (the file wins). Without write access that is tried again the next time the vault is opened.
+- The default shortcuts are Slatebase's (Ctrl+Shift+]/[ for tabs, Alt+Left/Right for history), not Obsidian's
+  everywhere; the Obsidian default applies only if the file says so.
+
 ## Not done yet
 
-`hotkeys.json` and `workspaces.json` as shared vault files, groups in the bookmarks UI, the functions
-behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
+`workspaces.json` as a shared vault file, groups in the bookmarks UI, the audit of Obsidian's commands against
+Slatebase's (and the missing commands), plugin commands in the shortcut list and `app.hotkeyManager` reading the
+file, the functions behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
 `.kiro/specs/obsidian-app-json-compat/tasks.md`. `core-plugins.json` is left to its own spec.
