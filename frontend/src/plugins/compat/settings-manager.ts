@@ -8,8 +8,10 @@
  * @module settings-manager
  */
 
-/** Maximum allowed serialized settings size in bytes (1 MB). */
-const MAX_SETTINGS_SIZE = 1_048_576;
+import { PLUGIN_LIMITS, formatPluginLimit } from '@slatebase/shared-contracts';
+
+/** Maximum allowed serialized settings size in bytes (same limit as the server, shared-contracts plugin-limits.ts). */
+const MAX_SETTINGS_SIZE = PLUGIN_LIMITS.maxSettingsBytes;
 
 // ─── Module-Level Write Tracker (Loop Prevention) ───────────────────────────
 //
@@ -156,7 +158,7 @@ export class SettingsManager implements ISettingsManager {
     const byteLength = new TextEncoder().encode(serialized).length;
     if (byteLength > MAX_SETTINGS_SIZE) {
       const sizeError = new Error(
-        `Settings for plugin "${pluginId}" exceed maximum size of 1 MB (actual: ${byteLength} bytes)`
+        `Settings for plugin "${pluginId}" exceed maximum size of ${formatPluginLimit(MAX_SETTINGS_SIZE)} (actual: ${byteLength} bytes)`
       );
       console.error(
         `[SettingsManager] Save failed for plugin "${pluginId}" in vault "${this.vaultId}":`,

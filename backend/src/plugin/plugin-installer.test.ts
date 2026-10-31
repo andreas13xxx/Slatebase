@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import AdmZip from 'adm-zip'
+import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 import { PluginInstaller, PluginInstallError, compareSemver } from './plugin-installer.js'
 import type { IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData } from './types.js'
 
@@ -112,15 +113,21 @@ describe('PluginInstaller', () => {
   })
 
   describe('installFromZip — ZIP size validation', () => {
-    it('rejects ZIP files larger than 10 MB', async () => {
-      // Create a buffer larger than 10 MB
-      const largeBuffer = Buffer.alloc(10 * 1024 * 1024 + 1, 0)
+    it('rejects ZIP files larger than the ZIP limit and names the limit', async () => {
+      const largeBuffer = Buffer.alloc(PLUGIN_LIMITS.maxZipBytes + 1, 0)
 
       await expect(installer.installFromZip('vault-1', largeBuffer))
         .rejects.toThrow(PluginInstallError)
 
       await expect(installer.installFromZip('vault-1', largeBuffer))
-        .rejects.toMatchObject({ code: 'ZIP_TOO_LARGE' })
+        .rejects.toMatchObject({ code: 'ZIP_TOO_LARGE', message: expect.stringContaining('50 MB') })
+    })
+
+    it('does not reject a ZIP exactly at the limit for its size', async () => {
+      const atLimit = Buffer.alloc(PLUGIN_LIMITS.maxZipBytes, 0)
+
+      await expect(installer.installFromZip('vault-1', atLimit))
+        .rejects.not.toMatchObject({ code: 'ZIP_TOO_LARGE' })
     })
   })
 
@@ -253,9 +260,9 @@ describe('PluginInstaller', () => {
   })
 
   describe('installFromZip — extracted size validation', () => {
-    it('rejects if total extracted size exceeds 20 MB', async () => {
-      // Create a ZIP with a large file (>20 MB uncompressed)
-      const largeContent = 'x'.repeat(20 * 1024 * 1024 + 1)
+    it('rejects if total extracted size exceeds the extracted limit', async () => {
+      // A ZIP with a large file (over the limit uncompressed; it compresses to almost nothing)
+      const largeContent = 'x'.repeat(PLUGIN_LIMITS.maxExtractedBytes + 1)
       const zip = new AdmZip()
       zip.addFile('manifest.json', Buffer.from(JSON.stringify({
         id: 'large-plugin', name: 'Large', version: '1.0.0',
@@ -263,10 +270,9 @@ describe('PluginInstaller', () => {
       zip.addFile('main.js', Buffer.from(largeContent, 'utf-8'))
       const zipBuffer = zip.toBuffer()
 
-      // This might also fail ZIP_TOO_LARGE depending on compression,
-      // so we check for either error
+      // 'x' repeated compresses far below the ZIP limit, so only the extracted-size check can fire
       await expect(installer.installFromZip('vault-1', zipBuffer))
-        .rejects.toThrow(PluginInstallError)
+        .rejects.toMatchObject({ code: 'EXTRACTED_TOO_LARGE', message: expect.stringContaining('100 MB') })
     })
   })
 

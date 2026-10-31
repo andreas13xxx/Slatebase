@@ -3,6 +3,7 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { PLUGIN_LIMITS, formatPluginLimit } from '@slatebase/shared-contracts'
 import type { PluginRegistryData } from '../plugin/types.js'
 import type { IPluginService } from '../plugin/plugin-service.js'
 import type { PluginInstallResult } from '../plugin/plugin-installer.js'
@@ -185,11 +186,11 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
         return c.json(createApiError('VALIDATION_ERROR', 'Missing required file field (multipart/form-data with "file" key)'), 400)
       }
 
-      // Check ZIP size limit (10 MB)
-      const maxZipSize = 10 * 1024 * 1024
+      // Check ZIP size limit
+      const maxZipSize = PLUGIN_LIMITS.maxZipBytes
       if (file.size > maxZipSize) {
         return c.json(
-          createApiError('FILE_TOO_LARGE', `ZIP file exceeds maximum size of ${maxZipSize} bytes (actual: ${file.size})`),
+          createApiError('FILE_TOO_LARGE', `ZIP file exceeds maximum size of ${formatPluginLimit(maxZipSize)} (actual: ${formatPluginLimit(file.size)}, ${file.size} bytes)`),
           413,
         )
       }
@@ -419,12 +420,12 @@ export function createPluginRoutes(deps: PluginRouteDependencies): Hono {
     try {
       const rawBody = await c.req.text()
 
-      // Validate size (max 1 MB)
-      const maxSettingsSize = 1 * 1024 * 1024
+      // Validate size
+      const maxSettingsSize = PLUGIN_LIMITS.maxSettingsBytes
       const size = Buffer.byteLength(rawBody, 'utf-8')
       if (size > maxSettingsSize) {
         return c.json(
-          createApiError('SETTINGS_TOO_LARGE', `Plugin settings exceed maximum size of 1 MB (actual: ${size} bytes)`),
+          createApiError('SETTINGS_TOO_LARGE', `Plugin settings exceed maximum size of ${formatPluginLimit(maxSettingsSize)} (actual: ${size} bytes)`),
           413,
         )
       }

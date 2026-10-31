@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 
 // ─── Plugin ID Validation ────────────────────────────────────────────────────
 
@@ -85,10 +86,10 @@ export const pluginRegistrySchema = z.object({
  * Upload size constraints for plugin files.
  */
 export const pluginUploadConstraints = {
-  /** Maximum ZIP file size: 10 MB */
-  maxZipSize: 10 * 1024 * 1024,
-  /** Maximum individual file size: 10 MB */
-  maxFileSize: 10 * 1024 * 1024,
+  /** Maximum ZIP file size (shared-contracts plugin-limits.ts) */
+  maxZipSize: PLUGIN_LIMITS.maxZipBytes,
+  /** Maximum individual file size */
+  maxFileSize: PLUGIN_LIMITS.maxFileBytes,
 } as const
 
 // ─── Inferred Types ──────────────────────────────────────────────────────────

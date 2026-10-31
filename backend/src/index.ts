@@ -6,6 +6,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServer as createHttpServer } from 'node:http'
 import { Hono } from 'hono'
+import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 import { cors } from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
 import { getRequestListener } from '@hono/node-server'
@@ -451,8 +452,8 @@ const pluginStoreConfig: IPluginStoreConfig = {
   ...(process.env['SLATEBASE_GITHUB_TOKEN'] ? { githubToken: process.env['SLATEBASE_GITHUB_TOKEN'] } : {}),
   cacheTtlPluginList: (config as unknown as { pluginStore?: { cacheTtl?: number } }).pluginStore?.cacheTtl ?? 3600000,
   cacheTtlManifest: 900000,
-  maxAssetSize: (config as unknown as { pluginStore?: { maxAssetSize?: number } }).pluginStore?.maxAssetSize ?? 10 * 1024 * 1024,
-  maxTotalDownloadSize: 15 * 1024 * 1024,
+  maxAssetSize: (config as unknown as { pluginStore?: { maxAssetSize?: number } }).pluginStore?.maxAssetSize ?? PLUGIN_LIMITS.maxAssetBytes,
+  maxTotalDownloadSize: PLUGIN_LIMITS.maxTotalDownloadBytes,
   autoCheckInterval: (config as unknown as { pluginStore?: { autoCheckInterval?: number } }).pluginStore?.autoCheckInterval ?? 86400000,
 }
 const pluginStoreCache = new PluginStoreCache(pluginStoreConfig, serverConfig.dataDir, logger)
