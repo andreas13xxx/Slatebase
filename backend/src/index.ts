@@ -1148,13 +1148,13 @@ vaultRegistryReady = true
 await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
 // Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
-// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
-// app.json defaults follow Obsidian now; vaults Slatebase has worked in keep the previous ones. Must run before the other app.json migrations, which create the file.
+// app.json defaults follow Obsidian now; vaults that exist at the first start keep the previous ones. Must run before the other app.json migrations, which create the file.
 await migrateAppConfigDefaults({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
 await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
 // Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.
 await migrateUserVaultSettingsToAppConfig({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
+// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
 await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.

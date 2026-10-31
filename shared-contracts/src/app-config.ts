@@ -102,7 +102,7 @@ export const APP_CONFIG_DEFAULTS: Readonly<AppConfigValues> = Object.freeze(
 )
 
 /** Defaults Slatebase used before they were aligned with Obsidian. Used to keep existing vaults unchanged. */
-export const LEGACY_APP_CONFIG_DEFAULTS: Partial<Record<AppConfigKey, boolean | string>> = {
+export const LEGACY_APP_CONFIG_DEFAULTS: Partial<AppConfigValues> = {
   alwaysUpdateLinks: true,
 }
 
