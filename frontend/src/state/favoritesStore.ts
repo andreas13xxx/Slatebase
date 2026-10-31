@@ -1,19 +1,24 @@
 /**
- * Favorites store — per-user persistence with localStorage cache.
+ * Favorites (bookmarks) store — the vault's bookmarks, with a localStorage cache.
  *
- * Persists per-vault favorite file entries.
- * Uses localStorage as immediate cache for responsiveness.
- * Syncs with backend API for cross-device persistence (debounced).
+ * The bookmarks of a vault live in `.obsidian/bookmarks.json`, like in Obsidian: the same for
+ * everyone who opens the vault, and changing them needs write access (see bookmarksFile.ts for the
+ * mapping). localStorage is the immediate cache for responsiveness; a change is written to the file
+ * debounced, and `loadVaultBookmarks()` replaces the cache with the file's content when a vault is
+ * opened or the file changes elsewhere.
+ *
+ * The bookmarks used to be per user, on the server (`/users/me/favorites`). That copy is only read
+ * now: the first time a vault whose file has no bookmarks is opened, the entries found there are
+ * written into the file.
  *
  * localStorage key format: `slatebase:favorites:<vaultId>`
- * Max 50 favorites per vault. Ordered by addedAt descending (newest first).
+ * Entries are ordered by `order`; at most MAX_BOOKMARK_ITEMS per vault.
  */
 
+import { MAX_BOOKMARK_ITEMS } from '@slatebase/shared-contracts'
 import type { IApiClient, FavoriteEntry as ApiFavoriteEntry } from '../api'
+import { entriesToItems, itemsToEntries, type LoadedBookmarks } from './bookmarksFile'
 import {
-  hasSyncedBefore,
-  markSyncedBefore,
-  clearSyncedBefore,
   reportSyncFailure,
   reportSyncSuccess,
 } from './preferenceSync'
@@ -80,7 +85,7 @@ export interface IFavoritesStore {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_PREFIX = 'slatebase:favorites:'
-const MAX_FAVORITES_PER_VAULT = 50
+const MAX_FAVORITES_PER_VAULT = MAX_BOOKMARK_ITEMS
 const SYNC_DEBOUNCE_MS = 2000
 
 /** Identifies this store to the shared first-sync/failure bookkeeping. */
@@ -113,16 +118,26 @@ let apiClient: IApiClient | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 let syncInProgress = false
 
+/** Vaults with a change that is not in the file yet. */
+const dirtyVaults = new Set<string>()
+/** What the file held when it was last read or written, per vault (to write back what Slatebase does not show). */
+const loadedFiles = new Map<string, LoadedBookmarks>()
+const changeListeners = new Set<() => void>()
+
+/** Calls `cb` after the cache of any vault was replaced by the file's content. Returns the function that stops it. */
+export function onFavoritesChange(cb: () => void): () => void {
+  changeListeners.add(cb)
+  return () => { changeListeners.delete(cb) }
+}
+
 // ─── Initialization ──────────────────────────────────────────────────────────
 
 /**
- * Initialize the store with an API client and load server-side data.
+ * Initialize the store with an API client and read the old per-user list from the server.
  *
- * Once this device has synced before, the server list *replaces* the local
- * cache rather than merging into it. Merging kept local-only entries alive,
- * which resurrected favorites deleted on another device — the older state
- * winning, not the newer one. See preferenceSync.ts for why an empty server
- * response is only treated as "no record" before the first successful upload.
+ * That list is only read, never written: it fills the local cache so that a vault whose
+ * bookmarks.json has no bookmarks yet can take them over (see `loadVaultBookmarks`). The vault's
+ * file replaces the cache of each vault as it is opened.
  *
  * Called on login / app mount.
  */
@@ -130,11 +145,6 @@ export async function initialize(client: IApiClient): Promise<void> {
   apiClient = client
   try {
     const response = await client.getFavorites()
-
-    if (response.entries.length === 0 && !hasSyncedBefore(SYNC_STORE_KEY) && collectAllFavorites().length > 0) {
-      await syncToServer()
-      return
-    }
 
     // Group server entries by vault
     const serverByVault = new Map<string, ApiFavoriteEntry[]>()
@@ -149,18 +159,10 @@ export async function initialize(client: IApiClient): Promise<void> {
       saveFavoritesLocal(vaultId, migrated.slice(0, MAX_FAVORITES_PER_VAULT))
     }
 
-    // Vaults the server no longer lists have had their last favorite removed
-    // elsewhere; drop the stale local copies so they aren't pushed back up.
-    for (const vaultId of listLocalVaultIds()) {
-      if (!serverByVault.has(vaultId)) {
-        saveFavoritesLocal(vaultId, [])
-      }
-    }
-
-    markSyncedBefore(SYNC_STORE_KEY)
+    // A vault the old list does not mention has no entries to take over; its cache is replaced
+    // by the vault's file when it is opened (and not wiped here, it may hold unsaved changes).
   } catch {
-    // Server unavailable — continue with localStorage data. No marker is set,
-    // so a later successful init can still seed from this cache.
+    // Server unavailable — continue with localStorage data.
   }
 }
 
@@ -173,9 +175,8 @@ export function disconnect(): void {
     syncTimer = null
   }
   apiClient = null
-  // The marker is per device *and* account: the next user to log in here must
-  // not inherit this one's "already synced" state.
-  clearSyncedBefore(SYNC_STORE_KEY)
+  dirtyVaults.clear()
+  loadedFiles.clear()
 }
 
 // ─── Storage Helpers ─────────────────────────────────────────────────────────
@@ -302,15 +303,16 @@ function saveFavoritesLocal(vaultId: string, entries: FavoriteEntry[]): void {
   }
 }
 
-/** Save favorites locally AND schedule backend sync. */
+/** Save favorites locally AND schedule the write into the vault's file. */
 function saveFavorites(vaultId: string, entries: FavoriteEntry[]): void {
   saveFavoritesLocal(vaultId, entries)
+  dirtyVaults.add(vaultId)
   scheduleSyncToServer()
 }
 
-// ─── Backend Sync ────────────────────────────────────────────────────────────
+// ─── Vault file sync ─────────────────────────────────────────────────────────
 
-/** Schedule a debounced sync of ALL favorites to the backend. */
+/** Schedule a debounced write of the changed vaults' bookmarks into their files. */
 function scheduleSyncToServer(): void {
   if (!apiClient) return
   if (syncTimer !== null) {
@@ -318,68 +320,82 @@ function scheduleSyncToServer(): void {
   }
   syncTimer = setTimeout(() => {
     syncTimer = null
-    syncToServer()
+    void syncToServer()
   }, SYNC_DEBOUNCE_MS)
 }
 
-/** Sync all favorites across all vaults to the backend. */
+/** An empty view of a file nothing is known about yet: no items, so nothing is kept and everything is new. */
+function emptyFile(): LoadedBookmarks {
+  return { entries: [], items: [], rawById: new Map() }
+}
+
+/** Writes the bookmarks of every changed vault into its `.obsidian/bookmarks.json`. */
 async function syncToServer(): Promise<void> {
   if (!apiClient || syncInProgress) return
   syncInProgress = true
   try {
-    // Collect all favorites from all vault keys in localStorage
-    const allEntries = collectAllFavorites()
-    const apiEntries: ApiFavoriteEntry[] = allEntries.map(e => ({
-      id: e.id,
-      vaultId: e.vaultId,
-      path: e.path,
-      addedAt: e.addedAt,
-      order: e.order,
-      label: e.label,
-      type: e.type,
-      heading: e.heading,
-      blockId: e.blockId,
-      searchQuery: e.searchQuery,
-      searchCaseSensitive: e.searchCaseSensitive,
-      searchRegex: e.searchRegex,
-    }))
-    await apiClient.saveFavorites(apiEntries)
-    markSyncedBefore(SYNC_STORE_KEY)
-    reportSyncSuccess(SYNC_STORE_KEY)
-  } catch (error) {
-    // Data remains in localStorage and retries on the next change; the user is
-    // told once per failure streak so a silent divergence can't build up.
-    reportSyncFailure(SYNC_STORE_KEY, error, 'Favoriten')
+    for (const vaultId of [...dirtyVaults]) {
+      const previous = loadedFiles.get(vaultId) ?? emptyFile()
+      const items = entriesToItems(loadFavorites(vaultId), previous)
+      try {
+        const saved = await apiClient.patchBookmarksConfig(vaultId, { items })
+        const savedItems = Array.isArray(saved['items']) ? saved['items'] : items
+        // What is in the file now, with the ids the cache already has for the entries Slatebase shows.
+        const fresh = itemsToEntries(vaultId, savedItems)
+        const rawById = new Map<string, Record<string, unknown>>()
+        // The entries were written in `order`, so they line up with the entries read back.
+        ;[...loadFavorites(vaultId)].sort((a, b) => a.order - b.order).forEach((entry, index) => {
+          const raw = fresh.entries[index] ? fresh.rawById.get(fresh.entries[index]!.id) : undefined
+          if (raw !== undefined) rawById.set(entry.id, raw)
+        })
+        loadedFiles.set(vaultId, { entries: fresh.entries, items: fresh.items, rawById })
+        dirtyVaults.delete(vaultId)
+        reportSyncSuccess(SYNC_STORE_KEY)
+      } catch (error) {
+        // The cache keeps the change and the vault stays dirty; it is written again with the next
+        // change. The user is told once per failure streak (typically: no write access).
+        reportSyncFailure(SYNC_STORE_KEY, error, 'Lesezeichen')
+      }
+    }
   } finally {
     syncInProgress = false
   }
 }
 
-/** Vault IDs that currently have a favorites entry in local storage. */
-function listLocalVaultIds(): string[] {
-  if (!isLocalStorageAvailable()) {
-    return Array.from(memoryStore.keys(), (key) => key.slice(STORAGE_PREFIX.length))
-  }
-
-  const vaultIds: string[] = []
+/**
+ * Replaces the cache of a vault with the content of its `bookmarks.json`, and tells the listeners.
+ * Does nothing while the vault has a change that is not in the file yet (it would be lost).
+ *
+ * A vault whose file has no bookmarks yet takes over the entries found in the cache (from the old
+ * per-user list) by writing them into the file. Returns whether the cache was replaced.
+ */
+export async function loadVaultBookmarks(vaultId: string): Promise<boolean> {
+  const client = apiClient
+  if (!client || dirtyVaults.has(vaultId)) return false
+  let config: Record<string, unknown>
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith(STORAGE_PREFIX)) {
-        vaultIds.push(key.slice(STORAGE_PREFIX.length))
-      }
-    }
-  } catch { /* ignore */ }
-  return vaultIds
-}
-
-/** Collect all favorites from localStorage across all vault keys (migrated). */
-function collectAllFavorites(): FavoriteEntry[] {
-  const all: FavoriteEntry[] = []
-  for (const vaultId of listLocalVaultIds()) {
-    all.push(...loadFavorites(vaultId))
+    config = await client.getBookmarksConfig(vaultId)
+  } catch {
+    return false // unknown, not gone: the cache stays
   }
-  return all
+  if (dirtyVaults.has(vaultId)) return false // changed while the file was being read
+
+  const items = config['items']
+  if (!Array.isArray(items)) {
+    // No bookmarks in the file yet: hand over what the old list had.
+    if (loadFavorites(vaultId).length > 0) {
+      loadedFiles.set(vaultId, emptyFile())
+      dirtyVaults.add(vaultId)
+      await syncToServer()
+    }
+    return false
+  }
+
+  const loaded = itemsToEntries(vaultId, items)
+  loadedFiles.set(vaultId, loaded)
+  saveFavoritesLocal(vaultId, loaded.entries.slice(0, MAX_FAVORITES_PER_VAULT))
+  for (const cb of changeListeners) cb()
+  return true
 }
 
 // ─── Store Implementation ────────────────────────────────────────────────────
