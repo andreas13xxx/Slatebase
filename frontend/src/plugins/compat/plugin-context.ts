@@ -99,6 +99,7 @@ import {
   clearAllStatusBarItems,
 } from './status-bar-registry'
 import type { RibbonIconEntry } from './ribbon-icon-registry'
+import { effectiveDailyNoteFormat } from '../../state/dailyNoteFormat'
 // Static: ToastNotification imports only React, icons and CSS, so there is no
 // cycle to break here, and the module is already statically bundled via App.tsx.
 // Importing it dynamically only delayed every Notice() by a microtask.
@@ -799,6 +800,7 @@ export function PluginProvider({
       if (dailyNotesPlugin?.instance?.options) {
         dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
         dailyNotesPlugin.instance.options.template = config.dailyNoteTemplate
+        dailyNotesPlugin.instance.options.format = effectiveDailyNoteFormat(config.dailyNoteFormat)
       }
     }).catch(() => { /* vault config unavailable — keep defaults */ })
 
@@ -1131,6 +1133,8 @@ export function PluginProvider({
             dailyNotesPlugin.instance.options.folder = config.dailyNotesDirectory || ''
             // eslint-disable-next-line react-hooks/immutability
             dailyNotesPlugin.instance.options.template = config.dailyNoteTemplate
+            // eslint-disable-next-line react-hooks/immutability
+            dailyNotesPlugin.instance.options.format = effectiveDailyNoteFormat(config.dailyNoteFormat)
           }
         } catch {
           // Vault config unavailable — keep defaults (folder='')

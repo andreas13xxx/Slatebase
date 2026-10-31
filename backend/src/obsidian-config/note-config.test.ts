@@ -51,7 +51,13 @@ describe('NoteConfigService', () => {
     expect(await readJson('daily-notes.json')).toEqual({ folder: 'Journal', template: 'Templates/tag', format: 'YYYY-MM-DD' })
   })
 
-  it('never overwrites an existing format and keeps unknown keys', async () => {
+  it('writes the format when it is asked to, also over an existing one, and keeps the other keys', async () => {
+    await seed('daily-notes.json', { folder: 'a', format: 'MM-DD', autorun: true })
+    await service.patch(vault, { dailyFormat: 'YYYY/MM/YYYY-MM-DD' })
+    expect(await readJson('daily-notes.json')).toEqual({ folder: 'a', format: 'YYYY/MM/YYYY-MM-DD', autorun: true })
+  })
+
+  it('never overwrites an existing format when only other values change, and keeps unknown keys', async () => {
     await seed('daily-notes.json', { folder: 'a', format: 'MM-DD', autorun: true })
     await service.patch(vault, { dailyFolder: 'b' })
     expect(await readJson('daily-notes.json')).toEqual({ folder: 'b', format: 'MM-DD', autorun: true })

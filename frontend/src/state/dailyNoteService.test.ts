@@ -242,6 +242,56 @@ describe('dailyNoteService', () => {
       vi.useRealTimers()
     })
 
+    it('names and places the note by the format in daily-notes.json, with sub folders', async () => {
+      const fetchFileContent = vi.fn().mockRejectedValue({ code: 'NOT_FOUND', message: 'File not found' })
+      const apiClient = createMockApiClient({
+        fetchFileContent,
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: 'Journal', dailyNoteTemplate: '', dailyNoteFormat: 'YYYY/MM/YYYY-MM-DD' }),
+      })
+
+      const result = await createDailyNoteService(apiClient).openOrCreate('vault1', 'Journal', '2026-10-31')
+
+      expect(result).toBe('Journal/2026/10/2026-10-31.md')
+      expect(fetchFileContent).toHaveBeenCalledWith('vault1', 'Journal/2026/10/2026-10-31.md')
+      expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', 'Journal/2026/10/2026-10-31.md', '')
+    })
+
+    it('opens the existing note of that name instead of creating one', async () => {
+      const fetchFileContent = vi.fn().mockResolvedValue({ path: 'x', name: 'x', content: 'old', size: 3, encoding: 'utf-8', isBinary: false, isTruncated: false })
+      const apiClient = createMockApiClient({
+        fetchFileContent,
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: '', dailyNoteFormat: 'DD.MM.YYYY' }),
+      })
+
+      expect(await createDailyNoteService(apiClient).openOrCreate('vault1', '', '2026-10-31')).toBe('31.10.2026.md')
+      expect(apiClient.saveFile).not.toHaveBeenCalled()
+    })
+
+    it('uses the note name, not the ISO date, for {{title}}', async () => {
+      const fetchFileContent = vi.fn()
+        .mockRejectedValueOnce({ code: 'NOT_FOUND', message: 'File not found' })
+        .mockResolvedValueOnce({ path: 't.md', name: 't.md', content: '# {{title}}', size: 5, encoding: 'utf-8', isBinary: false, isTruncated: false })
+      const apiClient = createMockApiClient({
+        fetchFileContent,
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: 't.md', dailyNoteFormat: 'YYYY/MM/DD' }),
+      })
+
+      await createDailyNoteService(apiClient).openOrCreate('vault1', '', '2026-10-31')
+      expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2026/10/31.md', '# 31')
+    })
+
+    it('falls back to YYYY-MM-DD, with a warning, for a format that cannot name notes safely', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const apiClient = createMockApiClient({
+        fetchFileContent: vi.fn().mockRejectedValue({ code: 'NOT_FOUND', message: 'File not found' }),
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: '', dailyNoteFormat: '[../]YYYY-MM-DD' }),
+      })
+
+      expect(await createDailyNoteService(apiClient).openOrCreate('vault1', '', '2026-10-31')).toBe('2026-10-31.md')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cannot name notes'))
+      warn.mockRestore()
+    })
+
     it('loads the template from the vault path in daily-notes.json, also outside the templates folder', async () => {
       const fetchFileContent = vi.fn()
         .mockRejectedValueOnce({ code: 'NOT_FOUND', message: 'File not found' })

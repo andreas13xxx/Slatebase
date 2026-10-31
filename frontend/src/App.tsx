@@ -12,6 +12,7 @@ import { NavigationHistoryProvider, useNavigationHistory } from './state/navigat
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
 import { createDailyNoteService, loadDailyNotesConfigFromServer, getTodayDateString, offsetDateString } from './state/dailyNoteService'
+import { dailyNoteDate } from './state/dailyNoteFormat'
 import { openTab } from './state/tabActions'
 import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
 import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
@@ -719,8 +720,14 @@ function AppContent() {
     const relativePath = activeTab && activeTab.filePath.startsWith(prefix)
       ? activeTab.filePath.slice(prefix.length)
       : null
-    const match = relativePath ? /^(\d{4}-\d{2}-\d{2})\.md$/.exec(relativePath) : null
-    const baseDateStr = match ? match[1]! : getTodayDateString()
+    // The note names follow the vault's format (daily-notes.json); a note that does not match counts as "not a daily note".
+    let format: string | null = null
+    try {
+      format = (await apiClient.getVaultConfig(vaultId)).dailyNoteFormat
+    } catch {
+      // Without the config the default format applies.
+    }
+    const baseDateStr = (relativePath ? dailyNoteDate(relativePath, format) : null) ?? getTodayDateString()
     const targetDateStr = offsetDateString(baseDateStr, offsetDays)
 
     try {

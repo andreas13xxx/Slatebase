@@ -33,6 +33,17 @@ export const updateVaultConfigSchema = z.object({
       'Daily note template must be a relative vault path without parent traversal',
     )
     .optional(),
+  dailyNoteFormat: z
+    .string()
+    .min(1, 'Daily note format must not be empty')
+    .max(128, 'Daily note format must be at most 128 characters')
+    .refine(
+      (val) => !val.includes('..') && !val.startsWith('/') && !val.includes('\\') && !val.includes('//'),
+      'Daily note format must be a relative pattern without parent traversal, backslashes or empty folder names',
+    )
+    // eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
+    .refine((val) => !/[\u0000-\u001f]/.test(val), 'Daily note format must not contain control characters')
+    .optional(),
   uniqueNoteDirectory: z
     .string()
     .max(255, 'Unique note directory must be at most 255 characters')
