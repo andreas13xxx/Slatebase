@@ -16,6 +16,7 @@ import { useFeatureContext } from '../../state/featureContext'
 import { ThemeImport } from './ThemeImport'
 import { ThemeManager } from './ThemeManager'
 import { ThemeStoreBrowser } from './ThemeStoreBrowser'
+import { VaultAppearanceSettings } from './VaultAppearanceSettings'
 import { SettingSection } from './ui'
 
 type ThemesTab = 'installed' | 'discover' | 'import'
@@ -56,6 +57,8 @@ export function ThemesSection() {
   const shown: ThemesTab = tabs.some((t) => t.id === tab) ? tab : 'installed'
 
   return (
+    <>
+    <VaultAppearanceSettings />
     <SettingSection title="Themes" description="Obsidian-Themes für diesen Vault installieren und auswählen.">
       <div className="themes-tabs" role="tablist" aria-label="Themes">
         {tabs.map((t) => (
@@ -87,5 +90,6 @@ export function ThemesSection() {
         {shown === 'import' && <ThemeImport key={state.selectedVaultId ?? ''} />}
       </div>
     </SettingSection>
+    </>
   )
 }

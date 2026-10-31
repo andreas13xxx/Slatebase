@@ -768,6 +768,10 @@ export interface IApiClient {
   getAppConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Change known keys of `.obsidian/app.json`; `null` removes a key. Needs write access. Returns the file's fields afterwards. */
   patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/appearance.json` (base theme, accent colour, font size and fonts). */
+  getAppearanceConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Changes appearance.json; `null` removes a key. */
+  patchAppearanceConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
 
   // --- Vault Keychain ---
   /** List the keychain entry IDs of a vault (NOT the values). */
@@ -1459,6 +1463,18 @@ export class ApiClient implements IApiClient {
 
   async patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/app-config`, patch)
+    return result.config
+  }
+
+  // --- Vault appearance.json ---
+
+  async getAppearanceConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/appearance-config`)
+    return result.config
+  }
+
+  async patchAppearanceConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/appearance-config`, patch)
     return result.config
   }
 

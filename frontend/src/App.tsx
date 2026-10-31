@@ -66,6 +66,9 @@ import { StatusBar } from './components/StatusBar'
 import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { ThemeLifecycle } from './components/ThemeLifecycle'
 import { AppConfigLifecycle } from './components/AppConfigLifecycle'
+import { AppearanceLifecycle } from './components/AppearanceLifecycle'
+import { useAppearanceValue } from './state/vaultAppearanceStore'
+import { resolveColorScheme } from '@slatebase/shared-contracts'
 import { DictationIndicator } from './components/DictationIndicator'
 import { PluginViewPanel } from './components/PluginViewPanel'
 import { VersionBrowser } from './components/VersionBrowser'
@@ -1439,6 +1442,7 @@ function AppContent() {
         {statusBarVisible && <StatusBar />}
         <ThemeLifecycle />
         <AppConfigLifecycle />
+        <AppearanceLifecycle />
         <SnippetLifecycle />
         {isEnabled('voice-transcription') && (
           <DictationIndicator vaultId={state.selectedVaultId} apiClient={apiClient} />
@@ -1458,7 +1462,9 @@ function AppContent() {
 function I18nBridge({ children }: { children: React.ReactNode }) {
   const { authState } = useAuthContext()
   const userLocale = authState.user?.preferredLanguage ?? null
-  const colorScheme = authState.user?.colorScheme ?? 'system'
+  // The user's own choice wins; the vault's base theme (appearance.json) decides only for users on 'system'.
+  const vaultTheme = useAppearanceValue('theme')
+  const colorScheme = resolveColorScheme(authState.user?.colorScheme ?? 'system', vaultTheme)
 
   // Apply color scheme to <html> element
   useEffect(() => {
