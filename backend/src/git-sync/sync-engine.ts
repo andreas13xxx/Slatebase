@@ -15,6 +15,7 @@ import type { IVaultRegistry } from '../vault/registry.js'
 import type { IGitSyncConfigStore } from './config-store.js'
 import type { IGitSyncStatusStore } from './status-store.js'
 import type { IGitCli } from './git-cli.js'
+import { resolveConfigConflicts } from './config-conflicts.js'
 import type { IModuleSecretStore } from '../shared-secrets/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IEventBus } from '../realtime/types.js'
@@ -27,7 +28,7 @@ const GITIGNORE_BLOCK_END = '# <<< slatebase managed <<<'
 /**
  * Vault-specific settings (`.slatebase/config.json`, property types, the spellcheck word list, Obsidian config/themes/plugins)
  * are synced; per-instance data (trash, versions, link-index cache) and per-device state
- * (workspace layout) are not. Plugin `data.json` is synced so plugin settings follow the vault. `.slatebase/*` rather than
+ * (the open-tabs layout in workspace.json; the saved layouts in workspaces.json are vault-wide and synced) are not. Plugin `data.json` is synced so plugin settings follow the vault. `.slatebase/*` rather than
  * `.slatebase/` because git cannot re-include a file inside an excluded directory.
  */
 const MANAGED_GITIGNORE_LINES = [
@@ -35,7 +36,7 @@ const MANAGED_GITIGNORE_LINES = [
   '!.slatebase/config.json',
   '!.slatebase/property-types.json',
   '!.slatebase/spellcheck-words.json',
-  '.obsidian/workspace*.json',
+  '.obsidian/workspace.json',
 ]
 /** Lines older versions wrote on their own — superseded by the managed block. */
 const LEGACY_GITIGNORE_LINES = ['.slatebase/', '.obsidian/']
@@ -176,13 +177,20 @@ export class GitSyncEngine implements IGitSyncEngine {
       let pulledFiles = 0
       if (fetched) {
         const preMergeHead = postCommitHead
-        const mergeResult = await this.gitCli.mergeNoEdit(cwd, remoteName, vaultData.branch)
+        let mergeResult = await this.gitCli.mergeNoEdit(cwd, remoteName, vaultData.branch)
         if (mergeResult === 'conflict') {
-          const conflictFiles = await this.gitCli.conflictedFiles(cwd)
-          this.logger.warn('Git-sync merge conflict, leaving conflict markers for manual resolution', {
-            vaultId, remoteId, conflictFiles,
-          })
-          return this.finish(vaultId, remoteId, { result: 'conflict', conflictFiles })
+          // Obsidian's JSON config files are merged key by key; anything else stays as git wrote it.
+          const allConflicts = await this.gitCli.conflictedFiles(cwd)
+          const resolved = await resolveConfigConflicts({ gitCli: this.gitCli, cwd, conflictFiles: allConflicts, logger: this.logger, vaultId })
+          const conflictFiles = allConflicts.filter((file) => !resolved.includes(file))
+          if (conflictFiles.length > 0) {
+            this.logger.warn('Git-sync merge conflict, leaving conflict markers for manual resolution', {
+              vaultId, remoteId, conflictFiles, resolvedAutomatically: resolved,
+            })
+            return this.finish(vaultId, remoteId, { result: 'conflict', conflictFiles })
+          }
+          await this.gitCli.commitAll(cwd, 'Slatebase sync: merge (config conflicts resolved automatically)')
+          mergeResult = 'merged'
         }
         // Notify open sessions their file tree may be stale — but only when the
         // merge actually brought in remote changes, not on every no-op poll.

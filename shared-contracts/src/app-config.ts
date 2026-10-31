@@ -115,19 +115,19 @@ export function appConfigValueProblem(key: AppConfigKey, value: unknown): string
   const spec: AppConfigKeyMeta = APP_CONFIG_KEYS[key]
   switch (spec.kind) {
     case 'boolean':
-      return typeof value === 'boolean' ? null : `expected a boolean, found ${describe(value)}`
+      return typeof value === 'boolean' ? null : `expected a boolean, found ${describeValue(value)}`
     case 'number':
-      if (typeof value !== 'number' || !Number.isFinite(value)) return `expected a number, found ${describe(value)}`
+      if (typeof value !== 'number' || !Number.isFinite(value)) return `expected a number, found ${describeValue(value)}`
       return value >= spec.min && value <= spec.max ? null : `expected a number from ${spec.min} to ${spec.max}, found ${value}`
     case 'string':
-      if (typeof value !== 'string') return `expected a string, found ${describe(value)}`
+      if (typeof value !== 'string') return `expected a string, found ${describeValue(value)}`
       return value.length <= spec.maxLength ? null : `string longer than ${spec.maxLength} characters`
     case 'enum':
       return typeof value === 'string' && spec.values.includes(value)
         ? null
-        : `unexpected enum value ${describe(value)} (expected ${spec.values.join('|')})`
+        : `unexpected enum value ${describeValue(value)} (expected ${spec.values.join('|')})`
     case 'string[]':
-      if (!Array.isArray(value)) return `expected a list of strings, found ${describe(value)}`
+      if (!Array.isArray(value)) return `expected a list of strings, found ${describeValue(value)}`
       if (value.length > spec.maxItems) return `list longer than ${spec.maxItems} entries`
       return value.every((entry) => typeof entry === 'string' && entry.length <= spec.maxLength)
         ? null
@@ -135,11 +135,13 @@ export function appConfigValueProblem(key: AppConfigKey, value: unknown): string
   }
 }
 
-function describe(value: unknown): string {
+/** A value for a log or error message: strings quoted, everything cut to 80 characters. */
+export function describeValue(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value.length > 80 ? `${value.slice(0, 80)}…` : value)
-  if (value === null) return 'null'
-  if (Array.isArray(value)) return 'a list'
-  return typeof value === 'object' ? 'an object' : String(value)
+  if (value === undefined) return 'undefined'
+  if (typeof value !== 'object' || value === null) return String(value)
+  const json = JSON.stringify(value)
+  return json.length > 80 ? `${json.slice(0, 80)}…` : json
 }
 
 export interface AppConfigDeviation {
@@ -153,7 +155,7 @@ export function describeAppConfigDeviations(fields: Record<string, unknown>): Ap
   const deviations: AppConfigDeviation[] = []
   for (const [key, value] of Object.entries(fields)) {
     if (!isAppConfigKey(key)) {
-      deviations.push({ key, reason: `unknown key (value ${describe(value)})` })
+      deviations.push({ key, reason: `unknown key (value ${describeValue(value)})` })
       continue
     }
     const problem = appConfigValueProblem(key, value)
