@@ -8,9 +8,9 @@
  * (Requirement 3).
  */
 
-import React, { useMemo, useCallback, useState, useRef } from 'react'
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react'
 import { Star, StarOff, Heading, Hash, Search as SearchIcon, FolderOpen, Pencil } from 'lucide-react'
-import { favoritesStore } from '../../state/favoritesStore'
+import { favoritesStore, onFavoritesChange } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { useSearchContext } from '../../state/searchContext'
 import { useAppContext } from '../../state'
@@ -136,6 +136,9 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   )
 
   const refresh = useCallback(() => setInternalRefreshTick((n) => n + 1), [])
+
+  // The vault's bookmarks.json was read (vault opened, or changed by Obsidian, a sync or another user).
+  useEffect(() => onFavoritesChange(refresh), [refresh])
 
   const handleEntryClick = useCallback((entry: FavoriteEntry) => {
     const type = entry.type ?? 'file'

@@ -12,6 +12,7 @@ import { NavigationHistoryProvider, useNavigationHistory } from './state/navigat
 import { FeatureProvider, useFeatureContext } from './state/featureContext'
 import { SearchProvider } from './state/searchContext'
 import { createDailyNoteService, loadDailyNotesConfigFromServer, getTodayDateString, offsetDateString } from './state/dailyNoteService'
+import { dailyNoteDate } from './state/dailyNoteFormat'
 import { openTab } from './state/tabActions'
 import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
 import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
@@ -65,6 +66,11 @@ import { StatusBar } from './components/StatusBar'
 import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { ThemeLifecycle } from './components/ThemeLifecycle'
 import { AppConfigLifecycle } from './components/AppConfigLifecycle'
+import { AppearanceLifecycle } from './components/AppearanceLifecycle'
+import { GraphConfigLifecycle } from './components/GraphConfigLifecycle'
+import { BookmarksLifecycle } from './components/BookmarksLifecycle'
+import { getAppearanceValue, useAppearanceValue } from './state/vaultAppearanceStore'
+import { resolveColorScheme } from '@slatebase/shared-contracts'
 import { DictationIndicator } from './components/DictationIndicator'
 import { PluginViewPanel } from './components/PluginViewPanel'
 import { VersionBrowser } from './components/VersionBrowser'
@@ -719,8 +725,14 @@ function AppContent() {
     const relativePath = activeTab && activeTab.filePath.startsWith(prefix)
       ? activeTab.filePath.slice(prefix.length)
       : null
-    const match = relativePath ? /^(\d{4}-\d{2}-\d{2})\.md$/.exec(relativePath) : null
-    const baseDateStr = match ? match[1]! : getTodayDateString()
+    // The note names follow the vault's format (daily-notes.json); a note that does not match counts as "not a daily note".
+    let format: string | null = null
+    try {
+      format = (await apiClient.getVaultConfig(vaultId)).dailyNoteFormat
+    } catch {
+      // Without the config the default format applies.
+    }
+    const baseDateStr = (relativePath ? dailyNoteDate(relativePath, format) : null) ?? getTodayDateString()
     const targetDateStr = offsetDateString(baseDateStr, offsetDays)
 
     try {
@@ -1111,8 +1123,9 @@ function AppContent() {
         }}
         onLogout={handleLogout}
         onToggleTheme={async () => {
-          const current = authState.user?.colorScheme ?? 'system'
-          const next = current === 'dark' ? 'light' : 'dark'
+          // Flip what is shown: a user on 'system' may be shown the vault's base theme (appearance.json).
+          const shown = resolveColorScheme(authState.user?.colorScheme ?? 'system', getAppearanceValue('theme'))
+          const next = shown === 'dark' ? 'light' : 'dark'
           try {
             const updatedUser = await apiClient.updateProfile({ colorScheme: next })
             authDispatch({ type: 'PROFILE_UPDATED', payload: { user: updatedUser } })
@@ -1432,6 +1445,9 @@ function AppContent() {
         {statusBarVisible && <StatusBar />}
         <ThemeLifecycle />
         <AppConfigLifecycle />
+        <AppearanceLifecycle />
+        <GraphConfigLifecycle />
+        <BookmarksLifecycle />
         <SnippetLifecycle />
         {isEnabled('voice-transcription') && (
           <DictationIndicator vaultId={state.selectedVaultId} apiClient={apiClient} />
@@ -1451,7 +1467,9 @@ function AppContent() {
 function I18nBridge({ children }: { children: React.ReactNode }) {
   const { authState } = useAuthContext()
   const userLocale = authState.user?.preferredLanguage ?? null
-  const colorScheme = authState.user?.colorScheme ?? 'system'
+  // The user's own choice wins; the vault's base theme (appearance.json) decides only for users on 'system'.
+  const vaultTheme = useAppearanceValue('theme')
+  const colorScheme = resolveColorScheme(authState.user?.colorScheme ?? 'system', vaultTheme)
 
   // Apply color scheme to <html> element
   useEffect(() => {

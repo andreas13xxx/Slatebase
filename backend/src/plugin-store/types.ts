@@ -96,9 +96,9 @@ export interface IPluginStoreConfig {
   cacheTtlPluginList: number;
   /** Cache TTL for remote manifests in milliseconds (default: 900000 = 15min) */
   cacheTtlManifest: number;
-  /** Maximum allowed size per individual asset in bytes (default: 10 * 1024 * 1024 = 10 MB) */
+  /** Maximum allowed size per individual asset in bytes (default: PLUGIN_LIMITS.maxAssetBytes, 25 MB) */
   maxAssetSize: number;
-  /** Maximum total download size per plugin in bytes (default: 15 * 1024 * 1024 = 15 MB) */
+  /** Maximum total download size per plugin in bytes (default: PLUGIN_LIMITS.maxTotalDownloadBytes, 50 MB) */
   maxTotalDownloadSize: number;
   /** Interval for automatic update checks in milliseconds (default: 86400000 = 24h) */
   autoCheckInterval: number;

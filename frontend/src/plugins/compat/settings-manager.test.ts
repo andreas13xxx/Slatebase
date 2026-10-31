@@ -59,12 +59,20 @@ describe('SettingsManager', () => {
       expect(apiClient.saveSettings).not.toHaveBeenCalled()
     })
 
-    it('rejects data over 1 MB', async () => {
+    it('rejects data over the settings limit (10 MB, the server\'s)', async () => {
       const apiClient = makeApiClient()
       const manager = new SettingsManager(apiClient, 'vault-1')
 
-      await expect(manager.saveData('plugin-a', { big: 'x'.repeat(2 * 1024 * 1024) })).rejects.toThrow(/1 MB/)
+      await expect(manager.saveData('plugin-a', { big: 'x'.repeat(11 * 1024 * 1024) })).rejects.toThrow(/10 MB/)
       expect(apiClient.saveSettings).not.toHaveBeenCalled()
+    })
+
+    it('accepts data of 2 MB, which the old 1 MB limit refused', async () => {
+      const apiClient = makeApiClient()
+      const manager = new SettingsManager(apiClient, 'vault-1')
+
+      await manager.saveData('plugin-a', { big: 'x'.repeat(2 * 1024 * 1024) })
+      expect(apiClient.saveSettings).toHaveBeenCalledTimes(1)
     })
   })
 

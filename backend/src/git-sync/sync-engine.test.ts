@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { GitSyncEngine } from './sync-engine.js'
 import type { IGitCli } from './git-cli.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
@@ -9,6 +11,8 @@ import type { IGitSyncConfigStore } from './config-store.js'
 import type { IGitSyncStatusStore } from './status-store.js'
 import type { IModuleSecretStore } from '../shared-secrets/index.js'
 import type { GitSyncRemoteConfig, GitSyncVaultData, GitSyncRemoteStatus } from './types.js'
+
+const execFileAsync = promisify(execFile)
 
 const createMockLogger = () => ({
   info: () => {},
@@ -66,6 +70,15 @@ class FakeGitCli implements IGitCli {
     return value
   }
   async diffNameOnly(): Promise<string[]> { this.calls.push('diffNameOnly'); return this.diffResult }
+  /** Content of the three conflict stages, by stage number; a missing one means "no such file". */
+  public stages: Partial<Record<1 | 2 | 3, string>> = {}
+  async showStage(_cwd: string, stage: 1 | 2 | 3): Promise<string | null> { return this.stages[stage] ?? null }
+  async stageFile(_cwd: string, file: string): Promise<void> {
+    this.calls.push('stageFile')
+    this.conflicted = this.conflicted.filter((name) => name !== file)
+  }
+  async lastChangeTime(): Promise<number> { return 0 }
+  async concludeMerge(): Promise<void> { this.calls.push('concludeMerge') }
 }
 
 describe('GitSyncEngine', () => {
@@ -123,11 +136,40 @@ describe('GitSyncEngine', () => {
     expect(gitignore).toContain('.slatebase/*')
     expect(gitignore).toContain('!.slatebase/config.json')
     expect(gitignore).toContain('!.slatebase/spellcheck-words.json')
-    expect(gitignore).toContain('.obsidian/workspace*.json')
+    expect(gitignore).toContain('.obsidian/workspace.json')
+    expect(gitignore).not.toContain('workspace*.json')
     expect(gitignore).not.toMatch(/^\.obsidian\/$/m)
 
     expect(recordedStatuses).toHaveLength(1)
     expect(recordedStatuses[0]).toMatchObject({ remoteId: 'remote-1', lastResult: 'success' })
+  })
+
+  describe('.gitignore against a real git', () => {
+    const isIgnored = async (file: string): Promise<boolean> => {
+      try {
+        await execFileAsync('git', ['check-ignore', '-q', '--no-index', file], { cwd: vaultPath })
+        return true
+      } catch (error: unknown) {
+        if ((error as { code?: number }).code === 1) return false
+        throw error
+      }
+    }
+
+    it('syncs the vault-wide Obsidian files and keeps the per-user and per-instance state out', async () => {
+      await engine.runOne('vault-1', 'remote-1')
+      await execFileAsync('git', ['init', '-q'], { cwd: vaultPath })
+
+      for (const file of [
+        '.obsidian/app.json', '.obsidian/appearance.json', '.obsidian/daily-notes.json', '.obsidian/bookmarks.json',
+        '.obsidian/hotkeys.json', '.obsidian/graph.json', '.obsidian/types.json', '.obsidian/workspaces.json',
+        '.obsidian/core-plugins.json', '.slatebase/config.json', '.slatebase/property-types.json',
+      ]) {
+        expect(await isIgnored(file), file).toBe(false)
+      }
+      for (const file of ['.obsidian/workspace.json', '.obsidian/workspace-mobile.json', '.slatebase/link-index.json']) {
+        expect(await isIgnored(file), file).toBe(true)
+      }
+    })
   })
 
   describe('.gitignore migration', () => {
@@ -161,7 +203,7 @@ describe('GitSyncEngine', () => {
       const first = await readGitignore()
       expect(first).not.toContain('data.json')
 
-      await writeFile(join(vaultPath, '.gitignore'), first.replace('.obsidian/workspace*.json\n', '.obsidian/workspace*.json\n.obsidian/plugins/*/data.json\n'))
+      await writeFile(join(vaultPath, '.gitignore'), first.replace('.obsidian/workspace.json\n', '.obsidian/workspace.json\n.obsidian/plugins/*/data.json\n'))
       await engine.runOne('vault-1', 'remote-1')
       expect(await readGitignore()).toBe(first)
     })
@@ -217,6 +259,36 @@ describe('GitSyncEngine', () => {
     expect(outcome.conflictFiles).toEqual(['notes/example.md'])
     expect(gitCli.calls).not.toContain('push')
     expect(recordedStatuses[0]).toMatchObject({ lastResult: 'conflict', conflictFiles: ['notes/example.md'], lastPulledFiles: null, lastPushedFiles: null })
+  })
+
+  it('resolves a conflict in a config file on its own, commits the merge and carries on', async () => {
+    gitCli.isRepoValue = true
+    gitCli.mergeResult = 'conflict'
+    gitCli.conflicted = ['.obsidian/app.json']
+    gitCli.stages = { 1: '{"a":1,"b":1}', 2: '{"a":2,"b":1}', 3: '{"a":1,"b":2}' }
+    await mkdir(join(vaultPath, '.obsidian'), { recursive: true })
+
+    const outcome = await engine.runOne('vault-1', 'remote-1')
+
+    expect(outcome.result).toBe('success')
+    expect(JSON.parse(await readFile(join(vaultPath, '.obsidian', 'app.json'), 'utf-8'))).toEqual({ a: 2, b: 2 })
+    expect(gitCli.calls).toContain('concludeMerge')
+    expect(gitCli.calls).toContain('push')
+  })
+
+  it('still reports a conflict for the files it cannot resolve, and keeps the ones it resolved staged', async () => {
+    gitCli.isRepoValue = true
+    gitCli.mergeResult = 'conflict'
+    gitCli.conflicted = ['.obsidian/app.json', 'notes/example.md']
+    gitCli.stages = { 1: '{"a":1}', 2: '{"a":2}', 3: '{"a":1,"b":2}' }
+    await mkdir(join(vaultPath, '.obsidian'), { recursive: true })
+
+    const outcome = await engine.runOne('vault-1', 'remote-1')
+
+    expect(outcome.result).toBe('conflict')
+    expect(outcome.conflictFiles).toEqual(['notes/example.md'])
+    expect(gitCli.calls).toContain('stageFile')
+    expect(gitCli.calls).not.toContain('push')
   })
 
   it('skips the push when the repo has no commits yet (e.g. an empty vault)', async () => {

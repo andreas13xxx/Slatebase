@@ -1,22 +1,29 @@
 /**
- * PropertyTypeStore — filesystem persistence for per-vault property type definitions.
- * Each vault's registry is stored as `.slatebase/property-types.json` inside the vault's data directory.
- * Uses atomic writes (temp → rename) via KeyedJsonFileStore for crash safety.
+ * PropertyTypeStore — per-vault property type definitions.
+ *
+ * The types live where Obsidian keeps them, in `<vault>/.obsidian/types.json` (key → type name, see
+ * obsidian-types.ts), so both programs see the same types. What Obsidian has no place for — the
+ * allowed values and date format hint of an entry — stays in `.slatebase/property-types.json`, keyed
+ * by property name and attached to the entry when the registry is read. Entries are kept in the
+ * order of types.json; names of types Slatebase does not know stay in the file and are left out of
+ * the registry.
+ *
+ * Both files are written atomically (temp → rename); types.json under the shared per-file lock.
  */
 
 import path from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import type { IPropertyTypeService, PropertyTypeEntry, PropertyTypeRegistry } from './types.js'
-import { DEFAULT_PROPERTY_TYPE_REGISTRY, RESERVED_PROPERTY_KEYS } from './types.js'
+import { DEFAULT_PROPERTY_TYPE_REGISTRY, MAX_PROPERTY_TYPE_ENTRIES, RESERVED_PROPERTY_KEYS } from './types.js'
 import { KeyedJsonFileStore } from '../shared/json-file-store.js'
+import { ObsidianConfigFileInvalidError, readObsidianConfig, updateObsidianConfig } from '../shared/obsidian-config-file.js'
+import { noopDeviationReporter, type IDeviationReporter } from '../obsidian-config/deviation-reporter.js'
+import { fromObsidianType, toObsidianType } from './obsidian-types.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Registry file path relative to vault root. */
-const REGISTRY_PATH = path.join('.slatebase', 'property-types.json')
-
-/** Maximum entries allowed per vault. */
-const MAX_ENTRIES = 200
+/** Options file path relative to vault root (Slatebase's part of the registry). */
+const OPTIONS_PATH = path.join('.slatebase', 'property-types.json')
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,7 +33,7 @@ export type VaultPathResolver = (vaultId: string) => string | null
 // ─── Sanitizer ───────────────────────────────────────────────────────────────
 
 /**
- * Validates and sanitizes raw JSON into a PropertyTypeRegistry.
+ * Validates and sanitizes raw JSON of `.slatebase/property-types.json` into a PropertyTypeRegistry.
  * Returns null (= fall back to default) for unrecognizable data.
  */
 function sanitizeRegistry(raw: unknown): PropertyTypeRegistry | null {
@@ -69,71 +76,159 @@ function sanitizeRegistry(raw: unknown): PropertyTypeRegistry | null {
     entries.push(result)
   }
 
-  return { entries: entries.slice(0, MAX_ENTRIES) }
+  return { entries: entries.slice(0, MAX_PROPERTY_TYPE_ENTRIES) }
 }
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 export class PropertyTypeStore implements IPropertyTypeService {
-  private readonly store: KeyedJsonFileStore<PropertyTypeRegistry>
+  /** Slatebase's own part: the entries that have options (the type is repeated there for validation only). */
+  private readonly optionsStore: KeyedJsonFileStore<PropertyTypeRegistry>
 
   constructor(
     private readonly resolveVaultPath: VaultPathResolver,
     private readonly logger: ILogger,
+    private readonly reporter: IDeviationReporter = noopDeviationReporter,
   ) {
-    this.store = new KeyedJsonFileStore<PropertyTypeRegistry>(
-      (vaultId) => this.getFilePath(vaultId),
+    this.optionsStore = new KeyedJsonFileStore<PropertyTypeRegistry>(
+      (vaultId) => this.getOptionsPath(vaultId),
       DEFAULT_PROPERTY_TYPE_REGISTRY,
       sanitizeRegistry,
-      (error) => this.logger.error('Failed to load property type registry', { error: String(error) }),
+      (error) => this.logger.error('Failed to load property type options', { error: String(error) }),
     )
   }
 
   async getRegistry(vaultId: string): Promise<PropertyTypeRegistry> {
-    return this.store.read(vaultId)
+    const vaultPath = this.getVaultPath(vaultId)
+    const types = await this.readTypes(vaultPath, vaultId)
+    const { entries: withOptions } = await this.optionsStore.read(vaultId)
+    const optionsByKey = new Map(withOptions.map((entry) => [entry.key, entry.options]))
+
+    const entries: PropertyTypeEntry[] = []
+    for (const [key, name] of Object.entries(types)) {
+      // tags and aliases have a fixed type; whatever the file says for them is not a choice.
+      const type = RESERVED_PROPERTY_KEYS[key] ?? fromObsidianType(key, name)
+      if (type === null) {
+        this.reporter.report(vaultId, 'types.json', [{ path: `types.${key}`, reason: `unknown property type ${JSON.stringify(name)?.slice(0, 80)}` }])
+        continue
+      }
+      const options = optionsByKey.get(key)
+      entries.push({ key, type, ...(options !== undefined ? { options } : {}) })
+    }
+    return { entries: entries.slice(0, MAX_PROPERTY_TYPE_ENTRIES) }
   }
 
   async saveRegistry(vaultId: string, registry: PropertyTypeRegistry): Promise<PropertyTypeRegistry> {
+    const vaultPath = this.getVaultPath(vaultId)
     // Enforce reserved key constraints
-    const validated = this.enforceReservedKeys(registry.entries)
-    const capped: PropertyTypeRegistry = { entries: validated.slice(0, MAX_ENTRIES) }
+    const capped = this.enforceReservedKeys(registry.entries).slice(0, MAX_PROPERTY_TYPE_ENTRIES)
 
-    await this.store.write(vaultId, capped)
-    return capped
+    const wanted = new Map(capped.filter((entry) => entry.key !== '__proto__').map((entry) => [entry.key, toObsidianType(entry.type)]))
+    await updateObsidianConfig(vaultPath, 'types.json', (current) => {
+      const previous = typesOf(current)
+      // The file keeps its order. Types Slatebase does not know stay where they are; the others are
+      // replaced by the registry or, if it no longer has them, removed. New keys follow.
+      // No prototype, so a key called __proto__ in the file stays an ordinary key.
+      const next = Object.create(null) as Record<string, unknown>
+      for (const [key, name] of Object.entries(previous)) {
+        if (RESERVED_PROPERTY_KEYS[key] === undefined && fromObsidianType(key, name) === null) next[key] = name
+        else if (wanted.has(key)) next[key] = wanted.get(key)
+      }
+      for (const [key, name] of wanted) if (!Object.hasOwn(next, key)) next[key] = name
+      current['types'] = next
+      return current
+    })
+    await this.optionsStore.write(vaultId, { entries: capped.filter((entry) => entry.options !== undefined) })
+    return { entries: capped }
   }
 
   async upsertEntry(vaultId: string, entry: PropertyTypeEntry): Promise<PropertyTypeRegistry> {
+    const vaultPath = this.getVaultPath(vaultId)
     // Check reserved key constraint
     const reservedType = RESERVED_PROPERTY_KEYS[entry.key]
     if (reservedType !== undefined && entry.type !== reservedType) {
       throw new PropertyTypeReservedKeyError(entry.key, reservedType)
     }
 
-    return this.store.mutate(vaultId, (current) => {
-      const entries = [...current.entries]
-      const existingIndex = entries.findIndex((e) => e.key === entry.key)
-
-      if (existingIndex >= 0) {
-        entries[existingIndex] = entry
-      } else {
-        if (entries.length >= MAX_ENTRIES) {
-          throw new PropertyTypeMaxEntriesError(MAX_ENTRIES)
-        }
-        entries.push(entry)
+    if (entry.key === '__proto__') throw new Error('"__proto__" is not a usable property name')
+    await updateObsidianConfig(vaultPath, 'types.json', (current) => {
+      const types = typesOf(current)
+      if (!Object.hasOwn(types, entry.key) && Object.keys(types).length >= MAX_PROPERTY_TYPE_ENTRIES) {
+        throw new PropertyTypeMaxEntriesError(MAX_PROPERTY_TYPE_ENTRIES)
       }
-
-      return { entries }
+      types[entry.key] = toObsidianType(entry.type)
+      current['types'] = types
+      return current
     })
+    await this.optionsStore.mutate(vaultId, (stored) => ({
+      entries: [
+        ...stored.entries.filter((other) => other.key !== entry.key),
+        ...(entry.options !== undefined ? [entry] : []),
+      ],
+    }))
+    return this.getRegistry(vaultId)
+  }
+
+  /**
+   * Copies the entries of the old `.slatebase/property-types.json` that `types.json` lacks into
+   * `types.json`, and leaves only the entries with options in the old file. A key `types.json`
+   * already has keeps its type. Returns the number of entries added. Used by the startup migration.
+   */
+  async adoptLegacyEntries(vaultId: string): Promise<number> {
+    const vaultPath = this.getVaultPath(vaultId)
+    const { entries: legacy } = await this.optionsStore.read(vaultId)
+    if (legacy.length === 0) return 0
+
+    let added = 0
+    await updateObsidianConfig(vaultPath, 'types.json', (current) => {
+      const types = typesOf(current)
+      for (const entry of legacy) {
+        if (entry.key === '__proto__' || Object.hasOwn(types, entry.key)) continue
+        if (Object.keys(types).length >= MAX_PROPERTY_TYPE_ENTRIES) break
+        types[entry.key] = toObsidianType(this.enforceReservedKeys([entry])[0]?.type ?? entry.type)
+        added++
+      }
+      if (added === 0) return null
+      current['types'] = types
+      return current
+    })
+    await this.optionsStore.write(vaultId, { entries: legacy.filter((entry) => entry.options !== undefined) })
+    return added
   }
 
   // ─── Internal ────────────────────────────────────────────────────────────────
 
-  private getFilePath(vaultId: string): string {
+  /** The `types` map of types.json; empty if the file is absent or unusable (reported, not overwritten). */
+  private async readTypes(vaultPath: string, vaultId: string): Promise<Record<string, unknown>> {
+    try {
+      const file = await readObsidianConfig(vaultPath, 'types.json')
+      if (file === null) return {}
+      const types = file['types']
+      if (types === undefined) return {}
+      if (!isRecord(types)) {
+        this.reporter.report(vaultId, 'types.json', [{ path: 'types', reason: 'expected an object of property names to types' }])
+        return {}
+      }
+      return types
+    } catch (error) {
+      if (error instanceof ObsidianConfigFileInvalidError) {
+        this.reporter.report(vaultId, 'types.json', [{ path: '', reason: 'not a JSON object' }])
+        return {}
+      }
+      throw error
+    }
+  }
+
+  private getVaultPath(vaultId: string): string {
     const vaultPath = this.resolveVaultPath(vaultId)
     if (!vaultPath) {
       throw new Error(`Vault not found: ${vaultId}`)
     }
-    return path.join(vaultPath, REGISTRY_PATH)
+    return vaultPath
+  }
+
+  private getOptionsPath(vaultId: string): string {
+    return path.join(this.getVaultPath(vaultId), OPTIONS_PATH)
   }
 
   /**
@@ -149,6 +244,22 @@ export class PropertyTypeStore implements IPropertyTypeService {
       return entry
     })
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * A copy of the `types` map of types.json (empty if the key is absent). A `types` that is not an
+ * object is refused instead of replaced: the file may be mid-sync or hand-edited, as for any other
+ * Obsidian file Slatebase writes.
+ */
+function typesOf(file: Record<string, unknown>): Record<string, unknown> {
+  const types = file['types']
+  if (types === undefined) return {}
+  if (!isRecord(types)) throw new ObsidianConfigFileInvalidError('types.json')
+  return { ...types }
 }
 
 // ─── Error Classes ───────────────────────────────────────────────────────────

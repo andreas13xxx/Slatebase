@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PLUGIN_LIMITS, formatPluginLimit } from '@slatebase/shared-contracts'
 
 // ─── Plugin ID Validation ────────────────────────────────────────────────────
 
@@ -53,9 +54,9 @@ export const pluginManifestSchema = z.object({
 
 /**
  * Schema for validating plugin settings (data.json content).
- * Must be a JSON string not exceeding 1 MB (1,048,576 bytes).
+ * Must be a JSON string not exceeding PLUGIN_LIMITS.maxSettingsBytes (10 MB).
  */
-export const pluginSettingsSchema = z.string().max(1_048_576, 'Plugin settings must not exceed 1 MB')
+export const pluginSettingsSchema = z.string().max(PLUGIN_LIMITS.maxSettingsBytes, `Plugin settings must not exceed ${formatPluginLimit(PLUGIN_LIMITS.maxSettingsBytes)}`)
 
 /**
  * Schema for validating the plugin registry (_registry.json).
@@ -85,10 +86,10 @@ export const pluginRegistrySchema = z.object({
  * Upload size constraints for plugin files.
  */
 export const pluginUploadConstraints = {
-  /** Maximum ZIP file size: 10 MB */
-  maxZipSize: 10 * 1024 * 1024,
-  /** Maximum individual file size: 10 MB */
-  maxFileSize: 10 * 1024 * 1024,
+  /** Maximum ZIP file size (shared-contracts plugin-limits.ts) */
+  maxZipSize: PLUGIN_LIMITS.maxZipBytes,
+  /** Maximum individual file size */
+  maxFileSize: PLUGIN_LIMITS.maxFileBytes,
 } as const
 
 // ─── Inferred Types ──────────────────────────────────────────────────────────

@@ -82,6 +82,14 @@ export interface IGitCli {
   getHead(cwd: string): Promise<string | null>
   /** Names of files that differ between two commits. `fromRef: null` diffs against the empty tree (e.g. a fresh first commit). */
   diffNameOnly(cwd: string, fromRef: string | null, toRef: string): Promise<string[]>
+  /** Content of `file` in a conflicted merge: stage 1 = common base, 2 = ours, 3 = theirs. `null` if that side has no such file. */
+  showStage(cwd: string, stage: 1 | 2 | 3, file: string): Promise<string | null>
+  /** Stages `file` as it is in the working tree (marks a conflict as resolved). */
+  stageFile(cwd: string, file: string): Promise<void>
+  /** Concludes a merge whose conflicts are all resolved and staged. Commits even if the result equals HEAD (a merge commit must exist, or MERGE_HEAD stays and blocks the next merge). */
+  concludeMerge(cwd: string, message: string): Promise<void>
+  /** Unix time (seconds) of the newest commit at `ref` that touched `file`; 0 if there is none. */
+  lastChangeTime(cwd: string, ref: string, file: string): Promise<number>
 }
 
 export class GitCli implements IGitCli {
@@ -194,6 +202,33 @@ export class GitCli implements IGitCli {
   async diffNameOnly(cwd: string, fromRef: string | null, toRef: string): Promise<string[]> {
     const { stdout } = await this.run(cwd, ['diff', '--name-only', fromRef ?? EMPTY_TREE_HASH, toRef])
     return stdout.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+  }
+
+  async showStage(cwd: string, stage: 1 | 2 | 3, file: string): Promise<string | null> {
+    try {
+      const { stdout } = await this.run(cwd, ['show', `:${stage}:${file}`])
+      return stdout
+    } catch {
+      return null
+    }
+  }
+
+  async stageFile(cwd: string, file: string): Promise<void> {
+    await this.run(cwd, ['add', '--', file])
+  }
+
+  async concludeMerge(cwd: string, message: string): Promise<void> {
+    await this.run(cwd, ['commit', '-m', message])
+  }
+
+  async lastChangeTime(cwd: string, ref: string, file: string): Promise<number> {
+    try {
+      const { stdout } = await this.run(cwd, ['log', '-1', '--format=%ct', ref, '--', file])
+      const seconds = Number.parseInt(stdout.trim(), 10)
+      return Number.isFinite(seconds) ? seconds : 0
+    } catch {
+      return 0
+    }
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────

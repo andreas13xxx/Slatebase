@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { MAX_BOOKMARK_ITEMS } from '@slatebase/shared-contracts'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { history } from '@codemirror/commands'
@@ -745,10 +746,11 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
       expect(toastSpy).toHaveBeenCalledWith('info', expect.any(String))
     })
 
-    it('stops and shows an info toast once the 50-entry cap is reached', () => {
-      for (let i = 0; i < 50; i++) {
-        favoritesStore.add('vault-1', `existing-${i}.md`)
-      }
+    it('stops and shows an info toast once the entry limit is reached', () => {
+      const full = Array.from({ length: MAX_BOOKMARK_ITEMS }, (_, i) => ({
+        id: `id-${i}`, vaultId: 'vault-1', path: `existing-${i}.md`, addedAt: '2026-01-01T00:00:00.000Z', order: i, type: 'file',
+      }))
+      localStorage.setItem('slatebase:favorites:vault-1', JSON.stringify(full))
       handlers.tabState = {
         tabs: [makeTab({ id: 'a', filePath: 'new-a.md' }), makeTab({ id: 'b', filePath: 'new-b.md' })],
         activeTabId: 'a',
@@ -756,7 +758,7 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
 
       registry.executeCommand('bookmarks:bookmark-all-tabs')
 
-      expect(favoritesStore.getForVault('vault-1')).toHaveLength(50)
+      expect(favoritesStore.getForVault('vault-1')).toHaveLength(MAX_BOOKMARK_ITEMS)
       expect(toastSpy).toHaveBeenCalledWith('info', expect.stringContaining('Limit'))
     })
   })

@@ -768,6 +768,18 @@ export interface IApiClient {
   getAppConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Change known keys of `.obsidian/app.json`; `null` removes a key. Needs write access. Returns the file's fields afterwards. */
   patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/appearance.json` (base theme, accent colour, font size and fonts). */
+  getAppearanceConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Changes appearance.json; `null` removes a key. */
+  patchAppearanceConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/graph.json` (force settings and display options of the graph view). */
+  getGraphConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Changes graph.json; `null` removes a key. */
+  patchGraphConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/bookmarks.json`. */
+  getBookmarksConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Replaces the bookmark list of the vault's bookmarks.json (`{ items }`). */
+  patchBookmarksConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
 
   // --- Vault Keychain ---
   /** List the keychain entry IDs of a vault (NOT the values). */
@@ -1459,6 +1471,42 @@ export class ApiClient implements IApiClient {
 
   async patchAppConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/app-config`, patch)
+    return result.config
+  }
+
+  // --- Vault appearance.json ---
+
+  async getAppearanceConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/appearance-config`)
+    return result.config
+  }
+
+  async patchAppearanceConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/appearance-config`, patch)
+    return result.config
+  }
+
+  // --- Vault graph.json ---
+
+  async getGraphConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/graph-config`)
+    return result.config
+  }
+
+  async patchGraphConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/graph-config`, patch)
+    return result.config
+  }
+
+  // --- Vault bookmarks.json ---
+
+  async getBookmarksConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/bookmarks-config`)
+    return result.config
+  }
+
+  async patchBookmarksConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/bookmarks-config`, patch)
     return result.config
   }
 

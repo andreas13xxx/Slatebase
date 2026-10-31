@@ -20,8 +20,9 @@ export interface VaultConfig {
    */
   dailyNoteTemplate: string
   /**
-   * The Moment pattern `daily-notes.json` names daily notes by, or null if the file does not say.
-   * Read-only: Slatebase always names them `YYYY-MM-DD.md`.
+   * The Moment pattern `daily-notes.json` names daily notes by, or null if the file does not say
+   * (then `YYYY-MM-DD`). A `/` in the pattern puts the note into sub folders. The client formats
+   * the name; the server only keeps the pattern.
    */
   dailyNoteFormat: string | null
   /**

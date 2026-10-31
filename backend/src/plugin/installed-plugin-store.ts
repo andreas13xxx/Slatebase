@@ -18,6 +18,7 @@ import {
   PluginSettingsTooLargeError,
   PluginVaultUnavailableError,
 } from './errors.js'
+import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 import { PLUGIN_ID_PATTERN, isValidPluginId } from './validation.js'
 import { KeyedMutex } from '../shared/async-mutex.js'
 import { isNodeError } from '../shared/fs-utils.js'
@@ -26,11 +27,11 @@ import { PathTraversalError, assertRealPathInsideVault, validateFilePath } from 
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Maximum file size for plugin files (manifest, bundle, styles): 10 MB */
-const MAX_FILE_SIZE = 10 * 1024 * 1024
+/** Maximum file size for plugin files (manifest, bundle, styles); see shared-contracts plugin-limits.ts. */
+const MAX_FILE_SIZE = PLUGIN_LIMITS.maxFileBytes
 
-/** Maximum file size for plugin settings (data.json): 1 MB */
-const MAX_SETTINGS_SIZE = 1 * 1024 * 1024
+/** Maximum file size for plugin settings (data.json) and community-plugins.json. */
+const MAX_SETTINGS_SIZE = PLUGIN_LIMITS.maxSettingsBytes
 
 const PLUGINS_DIR = '.obsidian/plugins'
 const COMMUNITY_PLUGINS_FILE = '.obsidian/community-plugins.json'
@@ -136,12 +137,12 @@ export class InstalledPluginStore implements IInstalledPluginStore {
 
   /**
    * Saves plugin settings (data.json) atomically.
-   * Validates that settings do not exceed 1 MB.
+   * Validates that settings do not exceed PLUGIN_LIMITS.maxSettingsBytes.
    */
   async saveSettings(vaultId: string, pluginId: string, data: string): Promise<void> {
     const size = Buffer.byteLength(data, 'utf-8')
     if (size > MAX_SETTINGS_SIZE) {
-      throw new PluginSettingsTooLargeError(pluginId)
+      throw new PluginSettingsTooLargeError(pluginId, size)
     }
 
     const dir = this.getPluginDir(vaultId, pluginId)
@@ -357,7 +358,7 @@ export class InstalledPluginStore implements IInstalledPluginStore {
     vaultId: string,
     filePath: string,
     maxSize: number,
-    tooLarge: (size: number) => Error = (size) => new PluginFileTooLargeError(maxSize, size),
+    tooLarge: (size: number) => Error = (size) => new PluginFileTooLargeError(maxSize, size, path.basename(filePath)),
   ): Promise<string | null> {
     try {
       await this.assertInsideVault(vaultId, filePath)
@@ -388,10 +389,10 @@ export class InstalledPluginStore implements IInstalledPluginStore {
    * Validates that a file's byte size does not exceed the maximum.
    * @throws PluginFileTooLargeError if size exceeds MAX_FILE_SIZE.
    */
-  private validateFileSize(content: string, _fileName: string): void {
+  private validateFileSize(content: string, fileName: string): void {
     const size = Buffer.byteLength(content, 'utf-8')
     if (size > MAX_FILE_SIZE) {
-      throw new PluginFileTooLargeError(MAX_FILE_SIZE, size)
+      throw new PluginFileTooLargeError(MAX_FILE_SIZE, size, fileName)
     }
   }
 

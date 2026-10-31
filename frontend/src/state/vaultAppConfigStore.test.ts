@@ -178,4 +178,26 @@ describe('vaultAppConfigStore', () => {
     expect(getAppConfigValue('showLineNumber')).toBe(true)
     expect(getAppConfigValue('readableLineLength')).toBe(true)
   })
+
+  it('uses Obsidian\'s defaults, not the earlier Slatebase ones', () => {
+    expect(getAppConfigValue('alwaysUpdateLinks')).toBe(false)
+    expect(getAppConfigValue('tabSize')).toBe(4)
+    expect(getAppConfigValue('userIgnoreFilters')).toEqual([])
+  })
+
+  it('warns once in the console about keys and values it does not expect, and keeps the file values it cannot use out of the snapshot', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    connect(createClient({ v1: { mobilePullAction: 'graph:open', fancy: 1, newLinkFormat: 'diagonal', showLineNumber: true } }))
+
+    await setActiveVault('v1')
+    await refreshAppConfig('v1')
+
+    expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([
+      expect.stringContaining('[app.json] fancy: unknown key'),
+      expect.stringContaining('[app.json] newLinkFormat: unexpected enum value "diagonal"'),
+    ])
+    expect(getAppConfigValue('newLinkFormat')).toBe('shortest')
+    expect(getAppConfigRaw('fancy')).toBe(1)
+    warn.mockRestore()
+  })
 })

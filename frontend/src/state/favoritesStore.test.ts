@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   add,
   remove,
@@ -15,12 +15,30 @@ import {
   favoritesStore,
   initialize,
   disconnect,
+  loadVaultBookmarks,
+  onFavoritesChange,
 } from './favoritesStore'
+import { MAX_BOOKMARK_ITEMS } from '@slatebase/shared-contracts'
 import type { FavoriteEntry } from './favoritesStore'
 import type { IApiClient } from '../api'
-import { hasSyncedBefore, markSyncedBefore } from './preferenceSync'
 
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
+
+/** Puts entries into a vault's cache the way an earlier session or the old per-user list left them (not a change to sync). */
+function seedLocal(vaultId: string, paths: string[]): void {
+  const entries = paths.map((path, i) => ({
+    id: `seed-${i}`, vaultId, path, addedAt: '2026-01-01T00:00:00.000Z', order: i, type: 'file',
+  }))
+  localStorage.setItem(`slatebase:favorites:${vaultId}`, JSON.stringify(entries))
+}
+
+/** Fills a vault's cache with the most entries it may have. */
+function seedFull(vaultId: string): void {
+  const entries = Array.from({ length: MAX_BOOKMARK_ITEMS }, (_, i) => ({
+    id: `id-${i}`, vaultId, path: `f${i}.md`, addedAt: '2026-01-01T00:00:00.000Z', order: i, type: 'file',
+  }))
+  localStorage.setItem(`slatebase:favorites:${vaultId}`, JSON.stringify(entries))
+}
 
 describe('favoritesStore', () => {
   beforeEach(() => {
@@ -55,15 +73,19 @@ describe('favoritesStore', () => {
       expect(getForVault('vault2')[0]!.path).toBe('notes/b.md')
     })
 
-    it('rejects add when cap of 50 is reached', () => {
-      for (let i = 0; i < 50; i++) {
-        add('vault1', `file-${i}.md`)
-      }
+    it('rejects add when the guard limit is reached (far above the old 50)', () => {
+      seedFull('vault1')
 
-      add('vault1', 'file-50.md')
+      add('vault1', 'one-too-many.md')
 
-      expect(getForVault('vault1')).toHaveLength(50)
-      expect(isFavorite('vault1', 'file-50.md')).toBe(false)
+      expect(getForVault('vault1')).toHaveLength(MAX_BOOKMARK_ITEMS)
+      expect(isFavorite('vault1', 'one-too-many.md')).toBe(false)
+      expect(MAX_BOOKMARK_ITEMS).toBeGreaterThan(50)
+    })
+
+    it('accepts more than 50 bookmarks', () => {
+      for (let i = 0; i < 60; i++) add('vault1', `file-${i}.md`)
+      expect(getForVault('vault1')).toHaveLength(60)
     })
 
     it('persists to localStorage with correct key', () => {
@@ -471,26 +493,27 @@ describe('favoritesStore', () => {
       expect(entries.map(e => e.searchQuery).sort()).toEqual(['bar', 'foo'])
     })
 
-    it('non-file bookmarks respect the 50-entry cap', () => {
-      for (let i = 0; i < 50; i++) {
-        addSearchBookmark('vault1', `query-${i}`, false, false)
-      }
+    it('non-file bookmarks respect the guard limit too', () => {
+      seedFull('vault1')
 
       addSearchBookmark('vault1', 'one-too-many', false, false)
 
-      expect(getForVault('vault1')).toHaveLength(50)
+      expect(getForVault('vault1')).toHaveLength(MAX_BOOKMARK_ITEMS)
     })
   })
 
-  describe('initialize', () => {
-    /** Minimal API client stub — only the favorites endpoints are exercised. */
+  describe('initialize (old per-user list: read only)', () => {
     function createMockApiClient(serverEntries: unknown[]) {
       return {
         getFavorites: vi.fn().mockResolvedValue({ entries: serverEntries }),
         saveFavorites: vi.fn().mockResolvedValue(undefined),
+        getBookmarksConfig: vi.fn().mockResolvedValue({}),
+        patchBookmarksConfig: vi.fn().mockResolvedValue({}),
       } as unknown as IApiClient & {
         getFavorites: ReturnType<typeof vi.fn>
         saveFavorites: ReturnType<typeof vi.fn>
+        getBookmarksConfig: ReturnType<typeof vi.fn>
+        patchBookmarksConfig: ReturnType<typeof vi.fn>
       }
     }
 
@@ -499,67 +522,196 @@ describe('favoritesStore', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {})
     })
 
-    it('replaces the local list instead of merging local-only entries into it', async () => {
-      // The regression this guards: a favorite deleted on another device used
-      // to be resurrected here, because local-only entries were appended.
-      add('vault1', 'gone.md')
-      add('vault1', 'kept.md')
-      const kept = getForVault('vault1').find((e) => e.path === 'kept.md')!
-      markSyncedBefore('favorites')
-
-      await initialize(createMockApiClient([
-        { id: kept.id, vaultId: 'vault1', path: 'kept.md', addedAt: kept.addedAt, order: 0 },
-      ]))
-
-      expect(getForVault('vault1').map((e) => e.path)).toEqual(['kept.md'])
-    })
-
-    it('drops local vaults the server no longer lists', async () => {
-      add('vault1', 'a.md')
-      add('vault2', 'b.md')
-      const a = getForVault('vault1')[0]!
-      markSyncedBefore('favorites')
-
-      await initialize(createMockApiClient([
-        { id: a.id, vaultId: 'vault1', path: 'a.md', addedAt: a.addedAt, order: 0 },
-      ]))
-
-      expect(getForVault('vault1')).toHaveLength(1)
-      expect(getForVault('vault2')).toHaveLength(0)
-    })
-
-    it('seeds the server from the local cache on the very first sync', async () => {
-      add('vault1', 'local.md')
-      const client = createMockApiClient([])
+    it('reads the old list into the cache and never writes it back to /users/me/favorites', async () => {
+      const client = createMockApiClient([{ id: 'x1', vaultId: 'vault1', path: 'old.md', addedAt: '2026-01-01T00:00:00.000Z', order: 0 }])
 
       await initialize(client)
+      add('vault1', 'new.md')
+      await vi.waitFor(() => expect(client.patchBookmarksConfig).toHaveBeenCalled(), { timeout: 4000 })
 
-      expect(client.saveFavorites).toHaveBeenCalled()
-      expect(getForVault('vault1')).toHaveLength(1)
-    })
-
-    it('honours an empty server list once this device has synced before', async () => {
-      add('vault1', 'stale.md')
-      markSyncedBefore('favorites')
-      const client = createMockApiClient([])
-
-      await initialize(client)
-
+      expect(getForVault('vault1').map((e) => e.path)).toEqual(['old.md', 'new.md'])
       expect(client.saveFavorites).not.toHaveBeenCalled()
-      expect(getForVault('vault1')).toHaveLength(0)
     })
 
-    it('keeps local data and sets no marker when the server is unreachable', async () => {
+    it('keeps local data when the server is unreachable', async () => {
       add('vault1', 'local.md')
       const client = {
         getFavorites: vi.fn().mockRejectedValue(new Error('offline')),
-        saveFavorites: vi.fn(),
       } as unknown as IApiClient
 
       await initialize(client)
 
       expect(getForVault('vault1')).toHaveLength(1)
-      expect(hasSyncedBefore('favorites')).toBe(false)
+    })
+  })
+
+  describe('the vault\'s bookmarks.json', () => {
+    function createClient(file: Record<string, unknown>) {
+      const state = { file }
+      return {
+        state,
+        getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+        getBookmarksConfig: vi.fn(async () => state.file),
+        patchBookmarksConfig: vi.fn(async (_vaultId: string, patch: Record<string, unknown>) => {
+          state.file = { ...state.file, ...patch }
+          return state.file
+        }),
+      } as unknown as IApiClient & {
+        state: { file: Record<string, unknown> }
+        getBookmarksConfig: ReturnType<typeof vi.fn>
+        patchBookmarksConfig: ReturnType<typeof vi.fn>
+      }
+    }
+    const file = (path: string, extra: Record<string, unknown> = {}) => ({ type: 'file', path, ...extra })
+
+    beforeEach(() => {
+      disconnect()
+      vi.useFakeTimers()
+    })
+    afterEach(() => { vi.useRealTimers() })
+
+    it('replaces the cache with the content of the file and tells the listeners', async () => {
+      seedLocal('vault1', ['stale.md'])
+      const client = createClient({ items: [file('a.md', { title: 'A' }), { type: 'url', url: 'u' }, file('b.md', { subpath: '#H' })] })
+      await initialize(client)
+      const listener = vi.fn()
+      const stop = onFavoritesChange(listener)
+
+      expect(await loadVaultBookmarks('vault1')).toBe(true)
+
+      expect(getForVault('vault1').map((e) => [e.type, e.path, e.label ?? e.heading])).toEqual([['file', 'a.md', 'A'], ['heading', 'b.md', 'H']])
+      expect(listener).toHaveBeenCalledTimes(1)
+      stop()
+    })
+
+    it('writes a change into the file after the debounce, keeping what Slatebase does not show', async () => {
+      const client = createClient({ items: [file('a.md', { custom: 1 }), { type: 'group', title: 'G', items: [] }] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+
+      add('vault1', 'new.md')
+      expect(client.patchBookmarksConfig).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(2500)
+
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+      const items = (client.patchBookmarksConfig.mock.calls[0]?.[1] as { items: Array<Record<string, unknown>> }).items
+      expect(items.map((i) => i['path'] ?? i['title'])).toEqual(['a.md', 'G', 'new.md'])
+      expect(items[0]).toMatchObject({ custom: 1 })
+    })
+
+    it('does not replace a change that is not in the file yet', async () => {
+      const client = createClient({ items: [file('a.md')] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+      add('vault1', 'mine.md')
+
+      expect(await loadVaultBookmarks('vault1')).toBe(false)
+
+      expect(getForVault('vault1').map((e) => e.path)).toEqual(['a.md', 'mine.md'])
+    })
+
+    it('hands the entries of the old list to a file without bookmarks', async () => {
+      seedLocal('vault1', ['old.md'])
+      const client = createClient({})
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+      expect((client.patchBookmarksConfig.mock.calls[0]?.[1] as { items: unknown[] }).items).toEqual([expect.objectContaining({ type: 'file', path: 'old.md' })])
+    })
+
+    it('does not take the old list over a file that already has bookmarks', async () => {
+      seedLocal('vault1', ['old.md'])
+      const client = createClient({ items: [file('x.md')] })
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+
+      expect(client.patchBookmarksConfig).not.toHaveBeenCalled()
+      expect(getForVault('vault1').map((e) => e.path)).toEqual(['x.md'])
+    })
+
+    it('takes the old list over an empty list too, but only once per vault: deleted bookmarks stay deleted', async () => {
+      seedLocal('vault1', ['old.md'])
+      const client = createClient({ items: [] })
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+
+      // Someone empties the file; the old entries are not offered again.
+      client.state.file = { items: [] }
+      seedLocal('vault1', ['old.md'])
+      client.patchBookmarksConfig.mockClear()
+      expect(await loadVaultBookmarks('vault1')).toBe(true)
+      expect(client.patchBookmarksConfig).not.toHaveBeenCalled()
+      expect(getForVault('vault1')).toHaveLength(0)
+    })
+
+    it('writes a change made while a write is running with the next write, and does not lose it', async () => {
+      const client = createClient({ items: [file('a.md')] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+
+      let release: () => void = () => {}
+      client.patchBookmarksConfig.mockImplementationOnce(async (_v: string, patch: Record<string, unknown>) => {
+        await new Promise<void>((resolve) => { release = resolve })
+        return patch
+      })
+      add('vault1', 'b.md')
+      await vi.advanceTimersByTimeAsync(2500) // the first write starts and waits
+      add('vault1', 'c.md')                   // changed while it runs
+      release()
+      await vi.advanceTimersByTimeAsync(2500)
+
+      const last = client.patchBookmarksConfig.mock.calls.at(-1)?.[1] as { items: Array<{ path: string }> }
+      expect(last.items.map((i) => i.path)).toEqual(['a.md', 'b.md', 'c.md'])
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(2)
+    })
+
+    it('tries again by itself after a failed write', async () => {
+      const client = createClient({ items: [] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+      client.patchBookmarksConfig.mockRejectedValueOnce(new Error('500'))
+
+      add('vault1', 'a.md')
+      await vi.advanceTimersByTimeAsync(2500)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(31_000)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(2)
+    })
+
+    it('keeps bookmarks beyond the limit in the file instead of cutting them', async () => {
+      const many = Array.from({ length: MAX_BOOKMARK_ITEMS + 3 }, (_, i) => file(`f${i}.md`))
+      const client = createClient({ items: many })
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+      expect(getForVault('vault1')).toHaveLength(MAX_BOOKMARK_ITEMS + 3)
+    })
+
+    it('keeps the cache when the file cannot be read, and the change when it cannot be written', async () => {
+      seedLocal('vault1', ['a.md'])
+      const client = createClient({ items: [] })
+      client.getBookmarksConfig.mockRejectedValueOnce(new Error('offline'))
+      await initialize(client)
+      expect(await loadVaultBookmarks('vault1')).toBe(false)
+      expect(getForVault('vault1')).toHaveLength(1)
+
+      client.patchBookmarksConfig.mockRejectedValueOnce(new Error('forbidden'))
+      add('vault1', 'b.md')
+      await vi.advanceTimersByTimeAsync(2500)
+      expect(getForVault('vault1')).toHaveLength(2)
+
+      // The next change writes both again.
+      client.patchBookmarksConfig.mockImplementation(async (_v: string, patch: Record<string, unknown>) => patch)
+      add('vault1', 'c.md')
+      await vi.advanceTimersByTimeAsync(2500)
+      const items = (client.patchBookmarksConfig.mock.calls.at(-1)?.[1] as { items: Array<{ path: string }> }).items
+      expect(items.map((i) => i.path)).toEqual(['a.md', 'b.md', 'c.md'])
     })
   })
 })

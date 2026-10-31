@@ -6,6 +6,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServer as createHttpServer } from 'node:http'
 import { Hono } from 'hono'
+import { APP_CONFIG_DEFAULTS, PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 import { cors } from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
 import { getRequestListener } from '@hono/node-server'
@@ -88,7 +89,7 @@ import { PreferencesStore } from './preferences/index.js'
 import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
-import { PropertyTypeStore } from './property-type/index.js'
+import { PropertyTypeStore, migratePropertyTypesToObsidian } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { SpellcheckDictionaryStore } from './spellcheck-dictionary/index.js'
 import { createSpellcheckDictionaryRoutes } from './api/spellcheckDictionaryRoutes.js'
@@ -101,8 +102,14 @@ import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVau
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
 import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService, NoteConfigService, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
+import { AppConfigService, DeviationReporter, NoteConfigService, migrateAppConfigDefaults, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
+import { createAppearanceConfigRoutes } from './api/appearanceConfigRoutes.js'
+import { AppearanceConfigService } from './obsidian-config/appearance-config.js'
+import { createGraphConfigRoutes } from './api/graphConfigRoutes.js'
+import { GraphConfigService } from './obsidian-config/graph-config.js'
+import { createBookmarksConfigRoutes } from './api/bookmarksConfigRoutes.js'
+import { BookmarksConfigService } from './obsidian-config/bookmarks-config.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
 import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
@@ -451,8 +458,8 @@ const pluginStoreConfig: IPluginStoreConfig = {
   ...(process.env['SLATEBASE_GITHUB_TOKEN'] ? { githubToken: process.env['SLATEBASE_GITHUB_TOKEN'] } : {}),
   cacheTtlPluginList: (config as unknown as { pluginStore?: { cacheTtl?: number } }).pluginStore?.cacheTtl ?? 3600000,
   cacheTtlManifest: 900000,
-  maxAssetSize: (config as unknown as { pluginStore?: { maxAssetSize?: number } }).pluginStore?.maxAssetSize ?? 10 * 1024 * 1024,
-  maxTotalDownloadSize: 15 * 1024 * 1024,
+  maxAssetSize: (config as unknown as { pluginStore?: { maxAssetSize?: number } }).pluginStore?.maxAssetSize ?? PLUGIN_LIMITS.maxAssetBytes,
+  maxTotalDownloadSize: PLUGIN_LIMITS.maxTotalDownloadBytes,
   autoCheckInterval: (config as unknown as { pluginStore?: { autoCheckInterval?: number } }).pluginStore?.autoCheckInterval ?? 86400000,
 }
 const pluginStoreCache = new PluginStoreCache(pluginStoreConfig, serverConfig.dataDir, logger)
@@ -473,7 +480,22 @@ const searchService = new SearchService(vaultService, vaultAccessControl, logger
 const replaceService = new ReplaceService(vaultService, logger)
 
 // 4g2. Link Migration Module (getLinkIndex is a hoisted function declaration, defined below)
-const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger)
+// Links are rewritten only if the vault's app.json says so (alwaysUpdateLinks, Obsidian's "Automatically update internal links").
+// appConfigService is declared further down; the closure only runs after startup.
+const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger, async (vaultId) => {
+  const fallback = APP_CONFIG_DEFAULTS.alwaysUpdateLinks
+  const entry = vaultRegistry.findById(vaultId)
+  if (entry === null) return fallback
+  try {
+    const value = (await appConfigService.get(entry.storagePath, vaultId))['alwaysUpdateLinks']
+    return typeof value === 'boolean' ? value : fallback
+  } catch (error) {
+    logger.warn('Could not read alwaysUpdateLinks from app.json; using the default', {
+      vaultId, fallback, error: error instanceof Error ? error.message : String(error),
+    })
+    return fallback
+  }
+})
 
 // 4h. Realtime Services (SSE)
 const sseConfig = config.getSseConfig()
@@ -758,8 +780,16 @@ const pluginRoutes = createPluginRoutes({
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
-const appConfigService = new AppConfigService()
+// One reporter for every .obsidian/ file, so a deviation is logged once per process.
+const appConfigDeviationReporter = new DeviationReporter(logger)
+const appConfigService = new AppConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const appearanceConfigService = new AppearanceConfigService(appConfigDeviationReporter)
+app.route('/api/v1/vaults/:vaultId/appearance-config', createAppearanceConfigRoutes({ appearanceConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const graphConfigService = new GraphConfigService(appConfigDeviationReporter)
+app.route('/api/v1/vaults/:vaultId/graph-config', createGraphConfigRoutes({ graphConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const bookmarksConfigService = new BookmarksConfigService(appConfigDeviationReporter)
+app.route('/api/v1/vaults/:vaultId/bookmarks-config', createBookmarksConfigRoutes({ bookmarksConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
 const snippetRoutes = createSnippetRoutes({
@@ -1005,6 +1035,7 @@ app.route('/api/v1', vaultConfigRoutes)
 const propertyTypeStore = new PropertyTypeStore(
   (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
   logger,
+  appConfigDeviationReporter,
 )
 const propertyTypeRoutes = createPropertyTypeRoutes({
   propertyTypeService: propertyTypeStore,
@@ -1148,11 +1179,15 @@ vaultRegistryReady = true
 await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
 // Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
-// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
+// app.json defaults follow Obsidian now; vaults that exist at the first start keep the previous ones. Must run before the other app.json migrations, which create the file.
+await migrateAppConfigDefaults({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
+// Property types used to live only in .slatebase/property-types.json; Obsidian's types.json holds them now.
+await migratePropertyTypesToObsidian({ dataDir: serverConfig.dataDir, vaultRegistry, store: propertyTypeStore, logger })
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
 await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
 // Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.
 await migrateUserVaultSettingsToAppConfig({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
+// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
 await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
 
 // Set up link index hook on VaultController for incremental updates.

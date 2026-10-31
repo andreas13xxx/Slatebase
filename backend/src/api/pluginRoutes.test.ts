@@ -75,6 +75,25 @@ describe('pluginRoutes vault:change events', () => {
     expect(published[0]?.target).toEqual({ kind: 'users', userIds: ['owner-1', 'user-2'] })
   })
 
+  it('refuses an upload over the ZIP limit from its declared length, before the body is read', async () => {
+    const published: PublishOptions[] = []
+    const service = createService()
+    const app = createApp(service, published)
+    const form = new FormData()
+    form.set('file', new File([new Uint8Array([1])], 'plugin.zip'))
+
+    const res = await app.request('/api/v1/vaults/vault-1/plugins', {
+      method: 'POST',
+      body: form,
+      headers: { 'content-length': String(60 * 1024 * 1024) },
+    })
+
+    expect(res.status).toBe(413)
+    expect(await res.json()).toMatchObject({ code: 'FILE_TOO_LARGE', message: expect.stringContaining('50 MB') })
+    expect(service.installFromZip).not.toHaveBeenCalled()
+    expect(published).toEqual([])
+  })
+
   it('announces a deleted plugin', async () => {
     const published: PublishOptions[] = []
     const app = createApp(createService(), published)
