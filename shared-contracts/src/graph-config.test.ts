@@ -29,8 +29,8 @@ describe('graph.json table', () => {
   })
 
   it('reports unknown keys and values outside the ranges, and keeps them', () => {
-    expect(describeGraphDeviations({ fancy: 1, repelStrength: 99, showTags: 'yes' }).map((d) => d.key)).toEqual(['fancy', 'repelStrength', 'showTags'])
-    expect(mergeGraphConfig({ repelStrength: 99, fancy: 1 })).toMatchObject({ repelStrength: 10, fancy: 1 })
+    expect(describeGraphDeviations({ fancy: 1, repelStrength: 999, showTags: 'yes' }).map((d) => d.key)).toEqual(['fancy', 'repelStrength', 'showTags'])
+    expect(mergeGraphConfig({ repelStrength: 999, fancy: 1 })).toMatchObject({ repelStrength: 10, fancy: 1 })
     expect(graphConfigValueProblem('colorGroups', 'x'.repeat(70 * 1024))).toMatch(/larger/)
   })
 })
@@ -51,11 +51,24 @@ describe('force conversion', () => {
     expect(graphLayoutToFile(layout).repelStrength).toBeCloseTo(20, 4)
   })
 
-  it('clamps what Slatebase allows but the file table does not', () => {
-    const file = graphLayoutToFile({ repulsion: 5000, linkStrength: 5, linkDistance: 1, centerGravity: 5 })
-    expect(file.repelStrength).toBe(20)
-    expect(file.linkStrength).toBe(1)
-    expect(file.linkDistance).toBe(30)
-    expect(file.centerStrength).toBe(1)
+  it('keeps every position of Slatebase\'s sliders inside the file\'s ranges, so none is clipped', () => {
+    const ends = [
+      { repulsion: 10, linkStrength: 0.01, linkDistance: 10, centerGravity: 0.01 },
+      { repulsion: 500, linkStrength: 1, linkDistance: 200, centerGravity: 1 },
+    ]
+    for (const layout of ends) {
+      const file = graphLayoutToFile(layout)
+      for (const key of Object.keys(file) as Array<keyof typeof file>) expect(graphConfigValueProblem(key, file[key]), key).toBeNull()
+      const back = graphLayoutFromFile(file)
+      for (const key of Object.keys(layout) as Array<keyof typeof layout>) expect(back[key], key).toBeCloseTo(layout[key], 4)
+    }
+  })
+
+  it('clamps what is far outside anything Slatebase offers', () => {
+    const file = graphLayoutToFile({ repulsion: 5000, linkStrength: 50, linkDistance: -1, centerGravity: 50 })
+    expect(file.repelStrength).toBe(100)
+    expect(file.linkStrength).toBe(4)
+    expect(file.linkDistance).toBe(0)
+    expect(file.centerStrength).toBe(6)
   })
 })

@@ -149,8 +149,6 @@ export function loadGraphConfig(): GraphConfig {
 export function saveGraphConfig(config: GraphConfig): void {
   updateVaultSettings({ graph: { colors: config.colors, nodes: { ...config.nodes, showTags: DEFAULT_GRAPH_CONFIG.nodes.showTags }, localGraph: config.localGraph } as unknown as Record<string, unknown> })
 
-  // The new state is what the user wants; a failed write puts the session override back below.
-  sessionOverride = null
   const forces = graphLayoutToFile(config.layout)
   const current = fileForces()
   const change: Partial<ForceKeys & { showTags: boolean }> = {}
@@ -159,33 +157,46 @@ export function saveGraphConfig(config: GraphConfig): void {
     if (Math.abs(forces[key] - current[key]) > 1e-5 * Math.max(1, Math.abs(current[key]))) change[key] = forces[key]
   }
   if (config.nodes.showTags !== getGraphValue('showTags')) change.showTags = config.nodes.showTags
-  if (Object.keys(change).length === 0) return
+  if (Object.keys(change).length === 0) {
+    sessionOverride = null // the settings are the file's again
+    return
+  }
 
-  updateGraph(change).catch(
+  // The override (if any) stays until the write succeeds, so the graph does not flicker back meanwhile.
+  const hadOverride = sessionOverride !== null
+  updateGraph(change).then(
+    () => { sessionOverride = null },
     () => {
       sessionOverride = { layout: config.layout, showTags: config.nodes.showTags }
-      showToast('info', 'Die Graph-Einstellungen gehören zum Vault. Ohne Schreibrecht gelten deine Änderungen nur in dieser Sitzung.')
+      if (!hadOverride) showToast('info', VAULT_PART_NOT_SAVED)
     },
   )
 }
 
 /**
  * Resets the graph configuration: the personal part is dropped, and the forces and the tag switch
- * are removed from graph.json (Obsidian's defaults apply again). Without write access they are reset
- * for this session only.
+ * are removed from graph.json (Obsidian's defaults apply again). If the file cannot be written they
+ * are reset for this session only.
  * The next `loadGraphConfig()` call will return defaults.
  */
 export function resetGraphConfig(): void {
-  const resetKeys = { repelStrength: null, linkStrength: null, linkDistance: null, centerStrength: null, showTags: null } as const
-  sessionOverride = null
-  updateGraph(resetKeys).catch(
-    () => {
-      sessionOverride = { layout: { ...DEFAULT_GRAPH_CONFIG.layout }, showTags: DEFAULT_GRAPH_CONFIG.nodes.showTags }
-      showToast('info', 'Die Graph-Einstellungen gehören zum Vault. Ohne Schreibrecht gilt das Zurücksetzen nur in dieser Sitzung.')
-    },
-  )
   updateVaultSettings({ graph: null })
+  sessionOverride = null
+
+  const forces = graphLayoutToFile(DEFAULT_GRAPH_CONFIG.layout)
+  const current = fileForces()
+  const fileIsDefault = getGraphValue('showTags') === DEFAULT_GRAPH_CONFIG.nodes.showTags
+    && (Object.keys(forces) as Array<keyof ForceKeys>).every((key) => Math.abs(forces[key] - current[key]) <= 1e-5 * Math.max(1, Math.abs(current[key])))
+  if (fileIsDefault) return // nothing in the file to reset: no write, so no needless failure
+
+  const resetKeys = { repelStrength: null, linkStrength: null, linkDistance: null, centerStrength: null, showTags: null } as const
+  updateGraph(resetKeys).catch(() => {
+    sessionOverride = { layout: { ...DEFAULT_GRAPH_CONFIG.layout }, showTags: DEFAULT_GRAPH_CONFIG.nodes.showTags }
+    showToast('info', VAULT_PART_NOT_SAVED)
+  })
 }
+
+const VAULT_PART_NOT_SAVED = 'Die Graph-Einstellungen gehören zum Vault und konnten nicht dort gespeichert werden (zum Beispiel fehlt das Schreibrecht). Deine Änderung gilt nur in dieser Sitzung.'
 
 // ─── Private Helpers ─────────────────────────────────────────────────────────
 

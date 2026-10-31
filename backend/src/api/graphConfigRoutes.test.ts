@@ -68,7 +68,7 @@ describe('graph-config routes', () => {
 
   it('refuses values outside the ranges, unknown keys and oversized colour groups', async () => {
     for (const body of [
-      { repelStrength: 99 }, { linkDistance: 1 }, { showTags: 'yes' }, { fancy: 1 },
+      { repelStrength: 999 }, { linkDistance: 5000 }, { showTags: 'yes' }, { fancy: 1 },
       { colorGroups: 'x'.repeat(70 * 1024) }, 'not json',
     ]) {
       expect((await patch(body)).status, JSON.stringify(body).slice(0, 40)).toBe(400)
@@ -78,7 +78,7 @@ describe('graph-config routes', () => {
 
   it('reports what the table does not expect, but not what Obsidian really writes', async () => {
     await mkdir(join(vaultPath, '.obsidian'))
-    await writeFile(file(), JSON.stringify({ 'collapse-filter': true, colorGroups: [], close: true, fancy: 1, linkStrength: 7 }))
+    await writeFile(file(), JSON.stringify({ 'collapse-filter': true, colorGroups: [], close: true, fancy: 1, linkStrength: 70 }))
     await app.request('/vaults/v1/graph-config')
     expect(reported).toEqual(['fancy', 'linkStrength'])
   })

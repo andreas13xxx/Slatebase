@@ -23,10 +23,12 @@ import {
 export const GRAPH_CONFIG_KEYS = {
   // Used by Slatebase's graph
   showTags: cfg.bool(false, true),
-  centerStrength: cfg.number(0.518713248970312, 0, 1, true),
-  repelStrength: cfg.number(10, 0, 20, true),
-  linkStrength: cfg.number(1, 0, 1, true),
-  linkDistance: cfg.number(250, 30, 500, true),
+  // The ranges are wide enough for every position of Slatebase's sliders after conversion (repulsion
+  // 10-500, link strength 0.01-1, link distance 10-200, centre gravity 0.01-1); they are not Obsidian's own.
+  centerStrength: cfg.number(0.518713248970312, 0, 6, true),
+  repelStrength: cfg.number(10, 0, 100, true),
+  linkStrength: cfg.number(1, 0, 4, true),
+  linkDistance: cfg.number(250, 0, 2000, true),
   // Kept and written back unchanged
   search: cfg.string('', 1024, true, 'passthrough'),
   showAttachments: cfg.bool(false, true, 'passthrough'),

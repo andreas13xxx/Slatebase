@@ -152,6 +152,29 @@ describe('GraphConfig', () => {
     expect(config).toEqual(DEFAULT_GRAPH_CONFIG)
   })
 
+  it('asks once, not on every later save, when the vault part cannot be written, and keeps showing the session value', async () => {
+    const client = createGraphClient({}, true)
+    await useGraphFile(client)
+    const changed = { ...DEFAULT_GRAPH_CONFIG, layout: { ...DEFAULT_GRAPH_CONFIG.layout, repulsion: 100 } }
+
+    saveGraphConfig(changed)
+    await vi.waitFor(() => expect(showToast).toHaveBeenCalledTimes(1))
+    saveGraphConfig({ ...changed, localGraph: { hops: 2 } })
+    await vi.waitFor(() => expect(client.patchGraphConfig).toHaveBeenCalledTimes(2))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(showToast).toHaveBeenCalledTimes(1)
+    expect(loadGraphConfig().layout.repulsion).toBe(100)
+  })
+
+  it('does not write, or complain, when a reset has nothing to reset', async () => {
+    const client = createGraphClient({}, true)
+    await useGraphFile(client)
+    resetGraphConfig()
+    expect(client.patchGraphConfig).not.toHaveBeenCalled()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
   it('resetGraphConfig removes the forces and the tag switch from graph.json and keeps its other keys', async () => {
     const client = createGraphClient({ repelStrength: 20, showTags: true, linkStrength: 0.5, search: 'x' })
     await useGraphFile(client)
