@@ -99,3 +99,17 @@ describe('shortcutsToFileValue', () => {
     expect(shortcutsToFileValue(['Mod+K', 'Mod'])).toEqual([{ modifiers: ['Mod'], key: 'K' }])
   })
 })
+
+describe('space bar and unreadable lists', () => {
+  it('writes the space bar as " " and shows it as Space', () => {
+    expect(shortcutToHotkey('Mod+Space')).toEqual({ modifiers: ['Mod'], key: ' ' })
+    expect(hotkeyToShortcut({ modifiers: ['Mod'], key: ' ' })).toBe('Mod+Space')
+    expect(readHotkeys({ x: [{ modifiers: ['Mod'], key: ' ' }] }).get('x')).toEqual(['Mod+Space'])
+  })
+
+  it('does not read a list without a usable entry as "unbound"', () => {
+    const map = readHotkeys({ a: [{ modifiers: ['Hyper'], key: 'X' }], b: [] })
+    expect(map.has('a')).toBe(false)
+    expect(map.get('b')).toEqual([])
+  })
+})

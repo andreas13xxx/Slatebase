@@ -14,6 +14,7 @@ import {
   matchesShortcut,
   isOverridden,
   onKeybindingsChange,
+  disconnect,
   _reset,
 } from './keybindingsStore'
 
@@ -116,13 +117,13 @@ describe('keybindingsStore — hotkeys.json', () => {
     expect(getShortcuts('slatebase:open-command-palette')).toEqual(['Mod+Shift+P'])
   })
 
-  it('resetAll removes every entry the file has', async () => {
+  it('resetAll removes the entries of Slatebase\'s commands', async () => {
     const { client, file } = createClient({ 'app:go-back': [], 'plugin:x': [mod('X')] })
     await initialize(client)
     await loadVaultHotkeys('v1')
     resetAll()
     await vi.advanceTimersByTimeAsync(600)
-    expect(file()).toEqual({})
+    expect(file()).toEqual({ 'plugin:x': [mod('X')] })
   })
 
   it('does not replace unwritten changes with the file, and takes the file when it changed elsewhere', async () => {
@@ -256,5 +257,73 @@ describe('keybindingsStore — matching and conflicts', () => {
     expect(findConflict('Mod+Q', 'slatebase:open-settings')).toBe('plugin:x')
     expect(findConflict('Mod+Q', 'plugin:x')).toBeNull()
     expect(findConflict('Mod+F9', 'slatebase:open-settings')).toBeNull()
+  })
+})
+
+describe('keybindingsStore — safety', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    _reset()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('resetAll leaves the bindings of other commands in the file alone', async () => {
+    const { client, file } = createClient({ 'app:go-back': [], 'obsidian-git:push': [mod('G')] })
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    resetAll()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(file()).toEqual({ 'obsidian-git:push': [mod('G')] })
+  })
+
+  it('writes a change to the vault it was made in when another vault is opened meanwhile', async () => {
+    const a = createClient()
+    await initialize(a.client)
+    await loadVaultHotkeys('a')
+    setShortcut('slatebase:open-settings', 'Mod+K')
+
+    const b = createClient()
+    // Same store, another vault: switch the client the way the app does (one client per session).
+    await initialize({ ...a.mocks, getHotkeysConfig: b.mocks.getHotkeysConfig, getKeybindings: b.mocks.getKeybindings } as unknown as IApiClient)
+    await loadVaultHotkeys('b')
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(a.mocks.patchHotkeysConfig).toHaveBeenCalledWith('a', { 'app:open-settings': [mod('K')] })
+    expect(a.mocks.patchHotkeysConfig).not.toHaveBeenCalledWith('b', expect.anything())
+    expect(getShortcut('slatebase:open-settings')).toBe('Ctrl+,')
+  })
+
+  it('a default gives way when the file binds its keys to another command', async () => {
+    const { client } = createClient({ 'plugin:x': [mod('P')] })
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    expect(getShortcuts('slatebase:open-command-palette')).toEqual([])
+    expect(getShortcut('plugin:x')).toBe('Mod+P')
+  })
+
+  it('reads the file again when it changed elsewhere while our change was unwritten', async () => {
+    const { client, setFile, mocks } = createClient()
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    setShortcut('slatebase:open-settings', 'Mod+K')
+    setFile({ 'app:go-back': [mod('Q')] })
+    expect(await loadVaultHotkeys('v1')).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(700)
+    expect(mocks.getHotkeysConfig.mock.calls.length).toBeGreaterThan(1)
+    expect(getShortcut('slatebase:navigate-back')).toBe('Mod+Q')
+  })
+
+  it('forgets the caches and markers of the account on disconnect', async () => {
+    const { client } = createClient({ 'app:go-back': [] }, [{ commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' }])
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    expect(localStorage.getItem('slatebase:hotkeys:v1')).not.toBeNull()
+    expect(localStorage.getItem('slatebase:hotkeys-taken-over:v1')).not.toBeNull()
+    disconnect()
+    expect(localStorage.getItem('slatebase:hotkeys:v1')).toBeNull()
+    expect(localStorage.getItem('slatebase:hotkeys-taken-over:v1')).toBeNull()
   })
 })

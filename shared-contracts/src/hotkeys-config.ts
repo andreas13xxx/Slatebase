@@ -71,13 +71,15 @@ export function shortcutToHotkey(shortcut: string): Hotkey | null {
   }
   if (!key) return null
   modifiers.sort((a, b) => MODIFIER_ORDER.indexOf(a) - MODIFIER_ORDER.indexOf(b))
+  // The file spells the space bar as the key value itself (" "); inside Slatebase it is `Space`.
+  if (key.toLowerCase() === 'space') key = ' '
   return { modifiers, key: key.length === 1 ? key.toUpperCase() : key }
 }
 
-/** `{ modifiers: ['Mod', 'Shift'], key: 'F' }` → `Mod+Shift+F`. */
+/** `{ modifiers: ['Mod', 'Shift'], key: 'F' }` → `Mod+Shift+F`; a space bar key is written `Space`. */
 export function hotkeyToShortcut(hotkey: Hotkey): string {
   const modifiers = [...hotkey.modifiers].sort((a, b) => MODIFIER_ORDER.indexOf(a) - MODIFIER_ORDER.indexOf(b))
-  return [...modifiers, hotkey.key].join('+')
+  return [...modifiers, hotkey.key === ' ' ? 'Space' : hotkey.key].join('+')
 }
 
 // ─── Command IDs: Slatebase ↔ Obsidian ───────────────────────────────────────
@@ -143,8 +145,9 @@ export function describeHotkeysDeviations(fields: Record<string, unknown>): Arra
 
 /**
  * The bindings the file sets, as Slatebase command ID → shortcut strings. A command with an empty
- * list maps to `[]` (unbound). Entries that are not bindings are left out (never thrown away from
- * the file: the file is only read here).
+ * list maps to `[]` (unbound). Entries that are not bindings are left out. Reading changes nothing in
+ * the file, but when Slatebase changes the bindings of a command it writes that command's list from
+ * the usable entries only: an entry it could not read (see {@link describeHotkeysDeviations}) is lost then.
  */
 export function readHotkeys(fields: Record<string, unknown>): Map<string, string[]> {
   const result = new Map<string, string[]>()
@@ -152,7 +155,10 @@ export function readHotkeys(fields: Record<string, unknown>): Map<string, string
   for (const [id, value] of Object.entries(fields)) {
     if (!isValidHotkeyCommandId(id) || !Array.isArray(value)) continue
     if (++count > MAX_HOTKEY_COMMANDS) break
-    result.set(fromFileCommandId(id), value.filter(isHotkey).slice(0, MAX_HOTKEYS_PER_COMMAND).map(hotkeyToShortcut))
+    const hotkeys = value.filter(isHotkey).slice(0, MAX_HOTKEYS_PER_COMMAND)
+    // Nothing usable in a non-empty list (all entries unknown to us): not "unbound", the default stays.
+    if (value.length > 0 && hotkeys.length === 0) continue
+    result.set(fromFileCommandId(id), hotkeys.map(hotkeyToShortcut))
   }
   return result
 }

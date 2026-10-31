@@ -108,10 +108,13 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
 let bindings: Map<string, string[]> = new Map()
 let apiClient: IApiClient | null = null
 let currentVaultId: string | null = null
-/** Changes not yet written to the file (file command ID → bindings, `null` = back to default). */
-let pending: Record<string, Hotkey[] | null> = {}
+/** Changes not yet written, per vault (file command ID → bindings, `null` = back to default). */
+let pending = new Map<string, Record<string, Hotkey[] | null>>()
 let writeTimer: ReturnType<typeof setTimeout> | null = null
-let writing = false
+/** The vault a write is running for. */
+let writingVault: string | null = null
+/** The file changed elsewhere while a change of ours was unwritten; read it again when ours is written. */
+let reloadRequested = false
 const changeListeners = new Set<() => void>()
 
 const WRITE_DEBOUNCE_MS = 500
@@ -137,8 +140,18 @@ export function disconnect(): void {
   }
   apiClient = null
   currentVaultId = null
-  pending = {}
+  pending = new Map()
+  writingVault = null
+  reloadRequested = false
   bindings = new Map()
+  // The caches and markers belong to the account that is leaving: the next one must start clean.
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(CACHE_PREFIX) || key.startsWith(TAKEN_OVER_PREFIX) || key === LEGACY_STORAGE_KEY) localStorage.removeItem(key)
+    }
+  } catch {
+    // Silently fail
+  }
 }
 
 /** Calls `cb` whenever the effective bindings may have changed. Returns the unsubscribe function. */
@@ -162,20 +175,26 @@ export async function loadVaultHotkeys(vaultId: string): Promise<boolean> {
   const client = apiClient
   if (!client) return false
   if (currentVaultId !== vaultId) {
-    // Another vault: its bindings, not the previous vault's, until the file is read.
+    // Another vault: its bindings, not the previous vault's, until the file is read. Unwritten
+    // changes of the previous vault stay queued for it.
     currentVaultId = vaultId
-    pending = {}
     bindings = loadCache(vaultId)
     notify()
   }
-  if (hasPendingWork()) return false
+  if (hasPendingWork(vaultId)) {
+    reloadRequested = true
+    return false
+  }
   let config: Record<string, unknown>
   try {
     config = await client.getHotkeysConfig(vaultId)
   } catch {
     return false // unknown, not gone: the cache stays
   }
-  if (currentVaultId !== vaultId || hasPendingWork()) return false // changed while the file was being read
+  if (currentVaultId !== vaultId || hasPendingWork(vaultId)) {
+    if (currentVaultId === vaultId) reloadRequested = true
+    return false // changed while the file was being read
+  }
 
   bindings = readHotkeys(config)
   if (!isTakenOver(vaultId)) await takeOverUserBindings(client, vaultId)
@@ -184,8 +203,8 @@ export async function loadVaultHotkeys(vaultId: string): Promise<boolean> {
   return true
 }
 
-function hasPendingWork(): boolean {
-  return writing || Object.keys(pending).length > 0
+function hasPendingWork(vaultId: string): boolean {
+  return writingVault === vaultId || pending.has(vaultId)
 }
 
 /** Writes the old per-user bindings into the file, for commands the file does not name. Once per vault and device. */
@@ -207,7 +226,9 @@ async function takeOverUserBindings(client: IApiClient, vaultId: string): Promis
   }
   if (Object.keys(patch).length > 0) {
     try {
-      bindings = readHotkeys(await client.patchHotkeysConfig(vaultId, patch))
+      const saved = readHotkeys(await client.patchHotkeysConfig(vaultId, patch))
+      // The user may have changed a shortcut meanwhile; then the change is written next and wins.
+      if (currentVaultId === vaultId && !hasPendingWork(vaultId)) bindings = saved
     } catch {
       return // no write access or server down: try again the next time this vault is opened
     }
@@ -224,7 +245,12 @@ export function getShortcuts(commandId: string): string[] {
   const set = bindings.get(commandId)
   if (set) return set
   const def = DEFAULT_KEYBINDINGS.find(d => d.commandId === commandId)
-  return def?.defaultShortcut ? [def.defaultShortcut] : []
+  if (!def?.defaultShortcut) return []
+  // A default gives way when the file binds the same keys to another command (as Obsidian does).
+  for (const shortcuts of bindings.values()) {
+    if (shortcuts.some(s => sameShortcut(s, def.defaultShortcut))) return []
+  }
+  return [def.defaultShortcut]
 }
 
 /** The first (primary) shortcut for a command; empty if unbound. */
@@ -270,10 +296,11 @@ export function resetShortcut(commandId: string): void {
 }
 
 /**
- * Reset all overrides.
+ * Reset the overrides of Slatebase's own commands. What the file binds for other commands (plugins,
+ * Obsidian's) is left alone: it is not listed here and may belong to someone else.
  */
 export function resetAll(): void {
-  for (const commandId of [...bindings.keys()]) resetShortcut(commandId)
+  for (const { commandId } of DEFAULT_KEYBINDINGS) resetShortcut(commandId)
 }
 
 /** Whether the file sets this command (as opposed to the default applying). */
@@ -289,7 +316,7 @@ export function getAllBindings(): Array<KeybindingDefinition & { effectiveShortc
     ...def,
     effectiveShortcut: getShortcut(def.commandId),
     effectiveShortcuts: getShortcuts(def.commandId),
-    isOverridden: bindings.has(def.commandId),
+    isOverridden: isOverridden(def.commandId),
   }))
 }
 
@@ -304,7 +331,8 @@ export function matchesShortcut(commandId: string, event: KeyboardEvent): boolea
   })
 }
 
-function isMacPlatform(): boolean {
+/** Whether the primary modifier (`Mod`) is Cmd rather than Ctrl. */
+export function isMacPlatform(): boolean {
   return typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
 }
 
@@ -322,7 +350,7 @@ export function parseShortcut(shortcut: string): ParsedShortcut | null {
     shift: has('Shift'),
     alt: has('Alt'),
     meta: has('Meta') || (has('Mod') && isMac),
-    key: hotkey.key.toLowerCase(),
+    key: hotkey.key === ' ' ? 'space' : hotkey.key.toLowerCase(),
   }
 }
 
@@ -384,14 +412,16 @@ export function findConflict(shortcut: string, excludeCommandId: string): string
 // ─── Writing the file ────────────────────────────────────────────────────────
 
 function queueWrite(commandId: string, value: Hotkey[] | null): void {
-  pending[toFileCommandId(commandId)] = value
-  if (currentVaultId) saveCache(currentVaultId)
+  const vaultId = currentVaultId
+  if (!vaultId) return
+  pending.set(vaultId, { ...pending.get(vaultId), [toFileCommandId(commandId)]: value })
+  saveCache(vaultId)
   notify()
   scheduleWrite(WRITE_DEBOUNCE_MS)
 }
 
 function scheduleWrite(delay: number): void {
-  if (!apiClient || !currentVaultId) return
+  if (!apiClient) return
   if (writeTimer !== null) clearTimeout(writeTimer)
   writeTimer = setTimeout(() => {
     writeTimer = null
@@ -399,32 +429,40 @@ function scheduleWrite(delay: number): void {
   }, delay)
 }
 
-/** Write the queued changes to the file. */
+/** Write the queued changes to the file, vault by vault (a vault switched away from keeps its queue). */
 async function flush(): Promise<void> {
   const client = apiClient
-  const vaultId = currentVaultId
-  if (!client || !vaultId || writing || Object.keys(pending).length === 0) return
-  const sent = pending
-  pending = {}
-  writing = true
+  if (!client || writingVault !== null) return
+  const next = pending.entries().next()
+  if (next.done) return
+  const [vaultId, sent] = next.value
+  pending.delete(vaultId)
+  writingVault = vaultId
+  let failed = false
   try {
     const saved = await client.patchHotkeysConfig(vaultId, sent)
     reportSyncSuccess(SYNC_STORE_KEY)
     // Take the file's answer unless something was changed meanwhile (that change is written next).
-    if (currentVaultId === vaultId && Object.keys(pending).length === 0) {
+    if (currentVaultId === vaultId && !pending.has(vaultId)) {
       bindings = readHotkeys(saved)
       saveCache(vaultId)
       notify()
     }
   } catch (error) {
     // The file did not take it: keep it queued (what was changed since wins) and try again later.
-    pending = { ...sent, ...pending }
+    failed = true
+    pending.set(vaultId, { ...sent, ...pending.get(vaultId) })
     reportSyncFailure(SYNC_STORE_KEY, error, 'Tastaturkürzel')
-    scheduleWrite(RETRY_AFTER_FAILURE_MS)
   } finally {
-    writing = false
+    writingVault = null
   }
-  if (Object.keys(pending).length > 0 && writeTimer === null) scheduleWrite(WRITE_DEBOUNCE_MS)
+  if (apiClient !== client) return // logged out meanwhile
+  if (pending.size > 0) scheduleWrite(failed ? RETRY_AFTER_FAILURE_MS : WRITE_DEBOUNCE_MS)
+  // The file changed elsewhere while ours was unwritten: read it now that ours is in.
+  if (!failed && reloadRequested && currentVaultId && !hasPendingWork(currentVaultId)) {
+    reloadRequested = false
+    void loadVaultHotkeys(currentVaultId)
+  }
 }
 
 // ─── Local cache (so shortcuts work before the file is read) ─────────────────
@@ -496,5 +534,4 @@ function loadLegacyCache(): Array<{ commandId: string; shortcut: string }> {
 export function _reset(): void {
   disconnect()
   changeListeners.clear()
-  writing = false
 }

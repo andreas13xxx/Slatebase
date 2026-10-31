@@ -12,6 +12,8 @@ import {
   getAllBindings,
   setShortcut,
   addShortcut,
+  removeShortcut,
+  isMacPlatform,
   resetShortcut,
   resetAll,
   formatShortcut,
@@ -94,7 +96,7 @@ export function KeybindingsSection() {
 
     // Build shortcut string. The platform's primary modifier is written as Mod, as Obsidian does,
     // so the same file works on every system.
-    const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
+    const isMac = isMacPlatform()
     const parts: string[] = []
     if (isMac ? e.metaKey : e.ctrlKey) parts.push('Mod')
     if (isMac && e.ctrlKey) parts.push('Ctrl')
@@ -236,6 +238,22 @@ export function KeybindingsSection() {
                           ? item.effectiveShortcuts.map(formatShortcut).join(' · ')
                           : <span className="keybindings-unset">—</span>}
                       </button>
+                    )}
+                    {editingId !== item.commandId && item.effectiveShortcuts.length > 1 && (
+                      <span className="keybindings-extra">
+                        {item.effectiveShortcuts.map(shortcut => (
+                          <button
+                            key={shortcut}
+                            type="button"
+                            className="keybindings-btn keybindings-btn--unbind"
+                            onClick={() => { removeShortcut(item.commandId, shortcut); refreshBindings() }}
+                            title={`Nur ${formatShortcut(shortcut)} entfernen`}
+                            aria-label={`Nur ${formatShortcut(shortcut)} entfernen`}
+                          >
+                            {formatShortcut(shortcut)} ✕
+                          </button>
+                        ))}
+                      </span>
                     )}
                   </td>
                   <td className="keybindings-cell-actions">
