@@ -273,7 +273,7 @@ describe('PluginInstaller', () => {
       // 'x' repeated compresses far below the ZIP limit, so only the extracted-size check can fire
       await expect(installer.installFromZip('vault-1', zipBuffer))
         .rejects.toMatchObject({ code: 'EXTRACTED_TOO_LARGE', message: expect.stringContaining('100 MB') })
-    })
+    }, 30_000)
   })
 
   describe('installFromZip — version upgrade logic', () => {

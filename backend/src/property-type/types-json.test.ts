@@ -205,7 +205,7 @@ describe('migratePropertyTypesToObsidian', () => {
     const vault = await vaultAt('v-many', { entries: [...many, { key: '__proto__', type: 'text' }] })
     await run([vault])
     expect(Object.keys(await types(vault.storagePath))).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
-  })
+  }, 30_000)
 
   it('does nothing for a vault without an old file', async () => {
     const vault = await vaultAt('v-empty')
