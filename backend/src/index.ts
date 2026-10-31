@@ -106,6 +106,8 @@ import { AppConfigService, DeviationReporter, NoteConfigService, migrateAppConfi
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { createAppearanceConfigRoutes } from './api/appearanceConfigRoutes.js'
 import { AppearanceConfigService } from './obsidian-config/appearance-config.js'
+import { createGraphConfigRoutes } from './api/graphConfigRoutes.js'
+import { GraphConfigService } from './obsidian-config/graph-config.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
 import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
@@ -782,6 +784,8 @@ const appConfigService = new AppConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 const appearanceConfigService = new AppearanceConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/appearance-config', createAppearanceConfigRoutes({ appearanceConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const graphConfigService = new GraphConfigService(appConfigDeviationReporter)
+app.route('/api/v1/vaults/:vaultId/graph-config', createGraphConfigRoutes({ graphConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
 const snippetRoutes = createSnippetRoutes({

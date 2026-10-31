@@ -1,12 +1,23 @@
 /**
  * GraphConfig — Configuration for the knowledge graph visualization.
  *
- * Manages graph appearance (colors, layout, node visibility), persisted per
- * user and per vault via `vaultSettingsStore`. Falls back to Design Token
- * defaults.
+ * Two parts with two homes:
+ *  - the force settings (`layout`) and whether tag nodes are shown (`nodes.showTags`) are the vault's:
+ *    they live in `.obsidian/graph.json` like in Obsidian, the same for everyone who opens the vault,
+ *    and changing them needs write access (`vaultGraphStore`);
+ *  - colours, property nodes and the local graph's hops have no Obsidian counterpart and stay a
+ *    personal preference per user and vault (`vaultSettingsStore`).
+ * Without write access a change of the vault part holds for this session only.
  */
 
+import {
+  graphLayoutFromFile,
+  graphLayoutToFile,
+  type GraphConfigValues,
+} from '@slatebase/shared-contracts'
 import { getVaultSettings, updateVaultSettings } from '../state/vaultSettingsStore'
+import { getGraphValue, updateGraph } from '../state/vaultGraphStore'
+import { showToast } from './ToastNotification'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -93,45 +104,86 @@ export const DEFAULT_GRAPH_CONFIG: GraphConfig = {
 // ─── Backing store ───────────────────────────────────────────────────────────
 
 /*
- * The configuration lives in `vaultSettingsStore.graph` — per user and per
- * vault, on the server. Colours and force strengths are a personal reading
- * preference, so they must not be forced on everyone who shares a vault, but
- * they are worth remembering per vault because graphs differ in size and
- * density. It used to be one device-local `localStorage` blob shared across
- * every vault.
+ * The personal part lives in `vaultSettingsStore.graph` — per user and per vault, on the server (it
+ * used to hold the layout and the tag switch too; those values are ignored there now and the vault's
+ * graph.json decides, starting from Obsidian's defaults, which convert to the defaults below). The
+ * vault part lives in `vaultGraphStore`.
  */
+
+/** The vault part when the file could not be written: what this session shows instead. */
+let sessionOverride: { layout: GraphLayoutConfig; showTags: boolean } | null = null
+
+type ForceKeys = Pick<GraphConfigValues, 'repelStrength' | 'linkStrength' | 'linkDistance' | 'centerStrength'>
+
+function fileForces(): ForceKeys {
+  return {
+    repelStrength: getGraphValue('repelStrength'),
+    linkStrength: getGraphValue('linkStrength'),
+    linkDistance: getGraphValue('linkDistance'),
+    centerStrength: getGraphValue('centerStrength'),
+  }
+}
 
 // ─── Public Functions ────────────────────────────────────────────────────────
 
 /**
- * Loads the graph configuration from localStorage.
- * Returns defaults if no config is stored or if stored JSON is corrupt.
- * Merges partial configs with defaults (missing keys get default values).
+ * Loads the graph configuration: the personal part from the user's settings, the layout and the
+ * tag switch from the vault's graph.json (or, if a change of those could not be saved, from this
+ * session). Missing or invalid values get their defaults.
  *
  * @returns The current graph configuration
  */
 export function loadGraphConfig(): GraphConfig {
   const stored = getVaultSettings().graph
-  if (stored === null) {
-    return { ...DEFAULT_GRAPH_CONFIG }
-  }
-  return mergeWithDefaults(stored as Partial<GraphConfig>)
+  const personal = stored === null ? { ...DEFAULT_GRAPH_CONFIG } : mergeWithDefaults(stored as Partial<GraphConfig>)
+  const vault = sessionOverride ?? { layout: graphLayoutFromFile(fileForces()), showTags: getGraphValue('showTags') }
+  return { ...personal, layout: vault.layout, nodes: { ...personal.nodes, showTags: vault.showTags } }
 }
 
 /**
- * Saves the graph configuration to localStorage.
+ * Saves the graph configuration: the personal part to the user's settings, and what differs from the
+ * vault's graph.json there. Without write access the change holds for this session only, with a hint.
  *
  * @param config - The configuration to persist
  */
 export function saveGraphConfig(config: GraphConfig): void {
-  updateVaultSettings({ graph: config as unknown as Record<string, unknown> })
+  updateVaultSettings({ graph: { colors: config.colors, nodes: { ...config.nodes, showTags: DEFAULT_GRAPH_CONFIG.nodes.showTags }, localGraph: config.localGraph } as unknown as Record<string, unknown> })
+
+  // The new state is what the user wants; a failed write puts the session override back below.
+  sessionOverride = null
+  const forces = graphLayoutToFile(config.layout)
+  const current = fileForces()
+  const change: Partial<ForceKeys & { showTags: boolean }> = {}
+  for (const key of Object.keys(forces) as Array<keyof ForceKeys>) {
+    // graphLayoutToFile rounds to 6 decimals; a value that only differs by that is not a change.
+    if (Math.abs(forces[key] - current[key]) > 1e-5 * Math.max(1, Math.abs(current[key]))) change[key] = forces[key]
+  }
+  if (config.nodes.showTags !== getGraphValue('showTags')) change.showTags = config.nodes.showTags
+  if (Object.keys(change).length === 0) return
+
+  updateGraph(change).catch(
+    () => {
+      sessionOverride = { layout: config.layout, showTags: config.nodes.showTags }
+      showToast('info', 'Die Graph-Einstellungen gehören zum Vault. Ohne Schreibrecht gelten deine Änderungen nur in dieser Sitzung.')
+    },
+  )
 }
 
 /**
- * Resets the graph configuration by removing it from localStorage.
+ * Resets the graph configuration: the personal part is dropped, and the forces and the tag switch
+ * are removed from graph.json (Obsidian's defaults apply again). Without write access they are reset
+ * for this session only.
  * The next `loadGraphConfig()` call will return defaults.
  */
 export function resetGraphConfig(): void {
+  const resetKeys = { repelStrength: null, linkStrength: null, linkDistance: null, centerStrength: null, showTags: null } as const
+  sessionOverride = null
+  updateGraph(resetKeys).catch(
+    () => {
+      sessionOverride = { layout: { ...DEFAULT_GRAPH_CONFIG.layout }, showTags: DEFAULT_GRAPH_CONFIG.nodes.showTags }
+      showToast('info', 'Die Graph-Einstellungen gehören zum Vault. Ohne Schreibrecht gilt das Zurücksetzen nur in dieser Sitzung.')
+    },
+  )
   updateVaultSettings({ graph: null })
 }
 
@@ -210,4 +262,12 @@ function getStringArrayValue(obj: unknown, key: string, fallback: string[]): str
     }
   }
   return [...fallback]
+}
+
+/**
+ * Forgets a session override of the vault part. Test helper.
+ * @internal
+ */
+export function _resetGraphSession(): void {
+  sessionOverride = null
 }

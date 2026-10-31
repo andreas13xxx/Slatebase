@@ -10,7 +10,7 @@ import { isMissing, withRetry } from './fs-retry.js'
 import { writeJsonFileAtomic } from './json-file-store.js'
 
 /** The Obsidian config files this module may touch. A closed list: the name never comes from a request. */
-export type ObsidianConfigFile = 'app.json' | 'templates.json' | 'daily-notes.json' | 'types.json'
+export type ObsidianConfigFile = 'app.json' | 'templates.json' | 'daily-notes.json' | 'types.json' | 'graph.json'
 
 /** Thrown when the file exists but is not a JSON object. The file is left untouched. */
 export class ObsidianConfigFileInvalidError extends Error {

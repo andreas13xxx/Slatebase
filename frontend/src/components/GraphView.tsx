@@ -10,6 +10,7 @@ import type { GraphData, GraphNode, GraphMeta } from '../types'
 import { truncateLabel, clampZoom, computeNodeSize, filterNodes } from './graph-utils'
 import { filterToNeighborhood } from './local-graph-utils'
 import { loadGraphConfig, saveGraphConfig, resetGraphConfig } from './graph-config'
+import { onGraphChange } from '../state/vaultGraphStore'
 import type { GraphConfig } from './graph-config'
 import { GraphSettingsPanel } from './GraphSettingsPanel'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
@@ -93,6 +94,10 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   // Graph config state (persisted in localStorage)
   const [config, setConfig] = useState<GraphConfig>(() => loadGraphConfig())
   const [meta, setMeta] = useState<GraphMeta | null>(null)
+
+  // The forces and the tag switch are the vault's (graph.json): follow a change made elsewhere
+  // (Obsidian, a sync, another user) while the graph is open.
+  useEffect(() => onGraphChange(() => setConfig(loadGraphConfig())), [])
 
   // Lokaler_Graph: the note currently centered on. Initialized from the prop
   // (the note the tab was opened for) but can move independently afterwards

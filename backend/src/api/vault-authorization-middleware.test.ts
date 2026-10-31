@@ -31,6 +31,8 @@ import { createKeychainRoutes } from './keychainRoutes.js'
 import type { IAppConfigService } from '../obsidian-config/index.js'
 import { createAppConfigRoutes } from './appConfigRoutes.js'
 import { createAppearanceConfigRoutes } from './appearanceConfigRoutes.js'
+import { createGraphConfigRoutes } from './graphConfigRoutes.js'
+import type { IGraphConfigService } from '../obsidian-config/graph-config.js'
 import type { IAppearanceConfigService } from '../obsidian-config/appearance-config.js'
 import type { ISnippetStore } from '../snippets/index.js'
 import type { IPluginStoreService } from '../plugin-store/index.js'
@@ -220,6 +222,9 @@ app.route('/api/v1/vaults/:vaultId/app-config', appConfigRoutes)
 const appearanceConfigRoutes = createAppearanceConfigRoutes({ appearanceConfigService: stub<IAppearanceConfigService>('appearanceConfigService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/appearance-config', appearanceConfigRoutes)
 
+const graphConfigRoutes = createGraphConfigRoutes({ graphConfigService: stub<IGraphConfigService>('graphConfigService'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
+app.route('/api/v1/vaults/:vaultId/graph-config', graphConfigRoutes)
+
 const snippetRoutes = createSnippetRoutes({ snippetStore: stub<ISnippetStore>('snippetStore'), accessControl, vaultRegistry, eventBus: stub<IEventBus>('eventBus'), logger: silentLogger })
 app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)
 
@@ -376,6 +381,13 @@ describe('keychain routes', () => {
     expect(resolveRequiredLevel('GET', '/keychain/openai-key')).toBe('write')
     expect(resolveRequiredLevel('PUT', '/keychain/openai-key')).toBe('write')
     expect(resolveRequiredLevel('DELETE', '/keychain/openai-key')).toBe('write')
+  })
+})
+
+describe('graph-config routes', () => {
+  it('reads with read access and changes with write access, like app-config', () => {
+    expect(resolveRequiredLevel('GET', '/graph-config')).toBe('read')
+    expect(resolveRequiredLevel('PATCH', '/graph-config')).toBe('write')
   })
 })
 

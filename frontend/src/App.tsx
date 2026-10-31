@@ -67,6 +67,7 @@ import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { ThemeLifecycle } from './components/ThemeLifecycle'
 import { AppConfigLifecycle } from './components/AppConfigLifecycle'
 import { AppearanceLifecycle } from './components/AppearanceLifecycle'
+import { GraphConfigLifecycle } from './components/GraphConfigLifecycle'
 import { getAppearanceValue, useAppearanceValue } from './state/vaultAppearanceStore'
 import { resolveColorScheme } from '@slatebase/shared-contracts'
 import { DictationIndicator } from './components/DictationIndicator'
@@ -1444,6 +1445,7 @@ function AppContent() {
         <ThemeLifecycle />
         <AppConfigLifecycle />
         <AppearanceLifecycle />
+        <GraphConfigLifecycle />
         <SnippetLifecycle />
         {isEnabled('voice-transcription') && (
           <DictationIndicator vaultId={state.selectedVaultId} apiClient={apiClient} />

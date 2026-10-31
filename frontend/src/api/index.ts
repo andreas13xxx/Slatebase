@@ -772,6 +772,10 @@ export interface IApiClient {
   getAppearanceConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Changes appearance.json; `null` removes a key. */
   patchAppearanceConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/graph.json` (force settings and display options of the graph view). */
+  getGraphConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Changes graph.json; `null` removes a key. */
+  patchGraphConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
 
   // --- Vault Keychain ---
   /** List the keychain entry IDs of a vault (NOT the values). */
@@ -1475,6 +1479,18 @@ export class ApiClient implements IApiClient {
 
   async patchAppearanceConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/appearance-config`, patch)
+    return result.config
+  }
+
+  // --- Vault graph.json ---
+
+  async getGraphConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/graph-config`)
+    return result.config
+  }
+
+  async patchGraphConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/graph-config`, patch)
     return result.config
   }
 
