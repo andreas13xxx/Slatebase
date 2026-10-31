@@ -5,13 +5,13 @@ describe('updateVaultConfigSchema: dailyNoteFormat', () => {
   const parse = (dailyNoteFormat: string) => updateVaultConfigSchema.safeParse({ dailyNoteFormat })
 
   it('accepts the patterns Obsidian users write', () => {
-    for (const format of ['YYYY-MM-DD', 'YYYY/MM/YYYY-MM-DD', 'MM月/MM-DD ddd', '[Journal] YYYY-[W]ww', 'gggg-[W]WW/dddd']) {
+    for (const format of ['YYYY-MM-DD', 'YYYY/MM/YYYY-MM-DD', 'MM月/MM-DD ddd', '[Journal] YYYY-[W]ww', 'gggg-[W]WW/dddd', 'YYYY..MM..DD', '[a..b] YYYY-MM-DD']) {
       expect(parse(format).success, format).toBe(true)
     }
   })
 
   it('refuses a pattern that could leave the daily notes folder or is not a name', () => {
-    for (const format of ['', '../YYYY-MM-DD', '/YYYY-MM-DD', 'YYYY\\MM', 'YYYY//MM', 'YYYY\u0000MM', 'x'.repeat(129)]) {
+    for (const format of ['', '../YYYY-MM-DD', 'YYYY/../MM', './YYYY', 'YYYY/..', '/YYYY-MM-DD', 'YYYY-MM-DD/', 'YYYY\\MM', 'YYYY//MM', 'YYYY\u0000MM', 'x'.repeat(129)]) {
       expect(parse(format).success, JSON.stringify(format)).toBe(false)
     }
   })

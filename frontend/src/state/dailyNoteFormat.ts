@@ -20,9 +20,29 @@ const FORBIDDEN_IN_NAME = /[\u0000-\u001f<>:"|?*\\]/
 /** ISO date `YYYY-MM-DD` of a local calendar day, the form dates are passed around in. */
 const ISO = 'YYYY-MM-DD'
 
-/** The pattern to use: the file's, or the default if it has none. */
+/** The pattern as the file says it (trimmed), or the default if it has none. Not checked for safety. */
 export function effectiveDailyNoteFormat(format: string | null | undefined): string {
-  return format != null && format.trim() !== '' ? format : DEFAULT_DAILY_NOTE_FORMAT
+  const trimmed = format?.trim() ?? ''
+  return trimmed !== '' ? trimmed : DEFAULT_DAILY_NOTE_FORMAT
+}
+
+const warnedFormats = new Set<string>()
+
+/**
+ * The pattern notes are really named by: the file's if it can name notes safely, else the default
+ * (with one console warning per pattern). Every place that names or finds daily notes goes through
+ * this, so a hand-written bad pattern cannot make them disagree.
+ */
+export function usableDailyNoteFormat(format: string | null | undefined): string {
+  const effective = effectiveDailyNoteFormat(format)
+  if (effective === DEFAULT_DAILY_NOTE_FORMAT) return effective
+  const problem = validateDailyNoteFormat(effective)
+  if (problem === null) return effective
+  if (!warnedFormats.has(effective)) {
+    warnedFormats.add(effective)
+    console.warn(`[daily-notes] format ${JSON.stringify(effective)} in daily-notes.json cannot name notes (${problem}); using ${DEFAULT_DAILY_NOTE_FORMAT}`)
+  }
+  return DEFAULT_DAILY_NOTE_FORMAT
 }
 
 /**
@@ -33,7 +53,8 @@ export function validateDailyNoteFormat(format: string): string | null {
   if (format.trim() === '') return 'Das Format darf nicht leer sein.'
   if (format.length > 128) return 'Das Format darf höchstens 128 Zeichen lang sein.'
 
-  const samples = ['2026-01-01', '2026-02-02', '2027-03-03', '2028-12-31', '2026-07-15']
+  // Neighbours in every unit a pattern can leave out: next day, next month, next year, and a far day.
+  const samples = ['2026-01-01', '2026-01-02', '2026-02-01', '2027-01-01', '2028-12-31', '2026-07-15']
   const names = samples.map((day) => moment(day, ISO).format(format))
   for (const name of names) {
     if (name.startsWith('/') || name.endsWith('/')) return 'Der Name darf nicht mit / beginnen oder enden.'
@@ -51,7 +72,7 @@ export function validateDailyNoteFormat(format: string): string | null {
 
 /** Name of the daily note for `isoDate` (`YYYY-MM-DD`), without `.md`, possibly with sub folders. */
 export function dailyNoteName(isoDate: string, format: string | null | undefined): string {
-  return moment(isoDate, ISO).format(effectiveDailyNoteFormat(format))
+  return moment(isoDate, ISO).format(usableDailyNoteFormat(format))
 }
 
 /**
@@ -60,6 +81,6 @@ export function dailyNoteName(isoDate: string, format: string | null | undefined
  */
 export function dailyNoteDate(relativePath: string, format: string | null | undefined): string | null {
   const name = relativePath.replace(/\.md$/i, '')
-  const parsed = moment(name, effectiveDailyNoteFormat(format), true)
+  const parsed = moment(name, usableDailyNoteFormat(format), true)
   return parsed.isValid() ? parsed.format(ISO) : null
 }

@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_DAILY_NOTE_FORMAT,
   dailyNoteDate,
   dailyNoteName,
   effectiveDailyNoteFormat,
+  usableDailyNoteFormat,
   validateDailyNoteFormat,
 } from './dailyNoteFormat'
 
@@ -18,7 +19,7 @@ describe('dailyNoteName', () => {
     expect(dailyNoteName('2026-10-31', 'YYYY/MM/YYYY-MM-DD')).toBe('2026/10/2026-10-31')
     expect(dailyNoteName('2024-03-05', 'MM月/MM-DD ddd')).toMatch(/^03月\/03-05 /)
     expect(dailyNoteName('2026-10-31', '[Journal] YYYY-MM-DD')).toBe('Journal 2026-10-31')
-    expect(dailyNoteName('2026-10-31', 'gggg-[W]WW')).toBe('2026-W44')
+    expect(dailyNoteName('2026-10-31', 'gggg-[W]WW-E')).toBe('2026-W44-6')
   })
 
   it('uses the local calendar day, not UTC', () => {
@@ -40,6 +41,29 @@ describe('dailyNoteDate', () => {
   })
 })
 
+describe('usableDailyNoteFormat', () => {
+  it('trims a pattern and uses the default for an empty one', () => {
+    expect(usableDailyNoteFormat(' DD.MM.YYYY ')).toBe('DD.MM.YYYY')
+    expect(usableDailyNoteFormat('  ')).toBe(DEFAULT_DAILY_NOTE_FORMAT)
+    expect(usableDailyNoteFormat(null)).toBe(DEFAULT_DAILY_NOTE_FORMAT)
+  })
+
+  it('falls back to the default, once with a warning, for a pattern that cannot name notes', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(usableDailyNoteFormat('[../]YYYY-MM-DD')).toBe(DEFAULT_DAILY_NOTE_FORMAT)
+    expect(usableDailyNoteFormat('[../]YYYY-MM-DD')).toBe(DEFAULT_DAILY_NOTE_FORMAT)
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+
+  it('makes naming and finding agree for a bad pattern', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(dailyNoteName('2026-10-31', 'YYYY-MM')).toBe('2026-10-31')
+    expect(dailyNoteDate('2026-10-31', 'YYYY-MM')).toBe('2026-10-31')
+    warn.mockRestore()
+  })
+})
+
 describe('validateDailyNoteFormat', () => {
   it('accepts normal patterns', () => {
     for (const format of ['YYYY-MM-DD', 'YYYY/MM/YYYY-MM-DD', 'DD.MM.YYYY', '[Journal] YYYY-MM-DD', 'MM月/MM-DD ddd']) {
@@ -47,10 +71,13 @@ describe('validateDailyNoteFormat', () => {
     }
   })
 
-  it('refuses an empty pattern and one without a date', () => {
+  it('refuses an empty pattern and one that leaves out the day, the month or the year', () => {
     expect(validateDailyNoteFormat('')).toMatch(/leer/)
     expect(validateDailyNoteFormat('[Tagebuch]')).toMatch(/Datumsangaben/)
     expect(validateDailyNoteFormat('YYYY')).toMatch(/Datumsangaben/)
+    expect(validateDailyNoteFormat('YYYY-MM')).toMatch(/Datumsangaben/)
+    expect(validateDailyNoteFormat('MM-DD')).toMatch(/Datumsangaben/)
+    expect(validateDailyNoteFormat('DD')).toMatch(/Datumsangaben/)
   })
 
   it('refuses names that are not safe relative paths', () => {

@@ -280,6 +280,22 @@ describe('dailyNoteService', () => {
       expect(apiClient.saveFile).toHaveBeenCalledWith('vault1', '2026/10/31.md', '# 31')
     })
 
+    it('keeps the last known format when the config cannot be loaded, so no second note appears under the default name', async () => {
+      localStorage.clear()
+      const online = createMockApiClient({
+        fetchFileContent: vi.fn().mockResolvedValue({ path: 'x', name: 'x', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false }),
+        getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: '', dailyNoteFormat: 'DD.MM.YYYY' }),
+      })
+      await createDailyNoteService(online).openOrCreate('vault-cache', '', '2026-10-31')
+
+      const offline = createMockApiClient({
+        fetchFileContent: vi.fn().mockResolvedValue({ path: 'x', name: 'x', content: '', size: 0, encoding: 'utf-8', isBinary: false, isTruncated: false }),
+        getVaultConfig: vi.fn().mockRejectedValue(new Error('network')),
+      })
+      expect(await createDailyNoteService(offline).openOrCreate('vault-cache', '', '2026-10-31')).toBe('31.10.2026.md')
+      localStorage.clear()
+    })
+
     it('falls back to YYYY-MM-DD, with a warning, for a format that cannot name notes safely', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const apiClient = createMockApiClient({

@@ -1,5 +1,5 @@
 import type { IApiClient } from '../api'
-import { DEFAULT_DAILY_NOTE_FORMAT, dailyNoteName, validateDailyNoteFormat } from './dailyNoteFormat'
+import { dailyNoteName } from './dailyNoteFormat'
 
 /** localStorage key pattern for daily notes config per vault (cache). */
 const STORAGE_KEY_PREFIX = 'slatebase:dailyNotes:'
@@ -32,6 +32,27 @@ export function validateDirectoryPath(directory: string): void {
     throw new InvalidDirectoryPathError(
       `Path exceeds maximum length of ${MAX_DIRECTORY_PATH_LENGTH} characters`
     )
+  }
+}
+
+const FORMAT_KEY_PREFIX = 'slatebase:dailyNoteFormat:'
+
+/** Remembers the vault's daily note format for the case that the config cannot be loaded next time. */
+export function rememberDailyNoteFormat(vaultId: string, format: string | null): void {
+  try {
+    if (format === null) localStorage.removeItem(`${FORMAT_KEY_PREFIX}${vaultId}`)
+    else localStorage.setItem(`${FORMAT_KEY_PREFIX}${vaultId}`, format)
+  } catch {
+    // Silently fail
+  }
+}
+
+/** The format last seen for the vault, or null (then the default applies). */
+export function recallDailyNoteFormat(vaultId: string): string | null {
+  try {
+    return localStorage.getItem(`${FORMAT_KEY_PREFIX}${vaultId}`)
+  } catch {
+    return null
   }
 }
 
@@ -137,21 +158,20 @@ export function createDailyNoteService(apiClient: IApiClient): IDailyNoteService
       // The vault's daily-notes.json says how notes are named (format) and which template they get
       // (a vault path, empty = none). Without it: YYYY-MM-DD and the default template.
       let templatePath = 'Templates/daily.md'
-      let format: string | null = null
+      let format: string | null
       try {
         const vaultConfig = await apiClient.getVaultConfig(vaultId)
         templatePath = vaultConfig.dailyNoteTemplate
         format = vaultConfig.dailyNoteFormat
+        rememberDailyNoteFormat(vaultId, format)
       } catch {
-        // Use defaults if config unavailable
+        // Config unavailable: the template falls back to the default, and the format to the last one
+        // seen, so a vault with its own format does not get a second note under the default name.
+        format = recallDailyNoteFormat(vaultId)
       }
 
       // A pattern that cannot name a note safely (e.g. written by hand into the file) falls back to the default.
-      const effectiveFormat = format !== null && validateDailyNoteFormat(format) === null ? format : null
-      if (format !== null && effectiveFormat === null) {
-        console.warn(`[daily-notes] format ${JSON.stringify(format)} in daily-notes.json cannot name notes (${validateDailyNoteFormat(format)}); using ${DEFAULT_DAILY_NOTE_FORMAT}`)
-      }
-      const noteName = dailyNoteName(resolvedDateStr, effectiveFormat)
+      const noteName = dailyNoteName(resolvedDateStr, format)
       const filePath = dailyDir ? `${dailyDir}/${noteName}.md` : `${noteName}.md`
 
       // 1. Check if file exists
