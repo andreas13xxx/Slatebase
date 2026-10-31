@@ -188,3 +188,29 @@ LiveSync (Plugin `obsidian-livesync`) arbeitet unabhängig und überträgt `.obs
 - Formate wie `bookmarks.json`, `workspaces.json` sind nicht öffentlich dokumentiert. Task 0 braucht echte Dateien mit Einträgen; die Beispiele des Nutzers sind die verlässlichste Quelle.
 - Mehrere Quellen gleichzeitig (Obsidian und Slatebase schreiben dieselbe Datei) erfordern den gemeinsamen Lock und Neuladen bei `vault:change`.
 - Eine Migration, die pro User Werte in eine Vault-Datei zusammenführt, muss deterministisch sein, sonst hängt das Ergebnis von der Reihenfolge der Nutzer ab.
+
+## Task 0: Ergebnisse der Recherche (Stand 2026-10-31)
+
+Obsidian dokumentiert keines dieser Formate. Belegt ist nur, was unten steht; alles andere bleibt "unverifiziert" und wird von der Diagnose (Requirement 8) gemeldet, wenn eine echte Datei abweicht. Die Implementierung ist deshalb tolerant: unbekannte Schlüssel und Eintragstypen bleiben erhalten.
+
+| Datei | Belegt | Unverifiziert |
+|---|---|---|
+| `app.json` | `attachmentFolderPath` (fester Ordnername ohne `/`), `alwaysUpdateLinks`, `readableLineLength`, `showLineNumber`, `mobilePullAction` (echte Datei des Nutzers); `promptDelete`, `trashOption` (`local`), `userIgnoreFilters` (Liste, Beispiel `Meta/`), `showUnsupportedFiles`, `defaultViewMode` (`preview`), `livePreview`, `spellcheck` (Beispieldateien) | Defaults außer den drei aus der Nutzerdatei; Enum-Mengen von `trashOption`, `propertiesInDocument` |
+| `types.json` | `{ "types": { "<name>": "<typ>" } }`; enthält nur ausdrücklich gewählte Typen; Werte `multitext` (Liste), `tags`, `number` | `text`, `checkbox`, `date`, `datetime`, `aliases` als gespeicherte Namen |
+| `bookmarks.json` | `{ "items": [...] }`; Typen `file`, `folder`, `url`, `search`, `group`; `subpath` (Überschrift/Block) und `query` | `ctime`, `graph`-Typ, genaue Feldnamen von `url` |
+| `workspaces.json` | Knoten mit `id`, `type` (`split`, `tabs`, `leaf`), `children`; Blatt hat `state: { type, state: { file, mode } }` | Wurzelschlüssel `main`/`left`/`right`, `active`, ob unbekannte Felder Obsidians Rundreise überleben |
+| `appearance.json` | `cssTheme`, `enabledCssSnippets` (bereits im Einsatz) | Schlüsselnamen und Werte für Theme, Akzentfarbe, Schriften, Schriftgröße |
+| `hotkeys.json`, `daily-notes.json`, `graph.json` | siehe Task 0 der Vorgänger-Spec | `colorGroups`-Farbformat |
+
+### Plugin-Größen (GitHub-Release-Assets, gemessen 2026-10-31)
+
+| Plugin | `main.js` | `styles.css` |
+|---|---|---|
+| Copilot | 5,2 MB | 78 KB |
+| Excalidraw | 5,1 MB | 353 KB |
+| LiveSync | 4,6 MB | 19 KB |
+| Dataview | 2,4 MB | 3 KB |
+| Smart Connections | 1,5 MB | 113 KB |
+| übrige geprüfte (Git, Templater, Kanban, Tasks, PDF++) | 0,5 bis 1,1 MB | ≤ 61 KB |
+
+Das größte `main.js` liegt knapp über der Hälfte des heutigen Limits (10 MB). Ob Obsidian selbst ein Limit hat, ist nicht dokumentiert; bekannt ist keines. Entscheidung: Limits großzügig anheben (Einzeldatei 25 MB, ZIP 50 MB, entpackt 100 MB, Plugin-Einstellungen 10 MB), damit wachsende Plugins und eingebettete Assets nicht scheitern, und die Werte an einer Stelle halten.

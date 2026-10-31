@@ -4,13 +4,13 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
 
 ## Tasks
 
-- [ ] 0. Verifikation (nur Recherche, Ergebnis in `design.md` und `docs/app-json.md`)
-  - [ ] 0.1 Schlüssel, Typen, Enum-Werte und Defaults gegen echte Dateien, `obsidian.d.ts` und Obsidian-Hilfe prüfen; Tabelle "Ungesichert" im Design abarbeiten
-  - [ ] 0.2 Format von `userIgnoreFilters` und `trashOption` klären
-  - [ ] 0.3 Bestandsaufnahme der übrigen `.obsidian/`-Dateien: was liest/schreibt Slatebase schon
-  - [ ] 0.4 Plugin-Größen: Obsidian-Limits und Release-Assets der größten Community-Plugins messen
-  - [ ] 0.5 `workspaces.json`: Form belegen und prüfen, ob unbekannte Felder Obsidians Rundreise überleben
-  - [ ] 0.6 `types.json`, `bookmarks.json`, `appearance.json`: Formate und Typnamen mit echten Dateien belegen
+- [x] 0. Verifikation (nur Recherche, Ergebnis in `design.md` und `docs/app-json.md`)
+  - [x] 0.1 Schlüssel, Typen, Enum-Werte und Defaults gegen echte Dateien, `obsidian.d.ts` und Obsidian-Hilfe prüfen; Tabelle "Ungesichert" im Design abarbeiten
+  - [x] 0.2 Format von `userIgnoreFilters` und `trashOption` klären
+  - [x] 0.3 Bestandsaufnahme der übrigen `.obsidian/`-Dateien: was liest/schreibt Slatebase schon
+  - [x] 0.4 Plugin-Größen: Obsidian-Limits und Release-Assets der größten Community-Plugins messen
+  - [x] 0.5 `workspaces.json`: Form belegen und prüfen, ob unbekannte Felder Obsidians Rundreise überleben
+  - [x] 0.6 `types.json`, `bookmarks.json`, `appearance.json`: Formate und Typnamen mit echten Dateien belegen
   - _Requirements: 1, 2, 3, 9, 10, 12, 13, 16_
 
 - [ ] 1. Referenzdoku
