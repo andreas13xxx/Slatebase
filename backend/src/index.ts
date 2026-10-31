@@ -101,7 +101,7 @@ import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVau
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
 import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService, DeviationReporter, NoteConfigService, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
+import { AppConfigService, DeviationReporter, NoteConfigService, migrateAppConfigDefaults, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -1149,6 +1149,8 @@ await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snip
 // Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
 // Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
+// app.json defaults follow Obsidian now; vaults Slatebase has worked in keep the previous ones. Must run before the other app.json migrations, which create the file.
+await migrateAppConfigDefaults({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
 await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
 // Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.

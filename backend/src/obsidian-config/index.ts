@@ -7,6 +7,8 @@ export type { IAppConfigService, AppConfigRequest, AppConfigValue } from './app-
 export { DeviationReporter, noopDeviationReporter } from './deviation-reporter.js'
 export type { ConfigDeviation, IDeviationReporter } from './deviation-reporter.js'
 export { AppConfigService, appConfigRequestSchema } from './app-config.js'
+export { migrateAppConfigDefaults } from './defaults-migration.js'
+export type { DefaultsMigrationResult } from './defaults-migration.js'
 export { migrateVaultConfigToObsidianFiles } from './legacy-migration.js'
 export type { VaultConfigMigrationResult } from './legacy-migration.js'
 export { migrateUserVaultSettingsToAppConfig } from './user-settings-migration.js'
