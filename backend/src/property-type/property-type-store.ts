@@ -106,7 +106,8 @@ export class PropertyTypeStore implements IPropertyTypeService {
 
     const entries: PropertyTypeEntry[] = []
     for (const [key, name] of Object.entries(types)) {
-      const type = fromObsidianType(key, name)
+      // tags and aliases have a fixed type; whatever the file says for them is not a choice.
+      const type = RESERVED_PROPERTY_KEYS[key] ?? fromObsidianType(key, name)
       if (type === null) {
         this.reporter.report(vaultId, 'types.json', [{ path: `types.${key}`, reason: `unknown property type ${JSON.stringify(name)?.slice(0, 80)}` }])
         continue
@@ -122,14 +123,18 @@ export class PropertyTypeStore implements IPropertyTypeService {
     // Enforce reserved key constraints
     const capped = this.enforceReservedKeys(registry.entries).slice(0, MAX_PROPERTY_TYPE_ENTRIES)
 
+    const wanted = new Map(capped.filter((entry) => entry.key !== '__proto__').map((entry) => [entry.key, toObsidianType(entry.type)]))
     await updateObsidianConfig(vaultPath, 'types.json', (current) => {
-      const previous = isRecord(current['types']) ? current['types'] : {}
-      // Types Slatebase does not know stay; everything it knows is replaced by the registry.
-      const next: Record<string, unknown> = {}
+      const previous = typesOf(current)
+      // The file keeps its order. Types Slatebase does not know stay where they are; the others are
+      // replaced by the registry or, if it no longer has them, removed. New keys follow.
+      // No prototype, so a key called __proto__ in the file stays an ordinary key.
+      const next = Object.create(null) as Record<string, unknown>
       for (const [key, name] of Object.entries(previous)) {
-        if (fromObsidianType(key, name) === null) next[key] = name
+        if (RESERVED_PROPERTY_KEYS[key] === undefined && fromObsidianType(key, name) === null) next[key] = name
+        else if (wanted.has(key)) next[key] = wanted.get(key)
       }
-      for (const entry of capped) next[entry.key] = toObsidianType(entry.type)
+      for (const [key, name] of wanted) if (!Object.hasOwn(next, key)) next[key] = name
       current['types'] = next
       return current
     })
@@ -145,8 +150,9 @@ export class PropertyTypeStore implements IPropertyTypeService {
       throw new PropertyTypeReservedKeyError(entry.key, reservedType)
     }
 
+    if (entry.key === '__proto__') throw new Error('"__proto__" is not a usable property name')
     await updateObsidianConfig(vaultPath, 'types.json', (current) => {
-      const types = isRecord(current['types']) ? { ...current['types'] } : {}
+      const types = typesOf(current)
       if (!Object.hasOwn(types, entry.key) && Object.keys(types).length >= MAX_PROPERTY_TYPE_ENTRIES) {
         throw new PropertyTypeMaxEntriesError(MAX_PROPERTY_TYPE_ENTRIES)
       }
@@ -175,9 +181,10 @@ export class PropertyTypeStore implements IPropertyTypeService {
 
     let added = 0
     await updateObsidianConfig(vaultPath, 'types.json', (current) => {
-      const types = isRecord(current['types']) ? { ...current['types'] } : {}
+      const types = typesOf(current)
       for (const entry of legacy) {
-        if (Object.hasOwn(types, entry.key)) continue
+        if (entry.key === '__proto__' || Object.hasOwn(types, entry.key)) continue
+        if (Object.keys(types).length >= MAX_PROPERTY_TYPE_ENTRIES) break
         types[entry.key] = toObsidianType(this.enforceReservedKeys([entry])[0]?.type ?? entry.type)
         added++
       }
@@ -241,6 +248,18 @@ export class PropertyTypeStore implements IPropertyTypeService {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * A copy of the `types` map of types.json (empty if the key is absent). A `types` that is not an
+ * object is refused instead of replaced: the file may be mid-sync or hand-edited, as for any other
+ * Obsidian file Slatebase writes.
+ */
+function typesOf(file: Record<string, unknown>): Record<string, unknown> {
+  const types = file['types']
+  if (types === undefined) return {}
+  if (!isRecord(types)) throw new ObsidianConfigFileInvalidError('types.json')
+  return { ...types }
 }
 
 // ─── Error Classes ───────────────────────────────────────────────────────────

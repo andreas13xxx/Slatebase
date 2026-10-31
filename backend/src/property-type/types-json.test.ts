@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import { PropertyTypeStore } from './property-type-store.js'
+import { MAX_PROPERTY_TYPE_ENTRIES } from './types.js'
 import { migratePropertyTypesToObsidian } from './migration.js'
 
 const logger: ILogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -86,6 +87,31 @@ describe('PropertyTypeStore on .obsidian/types.json', () => {
     expect((await store.getRegistry('v1')).entries).toEqual([])
   })
 
+  it('keeps the order of the file when saving, and puts new keys at the end', async () => {
+    await seedTypes({ types: { rating: 'stars', b: 'number', a: 'text', gone: 'text' } })
+    await store.saveRegistry('v1', { entries: [{ key: 'new', type: 'date' }, { key: 'a', type: 'checkbox' }, { key: 'b', type: 'number' }] })
+    expect(Object.keys((await readTypes() as { types: Record<string, string> }).types)).toEqual(['rating', 'b', 'a', 'new'])
+    expect(await readTypes()).toEqual({ types: { rating: 'stars', b: 'number', a: 'checkbox', new: 'date' } })
+  })
+
+  it('forces the fixed type of tags and aliases when reading, whatever the file says', async () => {
+    await seedTypes({ types: { tags: 'text', aliases: 'number' } })
+    expect((await store.getRegistry('v1')).entries).toEqual([{ key: 'tags', type: 'tags' }, { key: 'aliases', type: 'aliases' }])
+  })
+
+  it('refuses to write over a types value that is not an object, and the route-level error says so', async () => {
+    await seedTypes({ types: ['a'], keep: 1 })
+    await expect(store.upsertEntry('v1', { key: 'a', type: 'text' })).rejects.toThrow(/not a valid JSON object/)
+    await expect(store.saveRegistry('v1', { entries: [] })).rejects.toThrow(/not a valid JSON object/)
+    expect(await readTypes()).toEqual({ types: ['a'], keep: 1 })
+  })
+
+  it('does not accept __proto__ as a property name', async () => {
+    await expect(store.upsertEntry('v1', { key: '__proto__', type: 'text' })).rejects.toThrow(/__proto__/)
+    await store.saveRegistry('v1', { entries: [{ key: '__proto__', type: 'text' }, { key: 'ok', type: 'text' }] })
+    expect(await readTypes()).toEqual({ types: { ok: 'text' } })
+  })
+
   it('reports a types.json that is not usable, reads nothing from it, and never overwrites it', async () => {
     await seedTypes('<<<<<<< ours')
     expect((await store.getRegistry('v1')).entries).toEqual([])
@@ -152,10 +178,10 @@ describe('migratePropertyTypesToObsidian', () => {
 
     expect(await run([vault])).toMatchObject({ alreadyDone: true })
     expect(await types(vault.storagePath)).toEqual({})
-    await stat(join(dataDir, 'migrations', 'property-types-to-obsidian.done'))
+    await stat(join(dataDir, 'migrations', 'property-types-to-obsidian.json'))
   })
 
-  it('names a vault it cannot handle, leaves its files and carries on with the others', async () => {
+  it('names a vault it cannot handle, leaves its files, carries on, and retries only that vault at the next start', async () => {
     const broken = await vaultAt('v-broken', { entries: [{ key: 'a', type: 'text' }] })
     await writeFile(join(broken.storagePath, '.obsidian', 'types.json'), '<<<<<<<')
     const fine = await vaultAt('v-fine', { entries: [{ key: 'b', type: 'text' }] })
@@ -164,6 +190,21 @@ describe('migratePropertyTypesToObsidian', () => {
     expect(await readFile(join(broken.storagePath, '.obsidian', 'types.json'), 'utf-8')).toBe('<<<<<<<')
     expect(await types(fine.storagePath)).toEqual({ b: 'text' })
     expect(logger.warn).toHaveBeenCalled()
+
+    // Next start: the finished vault is not touched again, the broken one is, once it is usable.
+    await writeFile(join(fine.storagePath, '.obsidian', 'types.json'), JSON.stringify({ types: {} }))
+    await writeFile(join(broken.storagePath, '.obsidian', 'types.json'), JSON.stringify({ types: {} }))
+    expect(await run([broken, fine])).toMatchObject({ migrated: 1, failed: 0, alreadyDone: false })
+    expect(await types(broken.storagePath)).toEqual({ a: 'text' })
+    expect(await types(fine.storagePath)).toEqual({})
+    expect(await run([broken, fine])).toMatchObject({ alreadyDone: true })
+  })
+
+  it('does not add more entries than the guard limit allows', async () => {
+    const many = Array.from({ length: MAX_PROPERTY_TYPE_ENTRIES + 5 }, (_, i) => ({ key: `k${i}`, type: 'text' }))
+    const vault = await vaultAt('v-many', { entries: [...many, { key: '__proto__', type: 'text' }] })
+    await run([vault])
+    expect(Object.keys(await types(vault.storagePath))).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
   })
 
   it('does nothing for a vault without an old file', async () => {
