@@ -453,3 +453,13 @@ so it follows the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS`
 |---|---|---|
 | GET | `.../app-config` | read |
 | PATCH | `.../app-config` | write |
+
+## Addendum — `backend/src/api/appearanceConfigRoutes.ts` (Vault `appearance.json`, 2026-10-31)
+
+Mounted at `/api/v1/vaults/:vaultId/appearance-config`. The file is `.obsidian/appearance.json`; like app.json it applies to
+every user of the vault and follows the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS`.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../appearance-config` | read |
+| PATCH | `.../appearance-config` | write |
