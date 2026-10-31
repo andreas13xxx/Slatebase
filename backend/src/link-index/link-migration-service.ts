@@ -61,9 +61,12 @@ export class LinkMigrationService implements ILinkMigrationService {
     private readonly searchService: ISearchService,
     private readonly getLinkIndex: (vaultId: string) => ILinkIndex | undefined,
     private readonly logger: ILogger,
+    /** Whether the vault wants its links updated (app.json `alwaysUpdateLinks`). Omitted: always. */
+    private readonly isEnabled: (vaultId: string) => Promise<boolean> = async () => true,
   ) {}
 
   async migrateLinks(vaultId: string, oldPath: string, newPath: string, oldTree: DirectoryTree): Promise<LinkMigrationResult> {
+    if (!(await this.isEnabled(vaultId))) return { migratedFiles: [], failedFiles: [] }
     const linkIndex = this.getLinkIndex(vaultId)
     const candidatePaths = await this.gatherCandidates(vaultId, oldPath, linkIndex)
     candidatePaths.delete(oldPath)

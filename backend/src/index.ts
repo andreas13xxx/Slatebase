@@ -6,7 +6,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createServer as createHttpServer } from 'node:http'
 import { Hono } from 'hono'
-import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
+import { APP_CONFIG_DEFAULTS, PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 import { cors } from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
 import { getRequestListener } from '@hono/node-server'
@@ -474,7 +474,19 @@ const searchService = new SearchService(vaultService, vaultAccessControl, logger
 const replaceService = new ReplaceService(vaultService, logger)
 
 // 4g2. Link Migration Module (getLinkIndex is a hoisted function declaration, defined below)
-const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger)
+// Links are rewritten only if the vault's app.json says so (alwaysUpdateLinks, Obsidian's "Automatically update internal links").
+// appConfigService is declared further down; the closure only runs after startup.
+const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger, async (vaultId) => {
+  const fallback = APP_CONFIG_DEFAULTS.alwaysUpdateLinks
+  const entry = vaultRegistry.findById(vaultId)
+  if (entry === null) return fallback
+  try {
+    const value = (await appConfigService.get(entry.storagePath, vaultId))['alwaysUpdateLinks']
+    return typeof value === 'boolean' ? value : fallback
+  } catch {
+    return fallback
+  }
+})
 
 // 4h. Realtime Services (SSE)
 const sseConfig = config.getSseConfig()

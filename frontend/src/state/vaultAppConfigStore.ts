@@ -77,6 +77,11 @@ function subscribe(cb: () => void): () => void {
   return () => { subscribers.delete(cb) }
 }
 
+/** Calls `cb` after every change of the snapshot. Returns the function that stops it. */
+export function onAppConfigChange(cb: () => void): () => void {
+  return subscribe(cb)
+}
+
 /** One value of the active vault's app.json (default if the file has none). */
 export function getAppConfigValue<K extends AppConfigKey>(key: K): AppConfigValues[K] {
   return snapshot[key] as AppConfigValues[K]

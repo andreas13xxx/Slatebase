@@ -187,12 +187,66 @@ describe('VaultShim', () => {
   });
 
   describe('getConfig()', () => {
-    it("returns true for 'updateInternalLinks' — the rewrite always runs server-side", () => {
+    async function useAppConfig(fields: Record<string, unknown>, patch?: IApiClient['patchAppConfig']): Promise<void> {
+      resetAppConfig();
+      initializeAppConfig({ getAppConfig: vi.fn().mockResolvedValue(fields), patchAppConfig: patch } as unknown as IApiClient);
+      await setActiveVault('vault-1');
+    }
+
+    it("'updateInternalLinks' follows alwaysUpdateLinks (off unless the vault says so, like Obsidian)", async () => {
+      await useAppConfig({});
+      expect(vault.getConfig('updateInternalLinks')).toBe(false);
+      await useAppConfig({ alwaysUpdateLinks: true });
       expect(vault.getConfig('updateInternalLinks')).toBe(true);
+      expect(vault.getConfig('alwaysUpdateLinks')).toBe(true);
     });
 
     it('returns null for an unknown key', () => {
       expect(vault.getConfig('someUnknownKey')).toBeNull();
+    });
+  });
+
+  describe('setConfig() and the config-changed event', () => {
+    async function useAppConfig(fields: Record<string, unknown>, patch: IApiClient['patchAppConfig']): Promise<void> {
+      resetAppConfig();
+      initializeAppConfig({ getAppConfig: vi.fn().mockResolvedValue(fields), patchAppConfig: patch } as unknown as IApiClient);
+      await setActiveVault('vault-1');
+    }
+
+    it('writes a key Slatebase knows to app.json', async () => {
+      const patch = vi.fn().mockResolvedValue({ tabSize: 2 });
+      await useAppConfig({}, patch);
+      await vault.setConfig('tabSize', 2);
+      expect(patch).toHaveBeenCalledWith('vault-1', { tabSize: 2 });
+      expect(vault.getConfig('tabSize')).toBe(2);
+    });
+
+    it('ignores a key it cannot write, with a warning', async () => {
+      const patch = vi.fn();
+      await useAppConfig({}, patch);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await vault.setConfig('somePluginKey', 1);
+      expect(patch).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('somePluginKey'));
+      warn.mockRestore();
+    });
+
+    it('does not throw when the write is refused (no write access); the value goes back', async () => {
+      const patch = vi.fn().mockRejectedValue(new Error('forbidden'));
+      await useAppConfig({ tabSize: 4 }, patch);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await expect(vault.setConfig('tabSize', 2)).resolves.toBeUndefined();
+      expect(vault.getConfig('tabSize')).toBe(4);
+      warn.mockRestore();
+    });
+
+    it("fires 'config-changed' on listeners when app.json changes, not before anyone listens", async () => {
+      const patch = vi.fn().mockResolvedValue({ tabSize: 8 });
+      await useAppConfig({}, patch);
+      const listener = vi.fn();
+      vault.on('config-changed', listener);
+      await vault.setConfig('tabSize', 8);
+      expect(listener).toHaveBeenCalled();
     });
   });
 
