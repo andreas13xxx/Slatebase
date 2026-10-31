@@ -1,112 +1,260 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { IApiClient } from '../api'
 import {
   initialize,
-  disconnect,
+  loadVaultHotkeys,
   getShortcut,
+  getShortcuts,
   setShortcut,
+  addShortcut,
+  removeShortcut,
+  resetShortcut,
   resetAll,
-  _reloadFromStorage,
+  findConflict,
+  matchesShortcut,
+  isOverridden,
+  onKeybindingsChange,
+  _reset,
 } from './keybindingsStore'
-import { hasSyncedBefore, markSyncedBefore } from './preferenceSync'
 
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
-/** Minimal API client stub — only the keybinding endpoints are exercised. */
-function createMockApiClient(serverEntries: Array<{ commandId: string; shortcut: string }>) {
-  return {
-    getKeybindings: vi.fn().mockResolvedValue({ entries: serverEntries }),
-    saveKeybindings: vi.fn().mockResolvedValue(undefined),
-  } as unknown as IApiClient & {
-    getKeybindings: ReturnType<typeof vi.fn>
-    saveKeybindings: ReturnType<typeof vi.fn>
+const mod = (key: string, ...modifiers: string[]) => ({ modifiers: ['Mod', ...modifiers], key })
+
+/** An API client over an in-memory hotkeys.json, applying PATCH like the server does. */
+function createClient(initialFile: Record<string, unknown> = {}, legacy: Array<{ commandId: string; shortcut: string }> = []) {
+  let file = { ...initialFile }
+  const client = {
+    getHotkeysConfig: vi.fn(async () => ({ ...file })),
+    patchHotkeysConfig: vi.fn(async (_vaultId: string, patch: Record<string, unknown>) => {
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null) delete file[k]
+        else file[k] = v
+      }
+      return { ...file }
+    }),
+    getKeybindings: vi.fn(async () => ({ entries: legacy })),
   }
+  return { client: client as unknown as IApiClient, mocks: client, file: () => file, setFile: (f: Record<string, unknown>) => { file = f } }
 }
 
-describe('keybindingsStore — initialize', () => {
+function keyEvent(init: KeyboardEventInit): KeyboardEvent {
+  return new KeyboardEvent('keydown', init)
+}
+
+describe('keybindingsStore — hotkeys.json', () => {
   beforeEach(() => {
-    // localStorage is cleared in test-setup.ts beforeEach
-    disconnect()
-    _reloadFromStorage()
+    vi.useFakeTimers()
+    _reset()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
-
-  it('replaces the local cache with the server list', async () => {
-    setShortcut('slatebase:open-command-palette', 'Ctrl+X')
-    const client = createMockApiClient([
-      { commandId: 'slatebase:open-command-palette', shortcut: 'Ctrl+K' },
-    ])
-
-    await initialize(client)
-
-    expect(getShortcut('slatebase:open-command-palette')).toBe('Ctrl+K')
-    expect(hasSyncedBefore('keybindings')).toBe(true)
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
-  it('seeds the server from the local cache on the very first sync', async () => {
-    setShortcut('slatebase:open-command-palette', 'Ctrl+X')
-    const client = createMockApiClient([])
-
+  it('uses the defaults until the file names a command', async () => {
+    const { client } = createClient()
     await initialize(client)
-
-    // Local data predates syncing — upload it instead of discarding it.
-    expect(client.saveKeybindings).toHaveBeenCalledWith([
-      { commandId: 'slatebase:open-command-palette', shortcut: 'Ctrl+X' },
-    ])
-    expect(getShortcut('slatebase:open-command-palette')).toBe('Ctrl+X')
+    await loadVaultHotkeys('v1')
+    expect(getShortcut('slatebase:open-command-palette')).toBe('Mod+P')
+    expect(isOverridden('slatebase:open-command-palette')).toBe(false)
   })
 
-  it('honours an empty server list once this device has synced before', async () => {
-    // The regression this guards: "reset all" on another device used to be
-    // undone here, because an empty response was read as "server has no data".
-    setShortcut('slatebase:open-command-palette', 'Ctrl+X')
-    markSyncedBefore('keybindings')
-    const client = createMockApiClient([])
-
+  it('reads Obsidian IDs as Slatebase commands; an empty list unbinds', async () => {
+    const { client } = createClient({
+      'command-palette:open': [mod('K')],
+      'app:go-back': [],
+      'some-plugin:run': [{ modifiers: ['Alt'], key: 'R' }],
+    })
     await initialize(client)
-
-    expect(client.saveKeybindings).not.toHaveBeenCalled()
-    expect(getShortcut('slatebase:open-command-palette')).toBe('Mod+P') // back to default
+    await loadVaultHotkeys('v1')
+    expect(getShortcuts('slatebase:open-command-palette')).toEqual(['Mod+K'])
+    expect(getShortcuts('slatebase:navigate-back')).toEqual([])
+    expect(getShortcut('some-plugin:run')).toBe('Alt+R')
   })
 
-  it('keeps local data and sets no marker when the server is unreachable', async () => {
-    setShortcut('slatebase:open-command-palette', 'Ctrl+X')
-    const client = {
-      getKeybindings: vi.fn().mockRejectedValue(new Error('offline')),
-      saveKeybindings: vi.fn(),
-    } as unknown as IApiClient
-
+  it('writes a change debounced, under Obsidian\'s command ID and format', async () => {
+    const { client, mocks } = createClient()
     await initialize(client)
+    await loadVaultHotkeys('v1')
 
-    expect(getShortcut('slatebase:open-command-palette')).toBe('Ctrl+X')
-    expect(hasSyncedBefore('keybindings')).toBe(false)
+    setShortcut('slatebase:open-settings', 'Mod+Shift+S')
+    setShortcut('slatebase:open-settings', 'Mod+Alt+S')
+    expect(mocks.patchHotkeysConfig).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(mocks.patchHotkeysConfig).toHaveBeenCalledTimes(1)
+    expect(mocks.patchHotkeysConfig).toHaveBeenCalledWith('v1', { 'app:open-settings': [{ modifiers: ['Mod', 'Alt'], key: 'S' }] })
   })
 
-  it('clears the marker on disconnect so the next account starts clean', async () => {
-    const client = createMockApiClient([
-      { commandId: 'slatebase:open-command-palette', shortcut: 'Ctrl+K' },
-    ])
+  it('unbinds with an empty list and resets by removing the entry', async () => {
+    const { client, mocks, file } = createClient()
     await initialize(client)
-    expect(hasSyncedBefore('keybindings')).toBe(true)
+    await loadVaultHotkeys('v1')
 
-    disconnect()
+    setShortcut('slatebase:open-command-palette', '')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(file()['command-palette:open']).toEqual([])
+    expect(getShortcut('slatebase:open-command-palette')).toBe('')
 
-    expect(hasSyncedBefore('keybindings')).toBe(false)
+    resetShortcut('slatebase:open-command-palette')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(mocks.patchHotkeysConfig).toHaveBeenLastCalledWith('v1', { 'command-palette:open': null })
+    expect('command-palette:open' in file()).toBe(false)
+    expect(getShortcut('slatebase:open-command-palette')).toBe('Mod+P')
   })
 
-  it('propagates a reset to the server as an empty list', async () => {
-    const client = createMockApiClient([
-      { commandId: 'slatebase:open-command-palette', shortcut: 'Ctrl+K' },
-    ])
+  it('adds and removes single shortcuts of a command', async () => {
+    const { client } = createClient()
     await initialize(client)
+    await loadVaultHotkeys('v1')
 
+    addShortcut('slatebase:open-command-palette', 'Mod+Shift+P')
+    addShortcut('slatebase:open-command-palette', 'Ctrl+Shift+P') // same keys as Mod+Shift+P on this platform
+    expect(getShortcuts('slatebase:open-command-palette')).toEqual(['Mod+P', 'Mod+Shift+P'])
+    removeShortcut('slatebase:open-command-palette', 'Mod+P')
+    expect(getShortcuts('slatebase:open-command-palette')).toEqual(['Mod+Shift+P'])
+  })
+
+  it('resetAll removes every entry the file has', async () => {
+    const { client, file } = createClient({ 'app:go-back': [], 'plugin:x': [mod('X')] })
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    resetAll()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(file()).toEqual({})
+  })
+
+  it('does not replace unwritten changes with the file, and takes the file when it changed elsewhere', async () => {
+    const { client, setFile } = createClient()
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+
+    setShortcut('slatebase:open-settings', 'Mod+K')
+    expect(await loadVaultHotkeys('v1')).toBe(false)
+    expect(getShortcut('slatebase:open-settings')).toBe('Mod+K')
+    await vi.advanceTimersByTimeAsync(600)
+
+    setFile({ 'app:open-settings': [mod('J')] })
+    expect(await loadVaultHotkeys('v1')).toBe(true)
+    expect(getShortcut('slatebase:open-settings')).toBe('Mod+J')
+  })
+
+  it('keeps a failed change queued and writes it on the retry', async () => {
+    const { client, mocks, file } = createClient()
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    mocks.patchHotkeysConfig.mockRejectedValueOnce(new Error('offline'))
+
+    setShortcut('slatebase:open-settings', 'Mod+K')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(file()['app:open-settings']).toBeUndefined()
+    expect(getShortcut('slatebase:open-settings')).toBe('Mod+K')
+
+    await vi.advanceTimersByTimeAsync(31_000)
+    expect(file()['app:open-settings']).toEqual([mod('K')])
+  })
+
+  it('does not show the previous vault\'s bindings in another vault', async () => {
+    const a = createClient({ 'app:open-settings': [mod('J')] })
+    await initialize(a.client)
+    await loadVaultHotkeys('a')
+    expect(getShortcut('slatebase:open-settings')).toBe('Mod+J')
+
+    const b = createClient()
+    await initialize(b.client)
+    await loadVaultHotkeys('b')
+    expect(getShortcut('slatebase:open-settings')).toBe('Ctrl+,')
+  })
+
+  it('tells listeners about changes', async () => {
+    const { client } = createClient({ 'app:go-back': [] })
+    await initialize(client)
+    const cb = vi.fn()
+    const off = onKeybindingsChange(cb)
+    await loadVaultHotkeys('v1')
+    expect(cb).toHaveBeenCalled()
+    cb.mockClear()
+    off()
+    setShortcut('slatebase:open-settings', 'Mod+K')
+    expect(cb).not.toHaveBeenCalled()
+  })
+})
+
+describe('keybindingsStore — taking over the per-user bindings', () => {
+  beforeEach(() => {
     vi.useFakeTimers()
-    try {
-      resetAll()
-      await vi.advanceTimersByTimeAsync(2000) // SYNC_DEBOUNCE_MS
-      expect(client.saveKeybindings).toHaveBeenCalledWith([])
-    } finally {
-      vi.useRealTimers()
-    }
+    _reset()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('writes the old bindings the file does not name, once, and the file wins', async () => {
+    const { client, mocks, file } = createClient(
+      { 'app:open-settings': [mod('J')] },
+      [
+        { commandId: 'slatebase:open-settings', shortcut: 'Ctrl+X' },
+        { commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' },
+        { commandId: 'slatebase:navigate-back', shortcut: '' },
+      ],
+    )
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+
+    expect(mocks.patchHotkeysConfig).toHaveBeenCalledWith('v1', {
+      'slatebase:toggle-theme': [{ modifiers: ['Mod', 'Shift'], key: 'L' }],
+      'app:go-back': [],
+    })
+    expect(file()['app:open-settings']).toEqual([mod('J')])
+    expect(getShortcut('slatebase:toggle-theme')).toBe('Mod+Shift+L')
+    expect(getShortcut('slatebase:open-settings')).toBe('Mod+J')
+
+    mocks.patchHotkeysConfig.mockClear()
+    await loadVaultHotkeys('v1')
+    expect(mocks.patchHotkeysConfig).not.toHaveBeenCalled()
+  })
+
+  it('tries again next time when the file cannot be written', async () => {
+    const { client, mocks } = createClient({}, [{ commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' }])
+    mocks.patchHotkeysConfig.mockRejectedValueOnce(new Error('403'))
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    expect(getShortcut('slatebase:toggle-theme')).toBe('')
+
+    await loadVaultHotkeys('v1')
+    expect(getShortcut('slatebase:toggle-theme')).toBe('Mod+Shift+L')
+  })
+
+  it('reads the browser cache of the old store when the server list is unavailable', async () => {
+    localStorage.setItem('slatebase:keybindings', JSON.stringify([{ commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' }]))
+    const { client, mocks } = createClient()
+    mocks.getKeybindings.mockRejectedValueOnce(new Error('offline'))
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+    expect(getShortcut('slatebase:toggle-theme')).toBe('Mod+Shift+L')
+  })
+})
+
+describe('keybindingsStore — matching and conflicts', () => {
+  beforeEach(async () => {
+    _reset()
+    const { client } = createClient({ 'plugin:x': [mod('Q')] })
+    await initialize(client)
+    await loadVaultHotkeys('v1')
+  })
+
+  it('matches any of a command\'s shortcuts', () => {
+    addShortcut('slatebase:open-settings', 'Alt+Space')
+    expect(matchesShortcut('slatebase:open-settings', keyEvent({ key: ',', ctrlKey: true }))).toBe(true)
+    expect(matchesShortcut('slatebase:open-settings', keyEvent({ key: ' ', altKey: true }))).toBe(true)
+    expect(matchesShortcut('slatebase:open-settings', keyEvent({ key: ',' }))).toBe(false)
+  })
+
+  it('finds a conflict with a built-in and with a plugin command, treating Mod and Ctrl alike', () => {
+    expect(findConflict('Ctrl+P', 'slatebase:open-settings')).toBe('slatebase:open-command-palette')
+    expect(findConflict('Mod+Q', 'slatebase:open-settings')).toBe('plugin:x')
+    expect(findConflict('Mod+Q', 'plugin:x')).toBeNull()
+    expect(findConflict('Mod+F9', 'slatebase:open-settings')).toBeNull()
   })
 })

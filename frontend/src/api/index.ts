@@ -780,6 +780,10 @@ export interface IApiClient {
   getBookmarksConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Replaces the bookmark list of the vault's bookmarks.json (`{ items }`). */
   patchBookmarksConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/hotkeys.json` (command ID → bindings). */
+  getHotkeysConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Sets (list), unbinds (empty list) or removes (`null`) single commands of the vault's hotkeys.json. */
+  patchHotkeysConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
 
   // --- Vault Keychain ---
   /** List the keychain entry IDs of a vault (NOT the values). */
@@ -1507,6 +1511,18 @@ export class ApiClient implements IApiClient {
 
   async patchBookmarksConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/bookmarks-config`, patch)
+    return result.config
+  }
+
+  // --- Vault hotkeys.json ---
+
+  async getHotkeysConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/hotkeys-config`)
+    return result.config
+  }
+
+  async patchHotkeysConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/hotkeys-config`, patch)
     return result.config
   }
 

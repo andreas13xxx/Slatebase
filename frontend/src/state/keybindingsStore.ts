@@ -1,23 +1,26 @@
 /**
- * Keybindings Store — configurable keyboard shortcuts with per-user overrides.
+ * Keybindings Store — the keyboard shortcuts of the open vault.
  *
- * Provides default keybindings for all commands and merges with user overrides
- * loaded from the backend. Uses localStorage as immediate cache.
- * Syncs with backend API for cross-device persistence (debounced).
+ * The bindings live in the vault's `.obsidian/hotkeys.json` (Obsidian's format: command ID → list of
+ * `{ modifiers, key }`), so they are the same for everyone who opens the vault and for Obsidian.
+ * A command the file does not name has its default; an empty list means "unbound". Changes are
+ * written to the file debounced; the per-user list of older versions is taken over once per vault.
  *
- * Shortcut format: "Ctrl+Shift+F", "Ctrl+P", "Ctrl+,", "Ctrl+S"
+ * Shortcut format inside Slatebase: "Ctrl+Shift+F", "Ctrl+P", "Ctrl+,", "Ctrl+S"
  * Modifiers: Ctrl, Shift, Alt, Meta (= Cmd on macOS)
  * Use "Mod" as platform-agnostic: Ctrl on Win/Linux, Meta on macOS.
  */
 
-import type { IApiClient, KeybindingEntry as ApiKeybindingEntry } from '../api'
+import type { IApiClient } from '../api'
 import {
-  hasSyncedBefore,
-  markSyncedBefore,
-  clearSyncedBefore,
-  reportSyncFailure,
-  reportSyncSuccess,
-} from './preferenceSync'
+  isValidHotkeyCommandId,
+  readHotkeys,
+  shortcutToHotkey,
+  shortcutsToFileValue,
+  toFileCommandId,
+  type Hotkey,
+} from '@slatebase/shared-contracts'
+import { reportSyncFailure, reportSyncSuccess } from './preferenceSync'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -53,8 +56,8 @@ export interface ParsedShortcut {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'slatebase:keybindings'
-const SYNC_DEBOUNCE_MS = 2000
+/** Where earlier versions cached the per-user overrides; read once to take them over. */
+const LEGACY_STORAGE_KEY = 'slatebase:keybindings'
 
 /** Identifies this store to the shared first-sync/failure bookkeeping. */
 const SYNC_STORE_KEY = 'keybindings'
@@ -101,126 +104,208 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
 
 // ─── Internal State ──────────────────────────────────────────────────────────
 
-/** User overrides (commandId → shortcut). */
-let overrides: Map<string, string> = loadFromStorage()
+/** Bindings the vault's hotkeys.json sets (Slatebase command ID → shortcuts; `[]` = unbound). */
+let bindings: Map<string, string[]> = new Map()
 let apiClient: IApiClient | null = null
-let syncTimer: ReturnType<typeof setTimeout> | null = null
-let syncInProgress = false
+let currentVaultId: string | null = null
+/** Changes not yet written to the file (file command ID → bindings, `null` = back to default). */
+let pending: Record<string, Hotkey[] | null> = {}
+let writeTimer: ReturnType<typeof setTimeout> | null = null
+let writing = false
+const changeListeners = new Set<() => void>()
+
+const WRITE_DEBOUNCE_MS = 500
+const RETRY_AFTER_FAILURE_MS = 30_000
 
 // ─── Initialization ──────────────────────────────────────────────────────────
 
 /**
- * Initialize the keybindings store with an API client and load user overrides.
- * Called on login / app mount.
+ * Give the store the API client. The bindings themselves come from the open vault's hotkeys.json
+ * (see {@link loadVaultHotkeys}); the per-user list on the server is only read once, to take over.
  */
 export async function initialize(client: IApiClient): Promise<void> {
   apiClient = client
-  try {
-    const response = await client.getKeybindings()
-
-    // An empty response means "the user unbound everything" once this device
-    // has synced before, and "the server has no record yet" when it has not —
-    // see preferenceSync.ts. Only the latter keeps the local cache.
-    if (response.entries.length === 0 && !hasSyncedBefore(SYNC_STORE_KEY) && overrides.size > 0) {
-      await syncToServer()
-      return
-    }
-
-    overrides = new Map(response.entries.map(e => [e.commandId, e.shortcut]))
-    persistLocal()
-    markSyncedBefore(SYNC_STORE_KEY)
-  } catch {
-    // Server unavailable — continue with localStorage data. No marker is set,
-    // so a later successful init can still seed from this cache.
-  }
-}
-
-/**
- * Re-read the overrides from localStorage, discarding in-memory state.
- * Mirrors `recentFilesStore._reload`; used by tests, which share this
- * module-level store across cases.
- * @internal
- */
-export function _reloadFromStorage(): void {
-  overrides = loadFromStorage()
 }
 
 /**
  * Disconnect from the backend (on logout).
  */
 export function disconnect(): void {
-  if (syncTimer !== null) {
-    clearTimeout(syncTimer)
-    syncTimer = null
+  if (writeTimer !== null) {
+    clearTimeout(writeTimer)
+    writeTimer = null
   }
   apiClient = null
-  // The marker is per device *and* account: the next user to log in here must
-  // not inherit this one's "already synced" state.
-  clearSyncedBefore(SYNC_STORE_KEY)
+  currentVaultId = null
+  pending = {}
+  bindings = new Map()
+}
+
+/** Calls `cb` whenever the effective bindings may have changed. Returns the unsubscribe function. */
+export function onKeybindingsChange(cb: () => void): () => void {
+  changeListeners.add(cb)
+  return () => { changeListeners.delete(cb) }
+}
+
+function notify(): void {
+  for (const cb of changeListeners) cb()
+}
+
+/**
+ * Read the vault's hotkeys.json and make it the bindings. Called when a vault is opened and when the
+ * file changed elsewhere (Obsidian, a sync, another user). Not while a change of this session is
+ * unwritten — the file does not have it yet. The first time a vault is read on a device, the user's
+ * old per-user bindings are written into the file for every command the file does not name
+ * (the file wins). Returns whether the bindings were replaced.
+ */
+export async function loadVaultHotkeys(vaultId: string): Promise<boolean> {
+  const client = apiClient
+  if (!client) return false
+  if (currentVaultId !== vaultId) {
+    // Another vault: its bindings, not the previous vault's, until the file is read.
+    currentVaultId = vaultId
+    pending = {}
+    bindings = loadCache(vaultId)
+    notify()
+  }
+  if (hasPendingWork()) return false
+  let config: Record<string, unknown>
+  try {
+    config = await client.getHotkeysConfig(vaultId)
+  } catch {
+    return false // unknown, not gone: the cache stays
+  }
+  if (currentVaultId !== vaultId || hasPendingWork()) return false // changed while the file was being read
+
+  bindings = readHotkeys(config)
+  if (!isTakenOver(vaultId)) await takeOverUserBindings(client, vaultId)
+  saveCache(vaultId)
+  notify()
+  return true
+}
+
+function hasPendingWork(): boolean {
+  return writing || Object.keys(pending).length > 0
+}
+
+/** Writes the old per-user bindings into the file, for commands the file does not name. Once per vault and device. */
+async function takeOverUserBindings(client: IApiClient, vaultId: string): Promise<void> {
+  let legacy: Array<{ commandId: string; shortcut: string }>
+  try {
+    legacy = (await client.getKeybindings()).entries
+  } catch {
+    legacy = loadLegacyCache() // server unavailable: the cache of the old store is the same data
+  }
+  const patch: Record<string, Hotkey[]> = {}
+  for (const { commandId, shortcut } of legacy) {
+    if (bindings.has(commandId)) continue
+    const fileId = toFileCommandId(commandId)
+    if (!isValidHotkeyCommandId(fileId)) continue
+    const value = shortcutsToFileValue(shortcut ? [shortcut] : [])
+    if (shortcut && value.length === 0) continue
+    patch[fileId] = value
+  }
+  if (Object.keys(patch).length > 0) {
+    try {
+      bindings = readHotkeys(await client.patchHotkeysConfig(vaultId, patch))
+    } catch {
+      return // no write access or server down: try again the next time this vault is opened
+    }
+  }
+  markTakenOver(vaultId)
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Get the effective shortcut for a command (user override or default).
+ * All shortcuts for a command: the file's, or the default if the file does not name the command.
  */
-export function getShortcut(commandId: string): string {
-  if (overrides.has(commandId)) {
-    return overrides.get(commandId)!
-  }
+export function getShortcuts(commandId: string): string[] {
+  const set = bindings.get(commandId)
+  if (set) return set
   const def = DEFAULT_KEYBINDINGS.find(d => d.commandId === commandId)
-  return def?.defaultShortcut ?? ''
+  return def?.defaultShortcut ? [def.defaultShortcut] : []
+}
+
+/** The first (primary) shortcut for a command; empty if unbound. */
+export function getShortcut(commandId: string): string {
+  return getShortcuts(commandId)[0] ?? ''
 }
 
 /**
- * Set a user override for a command.
+ * Bind a command to exactly these shortcuts. Pass an empty list to explicitly unbind.
+ */
+export function setShortcuts(commandId: string, shortcuts: string[]): void {
+  const list = shortcuts.filter(s => shortcutToHotkey(s) !== null)
+  bindings.set(commandId, list)
+  queueWrite(commandId, shortcutsToFileValue(list))
+}
+
+/**
+ * Set a user override for a command (replacing its bindings).
  * Pass empty string to explicitly unbind.
  */
 export function setShortcut(commandId: string, shortcut: string): void {
-  overrides.set(commandId, shortcut)
-  persistLocal()
-  scheduleSyncToServer()
+  setShortcuts(commandId, shortcut ? [shortcut] : [])
+}
+
+/** Add a shortcut to a command, keeping the ones it has. */
+export function addShortcut(commandId: string, shortcut: string): void {
+  const current = getShortcuts(commandId)
+  if (current.some(s => sameShortcut(s, shortcut))) return
+  setShortcuts(commandId, [...current, shortcut])
+}
+
+/** Remove one shortcut of a command; the command stays unbound if it was the last. */
+export function removeShortcut(commandId: string, shortcut: string): void {
+  setShortcuts(commandId, getShortcuts(commandId).filter(s => !sameShortcut(s, shortcut)))
 }
 
 /**
- * Reset a command to its default binding (removes override).
+ * Reset a command to its default binding (removes the entry from the file).
  */
 export function resetShortcut(commandId: string): void {
-  overrides.delete(commandId)
-  persistLocal()
-  scheduleSyncToServer()
+  if (!bindings.delete(commandId)) return
+  queueWrite(commandId, null)
 }
 
 /**
  * Reset all overrides.
  */
 export function resetAll(): void {
-  overrides.clear()
-  persistLocal()
-  scheduleSyncToServer()
+  for (const commandId of [...bindings.keys()]) resetShortcut(commandId)
+}
+
+/** Whether the file sets this command (as opposed to the default applying). */
+export function isOverridden(commandId: string): boolean {
+  return bindings.has(commandId)
 }
 
 /**
  * Get all keybinding definitions with their effective shortcuts.
  */
-export function getAllBindings(): Array<KeybindingDefinition & { effectiveShortcut: string; isOverridden: boolean }> {
+export function getAllBindings(): Array<KeybindingDefinition & { effectiveShortcut: string; effectiveShortcuts: string[]; isOverridden: boolean }> {
   return DEFAULT_KEYBINDINGS.map(def => ({
     ...def,
     effectiveShortcut: getShortcut(def.commandId),
-    isOverridden: overrides.has(def.commandId),
+    effectiveShortcuts: getShortcuts(def.commandId),
+    isOverridden: bindings.has(def.commandId),
   }))
 }
 
 /**
- * Check if a keyboard event matches the effective shortcut for a command.
+ * Check if a keyboard event matches one of the effective shortcuts for a command.
  * Handles platform-agnostic "Mod" (Ctrl on Win/Linux, Meta on macOS).
  */
 export function matchesShortcut(commandId: string, event: KeyboardEvent): boolean {
-  const shortcut = getShortcut(commandId)
-  if (!shortcut) return false
-  const parsed = parseShortcut(shortcut)
-  if (!parsed) return false
-  return matchesParsed(parsed, event)
+  return getShortcuts(commandId).some(shortcut => {
+    const parsed = parseShortcut(shortcut)
+    return parsed !== null && matchesParsed(parsed, event)
+  })
+}
+
+function isMacPlatform(): boolean {
+  return typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
 }
 
 /**
@@ -228,39 +313,23 @@ export function matchesShortcut(commandId: string, event: KeyboardEvent): boolea
  * Handles "Mod" as platform-agnostic modifier.
  */
 export function parseShortcut(shortcut: string): ParsedShortcut | null {
-  if (!shortcut) return null
-  const parts = shortcut.split('+').map(p => p.trim())
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
-
-  let ctrl = false
-  let shift = false
-  let alt = false
-  let meta = false
-  let key = ''
-
-  for (const part of parts) {
-    const lower = part.toLowerCase()
-    if (lower === 'ctrl') {
-      ctrl = true
-    } else if (lower === 'shift') {
-      shift = true
-    } else if (lower === 'alt') {
-      alt = true
-    } else if (lower === 'meta' || lower === 'cmd') {
-      meta = true
-    } else if (lower === 'mod') {
-      if (isMac) {
-        meta = true
-      } else {
-        ctrl = true
-      }
-    } else {
-      key = part.toLowerCase()
-    }
+  const hotkey = shortcutToHotkey(shortcut)
+  if (!hotkey) return null
+  const isMac = isMacPlatform()
+  const has = (m: string) => hotkey.modifiers.some(x => x === m)
+  return {
+    ctrl: has('Ctrl') || (has('Mod') && !isMac),
+    shift: has('Shift'),
+    alt: has('Alt'),
+    meta: has('Meta') || (has('Mod') && isMac),
+    key: hotkey.key.toLowerCase(),
   }
+}
 
-  if (!key) return null
-  return { ctrl, shift, alt, meta, key }
+/** The key name of an event as shortcuts spell it (space is `space`). */
+function eventKey(event: KeyboardEvent): string {
+  const key = event.key.toLowerCase()
+  return key === ' ' ? 'space' : key
 }
 
 /**
@@ -271,7 +340,7 @@ function matchesParsed(parsed: ParsedShortcut, event: KeyboardEvent): boolean {
   if (event.shiftKey !== parsed.shift) return false
   if (event.altKey !== parsed.alt) return false
   if (event.metaKey !== parsed.meta) return false
-  return event.key.toLowerCase() === parsed.key
+  return eventKey(event) === parsed.key
 }
 
 /**
@@ -279,8 +348,7 @@ function matchesParsed(parsed: ParsedShortcut, event: KeyboardEvent): boolean {
  */
 export function formatShortcut(shortcut: string): string {
   if (!shortcut) return ''
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
-  if (isMac) {
+  if (isMacPlatform()) {
     return shortcut
       .replace(/Mod\+/g, '⌘')
       .replace(/Ctrl\+/g, '⌃')
@@ -291,36 +359,88 @@ export function formatShortcut(shortcut: string): string {
   return shortcut.replace(/Mod\+/g, 'Ctrl+').replace(/Meta\+/g, 'Win+')
 }
 
+/** Whether two shortcut strings press the same keys on this platform (`Mod+P` = `Ctrl+P` on Windows). */
+function sameShortcut(a: string, b: string): boolean {
+  const pa = parseShortcut(a)
+  const pb = parseShortcut(b)
+  if (!pa || !pb) return a.toLowerCase() === b.toLowerCase()
+  return pa.ctrl === pb.ctrl && pa.shift === pb.shift && pa.alt === pb.alt && pa.meta === pb.meta && pa.key === pb.key
+}
+
 /**
- * Check if a shortcut is already in use by another command.
- * Returns the conflicting commandId or null.
+ * Check if a shortcut is already in use by another command: one with a definition here, or any
+ * other command the vault's file binds (plugins). Returns the conflicting command ID or null.
  */
 export function findConflict(shortcut: string, excludeCommandId: string): string | null {
   if (!shortcut) return null
-  for (const def of DEFAULT_KEYBINDINGS) {
-    if (def.commandId === excludeCommandId) continue
-    const effective = getShortcut(def.commandId)
-    if (effective && effective.toLowerCase() === shortcut.toLowerCase()) {
-      return def.commandId
-    }
+  const ids = new Set([...DEFAULT_KEYBINDINGS.map(d => d.commandId), ...bindings.keys()])
+  for (const commandId of ids) {
+    if (commandId === excludeCommandId) continue
+    if (getShortcuts(commandId).some(s => sameShortcut(s, shortcut))) return commandId
   }
   return null
 }
 
-// ─── Internal Helpers ────────────────────────────────────────────────────────
+// ─── Writing the file ────────────────────────────────────────────────────────
 
-/** Load overrides from localStorage. */
-function loadFromStorage(): Map<string, string> {
+function queueWrite(commandId: string, value: Hotkey[] | null): void {
+  pending[toFileCommandId(commandId)] = value
+  if (currentVaultId) saveCache(currentVaultId)
+  notify()
+  scheduleWrite(WRITE_DEBOUNCE_MS)
+}
+
+function scheduleWrite(delay: number): void {
+  if (!apiClient || !currentVaultId) return
+  if (writeTimer !== null) clearTimeout(writeTimer)
+  writeTimer = setTimeout(() => {
+    writeTimer = null
+    void flush()
+  }, delay)
+}
+
+/** Write the queued changes to the file. */
+async function flush(): Promise<void> {
+  const client = apiClient
+  const vaultId = currentVaultId
+  if (!client || !vaultId || writing || Object.keys(pending).length === 0) return
+  const sent = pending
+  pending = {}
+  writing = true
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return new Map()
-    const parsed: unknown = JSON.parse(raw)
+    const saved = await client.patchHotkeysConfig(vaultId, sent)
+    reportSyncSuccess(SYNC_STORE_KEY)
+    // Take the file's answer unless something was changed meanwhile (that change is written next).
+    if (currentVaultId === vaultId && Object.keys(pending).length === 0) {
+      bindings = readHotkeys(saved)
+      saveCache(vaultId)
+      notify()
+    }
+  } catch (error) {
+    // The file did not take it: keep it queued (what was changed since wins) and try again later.
+    pending = { ...sent, ...pending }
+    reportSyncFailure(SYNC_STORE_KEY, error, 'Tastaturkürzel')
+    scheduleWrite(RETRY_AFTER_FAILURE_MS)
+  } finally {
+    writing = false
+  }
+  if (Object.keys(pending).length > 0 && writeTimer === null) scheduleWrite(WRITE_DEBOUNCE_MS)
+}
+
+// ─── Local cache (so shortcuts work before the file is read) ─────────────────
+
+const CACHE_PREFIX = 'slatebase:hotkeys:'
+const TAKEN_OVER_PREFIX = 'slatebase:hotkeys-taken-over:'
+
+function loadCache(vaultId: string): Map<string, string[]> {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + vaultId)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
     if (!Array.isArray(parsed)) return new Map()
-    const map = new Map<string, string>()
+    const map = new Map<string, string[]>()
     for (const item of parsed) {
-      if (typeof item === 'object' && item !== null &&
-          typeof item.commandId === 'string' && typeof item.shortcut === 'string') {
-        map.set(item.commandId, item.shortcut)
+      if (Array.isArray(item) && typeof item[0] === 'string' && Array.isArray(item[1]) && item[1].every((s: unknown) => typeof s === 'string')) {
+        map.set(item[0], item[1])
       }
     }
     return map
@@ -329,45 +449,52 @@ function loadFromStorage(): Map<string, string> {
   }
 }
 
-/** Persist overrides to localStorage. */
-function persistLocal(): void {
+function saveCache(vaultId: string): void {
   try {
-    const arr = Array.from(overrides.entries()).map(([commandId, shortcut]) => ({ commandId, shortcut }))
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr))
+    localStorage.setItem(CACHE_PREFIX + vaultId, JSON.stringify([...bindings.entries()]))
   } catch {
     // Silently fail
   }
 }
 
-/** Schedule a debounced sync to the backend. */
-function scheduleSyncToServer(): void {
-  if (!apiClient) return
-  if (syncTimer !== null) {
-    clearTimeout(syncTimer)
+function isTakenOver(vaultId: string): boolean {
+  try {
+    return localStorage.getItem(TAKEN_OVER_PREFIX + vaultId) !== null
+  } catch {
+    return false
   }
-  syncTimer = setTimeout(() => {
-    syncTimer = null
-    syncToServer()
-  }, SYNC_DEBOUNCE_MS)
 }
 
-/** Sync current overrides to the backend. */
-async function syncToServer(): Promise<void> {
-  if (!apiClient || syncInProgress) return
-  syncInProgress = true
+function markTakenOver(vaultId: string): void {
   try {
-    const entries: ApiKeybindingEntry[] = Array.from(overrides.entries()).map(([commandId, shortcut]) => ({
-      commandId,
-      shortcut,
-    }))
-    await apiClient.saveKeybindings(entries)
-    markSyncedBefore(SYNC_STORE_KEY)
-    reportSyncSuccess(SYNC_STORE_KEY)
-  } catch (error) {
-    // Data remains in localStorage and retries on the next change; the user is
-    // told once per failure streak so a silent divergence can't build up.
-    reportSyncFailure(SYNC_STORE_KEY, error, 'Tastaturkürzel')
-  } finally {
-    syncInProgress = false
+    localStorage.setItem(TAKEN_OVER_PREFIX + vaultId, '1')
+  } catch {
+    // Silently fail
   }
+}
+
+/** The per-user overrides of earlier versions, as they were cached in this browser. */
+function loadLegacyCache(): Array<{ commandId: string; shortcut: string }> {
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item): item is { commandId: string; shortcut: string } =>
+        typeof item === 'object' && item !== null && typeof item.commandId === 'string' && typeof item.shortcut === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Forget all in-memory state; used by tests, which share
+ * this module-level store across cases.
+ * @internal
+ */
+export function _reset(): void {
+  disconnect()
+  changeListeners.clear()
+  writing = false
 }

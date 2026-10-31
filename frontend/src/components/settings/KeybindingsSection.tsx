@@ -11,10 +11,12 @@ import React from 'react'
 import {
   getAllBindings,
   setShortcut,
+  addShortcut,
   resetShortcut,
   resetAll,
   formatShortcut,
   findConflict,
+  onKeybindingsChange,
   DEFAULT_KEYBINDINGS,
   type KeybindingCategory,
 } from '../../state/keybindingsStore'
@@ -40,12 +42,18 @@ export function KeybindingsSection() {
   const [bindings, setBindings] = useState(getAllBindings())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [recordedKeys, setRecordedKeys] = useState('')
+  /** True when the recorded shortcut is added to the command's others instead of replacing them. */
+  const [adding, setAdding] = useState(false)
+  const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Refresh bindings from store
   const refreshBindings = useCallback(() => {
     setBindings(getAllBindings())
   }, [])
+
+  // The vault's hotkeys.json was read or changed (opened, Obsidian, a sync, another user).
+  useEffect(() => onKeybindingsChange(refreshBindings), [refreshBindings])
 
   // Focus the input when editing starts
   useEffect(() => {
@@ -54,8 +62,9 @@ export function KeybindingsSection() {
     }
   }, [editingId])
 
-  const handleEdit = useCallback((commandId: string) => {
+  const handleEdit = useCallback((commandId: string, add = false) => {
     setEditingId(commandId)
+    setAdding(add)
     setRecordedKeys('')
   }, [])
 
@@ -83,12 +92,15 @@ export function KeybindingsSection() {
       return
     }
 
-    // Build shortcut string
+    // Build shortcut string. The platform's primary modifier is written as Mod, as Obsidian does,
+    // so the same file works on every system.
+    const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
     const parts: string[] = []
-    if (e.ctrlKey) parts.push('Ctrl')
-    if (e.shiftKey) parts.push('Shift')
+    if (isMac ? e.metaKey : e.ctrlKey) parts.push('Mod')
+    if (isMac && e.ctrlKey) parts.push('Ctrl')
+    if (!isMac && e.metaKey) parts.push('Meta')
     if (e.altKey) parts.push('Alt')
-    if (e.metaKey) parts.push('Meta')
+    if (e.shiftKey) parts.push('Shift')
 
     // Normalize key
     let key = e.key
@@ -113,12 +125,13 @@ export function KeybindingsSection() {
       return
     }
 
-    setShortcut(editingId, recordedKeys)
+    if (adding) addShortcut(editingId, recordedKeys)
+    else setShortcut(editingId, recordedKeys)
     setEditingId(null)
     setRecordedKeys('')
     refreshBindings()
     showToast('success', 'Tastaturkürzel gespeichert')
-  }, [editingId, recordedKeys, refreshBindings])
+  }, [editingId, recordedKeys, adding, refreshBindings])
 
   /** Unbind a shortcut (set to empty). */
   const handleUnbind = useCallback((commandId: string) => {
@@ -139,18 +152,34 @@ export function KeybindingsSection() {
     showToast('success', 'Alle Tastaturkürzel zurückgesetzt')
   }, [refreshBindings])
 
-  // Group bindings by category
+  // Group bindings by category; the search matches the label, the command ID and the shortcuts
+  const needle = query.trim().toLowerCase()
+  const matches = (b: (typeof bindings)[number]) =>
+    needle === '' ||
+    b.label.toLowerCase().includes(needle) ||
+    b.commandId.toLowerCase().includes(needle) ||
+    b.effectiveShortcuts.some(s => formatShortcut(s).toLowerCase().includes(needle))
   const grouped = CATEGORY_ORDER.map(cat => ({
     category: cat,
     label: CATEGORY_LABELS[cat],
-    items: bindings.filter(b => b.category === cat),
+    items: bindings.filter(b => b.category === cat && matches(b)),
   })).filter(g => g.items.length > 0)
 
   return (
     <div className="keybindings-section">
       <p className="settings-field-hint">
+        Die Kürzel gelten für den ganzen Vault (<code>.obsidian/hotkeys.json</code>) und sind mit Obsidian kompatibel.
         Klicke auf ein Kürzel, um es zu ändern. Drücke die gewünschte Tastenkombination und bestätige mit dem Speichern-Button.
       </p>
+      <input
+        type="search"
+        className="keybindings-search"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Befehle oder Kürzel suchen…"
+        aria-label="Befehle oder Kürzel suchen"
+      />
+      {grouped.length === 0 && <p className="settings-field-hint">Kein Befehl gefunden.</p>}
 
       {grouped.map(group => (
         <SettingSection key={group.category} title={group.label}>
@@ -203,11 +232,23 @@ export function KeybindingsSection() {
                         onClick={() => handleEdit(item.commandId)}
                         title="Klicken zum Ändern"
                       >
-                        {item.effectiveShortcut ? formatShortcut(item.effectiveShortcut) : <span className="keybindings-unset">—</span>}
+                        {item.effectiveShortcuts.length > 0
+                          ? item.effectiveShortcuts.map(formatShortcut).join(' · ')
+                          : <span className="keybindings-unset">—</span>}
                       </button>
                     )}
                   </td>
                   <td className="keybindings-cell-actions">
+                    {item.effectiveShortcut && editingId !== item.commandId && (
+                      <button
+                        type="button"
+                        className="keybindings-btn keybindings-btn--add"
+                        onClick={() => handleEdit(item.commandId, true)}
+                        title="Weiteres Kürzel hinzufügen"
+                      >
+                        +
+                      </button>
+                    )}
                     {item.effectiveShortcut && editingId !== item.commandId && (
                       <button
                         type="button"
