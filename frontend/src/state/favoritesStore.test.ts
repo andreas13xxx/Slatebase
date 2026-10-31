@@ -623,13 +623,74 @@ describe('favoritesStore', () => {
 
     it('does not take the old list over a file that already has bookmarks', async () => {
       seedLocal('vault1', ['old.md'])
-      const client = createClient({ items: [] })
+      const client = createClient({ items: [file('x.md')] })
       await initialize(client)
 
       await loadVaultBookmarks('vault1')
 
       expect(client.patchBookmarksConfig).not.toHaveBeenCalled()
+      expect(getForVault('vault1').map((e) => e.path)).toEqual(['x.md'])
+    })
+
+    it('takes the old list over an empty list too, but only once per vault: deleted bookmarks stay deleted', async () => {
+      seedLocal('vault1', ['old.md'])
+      const client = createClient({ items: [] })
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+
+      // Someone empties the file; the old entries are not offered again.
+      client.state.file = { items: [] }
+      seedLocal('vault1', ['old.md'])
+      client.patchBookmarksConfig.mockClear()
+      expect(await loadVaultBookmarks('vault1')).toBe(true)
+      expect(client.patchBookmarksConfig).not.toHaveBeenCalled()
       expect(getForVault('vault1')).toHaveLength(0)
+    })
+
+    it('writes a change made while a write is running with the next write, and does not lose it', async () => {
+      const client = createClient({ items: [file('a.md')] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+
+      let release: () => void = () => {}
+      client.patchBookmarksConfig.mockImplementationOnce(async (_v: string, patch: Record<string, unknown>) => {
+        await new Promise<void>((resolve) => { release = resolve })
+        return patch
+      })
+      add('vault1', 'b.md')
+      await vi.advanceTimersByTimeAsync(2500) // the first write starts and waits
+      add('vault1', 'c.md')                   // changed while it runs
+      release()
+      await vi.advanceTimersByTimeAsync(2500)
+
+      const last = client.patchBookmarksConfig.mock.calls.at(-1)?.[1] as { items: Array<{ path: string }> }
+      expect(last.items.map((i) => i.path)).toEqual(['a.md', 'b.md', 'c.md'])
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(2)
+    })
+
+    it('tries again by itself after a failed write', async () => {
+      const client = createClient({ items: [] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+      client.patchBookmarksConfig.mockRejectedValueOnce(new Error('500'))
+
+      add('vault1', 'a.md')
+      await vi.advanceTimersByTimeAsync(2500)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(31_000)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(2)
+    })
+
+    it('keeps bookmarks beyond the limit in the file instead of cutting them', async () => {
+      const many = Array.from({ length: MAX_BOOKMARK_ITEMS + 3 }, (_, i) => file(`f${i}.md`))
+      const client = createClient({ items: many })
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+      expect(getForVault('vault1')).toHaveLength(MAX_BOOKMARK_ITEMS + 3)
     })
 
     it('keeps the cache when the file cannot be read, and the change when it cannot be written', async () => {
