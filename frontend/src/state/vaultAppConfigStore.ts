@@ -33,7 +33,7 @@ export type { AppConfigKey, AppConfigValues }
  * shared-contracts, documented in docs/app-json.md). `attachmentFolderPath: './'` means "next to
  * the note".
  */
-export const DEFAULT_APP_CONFIG = APP_CONFIG_DEFAULTS as unknown as AppConfigValues
+export const DEFAULT_APP_CONFIG: Readonly<AppConfigValues> = APP_CONFIG_DEFAULTS
 
 /** Path of the file, as reported by `vault:change` events. */
 export const APP_CONFIG_PATH = '.obsidian/app.json'

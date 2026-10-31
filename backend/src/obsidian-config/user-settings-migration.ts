@@ -102,7 +102,7 @@ export async function migrateUserVaultSettingsToAppConfig(deps: {
         }
         if (keys.size === 0) continue
 
-        const existing = await appConfigService.get(vault.storagePath)
+        const existing = await appConfigService.get(vault.storagePath, vault.id)
         const missing: AppConfigRequest = {}
         for (const key of keys) {
           const value = patch[USER_KEYS[key]]

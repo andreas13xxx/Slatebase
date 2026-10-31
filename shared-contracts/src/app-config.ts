@@ -91,9 +91,15 @@ export type AppConfigValues = { [K in AppConfigKey]: AppConfigValue<K> }
 export const APP_CONFIG_KEY_NAMES = Object.keys(APP_CONFIG_KEYS) as AppConfigKey[]
 
 /** Slatebase's default per key — Obsidian's where known (see `verified`). */
-export const APP_CONFIG_DEFAULTS: Record<AppConfigKey, boolean | number | string | readonly string[]> = Object.fromEntries(
-  APP_CONFIG_KEY_NAMES.map((key) => [key, APP_CONFIG_KEYS[key].default]),
-) as Record<AppConfigKey, boolean | number | string | readonly string[]>
+export const APP_CONFIG_DEFAULTS: Readonly<AppConfigValues> = Object.freeze(
+  // The one cast: each default is checked against its own spec by app-config.test.ts.
+  Object.fromEntries(
+    APP_CONFIG_KEY_NAMES.map((key) => {
+      const value = APP_CONFIG_KEYS[key].default
+      return [key, Array.isArray(value) ? Object.freeze([...value]) : value]
+    }),
+  ) as AppConfigValues,
+)
 
 /** Defaults Slatebase used before they were aligned with Obsidian. Used to keep existing vaults unchanged. */
 export const LEGACY_APP_CONFIG_DEFAULTS: Partial<Record<AppConfigKey, boolean | string>> = {

@@ -5,24 +5,17 @@
 
 import type { ILogger } from '../logger/index.js'
 
+/** After this many distinct deviations nothing new is logged, so a broken vault cannot flood the log. */
 const MAX_REMEMBERED = 5000
-/** Longest value shown in a message. Config values only — note content never reaches this module. */
-const MAX_VALUE_LENGTH = 80
 
 export interface ConfigDeviation {
-  /** Path inside the JSON file, e.g. `newLinkFormat` or `items.2.type`. */
+  /** Path inside the JSON file, e.g. `newLinkFormat` or `items.2.type`. Values in `reason` are already shortened by the caller (80 characters). */
   path: string
   reason: string
 }
 
 export interface IDeviationReporter {
   report(vaultId: string, file: string, deviations: readonly ConfigDeviation[]): void
-}
-
-/** Shortens a value for a log line. */
-export function shortValue(value: unknown): string {
-  const text = typeof value === 'string' ? JSON.stringify(value) : (JSON.stringify(value) ?? String(value))
-  return text.length > MAX_VALUE_LENGTH ? `${text.slice(0, MAX_VALUE_LENGTH)}…` : text
 }
 
 export class DeviationReporter implements IDeviationReporter {
@@ -34,7 +27,7 @@ export class DeviationReporter implements IDeviationReporter {
     for (const deviation of deviations) {
       const id = `${vaultId}\0${file}\0${deviation.path}\0${deviation.reason}`
       if (this.seen.has(id)) continue
-      if (this.seen.size >= MAX_REMEMBERED) this.seen.clear()
+      if (this.seen.size >= MAX_REMEMBERED) return
       this.seen.add(id)
       this.logger.warn(`[obsidian-config] vault=${vaultId} file=${file} path=${deviation.path} ${deviation.reason}`, {
         vaultId,

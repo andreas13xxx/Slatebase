@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ILogger } from '../logger/index.js'
-import { DeviationReporter, shortValue } from './deviation-reporter.js'
+import { DeviationReporter } from './deviation-reporter.js'
 
 function makeLogger() {
   const warn = vi.fn()
@@ -38,10 +38,14 @@ describe('DeviationReporter', () => {
   })
 })
 
-describe('shortValue', () => {
-  it('cuts long values to 80 characters', () => {
-    expect(shortValue('x'.repeat(200)).length).toBeLessThanOrEqual(82)
-    expect(shortValue({ a: 1 })).toBe('{"a":1}')
-    expect(shortValue(undefined)).toBe('undefined')
+describe('DeviationReporter limit', () => {
+  it('stops logging new deviations after 5000 distinct ones instead of repeating old ones', () => {
+    const logger = makeLogger()
+    const reporter = new DeviationReporter(logger)
+    const many = Array.from({ length: 5100 }, (_, i) => ({ path: `k${i}`, reason: 'unknown key' }))
+    reporter.report('v1', 'app.json', many)
+    expect(logger.warn).toHaveBeenCalledTimes(5000)
+    reporter.report('v1', 'app.json', many.slice(0, 10))
+    expect(logger.warn).toHaveBeenCalledTimes(5000)
   })
 })
