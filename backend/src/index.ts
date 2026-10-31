@@ -109,6 +109,8 @@ import { AppearanceConfigService } from './obsidian-config/appearance-config.js'
 import { createGraphConfigRoutes } from './api/graphConfigRoutes.js'
 import { GraphConfigService } from './obsidian-config/graph-config.js'
 import { createBookmarksConfigRoutes } from './api/bookmarksConfigRoutes.js'
+import { createHotkeysConfigRoutes } from './api/hotkeysConfigRoutes.js'
+import { HotkeysConfigService } from './obsidian-config/hotkeys-config.js'
 import { BookmarksConfigService } from './obsidian-config/bookmarks-config.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -790,6 +792,8 @@ const graphConfigService = new GraphConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/graph-config', createGraphConfigRoutes({ graphConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 const bookmarksConfigService = new BookmarksConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/bookmarks-config', createBookmarksConfigRoutes({ bookmarksConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const hotkeysConfigService = new HotkeysConfigService(appConfigDeviationReporter)
+app.route('/api/v1/vaults/:vaultId/hotkeys-config', createHotkeysConfigRoutes({ hotkeysConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
 const snippetRoutes = createSnippetRoutes({
