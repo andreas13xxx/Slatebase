@@ -21,10 +21,18 @@ function parseObject(raw: string | null): JsonObject | null {
   }
 }
 
+/** Writes the merged object the way our file was written: same indentation, line endings, final newline. */
+function serialize(merged: JsonObject, original: string): string {
+  const eol = original.includes('\r\n') ? '\r\n' : '\n'
+  const indent = /^([ \t]+)\S/m.exec(original)?.[1] ?? '  '
+  const text = JSON.stringify(merged, null, indent).replace(/\n/g, eol)
+  return /\r?\n$/.test(original) ? `${text}${eol}` : text
+}
+
 /**
  * Which side counts as newer for keys both changed. Both instances must pick the same winner when
  * they merge the same two commits, so a tie is broken by comparing the content, which is the same
- * on both ends (only "ours" and "theirs" swap).
+ * on both ends (only "ours" and "theirs" swap). Commit times come from the devices' clocks; a badly set clock can make an older value win (a known limit).
  */
 function isOursNewer(oursTime: number, theirsTime: number, oursRaw: string, theirsRaw: string): boolean {
   if (oursTime !== theirsTime) return oursTime > theirsTime
@@ -45,29 +53,32 @@ export async function resolveConfigConflicts(deps: {
   for (const file of conflictFiles) {
     const name = CONFIG_FILE.exec(file)?.[1]
     if (name === undefined || !(AUTO_RESOLVABLE_FILES as readonly string[]).includes(name)) continue
+    const skip = (reason: string): void => {
+      logger.info('Git-sync left a config file conflict for manual resolution', { vaultId, file, reason })
+    }
     try {
       const oursRaw = await gitCli.showStage(cwd, 2, file)
       const theirsRaw = await gitCli.showStage(cwd, 3, file)
+      if (oursRaw === null || theirsRaw === null) { skip('deleted on one side'); continue }
       const ours = parseObject(oursRaw)
       const theirs = parseObject(theirsRaw)
-      if (oursRaw === null || theirsRaw === null || ours === null || theirs === null) continue // deleted on one side, or not JSON
+      if (ours === null || theirs === null) { skip('not a JSON object on one side'); continue }
       const baseRaw = await gitCli.showStage(cwd, 1, file)
       const base = parseObject(baseRaw)
-      if (baseRaw !== null && base === null) continue
+      if (baseRaw !== null && base === null) { skip('common ancestor is not a JSON object'); continue }
 
       const oursTime = await gitCli.lastChangeTime(cwd, 'HEAD', file)
       const theirsTime = await gitCli.lastChangeTime(cwd, 'MERGE_HEAD', file)
       const result = mergeObsidianConfig(name, base, ours, theirs, isOursNewer(oursTime, theirsTime, oursRaw, theirsRaw))
-      if (result === null) continue
+      if (result === null) { skip('structure not supported'); continue }
 
-      const trailingNewline = oursRaw.endsWith('\n') ? '\n' : ''
-      await writeFile(join(cwd, file), `${JSON.stringify(result.merged, null, 2)}${trailingNewline}`, 'utf-8')
+      await writeFile(join(cwd, file), serialize(result.merged, oursRaw), 'utf-8')
       await gitCli.stageFile(cwd, file)
       resolved.push(file)
 
       for (const decision of result.decisions) {
         logger.warn(
-          `[git-sync] vault=${vaultId} file=${name} path=${decision.path} changed on both devices; kept the ${decision.kept === 'ours' ? 'local' : 'remote'} (newer) value ${decision.kept === 'ours' ? decision.ours : decision.theirs} over ${decision.kept === 'ours' ? decision.theirs : decision.ours}`,
+          `[git-sync] vault=${vaultId} file=${name} path=${decision.path} changed on both devices; kept ${decision.keptValue} (${decision.kept === 'ours' ? 'local' : 'remote'}, newer commit) over ${decision.droppedValue}`,
           { vaultId, file: name, path: decision.path },
         )
       }

@@ -86,7 +86,7 @@ describe('resolveConfigConflicts (real git)', () => {
     expect(resolved).toEqual(['.obsidian/app.json'])
     expect(await json(ours, '.obsidian/app.json')).toEqual({ a: 2, b: 2 })
     expect(await gitCli.conflictedFiles(ours)).toEqual([])
-    await gitCli.commitAll(ours, 'merge')
+    await gitCli.concludeMerge(ours, 'merge')
     await git(ours, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'])
     expect(logger.warn).not.toHaveBeenCalled()
   })
@@ -104,6 +104,36 @@ describe('resolveConfigConflicts (real git)', () => {
     expect(await json(ours, '.obsidian/app.json')).toEqual({ tabSize: 2 })
     expect(logger.warn).toHaveBeenCalledTimes(1)
     expect(String((logger.warn as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain('path=tabSize')
+  })
+
+  it('can conclude the merge even when the result equals our side', async () => {
+    await setUp({ '.obsidian/app.json': '{"tabSize":4}' })
+    await write(ours, '.obsidian/app.json', '{"tabSize":2}')
+    await commit(ours, 'ours', '2026-01-05T00:00:00Z')
+    await write(theirs, '.obsidian/app.json', '{"tabSize":8}')
+    await commit(theirs, 'theirs', '2026-01-03T00:00:00Z')
+
+    await mergeTheirs()
+    await resolve()
+    await git(ours, ['rev-parse', '-q', '--verify', 'MERGE_HEAD'])
+    await gitCli.concludeMerge(ours, 'merge')
+
+    await expect(git(ours, ['rev-parse', '-q', '--verify', 'MERGE_HEAD'])).rejects.toThrow()
+    await git(ours, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'])
+    expect(await readFile(join(ours, '.obsidian/app.json'), 'utf-8')).toBe('{\n  "tabSize": 2\n}')
+  })
+
+  it('writes the merged file with our indentation, line endings and final newline', async () => {
+    await setUp({ '.obsidian/app.json': '{\r\n\t"a": 1, "b": 1\r\n}\r\n' })
+    await write(ours, '.obsidian/app.json', '{\r\n\t"a": 2, "b": 1\r\n}\r\n')
+    await commit(ours, 'ours', '2026-01-02T00:00:00Z')
+    await write(theirs, '.obsidian/app.json', '{\r\n\t"a": 1, "b": 2\r\n}\r\n')
+    await commit(theirs, 'theirs', '2026-01-03T00:00:00Z')
+
+    await mergeTheirs()
+    await resolve()
+
+    expect(await readFile(join(ours, '.obsidian/app.json'), 'utf-8')).toBe('{\r\n\t"a": 2,\r\n\t"b": 2\r\n}\r\n')
   })
 
   it('takes the remote value when the remote commit is newer', async () => {
@@ -130,7 +160,8 @@ describe('resolveConfigConflicts (real git)', () => {
     expect(await mergeTheirs()).toBe('conflict')
     await resolve()
 
-    expect(await json(ours, '.obsidian/bookmarks.json')).toEqual({ items: [file('a.md'), file('ours.md'), file('theirs.md')] })
+    // The newer commit (theirs) sets the order on every device; the other side's additions follow.
+    expect(await json(ours, '.obsidian/bookmarks.json')).toEqual({ items: [file('a.md'), file('theirs.md'), file('ours.md')] })
   })
 
   it('leaves a note, an unknown config file and invalid JSON conflicted, but resolves the config file it can', async () => {

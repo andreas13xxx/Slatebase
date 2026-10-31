@@ -10,7 +10,11 @@
 //   - both changed differently             → the side whose commit is newer; reported as a decision
 // bookmarks.json: `items` is merged as a list whose entries are matched by identity (type + path /
 // query / url / title + subpath); groups merge recursively. An entry removed on one side stays
-// removed unless the other side changed it.
+// removed unless the other side changed it. A rename counts as remove + add (known limit).
+//
+// Both devices must produce the same bytes from the same two commits, or they would conflict again
+// on the merge result. The newer side therefore sets the order of keys and entries (the other side's
+// additions follow), and "newer" is the same physical commit on both ends.
 //
 // Nothing here touches git or the file system.
 
@@ -27,12 +31,12 @@ const NESTED: Record<string, string> = { 'workspaces.json': 'workspaces', 'types
 
 export type JsonObject = Record<string, unknown>
 
-/** A key both sides changed differently; `kept` is the side that won. */
+/** A key both sides changed differently. `kept` names the side whose value is in the result. */
 export interface MergeDecision {
   path: string
-  ours: string
-  theirs: string
   kept: 'ours' | 'theirs'
+  keptValue: string
+  droppedValue: string
 }
 
 export interface ConfigMergeResult {
@@ -48,36 +52,45 @@ function same(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
-type Winner = 'ours' | 'theirs'
+/** Own properties only: a key called `constructor` or `toString` must not find Object.prototype. */
+function get(object: JsonObject, key: string): unknown {
+  return Object.hasOwn(object, key) ? object[key] : undefined
+}
 
-/** Merges one value that may be absent (`undefined`). Returns `undefined` for "delete the key". */
-function mergeValue(
-  path: string, base: unknown, ours: unknown, theirs: unknown, oursNewer: boolean, decisions: MergeDecision[],
-): unknown {
-  if (same(ours, theirs)) return ours
-  if (same(base, ours)) return theirs
-  if (same(base, theirs)) return ours
-  const kept: Winner = oursNewer ? 'ours' : 'theirs'
-  decisions.push({ path, ours: describeValue(ours), theirs: describeValue(theirs), kept })
-  return kept === 'ours' ? ours : theirs
+/** Without a prototype, so a key called `__proto__` becomes an ordinary property. */
+function newObject(): JsonObject {
+  return Object.create(null) as JsonObject
+}
+
+// In the functions below `primary` is the newer side and `secondary` the older one.
+
+interface Context {
+  /** Which real side `primary` is. */
+  primarySide: 'ours' | 'theirs'
+  decisions: MergeDecision[]
+}
+
+function mergeValue(ctx: Context, path: string, base: unknown, primary: unknown, secondary: unknown): unknown {
+  if (same(primary, secondary)) return primary
+  if (same(base, primary)) return secondary
+  if (same(base, secondary)) return primary
+  ctx.decisions.push({ path, kept: ctx.primarySide, keptValue: describeValue(primary), droppedValue: describeValue(secondary) })
+  return primary
 }
 
 function mergeObjects(
-  path: string, base: JsonObject, ours: JsonObject, theirs: JsonObject, oursNewer: boolean,
-  decisions: MergeDecision[], nestedKey?: string,
+  ctx: Context, path: string, base: JsonObject, primary: JsonObject, secondary: JsonObject, nestedKey?: string,
 ): JsonObject {
-  const result: JsonObject = {}
-  const keys = [...Object.keys(ours), ...Object.keys(theirs).filter((key) => !(key in ours))]
+  const result = newObject()
+  const keys = [...Object.keys(primary), ...Object.keys(secondary).filter((key) => !Object.hasOwn(primary, key))]
   for (const key of keys) {
     const keyPath = path === '' ? key : `${path}.${key}`
-    let value: unknown
-    if (key === nestedKey && isObject(ours[key]) && isObject(theirs[key])) {
-      value = mergeObjects(
-        keyPath, isObject(base[key]) ? base[key] : {}, ours[key], theirs[key], oursNewer, decisions,
-      )
-    } else {
-      value = mergeValue(keyPath, base[key], ours[key], theirs[key], oursNewer, decisions)
-    }
+    const p = get(primary, key)
+    const s = get(secondary, key)
+    const b = get(base, key)
+    const value = key === nestedKey && isObject(p) && isObject(s)
+      ? mergeObjects(ctx, keyPath, isObject(b) ? b : {}, p, s)
+      : mergeValue(ctx, keyPath, b, p, s)
     if (value !== undefined) result[key] = value
   }
   return result
@@ -96,56 +109,55 @@ function itemIdentity(item: unknown): string {
 function identities(items: unknown[]): string[] {
   const seen = new Map<string, number>()
   return items.map((item) => {
-    const base = itemIdentity(item)
-    const count = (seen.get(base) ?? 0) + 1
-    seen.set(base, count)
-    return `${base}\0#${count}`
+    const identity = itemIdentity(item)
+    const count = (seen.get(identity) ?? 0) + 1
+    seen.set(identity, count)
+    return `${identity}\0#${count}`
   })
 }
 
-function mergeItemLists(
-  path: string, base: unknown[], ours: unknown[], theirs: unknown[], oursNewer: boolean, decisions: MergeDecision[],
-): unknown[] {
+function mergeItemLists(ctx: Context, path: string, base: unknown[], primary: unknown[], secondary: unknown[]): unknown[] {
   const baseIds = identities(base)
-  const ourIds = identities(ours)
-  const theirIds = identities(theirs)
+  const primaryIds = identities(primary)
+  const secondaryIds = identities(secondary)
   const baseById = new Map(baseIds.map((id, i) => [id, base[i]]))
-  const theirById = new Map(theirIds.map((id, i) => [id, theirs[i]]))
-  const ourById = new Map(ourIds.map((id, i) => [id, ours[i]]))
+  const secondaryById = new Map(secondaryIds.map((id, i) => [id, secondary[i]]))
+  const primaryById = new Map(primaryIds.map((id, i) => [id, primary[i]]))
   const result: unknown[] = []
 
-  const mergeEntry = (id: string, o: unknown, t: unknown): unknown => {
+  const mergeEntry = (id: string, p: unknown, s: unknown): unknown => {
     const b = baseById.get(id)
-    if (isObject(o) && isObject(t) && o['type'] === 'group' && t['type'] === 'group') {
-      const entryPath = `${path}[${String(o['title'])}]`
-      const nested = mergeObjects(entryPath, isObject(b) ? b : {}, { ...o, items: undefined }, { ...t, items: undefined }, oursNewer, decisions)
+    if (isObject(p) && isObject(s) && p['type'] === 'group' && s['type'] === 'group') {
+      const entryPath = `${path}[${String(p['title'])}]`
+      const without = (object: JsonObject): JsonObject => ({ ...object, items: undefined })
+      const fields = mergeObjects(ctx, entryPath, isObject(b) ? without(b) : {}, without(p), without(s))
       const items = mergeItemLists(
-        `${entryPath}.items`,
+        ctx, `${entryPath}.items`,
         isObject(b) && Array.isArray(b['items']) ? b['items'] : [],
-        Array.isArray(o['items']) ? o['items'] : [],
-        Array.isArray(t['items']) ? t['items'] : [],
-        oursNewer, decisions,
+        Array.isArray(p['items']) ? p['items'] : [],
+        Array.isArray(s['items']) ? s['items'] : [],
       )
-      return { ...nested, items }
+      delete fields['items']
+      return { ...fields, items }
     }
-    return mergeValue(`${path}[${id.split('\0').filter(Boolean).slice(0, 3).join(' ')}]`, b, o, t, oursNewer, decisions)
+    return mergeValue(ctx, `${path}[${id.split('\0').filter(Boolean).slice(0, 3).join(' ')}]`, b, p, s)
   }
 
-  ourIds.forEach((id, i) => {
-    const o = ours[i]
-    if (theirById.has(id)) {
-      result.push(mergeEntry(id, o, theirById.get(id)))
-    } else if (baseById.has(id) && same(baseById.get(id), o)) {
-      // Removed on their side and untouched on ours: stays removed.
+  primaryIds.forEach((id, i) => {
+    const p = primary[i]
+    if (secondaryById.has(id)) {
+      result.push(mergeEntry(id, p, secondaryById.get(id)))
+    } else if (baseById.has(id) && same(baseById.get(id), p)) {
+      // Removed on the other side and untouched here: stays removed.
     } else {
-      result.push(o)
+      result.push(p)
     }
   })
-  theirIds.forEach((id, i) => {
-    if (ourById.has(id)) return
-    const t = theirs[i]
-    if (baseById.has(id) && same(baseById.get(id), t)) return // removed on our side, untouched on theirs
-    result.push(t)
+  secondaryIds.forEach((id, i) => {
+    if (primaryById.has(id)) return
+    const s = secondary[i]
+    if (baseById.has(id) && same(baseById.get(id), s)) return // removed on the newer side, untouched here
+    result.push(s)
   })
   return result
 }
@@ -154,35 +166,42 @@ function mergeItemLists(
 
 /**
  * Merges the three versions of `.obsidian/<file>`. `base` is `null` when the file did not exist at
- * the common ancestor (both sides added it). `oursNewer` decides every key both sides changed.
- * Returns `null` when the structure is not one this module handles (the caller leaves the conflict).
+ * the common ancestor (both sides added it). `oursNewer` decides every key both sides changed and
+ * sets the order. Returns `null` when the structure is not one this module handles (the caller
+ * leaves the conflict to the user).
  */
 export function mergeObsidianConfig(
   file: string, base: JsonObject | null, ours: JsonObject, theirs: JsonObject, oursNewer: boolean,
 ): ConfigMergeResult | null {
   if (!(AUTO_RESOLVABLE_FILES as readonly string[]).includes(file)) return null
-  const decisions: MergeDecision[] = []
   const baseObject = base ?? {}
-  const nestedKey = NESTED[file]
+  const ctx: Context = { primarySide: oursNewer ? 'ours' : 'theirs', decisions: [] }
+  const primary = oursNewer ? ours : theirs
+  const secondary = oursNewer ? theirs : ours
+
   if (file !== 'bookmarks.json') {
-    return { merged: mergeObjects('', baseObject, ours, theirs, oursNewer, decisions, nestedKey), decisions }
+    return { merged: mergeObjects(ctx, '', baseObject, primary, secondary, NESTED[file]), decisions: ctx.decisions }
   }
 
-  // `items` is a list of entries: merge everything else by key, the list by entry, and put the
-  // list back where it was in our file so the key order stays stable.
+  // `items` is a list of entries: merge everything else by key and the list by entry.
+  for (const object of [baseObject, primary, secondary]) {
+    if (get(object, 'items') !== undefined && !Array.isArray(get(object, 'items'))) return null
+  }
   const without = (object: JsonObject): JsonObject => ({ ...object, items: undefined })
-  const others = mergeObjects('', without(baseObject), without(ours), without(theirs), oursNewer, decisions)
+  const fields = mergeObjects(ctx, '', without(baseObject), without(primary), without(secondary))
   const items = mergeItemLists(
-    'items',
+    ctx, 'items',
     Array.isArray(baseObject['items']) ? baseObject['items'] : [],
-    Array.isArray(ours['items']) ? ours['items'] : [],
-    Array.isArray(theirs['items']) ? theirs['items'] : [],
-    oursNewer, decisions,
+    Array.isArray(primary['items']) ? primary['items'] : [],
+    Array.isArray(secondary['items']) ? secondary['items'] : [],
   )
-  const merged: JsonObject = {}
-  for (const key of Object.keys(ours)) merged[key] = key === 'items' ? items : others[key]
-  for (const key of Object.keys(others)) if (!(key in merged)) merged[key] = others[key]
-  if (!('items' in merged)) merged['items'] = items
-  for (const key of Object.keys(merged)) if (merged[key] === undefined) delete merged[key]
-  return { merged, decisions }
+  // `items` keeps its place in the newer file.
+  const merged = newObject()
+  for (const key of Object.keys(primary)) {
+    if (key === 'items') merged[key] = items
+    else if (Object.hasOwn(fields, key)) merged[key] = fields[key]
+  }
+  for (const key of Object.keys(fields)) if (!Object.hasOwn(merged, key) && fields[key] !== undefined) merged[key] = fields[key]
+  if (!Object.hasOwn(merged, 'items')) merged['items'] = items
+  return { merged, decisions: ctx.decisions }
 }

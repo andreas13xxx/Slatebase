@@ -28,7 +28,7 @@ const GITIGNORE_BLOCK_END = '# <<< slatebase managed <<<'
 /**
  * Vault-specific settings (`.slatebase/config.json`, property types, the spellcheck word list, Obsidian config/themes/plugins)
  * are synced; per-instance data (trash, versions, link-index cache) and per-device state
- * (the open-tabs layout in workspace.json; the saved layouts in workspaces.json are vault-wide and synced) are not. Plugin `data.json` is synced so plugin settings follow the vault. `.slatebase/*` rather than
+ * (the open-tabs layout in workspace.json and workspace-mobile.json; the saved layouts in workspaces.json are vault-wide and synced) are not. Plugin `data.json` is synced so plugin settings follow the vault. `.slatebase/*` rather than
  * `.slatebase/` because git cannot re-include a file inside an excluded directory.
  */
 const MANAGED_GITIGNORE_LINES = [
@@ -37,6 +37,7 @@ const MANAGED_GITIGNORE_LINES = [
   '!.slatebase/property-types.json',
   '!.slatebase/spellcheck-words.json',
   '.obsidian/workspace.json',
+  '.obsidian/workspace-mobile.json',
 ]
 /** Lines older versions wrote on their own — superseded by the managed block. */
 const LEGACY_GITIGNORE_LINES = ['.slatebase/', '.obsidian/']
@@ -189,7 +190,7 @@ export class GitSyncEngine implements IGitSyncEngine {
             })
             return this.finish(vaultId, remoteId, { result: 'conflict', conflictFiles })
           }
-          await this.gitCli.commitAll(cwd, 'Slatebase sync: merge (config conflicts resolved automatically)')
+          await this.gitCli.concludeMerge(cwd, 'Slatebase sync: merge (config conflicts resolved automatically)')
           mergeResult = 'merged'
         }
         // Notify open sessions their file tree may be stale — but only when the

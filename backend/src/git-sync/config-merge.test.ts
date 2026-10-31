@@ -29,7 +29,7 @@ describe('mergeObsidianConfig: keys', () => {
   it('lets the newer side win a key both changed, and reports the decision', () => {
     const newerOurs = merge('app.json', { tabSize: 4 }, { tabSize: 2 }, { tabSize: 8 }, true)
     expect(newerOurs.merged).toEqual({ tabSize: 2 })
-    expect(newerOurs.decisions).toEqual([{ path: 'tabSize', ours: '2', theirs: '8', kept: 'ours' }])
+    expect(newerOurs.decisions).toEqual([{ path: 'tabSize', kept: 'ours', keptValue: '2', droppedValue: '8' }])
     const newerTheirs = merge('app.json', { tabSize: 4 }, { tabSize: 2 }, { tabSize: 8 }, false)
     expect(newerTheirs.merged).toEqual({ tabSize: 8 })
     expect(newerTheirs.decisions[0]?.kept).toBe('theirs')
@@ -53,7 +53,27 @@ describe('mergeObsidianConfig: keys', () => {
   it('shortens long values in a decision', () => {
     const long = 'x'.repeat(300)
     const { decisions } = merge('app.json', { a: '' }, { a: long }, { a: 'y' })
-    expect(decisions[0]?.ours.length).toBeLessThan(100)
+    expect(decisions[0]?.keptValue.length).toBeLessThan(100)
+  })
+
+  it('produces the same bytes on both devices (ours and theirs swapped)', () => {
+    const base = { a: 1, b: 1, items: 1 }
+    const device1 = { b: 2, a: 1, z: 'one', items: 1 }
+    const device2 = { a: 1, b: 1, y: 'two', items: 3 }
+    const onDevice1 = merge('app.json', base, device1, device2, true).merged
+    const onDevice2 = merge('app.json', base, device2, device1, false).merged
+    expect(JSON.stringify(onDevice1)).toBe(JSON.stringify(onDevice2))
+    const bookmarks = (...paths: string[]) => ({ items: paths.map((path) => ({ type: 'file', path })) })
+    const b1 = merge('bookmarks.json', bookmarks('a.md'), bookmarks('a.md', 'x.md'), bookmarks('a.md', 'y.md'), true).merged
+    const b2 = merge('bookmarks.json', bookmarks('a.md'), bookmarks('a.md', 'y.md'), bookmarks('a.md', 'x.md'), false).merged
+    expect(JSON.stringify(b1)).toBe(JSON.stringify(b2))
+  })
+
+  it('keeps keys that are called like members of Object.prototype', () => {
+    const theirs = JSON.parse('{"constructor":1,"toString":2,"__proto__":{"x":1}}') as JsonObject
+    const { merged } = merge('app.json', {}, { a: 1 }, theirs, true)
+    expect(Object.keys(merged)).toEqual(['a', 'constructor', 'toString', '__proto__'])
+    expect(Object.getPrototypeOf(merged)).toBeNull()
   })
 
   it('does not resolve files it does not know', () => {
@@ -134,6 +154,10 @@ describe('mergeObsidianConfig: bookmarks', () => {
       { items: [file('a.md'), file('a.md', { subpath: '#H' })] },
       { items: [file('a.md')] })
     expect(merged.items).toEqual([file('a.md'), file('a.md', { subpath: '#H' })])
+  })
+
+  it('leaves the conflict alone when items is not a list on one side', () => {
+    expect(mergeObsidianConfig('bookmarks.json', { items: [] }, { items: 'oops' }, { items: [] }, true)).toBeNull()
   })
 
   it('merges other keys of the file next to the list', () => {

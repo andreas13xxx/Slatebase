@@ -78,6 +78,7 @@ class FakeGitCli implements IGitCli {
     this.conflicted = this.conflicted.filter((name) => name !== file)
   }
   async lastChangeTime(): Promise<number> { return 0 }
+  async concludeMerge(): Promise<void> { this.calls.push('concludeMerge') }
 }
 
 describe('GitSyncEngine', () => {
@@ -165,7 +166,7 @@ describe('GitSyncEngine', () => {
       ]) {
         expect(await isIgnored(file), file).toBe(false)
       }
-      for (const file of ['.obsidian/workspace.json', '.slatebase/link-index.json']) {
+      for (const file of ['.obsidian/workspace.json', '.obsidian/workspace-mobile.json', '.slatebase/link-index.json']) {
         expect(await isIgnored(file), file).toBe(true)
       }
     })
@@ -271,7 +272,7 @@ describe('GitSyncEngine', () => {
 
     expect(outcome.result).toBe('success')
     expect(JSON.parse(await readFile(join(vaultPath, '.obsidian', 'app.json'), 'utf-8'))).toEqual({ a: 2, b: 2 })
-    expect(gitCli.calls.filter((call) => call === 'commitAll')).toHaveLength(2) // local changes, then the merge
+    expect(gitCli.calls).toContain('concludeMerge')
     expect(gitCli.calls).toContain('push')
   })
 

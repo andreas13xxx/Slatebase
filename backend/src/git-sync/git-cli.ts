@@ -86,6 +86,8 @@ export interface IGitCli {
   showStage(cwd: string, stage: 1 | 2 | 3, file: string): Promise<string | null>
   /** Stages `file` as it is in the working tree (marks a conflict as resolved). */
   stageFile(cwd: string, file: string): Promise<void>
+  /** Concludes a merge whose conflicts are all resolved and staged. Commits even if the result equals HEAD (a merge commit must exist, or MERGE_HEAD stays and blocks the next merge). */
+  concludeMerge(cwd: string, message: string): Promise<void>
   /** Unix time (seconds) of the newest commit at `ref` that touched `file`; 0 if there is none. */
   lastChangeTime(cwd: string, ref: string, file: string): Promise<number>
 }
@@ -213,6 +215,10 @@ export class GitCli implements IGitCli {
 
   async stageFile(cwd: string, file: string): Promise<void> {
     await this.run(cwd, ['add', '--', file])
+  }
+
+  async concludeMerge(cwd: string, message: string): Promise<void> {
+    await this.run(cwd, ['commit', '-m', message])
   }
 
   async lastChangeTime(cwd: string, ref: string, file: string): Promise<number> {
