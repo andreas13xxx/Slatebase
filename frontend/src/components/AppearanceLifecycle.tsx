@@ -7,7 +7,7 @@
  * It is only mounted while someone is logged in; unmounting it removes the variables again.
  */
 import { useEffect } from 'react'
-import { appearanceCssVariables, type AppearanceConfigValues } from '@slatebase/shared-contracts'
+import { appearanceCssVariables } from '@slatebase/shared-contracts'
 import { useAppContext } from '../state'
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import {
@@ -44,7 +44,7 @@ export function AppearanceLifecycle(): null {
   }, [apiClient, vaultId])
 
   useEffect(() => {
-    applyAppearanceVariables(appearanceCssVariables(snapshot as unknown as AppearanceConfigValues))
+    applyAppearanceVariables(appearanceCssVariables(snapshot))
   }, [snapshot])
 
   return null

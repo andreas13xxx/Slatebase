@@ -42,6 +42,8 @@ export function createVaultConfigStore<V extends object>(options: VaultConfigSto
   let snapshot: Record<string, unknown> = merge({})
   /** Bumped on every switch and every applied response, so a slow older response cannot win. */
   let generation = 0
+  /** Numbers the reads, so an older read cannot overwrite a newer one. */
+  let readSequence = 0
   const subscribers = new Set<() => void>()
   const reported = new Set<string>()
 
@@ -116,10 +118,13 @@ export function createVaultConfigStore<V extends object>(options: VaultConfigSto
   /** Re-reads the file of the active vault. A failed read keeps what is shown (unknown, not "gone"). */
   async function refresh(vaultId: string): Promise<void> {
     if (apiClient === null || vaultId !== activeVaultId) return
-    const mine = ++generation
+    // A read is outdated when a change, a vault switch or a newer read came after it started. It does
+    // not bump `generation` itself, so a read that starts during a save cannot throw that save's answer away.
+    const mine = generation
+    const myRead = ++readSequence
     try {
       const fields = await fetch(apiClient, vaultId)
-      if (activeVaultId === vaultId && mine === generation) {
+      if (activeVaultId === vaultId && mine === generation && myRead === readSequence) {
         reportDeviations(vaultId, fields)
         apply(fields)
       }
@@ -136,9 +141,9 @@ export function createVaultConfigStore<V extends object>(options: VaultConfigSto
     update,
     refresh,
     onChange: subscribe,
-    /** Subscribes a component to the whole snapshot (a new object after every change). */
-    useSnapshot(): Record<string, unknown> {
-      return useSyncExternalStore(subscribe, () => snapshot, () => snapshot)
+    /** Subscribes a component to the whole snapshot (a new object after every change). Keys of the table have valid values; others pass through. */
+    useSnapshot(): V & Record<string, unknown> {
+      return useSyncExternalStore(subscribe, () => snapshot, () => snapshot) as V & Record<string, unknown>
     },
     /** Subscribes a component to one value. */
     useValue<K extends keyof V>(key: K): V[K] {
@@ -146,7 +151,10 @@ export function createVaultConfigStore<V extends object>(options: VaultConfigSto
     },
     /** Connects the store to the API client. Called on login / app mount. */
     initialize(client: IApiClient): void {
+      const first = apiClient === null
       apiClient = client
+      // A vault chosen before the client was there has not been read yet.
+      if (first && activeVaultId !== null) void refresh(activeVaultId)
     },
     /** Switches to another vault: defaults at once, then the vault's file. */
     async setActiveVault(vaultId: string | null): Promise<void> {

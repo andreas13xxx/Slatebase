@@ -20,6 +20,15 @@ describe('applyAppearanceVariables', () => {
     document.body.style.removeProperty('--foreign')
   })
 
+  it('keeps track per target', () => {
+    const other = document.createElement('div')
+    applyAppearanceVariables({ '--accent-h': '10' })
+    applyAppearanceVariables({ '--accent-h': '30' }, other)
+    applyAppearanceVariables({}, other)
+    expect(other.style.getPropertyValue('--accent-h')).toBe('')
+    expect(document.body.style.getPropertyValue('--accent-h')).toBe('10')
+  })
+
   it('clears everything it set', () => {
     applyAppearanceVariables({ '--accent-h': '10' })
     clearAppearanceVariables()

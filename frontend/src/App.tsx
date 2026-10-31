@@ -67,7 +67,7 @@ import { SnippetLifecycle } from './components/SnippetLifecycle'
 import { ThemeLifecycle } from './components/ThemeLifecycle'
 import { AppConfigLifecycle } from './components/AppConfigLifecycle'
 import { AppearanceLifecycle } from './components/AppearanceLifecycle'
-import { useAppearanceValue } from './state/vaultAppearanceStore'
+import { getAppearanceValue, useAppearanceValue } from './state/vaultAppearanceStore'
 import { resolveColorScheme } from '@slatebase/shared-contracts'
 import { DictationIndicator } from './components/DictationIndicator'
 import { PluginViewPanel } from './components/PluginViewPanel'
@@ -1121,8 +1121,9 @@ function AppContent() {
         }}
         onLogout={handleLogout}
         onToggleTheme={async () => {
-          const current = authState.user?.colorScheme ?? 'system'
-          const next = current === 'dark' ? 'light' : 'dark'
+          // Flip what is shown: a user on 'system' may be shown the vault's base theme (appearance.json).
+          const shown = resolveColorScheme(authState.user?.colorScheme ?? 'system', getAppearanceValue('theme'))
+          const next = shown === 'dark' ? 'light' : 'dark'
           try {
             const updatedUser = await apiClient.updateProfile({ colorScheme: next })
             authDispatch({ type: 'PROFILE_UPDATED', payload: { user: updatedUser } })

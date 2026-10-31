@@ -65,15 +65,25 @@ function problems(draft: Draft): Partial<Record<keyof Draft, string>> {
   return found
 }
 
-/** The form. Mounted with `key={stored}`, so it starts from the file's values again when they change elsewhere. */
+/**
+ * The form. When the file's values change elsewhere (Obsidian, a sync, another tab) an untouched
+ * form takes them over; a form with unsaved input keeps what was typed.
+ */
 function AppearanceForm({ stored, disabled, onSave }: {
   stored: AppearanceConfigValues
   disabled: boolean
   onSave: (draft: Draft) => void
 }) {
+  const storedDraft = JSON.stringify(toDraft(stored))
   const [draft, setDraft] = useState<Draft>(() => toDraft(stored))
+  const [baseline, setBaseline] = useState(storedDraft)
+  if (baseline !== storedDraft) {
+    // Adjusting state while rendering, the documented way to follow a prop without an effect.
+    setBaseline(storedDraft)
+    if (JSON.stringify(draft) === baseline) setDraft(toDraft(stored))
+  }
   const found = problems(draft)
-  const changed = JSON.stringify(draft) !== JSON.stringify(toDraft(stored))
+  const changed = JSON.stringify(draft) !== storedDraft
   const invalid = Object.keys(found).length > 0
   const set = (key: keyof Draft) => (value: string) => setDraft((current) => ({ ...current, [key]: value }))
 
@@ -136,7 +146,7 @@ export function VaultAppearanceSettings() {
   const { state } = useAppContext()
   const vaultId = state.selectedVaultId
   const canWrite = state.vaults.find((vault) => vault.id === vaultId)?.permission !== 'read'
-  const stored = useAppearanceSnapshot() as unknown as AppearanceConfigValues
+  const stored = useAppearanceSnapshot()
   const [saving, setSaving] = useState(false)
 
   if (!vaultId) return null
@@ -180,7 +190,6 @@ export function VaultAppearanceSettings() {
       </SettingRow>
 
       <AppearanceForm
-        key={JSON.stringify([stored.accentColor, stored.baseFontSize, stored.interfaceFontFamily, stored.textFontFamily, stored.monospaceFontFamily])}
         stored={stored}
         disabled={disabled}
         onSave={(draft) => void save({

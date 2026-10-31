@@ -77,6 +77,15 @@ describe('VaultAppearanceSettings', () => {
     expect(client.patchAppearanceConfig.mock.calls[0]?.[1]).toMatchObject({ baseFontSize: null, interfaceFontFamily: 'Inter', textFontFamily: null })
   })
 
+  it('keeps unsaved input when the base theme is saved meanwhile', async () => {
+    const client = createClient({ textFontFamily: 'Georgia' })
+    await renderSettings(client)
+    fireEvent.change(await screen.findByLabelText('Schrift der Texte'), { target: { value: 'Inter' } })
+    fireEvent.change(screen.getByLabelText('Basis-Theme'), { target: { value: 'obsidian' } })
+    await waitFor(() => expect(client.patchAppearanceConfig).toHaveBeenCalledWith('v1', { theme: 'obsidian' }))
+    expect(screen.getByLabelText('Schrift der Texte')).toHaveValue('Inter')
+  })
+
   it('refuses a font list with characters that could leave a CSS declaration', async () => {
     const client = createClient()
     await renderSettings(client)
