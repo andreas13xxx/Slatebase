@@ -6,7 +6,7 @@
  * Validates paths to reject traversal attacks (../, null bytes, absolute paths).
  */
 
-import { isAppConfigKey } from '@slatebase/shared-contracts';
+import { appConfigValueProblem, isAppConfigKey } from '@slatebase/shared-contracts';
 import { getAppConfigRaw, getAppConfigValue, onAppConfigChange, updateAppConfig } from '../../../state/vaultAppConfigStore';
 import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
@@ -764,12 +764,18 @@ export class VaultShim implements IVaultShim {
    * user has no write access, nothing is written and a warning goes to the console.
    */
   async setConfig(key: string, value: unknown): Promise<void> {
-    if (!isAppConfigKey(key)) {
+    const name = key === 'updateInternalLinks' ? 'alwaysUpdateLinks' : key;
+    if (!isAppConfigKey(name)) {
       console.warn(`[vault.setConfig] "${key}" is not an app.json key Slatebase can write; ignored`);
       return;
     }
+    const problem = appConfigValueProblem(name, value);
+    if (problem !== null) {
+      console.warn(`[vault.setConfig] "${key}" not written: ${problem}`);
+      return;
+    }
     try {
-      await updateAppConfig({ [key]: value } as never);
+      await updateAppConfig({ [name]: value } as never);
     } catch (error) {
       console.warn(`[vault.setConfig] could not write "${key}":`, error instanceof Error ? error.message : error);
     }
@@ -788,16 +794,17 @@ export class VaultShim implements IVaultShim {
 
   /**
    * Fires `config-changed` whenever the vault's app.json changes (own change, another user's or an
-   * external write). Subscribes on the first listener; the subscription holds the shim weakly and
-   * drops itself once the shim is gone, since a shim has no dispose step.
+   * external write). Subscribes on the first listener and lets go on the first change after the
+   * last listener is gone (or the shim itself, held weakly, is); the next listener subscribes again.
    */
   private followAppConfig(): void {
     if (this.unfollowAppConfig !== null) return;
     const self = new WeakRef(this);
     const unsubscribe = onAppConfigChange(() => {
       const shim = self.deref();
-      if (shim === undefined) {
+      if (shim === undefined || !shim.events.hasListeners('config-changed')) {
         unsubscribe();
+        if (shim !== undefined) shim.unfollowAppConfig = null;
         return;
       }
       shim.events.trigger('config-changed');

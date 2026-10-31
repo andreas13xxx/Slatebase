@@ -483,7 +483,10 @@ const linkMigrationService = new LinkMigrationService(vaultService, searchServic
   try {
     const value = (await appConfigService.get(entry.storagePath, vaultId))['alwaysUpdateLinks']
     return typeof value === 'boolean' ? value : fallback
-  } catch {
+  } catch (error) {
+    logger.warn('Could not read alwaysUpdateLinks from app.json; using the default', {
+      vaultId, fallback, error: error instanceof Error ? error.message : String(error),
+    })
     return fallback
   }
 })

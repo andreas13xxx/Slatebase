@@ -248,6 +248,32 @@ describe('VaultShim', () => {
       await vault.setConfig('tabSize', 8);
       expect(listener).toHaveBeenCalled();
     });
+
+    it('stops following app.json once the last listener is gone, and follows again for a new one', async () => {
+      const patch = vi.fn().mockImplementation(async (_id: string, change: Record<string, unknown>) => change);
+      await useAppConfig({}, patch);
+      const first = vi.fn();
+      vault.on('config-changed', first);
+      vault.off('config-changed', first);
+      await vault.setConfig('tabSize', 2);
+      expect(first).not.toHaveBeenCalled();
+
+      const second = vi.fn();
+      vault.on('config-changed', second);
+      await vault.setConfig('tabSize', 3);
+      expect(second).toHaveBeenCalled();
+    });
+
+    it('does not write a value of the wrong type, and maps the old updateInternalLinks name', async () => {
+      const patch = vi.fn().mockImplementation(async (_id: string, change: Record<string, unknown>) => change);
+      await useAppConfig({}, patch);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await vault.setConfig('tabSize', 'abc');
+      expect(patch).not.toHaveBeenCalled();
+      await vault.setConfig('updateInternalLinks', true);
+      expect(patch).toHaveBeenCalledWith('vault-1', { alwaysUpdateLinks: true });
+      warn.mockRestore();
+    });
   });
 
   describe('getAvailablePathForAttachments()', () => {

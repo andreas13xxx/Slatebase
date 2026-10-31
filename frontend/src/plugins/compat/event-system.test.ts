@@ -114,6 +114,18 @@ describe('EventSystem', () => {
     });
   });
 
+  describe('hasListeners()', () => {
+    it('is true only while a callback is registered for the event', () => {
+      const cb = vi.fn();
+      expect(emitter.hasListeners('test')).toBe(false);
+      const ref = emitter.on('test', cb);
+      expect(emitter.hasListeners('test')).toBe(true);
+      expect(emitter.hasListeners('other')).toBe(false);
+      emitter.offref(ref);
+      expect(emitter.hasListeners('test')).toBe(false);
+    });
+  });
+
   describe('off()', () => {
     it('removes a callback so it no longer fires on trigger', () => {
       const cb = vi.fn();
