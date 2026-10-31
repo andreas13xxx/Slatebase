@@ -463,3 +463,15 @@ every user of the vault and follows the method default: no exception in `VAULT_R
 |---|---|---|
 | GET | `.../appearance-config` | read |
 | PATCH | `.../appearance-config` | write |
+
+## Addendum — `graphConfigRoutes.ts` and `bookmarksConfigRoutes.ts` (2026-10-31)
+
+Mounted at `/api/v1/vaults/:vaultId/graph-config` (`.obsidian/graph.json`) and `/api/v1/vaults/:vaultId/bookmarks-config`
+(`.obsidian/bookmarks.json`). Both files apply to every user of the vault and follow the method default: no exception in
+`VAULT_ROUTE_LEVEL_EXCEPTIONS`.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../graph-config`, `.../bookmarks-config` | read |
+| PATCH | `.../graph-config`, `.../bookmarks-config` | write |
+

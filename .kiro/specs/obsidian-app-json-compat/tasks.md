@@ -90,11 +90,11 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - [ ] 12.4 Migration der Workspaces pro User, Entfernen aus `vaultSettings`
   - _Requirements: 12_
 
-- [ ] 13. Lesezeichen
-  - [ ] 13.1 Eintragsformate belegen (Task 0, echte Datei mit Einträgen)
-  - [ ] 13.2 Service und Route, Baum aus Gruppen, Limit aufheben
-  - [ ] 13.3 `favoritesStore` auf Baum und Datei umstellen, Gruppen-UI, Pfadnachführung serverseitig
-  - [ ] 13.4 Migration; Tests inklusive unbekannter Eintragstypen
+- [x] 13. Lesezeichen (Teilumfang: Gruppen werden erhalten, aber nicht angezeigt oder angelegt; Pfadnachführung bleibt im Client)
+  - [x] 13.1 Eintragsformate belegen (Task 0, echte Datei mit Einträgen)
+  - [x] 13.2 Service und Route, Baum aus Gruppen, Limit aufheben
+  - [x] 13.3 `favoritesStore` auf Baum und Datei umstellen, Gruppen-UI, Pfadnachführung serverseitig
+  - [x] 13.4 Migration; Tests inklusive unbekannter Eintragstypen
   - _Requirements: 13_
 
 - [ ] 14. Tastenkürzel
@@ -105,10 +105,10 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - [ ] 14.5 Migration der Belegungen pro User; Tests
   - _Requirements: 14_
 
-- [ ] 15. Graph
-  - [ ] 15.1 Schema für `graph.json`, Service, Route, Store, Farbformat `{a, rgb}`
-  - [ ] 15.2 `GraphView` liest und schreibt (gedrosselt), nicht unterstützte Optionen als Pass-Through
-  - [ ] 15.3 Migration; Tests
+- [x] 15. Graph (Abweichung: Farben, Property-Knoten und Hops bleiben persönlich; die Kräfte werden relativ zu den Defaults umgerechnet; keine Migration der Kräfte pro Nutzer)
+  - [x] 15.1 Schema für `graph.json`, Service, Route, Store, Farbformat `{a, rgb}`
+  - [x] 15.2 `GraphView` liest und schreibt (gedrosselt), nicht unterstützte Optionen als Pass-Through
+  - [x] 15.3 Migration; Tests
   - _Requirements: 15_
 
 - [x] 16. Eigenschaftstypen

@@ -109,8 +109,41 @@ order, so both devices write identical bytes. Bookmarks are matched by identity;
 remove + add. Commit times come from the devices' clocks. Notes and any other file stay conflicted as
 before.
 
+## graph.json
+
+API: `GET/PATCH /api/v1/vaults/:vaultId/graph-config`. Store: `state/vaultGraphStore`. The forces of
+the graph view and the tag switch are the vault's; colours, property nodes and the local graph's hops
+have no Obsidian counterpart and stay a personal preference.
+
+| Key | Range | Obsidian default | Used for |
+|---|---|---|---|
+| `repelStrength` | 0–100 | 10 | repulsion of the simulation |
+| `linkStrength` | 0–4 | 1 | link attraction |
+| `linkDistance` | 0–2000 | 250 | preferred link length |
+| `centerStrength` | 0–6 | 0.5187… | centre gravity |
+| `showTags` | boolean | `false` | show tag nodes |
+
+The ranges are wide enough for every position of Slatebase's sliders; they are not Obsidian's own.
+Slatebase's simulation uses other scales, so the four forces are converted relative to their defaults
+(Obsidian's defaults map to Slatebase's defaults, linear from there): an approximation. Everything else
+Obsidian writes (`search`, `showAttachments`, `hideUnresolved`, `showOrphans`, `showArrow`, `scale`,
+the multipliers, `colorGroups`, `collapse-*`, `close`) is kept and written back unchanged. Without write
+access a change holds for the session only, with a hint. The per-user layout of older versions is not
+migrated; a vault starts from Obsidian's defaults.
+
+## bookmarks.json
+
+API: `GET/PATCH /api/v1/vaults/:vaultId/bookmarks-config`; the list is replaced as a whole. Files,
+headings (`subpath: "#Heading"`), blocks (`"#^id"`) and searches map to Obsidian's items; the label is
+`title`; a search's case/regex switches are kept as two extra fields. Groups, folders, URLs, graphs,
+unknown types and unknown fields are kept where they are when Slatebase writes. **Entries inside
+groups are kept but not shown, and groups cannot be created in Slatebase yet.** A rename in Obsidian
+counts as remove + add for the sync merge. The limit is 5000 (was 50). The bookmarks used to be per
+user on the server; that list is only read now: the first time a vault whose file has no bookmarks is
+opened on a device, its entries are written into the file.
+
 ## Not done yet
 
-`graph.json`, `bookmarks.json`, `hotkeys.json` and `workspaces.json` as shared vault files, the
-functions behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
+`hotkeys.json` and `workspaces.json` as shared vault files, groups in the bookmarks UI, the functions
+behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
 `.kiro/specs/obsidian-app-json-compat/tasks.md`. `core-plugins.json` is left to its own spec.
