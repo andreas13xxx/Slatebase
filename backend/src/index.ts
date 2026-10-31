@@ -89,7 +89,7 @@ import { PreferencesStore } from './preferences/index.js'
 import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
-import { PropertyTypeStore } from './property-type/index.js'
+import { PropertyTypeStore, migratePropertyTypesToObsidian } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { SpellcheckDictionaryStore } from './spellcheck-dictionary/index.js'
 import { createSpellcheckDictionaryRoutes } from './api/spellcheckDictionaryRoutes.js'
@@ -774,7 +774,9 @@ const pluginRoutes = createPluginRoutes({
 })
 app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)
 app.route('/api/v1/vaults/:vaultId/keychain', createKeychainRoutes({ keychainService, logger }))
-const appConfigService = new AppConfigService(new DeviationReporter(logger))
+// One reporter for every .obsidian/ file, so a deviation is logged once per process.
+const appConfigDeviationReporter = new DeviationReporter(logger)
+const appConfigService = new AppConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/app-config', createAppConfigRoutes({ appConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 
 // Snippet route registration (auth middleware applies via /api/v1/* pattern)
@@ -1021,6 +1023,7 @@ app.route('/api/v1', vaultConfigRoutes)
 const propertyTypeStore = new PropertyTypeStore(
   (vaultId: string) => vaultRegistry.findById(vaultId)?.storagePath ?? null,
   logger,
+  appConfigDeviationReporter,
 )
 const propertyTypeRoutes = createPropertyTypeRoutes({
   propertyTypeService: propertyTypeStore,
@@ -1166,6 +1169,8 @@ await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snip
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
 // app.json defaults follow Obsidian now; vaults that exist at the first start keep the previous ones. Must run before the other app.json migrations, which create the file.
 await migrateAppConfigDefaults({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
+// Property types used to live only in .slatebase/property-types.json; Obsidian's types.json holds them now.
+await migratePropertyTypesToObsidian({ dataDir: serverConfig.dataDir, vaultRegistry, store: propertyTypeStore, logger })
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
 await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
 // Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.

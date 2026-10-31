@@ -40,6 +40,9 @@ export interface PropertyTypeRegistry {
   entries: PropertyTypeEntry[]
 }
 
+/** Most entries a vault may have. A guard against runaway growth, not a product limit (Obsidian has none). */
+export const MAX_PROPERTY_TYPE_ENTRIES = 5000
+
 /** Default (empty) registry for new/missing vaults. */
 export const DEFAULT_PROPERTY_TYPE_REGISTRY: PropertyTypeRegistry = {
   entries: [],
