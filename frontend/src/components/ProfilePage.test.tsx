@@ -14,6 +14,10 @@ const mockProfile: PublicUserInfo = {
   displayName: 'Test User',
   email: 'test@example.com',
   avatarUrl: 'https://example.com/avatar.png',
+  avatarType: 'url',
+  avatarColor: '',
+  avatarData: '',
+  avatarDicebear: '',
   role: 'user',
   preferredLanguage: 'de',
   colorScheme: 'system',
@@ -93,6 +97,7 @@ describe('ProfilePage', () => {
       })
 
       expect(screen.getByLabelText('E-Mail')).toHaveValue('test@example.com')
+      // The avatar URL input (type 'url') is now inside the avatar editor, labelled "Avatar-URL".
       expect(screen.getByLabelText('Avatar-URL')).toHaveValue('https://example.com/avatar.png')
       // Sprache und Farbschema stehen jetzt unter Einstellungen → Darstellung,
       // siehe AppearanceSection.test.tsx.
@@ -406,6 +411,7 @@ describe('ProfilePage', () => {
       })
 
       expect(screen.getByLabelText('E-Mail')).toBeInTheDocument()
+      // Avatar is now edited via the AvatarEditor; its URL field (type 'url') is labelled "Avatar-URL".
       expect(screen.getByLabelText('Avatar-URL')).toBeInTheDocument()
       expect(screen.getByLabelText('Aktuelles Passwort')).toBeInTheDocument()
       expect(screen.getByLabelText('Neues Passwort')).toBeInTheDocument()
