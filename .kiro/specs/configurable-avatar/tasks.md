@@ -54,5 +54,5 @@ push, PR, CI grün (max. 3 Iterationen). Dokumentation nach Abschluss der Featur
 > reine „Avatar-URL"-Textfeld ist durch den Editor ersetzt (URL bleibt als Typ `url`).
 
 ## Phase 7 — Doku
-- [ ] 7.1 `structure.md` (UserAvatar, imageResize, dicebear) und ggf. `docs/` aktualisieren.
-- [ ] 7.2 README-Feature-Zeile zum Avatar, falls vorhanden.
+- [x] 7.1 `structure.md` (UserAvatar, imageResize, dicebear) und ggf. `docs/` aktualisieren.
+- [x] 7.2 README-Feature-Zeile zum Avatar, falls vorhanden. (README nennt den Avatar bisher nicht — keine Zeile vorhanden, nichts zu ändern.)
