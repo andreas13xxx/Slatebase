@@ -1,13 +1,16 @@
 /**
  * Editor preferences from the vault's `.obsidian/app.json`: indentation (`useTab`, `tabSize`), automatic
- * pairs (`autoPairBrackets`, `autoPairMarkdown`) and the text direction (`rightToLeft`). Built as one
+ * pairs (`autoPairBrackets`, `autoPairMarkdown`), list continuation (`smartIndentList`), indent guides
+ * (`showIndentGuide`) and the text direction (`rightToLeft`). Built as one
  * extension that CodeMirrorEditor keeps in a Compartment, so a change in the file or the settings
  * applies to an open note without reloading it.
  */
-import { EditorSelection, EditorState, type Extension } from '@codemirror/state'
+import { EditorSelection, EditorState, Prec, type Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
+import { insertNewlineAndIndent } from '@codemirror/commands'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
+import { indentGuides } from './indent-guides'
 
 export interface EditorPrefs {
   tabSize: number
@@ -15,6 +18,10 @@ export interface EditorPrefs {
   autoPairBrackets: boolean
   autoPairMarkdown: boolean
   rightToLeft: boolean
+  /** Enter in a list or quote continues it with a new marker; off, it only keeps the indentation. */
+  smartIndentList: boolean
+  /** Thin vertical lines at the indentation levels. */
+  showIndentGuide: boolean
 }
 
 /** Obsidian's defaults (the same values as the app.json key table). */
@@ -24,6 +31,8 @@ export const DEFAULT_EDITOR_PREFS: Readonly<EditorPrefs> = {
   autoPairBrackets: true,
   autoPairMarkdown: true,
   rightToLeft: false,
+  smartIndentList: true,
+  showIndentGuide: true,
 }
 
 /** Characters that wrap a selection instead of replacing it when `autoPairMarkdown` is on. */
@@ -57,5 +66,8 @@ export function editorPrefsExtension(prefs: EditorPrefs): Extension {
   if (prefs.autoPairBrackets) extensions.push(closeBrackets(), keymap.of(closeBracketsKeymap))
   if (prefs.autoPairMarkdown) extensions.push(markdownWrapHandler)
   if (prefs.rightToLeft) extensions.push(EditorView.contentAttributes.of({ dir: 'rtl' }))
+  // The Markdown language continues lists and quotes on Enter; ahead of it, a plain newline keeps only the indentation
+  if (!prefs.smartIndentList) extensions.push(Prec.highest(keymap.of([{ key: 'Enter', run: insertNewlineAndIndent }])))
+  if (prefs.showIndentGuide) extensions.push(indentGuides())
   return extensions
 }

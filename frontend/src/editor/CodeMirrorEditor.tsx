@@ -184,9 +184,11 @@ export function CodeMirrorEditor({
   const autoPairBrackets = useAppConfigValue('autoPairBrackets')
   const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
   const rightToLeft = useAppConfigValue('rightToLeft')
+  const smartIndentList = useAppConfigValue('smartIndentList')
+  const showIndentGuide = useAppConfigValue('showIndentGuide')
   const editorPrefs = useMemo<EditorPrefs>(
-    () => ({ tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft }),
-    [tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft],
+    () => ({ tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft, smartIndentList, showIndentGuide }),
+    [tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft, smartIndentList, showIndentGuide],
   )
 
   // Keep onContentChange ref up to date without recreating extensions

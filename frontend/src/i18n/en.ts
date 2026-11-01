@@ -971,4 +971,14 @@ export const en: TranslationShape = {
     menuItem: 'Show properties',
     command: 'Editor: Toggle properties in document',
   },
+
+  editorSettings: {
+    smartIndentList: 'Continue lists on line break',
+    smartIndentListHint: 'On: Enter in a list or quote starts the next line with a new marker. Off: Enter keeps only the indentation.',
+    showIndentGuide: 'Indent guides',
+    showIndentGuideHint: 'Thin vertical lines at every indentation level in the editor.',
+    spellcheckLanguage: 'Spellcheck language',
+    spellcheckLanguageHint: 'For everyone who opens the vault (spellcheckLanguages in app.json). Without a choice, the personal language from the editor context menu applies. Only one dictionary runs at a time; if the file lists several languages, the first one with a dictionary is used.',
+    spellcheckPersonal: 'Personal choice',
+  },
 } as const

@@ -1,109 +1,77 @@
-import { renderHook, act, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useSpellcheck } from './useSpellcheck'
-import {
-  _reset as resetVaultSettings,
-  setActiveVault,
-  updateVaultSettings,
-} from '../state/vaultSettingsStore'
-import {
-  _reset as resetAppConfig,
-  initialize as initializeAppConfig,
-  setActiveVault as setActiveAppConfigVault,
-} from '../state/vaultAppConfigStore'
+import { dictionaryForCode, getSpellcheckLanguage, setSpellcheckLanguage, vaultSpellcheckLanguage } from './useSpellcheck'
+import { _reset, initialize, setActiveVault } from '../state/vaultAppConfigStore'
 import type { IApiClient } from '../api'
 
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
-describe('useSpellcheck', () => {
-  /** Whether it runs is a vault setting (`spellcheck` in app.json); the dictionary stays personal. */
-  let appJson: Record<string, unknown>
+async function withFile(file: Record<string, unknown>) {
+  _reset()
+  const state = { file: { ...file } }
+  const client = {
+    getAppConfig: vi.fn(async () => ({ ...state.file })),
+    patchAppConfig: vi.fn(async (_v: string, patch: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === null) delete state.file[key]
+        else state.file[key] = value
+      }
+      return { ...state.file }
+    }),
+  }
+  initialize(client as unknown as IApiClient)
+  await setActiveVault('v1')
+  return client
+}
 
-  beforeEach(async () => {
-    resetVaultSettings()
-    resetAppConfig()
-    appJson = {}
-    initializeAppConfig({
-      getAppConfig: vi.fn(async () => ({ ...appJson })),
-      patchAppConfig: vi.fn(async (_vaultId: string, patch: Record<string, unknown>) => {
-        appJson = { ...appJson, ...patch }
-        return { ...appJson }
-      }),
-    } as unknown as IApiClient)
-    await setActiveVault('vault-1')
-    await setActiveAppConfigVault('vault-1')
+describe('dictionaryForCode', () => {
+  it('takes the language before the region, in any spelling', () => {
+    expect(dictionaryForCode('en-US')).toBe('en')
+    expect(dictionaryForCode('de_DE')).toBe('de')
+    expect(dictionaryForCode(' DE ')).toBe('de')
   })
 
-  describe('initial state', () => {
-    it('defaults to enabled (matches the browser default it replaced)', () => {
-      const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.enabled).toBe(true)
-    })
+  it('knows no dictionary for other languages', () => {
+    expect(dictionaryForCode('fr')).toBeNull()
+    expect(dictionaryForCode('')).toBeNull()
+  })
+})
 
-    it('reads spellcheck from the vault’s app.json', async () => {
-      appJson = { spellcheck: false }
-      await setActiveAppConfigVault(null)
-      await setActiveAppConfigVault('vault-1')
-      const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.enabled).toBe(false)
-    })
+describe('vaultSpellcheckLanguage', () => {
+  it('uses the first entry Slatebase has a dictionary for', () => {
+    expect(vaultSpellcheckLanguage(['fr', 'en-GB', 'de'])).toBe('en')
+    expect(vaultSpellcheckLanguage(['fr'])).toBeNull()
+    expect(vaultSpellcheckLanguage([])).toBeNull()
+  })
+})
+
+describe('the dictionary in use', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('is the vault file\'s when it names one, else the personal choice', async () => {
+    await withFile({ spellcheckLanguages: ['en-US'] })
+    expect(getSpellcheckLanguage()).toBe('en')
+
+    await withFile({ spellcheckLanguages: ['fr'] })
+    expect(getSpellcheckLanguage()).toBe('de') // the personal default
   })
 
-  describe('toggle', () => {
-    it('toggles from enabled to disabled and writes app.json', async () => {
-      const { result } = renderHook(() => useSpellcheck())
+  it('switching writes into the file and keeps the other entries, when the file names a dictionary', async () => {
+    const client = await withFile({ spellcheckLanguages: ['fr', 'de-DE'] })
 
-      act(() => { result.current.toggle() })
-      expect(result.current.enabled).toBe(false)
-      await waitFor(() => expect(appJson).toEqual({ spellcheck: false }))
-    })
+    setSpellcheckLanguage('en')
 
-    it('toggles from disabled to enabled', async () => {
-      appJson = { spellcheck: false }
-      await setActiveAppConfigVault(null)
-      await setActiveAppConfigVault('vault-1')
-      const { result } = renderHook(() => useSpellcheck())
-
-      act(() => { result.current.toggle() })
-      expect(result.current.enabled).toBe(true)
-    })
+    await vi.waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { spellcheckLanguages: ['fr', 'en'] }))
   })
 
-  describe('language', () => {
-    it('defaults to German, matching <html lang="de">', () => {
-      const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.language).toBe('de')
-    })
+  it('writes nothing when the file already has that language', async () => {
+    const client = await withFile({ spellcheckLanguages: ['en-US'] })
+    setSpellcheckLanguage('en')
+    expect(client.patchAppConfig).not.toHaveBeenCalled()
+  })
 
-    it('reads a stored language', () => {
-      updateVaultSettings({ spellcheckLanguage: 'en' })
-      const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.language).toBe('en')
-    })
-
-    it('falls back to German for an unknown stored language', () => {
-      updateVaultSettings({ spellcheckLanguage: 'kl' })
-      const { result } = renderHook(() => useSpellcheck())
-      expect(result.current.language).toBe('de')
-    })
-
-    it('switches the language without touching the toggle', () => {
-      const { result } = renderHook(() => useSpellcheck())
-
-      act(() => { result.current.setLanguage('en') })
-
-      expect(result.current.language).toBe('en')
-      expect(result.current.enabled).toBe(true)
-    })
-
-    it('keeps the dictionary separate per vault', async () => {
-      const { result } = renderHook(() => useSpellcheck())
-      act(() => { result.current.setLanguage('en') })
-      expect(result.current.language).toBe('en')
-
-      await act(async () => { await setActiveVault('vault-2') })
-
-      expect(result.current.language).toBe('de')
-    })
+  it('is the personal choice when the file names none', async () => {
+    const client = await withFile({})
+    setSpellcheckLanguage('en')
+    expect(client.patchAppConfig).not.toHaveBeenCalled()
   })
 })

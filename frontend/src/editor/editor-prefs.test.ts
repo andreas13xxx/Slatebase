@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import { closeBracketsKeymap } from '@codemirror/autocomplete'
-import { EditorView } from '@codemirror/view'
+import { EditorView, runScopeHandlers } from '@codemirror/view'
+import { markdown } from '@codemirror/lang-markdown'
 import { indentUnit, foldable } from '@codemirror/language'
 import { DEFAULT_EDITOR_PREFS, editorPrefsExtension, type EditorPrefs } from './editor-prefs'
 import { markdownFoldService } from './folding'
@@ -108,4 +109,34 @@ describe('markdownFoldService honours foldHeading and foldIndent', () => {
     expect(await foldableAt({ foldIndent: false }, doc.indexOf('- item'))).toBe(false)
     expect(await foldableAt({ foldIndent: false }, 0)).toBe(true)
   })
+
+  it('continues a list on Enter only while smartIndentList is on', () => {
+    const enter = (smartIndentList: boolean): string => {
+      const view = new EditorView({
+        state: EditorState.create({
+          doc: '- item',
+          selection: { anchor: 6 },
+          extensions: [markdown(), editorPrefsExtension({ ...DEFAULT_EDITOR_PREFS, smartIndentList })],
+        }),
+        parent: document.body,
+      })
+      views.push(view)
+      runScopeHandlers(view, new KeyboardEvent('keydown', { key: 'Enter' }), 'editor')
+      return view.state.doc.toString()
+    }
+
+    expect(enter(true)).toBe('- item\n- ')
+    expect(enter(false)).toBe('- item\n')
+  })
+
+  it('draws indent guides only while showIndentGuide is on', () => {
+    const guides = (showIndentGuide: boolean): number => {
+      const view = viewWith({ showIndentGuide }, '\t- a')
+      return view.dom.querySelectorAll('.cm-indent-guide').length
+    }
+
+    expect(guides(true)).toBe(1)
+    expect(guides(false)).toBe(0)
+  })
 })
+

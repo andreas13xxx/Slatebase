@@ -965,4 +965,14 @@ export const de = {
     menuItem: 'Eigenschaften anzeigen',
     command: 'Editor: Eigenschaften im Dokument ein-/ausblenden',
   },
+
+  editorSettings: {
+    smartIndentList: 'Listen beim Zeilenumbruch fortsetzen',
+    smartIndentListHint: 'An: Enter in einer Liste oder einem Zitat beginnt die nächste Zeile mit einem neuen Aufzählungszeichen. Aus: Enter behält nur die Einrückung.',
+    showIndentGuide: 'Einrückungslinien',
+    showIndentGuideHint: 'Dünne senkrechte Linien an jeder Einrückungsebene im Editor.',
+    spellcheckLanguage: 'Sprache der Rechtschreibprüfung',
+    spellcheckLanguageHint: 'Für alle, die den Vault öffnen (spellcheckLanguages in app.json). Ohne Auswahl gilt die persönliche Sprache aus dem Editor-Kontextmenü. Es läuft immer nur ein Wörterbuch; stehen mehrere Sprachen in der Datei, gilt die erste, für die es eines gibt.',
+    spellcheckPersonal: 'Persönliche Auswahl',
+  },
 } as const

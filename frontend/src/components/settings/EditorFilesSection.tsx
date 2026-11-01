@@ -21,6 +21,8 @@ import {
   type AppConfigValues,
 } from '../../state/vaultAppConfigStore'
 import { SettingSection, SettingRow, Button } from './ui'
+import { vaultSpellcheckLanguage, withVaultSpellcheckLanguage } from '../../hooks/useSpellcheck'
+import { isSpellcheckLanguage } from '../../editor/spellcheck/protocol'
 import { buildAttachmentPath, parseAttachmentPath, type AttachmentMode } from './attachmentPath'
 
 const MODE_LABELS: Record<AttachmentMode, string> = {
@@ -119,6 +121,9 @@ export function EditorFilesSection() {
   const autoPairBrackets = useAppConfigValue('autoPairBrackets')
   const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
   const rightToLeft = useAppConfigValue('rightToLeft')
+  const smartIndentList = useAppConfigValue('smartIndentList')
+  const showIndentGuide = useAppConfigValue('showIndentGuide')
+  const spellcheckLanguages = useAppConfigValue('spellcheckLanguages')
   const foldHeading = useAppConfigValue('foldHeading')
   const foldIndent = useAppConfigValue('foldIndent')
   const newFileLocation = useAppConfigValue('newFileLocation')
@@ -218,6 +223,19 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ strictLineBreaks: e.target.checked })}
           />
         </SettingRow>
+        <SettingRow label={t('editorSettings.spellcheckLanguage')} htmlFor="editor-spellcheck-language" hint={t('editorSettings.spellcheckLanguageHint')}>
+          <select
+            id="editor-spellcheck-language"
+            className="settings-field-input"
+            value={vaultSpellcheckLanguage(spellcheckLanguages) ?? ''}
+            disabled={disabled}
+            onChange={(e) => void save({ spellcheckLanguages: withVaultSpellcheckLanguage(spellcheckLanguages, isSpellcheckLanguage(e.target.value) ? e.target.value : null) })}
+          >
+            <option value="">{t('editorSettings.spellcheckPersonal')}</option>
+            <option value="de">Deutsch</option>
+            <option value="en">English</option>
+          </select>
+        </SettingRow>
         <SettingRow label="Rechts-nach-links-Schrift" htmlFor="editor-rtl">
           <input
             id="editor-rtl"
@@ -230,6 +248,24 @@ export function EditorFilesSection() {
       </SettingSection>
 
       <SettingSection title="Einrückung und Eingabe">
+        <SettingRow label={t('editorSettings.smartIndentList')} htmlFor="editor-smart-indent-list" hint={t('editorSettings.smartIndentListHint')}>
+          <input
+            id="editor-smart-indent-list"
+            type="checkbox"
+            checked={smartIndentList}
+            disabled={disabled}
+            onChange={(e) => void save({ smartIndentList: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.showIndentGuide')} htmlFor="editor-show-indent-guide" hint={t('editorSettings.showIndentGuideHint')}>
+          <input
+            id="editor-show-indent-guide"
+            type="checkbox"
+            checked={showIndentGuide}
+            disabled={disabled}
+            onChange={(e) => void save({ showIndentGuide: e.target.checked })}
+          />
+        </SettingRow>
         <SettingRow label="Mit Tabulator einrücken" htmlFor="editor-use-tab" hint="Aus: Leerzeichen, so viele wie die Tabulatorbreite.">
           <input
             id="editor-use-tab"
