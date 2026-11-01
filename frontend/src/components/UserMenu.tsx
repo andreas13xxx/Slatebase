@@ -6,6 +6,7 @@ import {
   Database, Download, Upload, FolderOpen, ScrollText,
 } from 'lucide-react'
 import type { AppPage } from '../App'
+import { UserAvatar } from './UserAvatar'
 
 /**
  * Props for the UserMenu component.
@@ -64,7 +65,6 @@ export function UserMenu({ onNavigate, onOpenSettings, onLogout, hasVaultSelecte
 
   if (!user) return null
 
-  const initials = (user.displayName || user.username).slice(0, 2).toUpperCase()
   const displayName = user.displayName || user.username
 
   return (
@@ -77,11 +77,7 @@ export function UserMenu({ onNavigate, onOpenSettings, onLogout, hasVaultSelecte
         aria-label={t('userMenu.ariaLabel')}
         aria-expanded={open}
       >
-        {user.avatarUrl ? (
-          <img className="user-menu-avatar" src={user.avatarUrl} alt={displayName} />
-        ) : (
-          <span className="user-menu-avatar user-menu-avatar--initials">{initials}</span>
-        )}
+        <UserAvatar user={user} size={26} />
       </button>
       {open && (
         <div className="user-menu-dropdown" role="menu" style={dropdownStyle}>

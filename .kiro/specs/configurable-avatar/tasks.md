@@ -22,6 +22,9 @@ push, PR, CI grün (max. 3 Iterationen). Dokumentation nach Abschluss der Featur
 - [ ] 3.1 `utils/UserAvatar`-Helfer: `getInitials`, `colorFromName`, `readableTextColor`.
 - [ ] 3.2 `components/UserAvatar.tsx` (Typ-Dispatch, Initialen-Kachel, `<img>`).
 - [ ] 3.3 `UserMenu.tsx` und `ProfilePage.tsx` auf `UserAvatar` umstellen (bisherige Zweige entfernen).
+      Hinweis: ProfilePage hat heute keinen eigenen Avatar-Render-Zweig (nur das URL-Textfeld) —
+      die Vorschau mit `UserAvatar` entsteht erst mit dem Editor in Phase 6. In Phase 3 wird daher
+      nur `UserMenu` umgestellt; Phase 6 baut die ProfilePage-Vorschau auf `UserAvatar` auf.
 - [ ] 3.4 Tests: Utils-Unit-Tests + `UserAvatar`-Render.
 
 ## Phase 4 — Bild-Upload/Paste
