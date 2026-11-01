@@ -137,5 +137,5 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - _Requirements: 19.5, 20_
 
 - [ ] 18. Abschluss
-  - [ ] 18.1 Doku final: `docs/app-json.md`, `docs/hotkeys.md`, README, AGENTS.md, structure.md, `VAULT-ROUTE-AUTHORIZATION.md`, CHANGELOG
+  - [x] 18.1 Doku final: `docs/app-json.md`, `docs/hotkeys.md`, README, AGENTS.md, structure.md, `VAULT-ROUTE-AUTHORIZATION.md` (CHANGELOG pflegt release-please)
   - [ ] 18.2 Push, PR, CI, Sage-Review

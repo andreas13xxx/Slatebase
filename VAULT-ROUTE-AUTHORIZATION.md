@@ -485,3 +485,13 @@ vault and follows the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTI
 | GET | `.../hotkeys-config` | read |
 | PATCH | `.../hotkeys-config` | write |
 
+## Addendum — `workspacesConfigRoutes.ts` (2026-11-01)
+
+Mounted at `/api/v1/vaults/:vaultId/workspaces-config` (`.obsidian/workspaces.json`). The saved layouts apply to every
+user of the vault and follow the method default: no exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS`. (`workspace.json`, the
+open tabs of one user, is not served and not written.)
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../workspaces-config` | read |
+| PATCH | `.../workspaces-config` | write |
