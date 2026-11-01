@@ -997,6 +997,36 @@ describe('favoritesStore', () => {
       }
     })
 
+    it('keeps a bookmark another device added to a group made here inside that group', async () => {
+      vi.useFakeTimers()
+      try {
+        const client = {
+          state: { file: { items: [] } as Record<string, unknown> },
+          getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+          getBookmarksConfig: vi.fn(async () => client.state.file),
+          patchBookmarksConfig: vi.fn(async (_v: string, patch: Record<string, unknown>) => {
+            client.state.file = { ...client.state.file, ...patch }
+            return client.state.file
+          }),
+        }
+        await initialize(client as unknown as IApiClient)
+        await loadVaultBookmarks('v1')
+        addGroup('v1', 'Work')
+        await vi.advanceTimersByTimeAsync(2500)
+
+        const written = (client.state.file['items'] as Array<Record<string, unknown>>)[0]!
+        client.state.file = { items: [{ ...written, items: [{ type: 'file', path: 'theirs.md' }] }] }
+        add('v1', 'mine.md')
+        await vi.advanceTimersByTimeAsync(2500)
+
+        const items = client.state.file['items'] as Array<Record<string, unknown>>
+        expect(items.map((i) => i['title'] ?? i['path'])).toEqual(['Work', 'mine.md'])
+        expect((items[0]!['items'] as Array<Record<string, unknown>>).map((i) => i['path'])).toEqual(['theirs.md'])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('reads groups from the file with their entries', async () => {
       const client = {
         getFavorites: vi.fn().mockResolvedValue({ entries: [] }),

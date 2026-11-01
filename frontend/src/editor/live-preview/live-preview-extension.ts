@@ -275,10 +275,13 @@ export function createLivePreviewField(options: LivePreviewOptions): Extension {
 const hiddenFrontmatterGuard: Extension = [
   EditorState.transactionFilter.of((tr) => {
     if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) return tr
+    // Undo and redo may take back what a command did to the block
+    if (tr.isUserEvent('undo') || tr.isUserEvent('redo')) return tr
     const block = locateFrontmatter(tr.startState.doc)
     if (!block) return tr
     let touches = false
-    tr.changes.iterChanges((fromA) => { if (fromA < block.end) touches = true })
+    // An edit that replaces the block as a whole (select all, then delete or paste) is the user's decision
+    tr.changes.iterChanges((fromA, toA) => { if (fromA < block.end && !(fromA === 0 && toA >= block.end)) touches = true })
     return touches ? [] : tr
   }),
   // Arrow keys and clicks skip over the hidden block

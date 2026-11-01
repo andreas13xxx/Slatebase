@@ -14,7 +14,7 @@ import {
   Star, StarOff, Heading, Hash, Search as SearchIcon, FolderOpen, Folder, FolderPlus, FolderInput,
   ChevronRight, ChevronDown, CornerLeftUp, Pencil, Trash2,
 } from 'lucide-react'
-import { favoritesStore, onFavoritesChange } from '../../state/favoritesStore'
+import { favoritesStore, groupByParent, onFavoritesChange, withDescendants } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { useSearchContext } from '../../state/searchContext'
 import { useAppContext } from '../../state'
@@ -137,19 +137,6 @@ function entryIconClass(entry: FavoriteEntry): string {
   return getFileIconClass(getFileName(entry.path))
 }
 
-/** The entries grouped by the group they sit in. An entry whose group is gone counts as top level. */
-function groupByParent(entries: FavoriteEntry[]): Map<string | null, FavoriteEntry[]> {
-  const known = new Set(entries.map((e) => e.id))
-  const byParent = new Map<string | null, FavoriteEntry[]>()
-  for (const entry of entries) {
-    const parent = entry.parentId !== undefined && known.has(entry.parentId) ? entry.parentId : null
-    const list = byParent.get(parent) ?? []
-    list.push(entry)
-    byParent.set(parent, list)
-  }
-  return byParent
-}
-
 /** The visible lines, depth first; the content of a folded group is left out. */
 function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set<string>): Row[] {
   const rows: Row[] = []
@@ -161,14 +148,6 @@ function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set
   }
   walk(null, 0)
   return rows
-}
-
-/** Whether `id` is `ancestorId` or sits somewhere inside it. */
-function isInside(byParent: Map<string | null, FavoriteEntry[]>, id: string, ancestorId: string, visited: Set<string> = new Set()): boolean {
-  if (id === ancestorId) return true
-  if (visited.has(ancestorId)) return false // a loop in stored data
-  visited.add(ancestorId)
-  return (byParent.get(ancestorId) ?? []).some((child) => isInside(byParent, id, child.id, visited))
 }
 
 /**
@@ -439,7 +418,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
   // Groups the entry could be moved into: every group but itself and what sits inside it
   const moveTargets = (entry: FavoriteEntry): FavoriteEntry[] =>
-    favorites.filter((g) => isGroup(g) && g.id !== entry.parentId && !isInside(byParent, g.id, entry.id))
+    favorites.filter((g) => isGroup(g) && g.id !== entry.parentId && !withDescendants(byParent, entry.id).has(g.id))
 
   const menuItems: ContextMenuItem[] = contextMenu ? [
     ...(contextMenu.entry.type !== 'search' && !isGroup(contextMenu.entry) ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen', icon: <FolderOpen size={14} /> }] : []),

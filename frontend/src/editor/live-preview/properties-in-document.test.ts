@@ -95,6 +95,33 @@ describe('propertiesInDocument in the editor', () => {
       expect(v.state.doc.toString()).toContain('title: Other')
     })
 
+    it('lets the user replace the whole note, and undo what a command did to the block', () => {
+      const v = mount('hidden')
+
+      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: 'fresh' }, userEvent: 'input.paste' })
+      expect(v.state.doc.toString()).toBe('fresh')
+
+      v.dispatch({ changes: { from: 0, to: 5, insert: DOC }, userEvent: 'undo' })
+      expect(v.state.doc.toString()).toBe(DOC)
+    })
+
+    it('also guards a frontmatter longer than 2 KB', () => {
+      view?.destroy()
+      view = null
+      document.body.innerHTML = ''
+      const long = `---\n${'k: v\n'.repeat(1000)}---\nBody\n`
+      const parent = document.createElement('div')
+      document.body.appendChild(parent)
+      view = new EditorView({
+        parent,
+        state: EditorState.create({ doc: long, extensions: [markdown({ extensions: GFM }), createLivePreviewField({ vaultId: 'v1', directoryTree: null, propertiesInDocument: 'hidden' })] }),
+      })
+
+      expect(view.dom.textContent).not.toContain('k: v')
+      view.dispatch({ changes: { from: 0, insert: 'x' }, userEvent: 'input.type' })
+      expect(view.state.doc.toString()).toBe(long)
+    })
+
     it('does not guard the visible and source modes', () => {
       for (const mode of ['visible', 'source'] as const) {
         view?.destroy()

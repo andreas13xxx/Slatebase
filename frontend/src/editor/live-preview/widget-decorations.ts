@@ -1755,10 +1755,10 @@ const BLOCK_MATH_REGEX = /^\$\$([\s\S]*?)\$\$\s*$/gm
 /**
  * The frontmatter block at the start of a document: the YAML between the `---` lines, and the position
  * after the closing line and its line break. Null if the document does not start with one.
- * Only the first 2 KB are looked at.
+ * Only the first 64 KB are looked at.
  */
 export function locateFrontmatter(doc: Text): { yaml: string; end: number } | null {
-  const docText = doc.sliceString(0, Math.min(doc.length, 2000))
+  const docText = doc.sliceString(0, Math.min(doc.length, 64_000))
   if (!docText.startsWith('---\n') && !docText.startsWith('---\r\n')) return null
   const endMatch = docText.indexOf('\n---', 3)
   if (endMatch === -1) return null

@@ -144,15 +144,16 @@ export function CodeMirrorEditor({
   const viewRef = useRef<EditorView | null>(null)
   const prevTabIdRef = useRef<string>(tabId)
   const onContentChangeRef = useRef(onContentChange)
-  // Read by the mount-effect's contextmenu listener, which only re-runs on
-  // tabId change — without this ref, toggling line numbers would leave the
-  // context menu's checkbox showing the state from whenever the tab was
-  // last (re)mounted instead of the current one.
+  // The context menu's label for the properties entry, in the current language
   const { t } = useTranslation()
   const propertiesLabelRef = useRef(t('propertiesInDocument.menuItem'))
   useEffect(() => {
     propertiesLabelRef.current = t('propertiesInDocument.menuItem')
   }, [t])
+  // Read by the mount-effect's contextmenu listener, which only re-runs on
+  // tabId change — without this ref, toggling line numbers would leave the
+  // context menu's checkbox showing the state from whenever the tab was
+  // last (re)mounted instead of the current one.
   const showLineNumbersRef = useRef(showLineNumbers)
   // Same reasoning as showLineNumbersRef — the context menu's checkbox needs
   // the current value without re-running the mount-effect's listener.

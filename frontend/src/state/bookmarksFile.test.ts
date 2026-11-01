@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { entriesToItems, itemsToEntries, type RawItem } from './bookmarksFile'
+import { adoptEntryIds, entriesToItems, itemsToEntries, type RawItem } from './bookmarksFile'
 import type { FavoriteEntry } from './favoritesStore'
 
 const file = (path: string, extra: RawItem = {}): RawItem => ({ type: 'file', path, ...extra })
@@ -207,3 +207,61 @@ describe('entriesToItems', () => {
     expect(entriesToItems([], loaded).items).toEqual([{ type: 'url', url: 'u' }])
   })
 })
+
+describe('entriesToItems: stored data that does not fit', () => {
+  const load = (items: RawItem[]) => itemsToEntries('v1', items)
+  const at = '2026-01-01T00:00:00.000Z'
+
+  it('puts an entry whose parent is not a group on the top level instead of losing it', () => {
+    const loaded = load([file('a.md'), file('b.md')])
+    const [a, b] = loaded.entries as [FavoriteEntry, FavoriteEntry]
+
+    const written = entriesToItems([a, { ...b, parentId: a.id }], loaded).items
+
+    expect(written.map((i) => i['path'])).toEqual(['a.md', 'b.md'])
+  })
+
+  it('keeps groups that point at each other, and what is in them', () => {
+    const entries: FavoriteEntry[] = [
+      { id: 'g1', vaultId: 'v1', path: '', addedAt: at, order: 0, type: 'group', label: 'One', parentId: 'g2' },
+      { id: 'g2', vaultId: 'v1', path: '', addedAt: at, order: 1, type: 'group', label: 'Two', parentId: 'g1' },
+      { id: 'f', vaultId: 'v1', path: 'x.md', addedAt: at, order: 2, type: 'file', parentId: 'g2' },
+    ]
+    const loaded = load([])
+
+    const { items, ids } = entriesToItems(entries, loaded)
+
+    expect(new Set(ids)).toEqual(new Set(['g1', 'g2', 'f']))
+    expect(ids).toHaveLength(3)
+    expect(JSON.stringify(items)).toContain('x.md')
+  })
+})
+
+describe('adoptEntryIds', () => {
+  const at = '2026-01-01T00:00:00.000Z'
+
+  it('gives the raw item of the file to the entry of the cache that is the same item', () => {
+    const fresh = itemsToEntries('v1', [{ type: 'group', title: 'G', items: [{ type: 'url', url: 'u' }] }])
+    const cache: FavoriteEntry[] = [{ id: 'random', vaultId: 'v1', path: '', addedAt: at, order: 0, type: 'group', label: 'G' }]
+
+    const { loaded, idMap } = adoptEntryIds(fresh, cache)
+
+    expect(loaded.rawById.get('random')).toBe(fresh.rawById.get(fresh.entries[0]!.id))
+    expect(idMap.get(fresh.entries[0]!.id)).toBe('random')
+  })
+
+  it('does not give one item of the file to two entries', () => {
+    const fresh = itemsToEntries('v1', [file('a.md', { custom: 1 })])
+    const sameId = fresh.entries[0]!.id
+    const cache: FavoriteEntry[] = [
+      { id: sameId, vaultId: 'v1', path: 'a.md', addedAt: at, order: 0, type: 'file' },
+      { id: 'new', vaultId: 'v1', path: 'a.md', addedAt: at, order: 1, type: 'file' },
+    ]
+
+    const { loaded } = adoptEntryIds(fresh, cache)
+
+    expect(loaded.rawById.get('new')).toBeUndefined()
+    expect(loaded.rawById.get(sameId)).toBeDefined()
+  })
+})
+

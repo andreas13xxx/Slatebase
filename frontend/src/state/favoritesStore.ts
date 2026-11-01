@@ -374,8 +374,14 @@ async function syncToServer(): Promise<void> {
           const added = fresh.entries.filter((entry) => !known.has(entry.id))
           addedElsewhere = added.length
           // The file's raw items also under the ids this device uses for the same entries
-          previous = adoptEntryIds(fresh, written)
-          written = [...written, ...added.map((entry, index) => ({ ...entry, order: written.length + index }))]
+          const adopted = adoptEntryIds(fresh, written)
+          previous = adopted.loaded
+          // An entry added in a group made here sits in it under the group's id here, not the file's
+          written = [...written, ...added.map((entry, index) => ({
+            ...entry,
+            ...(entry.parentId !== undefined ? { parentId: adopted.idMap.get(entry.parentId) ?? entry.parentId } : {}),
+            order: written.length + index,
+          }))]
         }
       } catch {
         // Unknown, not gone: write from what this device has, as before
@@ -600,7 +606,7 @@ export function reorder(vaultId: string, id: string, newIndex: number): void {
  * The entries by the group they sit in (null: the top level), each list in display order. An entry
  * whose group is gone counts as top level.
  */
-function groupByParent(sorted: FavoriteEntry[]): Map<string | null, FavoriteEntry[]> {
+export function groupByParent(sorted: FavoriteEntry[]): Map<string | null, FavoriteEntry[]> {
   const known = new Set(sorted.map((e) => e.id))
   const byParent = new Map<string | null, FavoriteEntry[]>()
   for (const entry of sorted) {
@@ -613,7 +619,7 @@ function groupByParent(sorted: FavoriteEntry[]): Map<string | null, FavoriteEntr
 }
 
 /** `id` and everything that sits inside it, at any depth. */
-function withDescendants(byParent: Map<string | null, FavoriteEntry[]>, id: string): Set<string> {
+export function withDescendants(byParent: Map<string | null, FavoriteEntry[]>, id: string): Set<string> {
   const result = new Set<string>([id])
   const queue = [id]
   while (queue.length > 0) {

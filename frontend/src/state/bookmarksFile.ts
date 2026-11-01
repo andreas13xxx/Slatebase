@@ -135,24 +135,34 @@ function entryKey(entry: FavoriteEntry, byId: Map<string, FavoriteEntry>, seen: 
  * A fresh read of the file, with its raw items also reachable by the ids of `entries` (the cache's).
  * Entries made in Slatebase have random ids while the same items read from the file have derived ones;
  * matching them by what they are lets a write keep the unknown fields and the items inside a group
- * that the file holds for them.
+ * that the file holds for them. `idMap` says which cache id each matched file entry has, for the entries
+ * of the file that sit inside a group (their `parentId` is a file id).
+ *
+ * Limit: an entry changed here since the last write (a renamed group) has a different key than its
+ * file item and is not matched.
  */
-export function adoptEntryIds(fresh: LoadedBookmarks, entries: FavoriteEntry[]): LoadedBookmarks {
+export function adoptEntryIds(fresh: LoadedBookmarks, entries: FavoriteEntry[]): { loaded: LoadedBookmarks; idMap: Map<string, string> } {
   const freshById = new Map(fresh.entries.map((entry) => [entry.id, entry]))
+  const cacheIds = new Set(entries.map((entry) => entry.id))
   const queues = new Map<string, FavoriteEntry[]>()
   for (const entry of fresh.entries) {
+    if (cacheIds.has(entry.id)) continue // the same id in both: matched by that, not up for another entry
     const key = entryKey(entry, freshById)
     queues.set(key, [...(queues.get(key) ?? []), entry])
   }
   const byId = new Map(entries.map((entry) => [entry.id, entry]))
   const rawById = new Map(fresh.rawById)
+  const idMap = new Map<string, string>()
   for (const entry of [...entries].sort((a, b) => a.order - b.order)) {
-    if (rawById.has(entry.id)) continue // the same id in both: already matched
+    if (rawById.has(entry.id)) continue
     const match = queues.get(entryKey(entry, byId))?.shift()
     const raw = match !== undefined ? fresh.rawById.get(match.id) : undefined
-    if (raw !== undefined) rawById.set(entry.id, raw)
+    if (match !== undefined && raw !== undefined) {
+      rawById.set(entry.id, raw)
+      idMap.set(match.id, entry.id)
+    }
   }
-  return { entries: fresh.entries, items: fresh.items, rawById }
+  return { loaded: { entries: fresh.entries, items: fresh.items, rawById }, idMap }
 }
 
 /** The item for an entry, on top of the raw item it came from (if any) so unknown fields survive. */
@@ -198,25 +208,28 @@ export interface BuiltItems {
  * reordered, removed or added. Items it does not show keep their place; the entries of a level take
  * the places of the ones they replace in their new order, new entries go to the end of their group.
  * A group keeps the items inside it that Slatebase does not show. An entry whose group no longer
- * exists goes to the top level.
+ * exists (or is not a group), and entries that hang in a loop of stored data, go to the top level.
  */
 export function entriesToItems(entries: FavoriteEntry[], previous: LoadedBookmarks): BuiltItems {
-  const known = new Set(entries.map((entry) => entry.id))
+  const groups = new Set(entries.filter((entry) => (entry.type ?? 'file') === 'group').map((entry) => entry.id))
   const children = new Map<string | undefined, FavoriteEntry[]>()
   for (const entry of [...entries].sort((a, b) => a.order - b.order)) {
-    const parent = entry.parentId !== undefined && known.has(entry.parentId) ? entry.parentId : undefined
+    const parent = entry.parentId !== undefined && groups.has(entry.parentId) ? entry.parentId : undefined
     const list = children.get(parent) ?? []
     list.push(entry)
     children.set(parent, list)
   }
   const shown = new Set(previous.rawById.values())
   const ids: string[] = []
+  const placed = new Set<string>()
 
   // `source` is what the file had at this level (empty for a new group)
   const build = (parentId: string | undefined, source: unknown[]): RawItem[] => {
     const queue = [...(children.get(parentId) ?? [])]
     const result: RawItem[] = []
     const place = (entry: FavoriteEntry): void => {
+      if (placed.has(entry.id)) return
+      placed.add(entry.id)
       ids.push(entry.id)
       const raw = previous.rawById.get(entry.id)
       const item = entryToItem(entry, raw)
@@ -237,5 +250,20 @@ export function entriesToItems(entries: FavoriteEntry[], previous: LoadedBookmar
     for (const entry of queue) place(entry)
     return result
   }
-  return { items: build(undefined, previous.items), ids }
+  const items = build(undefined, previous.items)
+  // Entries only a loop of stored data leads to are not reached from the top level; they go to its end
+  for (const entry of entries) {
+    if (placed.has(entry.id)) continue
+    const { parentId: _loop, ...top } = entry
+    const raw = previous.rawById.get(entry.id)
+    ids.push(entry.id)
+    placed.add(entry.id)
+    const item = entryToItem(top, raw)
+    if ((entry.type ?? 'file') === 'group') {
+      const inner = raw?.['items']
+      item['items'] = build(entry.id, Array.isArray(inner) ? inner : [])
+    }
+    items.push(item)
+  }
+  return { items, ids }
 }
