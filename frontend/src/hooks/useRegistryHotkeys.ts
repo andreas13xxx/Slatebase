@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { OBSIDIAN_COMMAND_ALIASES } from '@slatebase/shared-contracts'
 import type { Command, ICommandRegistry } from '../plugins/compat/command-registry'
-import { getShortcuts, matchesParsed, parseShortcut, isOverridden } from '../state/keybindingsStore'
+import { DEFAULT_KEYBINDINGS, getShortcuts, matchesParsed, matchesShortcut, parseShortcut, isOverridden } from '../state/keybindingsStore'
 
 /** Obsidian IDs of commands Slatebase handles natively (their own keydown handlers). */
 export const NATIVE_TWINS: ReadonlySet<string> = new Set(Object.values(OBSIDIAN_COMMAND_ALIASES))
@@ -26,10 +26,12 @@ export function registryShortcuts(command: Command): string[] {
  * press needs Ctrl, Alt or Cmd, or is a function key. Commands Slatebase handles itself are skipped.
  */
 export function findRegistryCommand(event: KeyboardEvent, commands: Command[]): Command | null {
-  if (event.defaultPrevented || event.isComposing) return null
+  if (event.defaultPrevented || event.isComposing || event.repeat) return null
   const hasModifier = event.ctrlKey || event.altKey || event.metaKey
   if (!hasModifier && !/^F\d{1,2}$/.test(event.key)) return null
   if (isTextField(event.target)) return null
+  // Slatebase's own commands take their keys first, whatever order the listeners run in.
+  if (DEFAULT_KEYBINDINGS.some(d => matchesShortcut(d.commandId, event))) return null
   for (const command of commands) {
     if (NATIVE_TWINS.has(command.id)) continue
     for (const shortcut of registryShortcuts(command)) {
@@ -42,17 +44,20 @@ export function findRegistryCommand(event: KeyboardEvent, commands: Command[]): 
 
 /**
  * Runs registry commands (Obsidian's core commands and plugins') from the shortcuts of the vault's
- * hotkeys.json. A key the editor or a native handler already took (`defaultPrevented`) is left alone.
+ * hotkeys.json. A key the editor or a native handler already took (`defaultPrevented`) is left alone,
+ * and so is a key whose command cannot run now (no editor open): the browser keeps it then.
+ * Does nothing while `enabled` is false (the plugin compatibility feature is off).
  */
-export function useRegistryHotkeys(registry: ICommandRegistry): void {
+export function useRegistryHotkeys(registry: ICommandRegistry, enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) return
     const onKeyDown = (event: KeyboardEvent) => {
       const command = findRegistryCommand(event, registry.getCommands())
-      if (!command) return
+      if (!command || !registry.canExecute(command.id)) return
       event.preventDefault()
       registry.executeCommand(command.id)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [registry])
+  }, [registry, enabled])
 }

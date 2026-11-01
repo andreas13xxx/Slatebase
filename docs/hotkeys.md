@@ -20,7 +20,7 @@ bound, unbound and reset, and are written to the vault's `hotkeys.json` under th
    (`preventDefault`) is not offered to the registry.
 2. `useRegistryHotkeys` looks through the registry for a command whose shortcut matches. The vault file wins; a
    command the file does not name uses the `hotkeys` its plugin declared; a command the file unbinds (`[]`) uses none.
-3. A key without Ctrl, Alt or Cmd never counts, except function keys, so typing is not swallowed. In `<input>`,
+3. A key without Ctrl, Alt or Cmd never counts, except function keys, so typing is not swallowed; a held key does not repeat the command. In `<input>`,
    `<textarea>` and `<select>` nothing runs; the note editor counts as an editor.
 4. Commands that Slatebase handles itself (the alias targets such as `app:open-settings`, `switcher:open`) are
    skipped here, so one key press never runs a command twice.

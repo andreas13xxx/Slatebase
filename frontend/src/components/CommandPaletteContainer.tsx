@@ -594,7 +594,7 @@ export function CommandPaletteContainer({
 
   // Every other registry command (Obsidian's core commands, plugins') runs from the shortcut the
   // vault's hotkeys.json gives it. Registered after the handlers above, which take their keys first.
-  useRegistryHotkeys(commandRegistry)
+  useRegistryHotkeys(commandRegistry, pluginCompatEnabled)
 
   const handleQuickSwitcherClose = useCallback(() => {
     setQuickSwitcherOpen(false)

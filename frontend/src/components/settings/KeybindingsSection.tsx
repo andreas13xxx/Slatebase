@@ -11,8 +11,8 @@ import React from 'react'
 import {
   getAllBindings,
   setShortcut,
-  addShortcut,
-  removeShortcut,
+  setShortcuts,
+  getShortcuts,
   isMacPlatform,
   resetShortcut,
   resetAll,
@@ -24,6 +24,7 @@ import {
   type KeybindingCategory,
 } from '../../state/keybindingsStore'
 import { PluginContext } from '../../plugins/compat/plugin-context'
+import { FeatureContext } from '../../state/featureContext'
 import { NATIVE_TWINS, registryShortcuts } from '../../hooks/useRegistryHotkeys'
 import { showToast } from '../ToastNotification'
 import { SettingSection, Button } from './ui'
@@ -51,6 +52,23 @@ export function KeybindingsSection() {
   const [adding, setAdding] = useState(false)
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Obsidian's core commands and plugins' commands come from the command registry (outside the
+  // plugin provider, e.g. in tests, or with plugin compatibility off, there are none).
+  const pluginCompat = useContext(FeatureContext)?.isEnabled('obsidian-plugin-compat') ?? false
+  const pluginRegistry = useContext(PluginContext)?.commandRegistry
+  const registry = pluginCompat ? pluginRegistry : undefined
+
+  /** The shortcuts a command answers to now; for a registry command that includes the hotkeys its plugin declares. */
+  const shortcutsOf = useCallback((commandId: string): string[] => {
+    const command = registry?.getCommand(commandId)
+    return command && !NATIVE_TWINS.has(commandId) ? registryShortcuts(command) : getShortcuts(commandId)
+  }, [registry])
+
+  const labelOf = useCallback(
+    (commandId: string): string => DEFAULT_KEYBINDINGS.find(d => d.commandId === commandId)?.label ?? registry?.getCommand(commandId)?.name ?? commandId,
+    [registry],
+  )
 
   // Refresh bindings from store
   const refreshBindings = useCallback(() => {
@@ -124,19 +142,17 @@ export function KeybindingsSection() {
     // Check for conflicts
     const conflict = findConflict(recordedKeys, editingId)
     if (conflict) {
-      const conflictDef = DEFAULT_KEYBINDINGS.find(d => d.commandId === conflict)
-      const conflictLabel = conflictDef?.label ?? conflict
-      showToast('error', `Konflikt: "${recordedKeys}" wird bereits für "${conflictLabel}" verwendet`)
+      showToast('error', `Konflikt: "${recordedKeys}" wird bereits für "${labelOf(conflict)}" verwendet`)
       return
     }
 
-    if (adding) addShortcut(editingId, recordedKeys)
+    if (adding) setShortcuts(editingId, [...shortcutsOf(editingId), recordedKeys])
     else setShortcut(editingId, recordedKeys)
     setEditingId(null)
     setRecordedKeys('')
     refreshBindings()
     showToast('success', 'Tastaturkürzel gespeichert')
-  }, [editingId, recordedKeys, adding, refreshBindings])
+  }, [editingId, recordedKeys, adding, refreshBindings, shortcutsOf, labelOf])
 
   /** Unbind a shortcut (set to empty). */
   const handleUnbind = useCallback((commandId: string) => {
@@ -164,9 +180,7 @@ export function KeybindingsSection() {
     b.label.toLowerCase().includes(needle) ||
     b.commandId.toLowerCase().includes(needle) ||
     b.effectiveShortcuts.some(s => formatShortcut(s).toLowerCase().includes(needle))
-  // Obsidian's core commands and plugins' commands from the command registry (outside the plugin
-  // provider, e.g. in tests, there are none). The ones Slatebase binds itself are listed above.
-  const registry = useContext(PluginContext)?.commandRegistry
+  // The registry commands Slatebase does not bind itself (those are listed above).
   const registryItems: typeof bindings = (registry?.getCommands() ?? [])
     .filter(c => !NATIVE_TWINS.has(c.id))
     .map(c => {
@@ -271,7 +285,7 @@ export function KeybindingsSection() {
                             key={shortcut}
                             type="button"
                             className="keybindings-btn keybindings-btn--unbind"
-                            onClick={() => { removeShortcut(item.commandId, shortcut); refreshBindings() }}
+                            onClick={() => { setShortcuts(item.commandId, shortcutsOf(item.commandId).filter(s => s !== shortcut)); refreshBindings() }}
                             title={`Nur ${formatShortcut(shortcut)} entfernen`}
                             aria-label={`Nur ${formatShortcut(shortcut)} entfernen`}
                           >

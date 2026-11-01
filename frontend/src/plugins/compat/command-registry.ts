@@ -50,6 +50,8 @@ export interface ICommandRegistry {
   getCommands(): Command[];
   getCommand(commandId: string): Command | undefined;
   executeCommand(commandId: string): void;
+  /** Whether {@link executeCommand} would do something now (an editor is open for editor commands, a check passes). */
+  canExecute(commandId: string): boolean;
   searchCommands(query: string): Command[];
   registerHotkey(commandId: string, hotkey: Hotkey): boolean;
   unregisterHotkey(commandId: string, hotkey: Hotkey): void;
@@ -239,6 +241,24 @@ export class CommandRegistry implements ICommandRegistry {
         `[CommandRegistry] Exception executing command "${commandId}":`,
         err
       );
+    }
+  }
+
+  /**
+   * Whether executeCommand would run something right now: same order as there (editor callbacks only
+   * with an open editor), with a `checkCallback` asked in checking mode. Never runs a command.
+   */
+  canExecute(commandId: string): boolean {
+    const cmd = this.commands.get(commandId);
+    if (!cmd) return false;
+    try {
+      const editorCtx = this.editorContextResolver?.();
+      if (editorCtx && cmd.editorCheckCallback) return cmd.editorCheckCallback(true, editorCtx.editor, editorCtx) !== false;
+      if (editorCtx && cmd.editorCallback) return true;
+      if (cmd.checkCallback) return cmd.checkCallback(true) !== false;
+      return cmd.callback !== undefined;
+    } catch {
+      return false;
     }
   }
 

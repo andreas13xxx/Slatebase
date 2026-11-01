@@ -368,7 +368,9 @@ export function matchesParsed(parsed: ParsedShortcut, event: KeyboardEvent): boo
   if (event.shiftKey !== parsed.shift) return false
   if (event.altKey !== parsed.alt) return false
   if (event.metaKey !== parsed.meta) return false
-  return eventKey(event) === parsed.key
+  if (eventKey(event) === parsed.key) return true
+  // A digit with Shift or Alt held reports another character (`!`, `¡`); the physical key still says which.
+  return /^\d$/.test(parsed.key) && (event.code === `Digit${parsed.key}` || event.code === `Numpad${parsed.key}`)
 }
 
 /**
