@@ -539,6 +539,24 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
     expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_TAB' }))
   })
 
+  it('editor:toggle-source flips source -> live-preview', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'source', lastEditMode: 'source' })], activeTabId: 'vault-1::note.md' }
+    registry.executeCommand('editor:toggle-source')
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'live-preview' } })
+  })
+
+  it('editor:toggle-source flips live-preview -> source', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'live-preview', lastEditMode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
+    registry.executeCommand('editor:toggle-source')
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'source' } })
+  })
+
+  it('editor:toggle-source from reading returns to the last edit mode', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'reading', lastEditMode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
+    registry.executeCommand('editor:toggle-source')
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'live-preview' } })
+  })
+
   it('editor:open-search opens the CM6 search panel', () => {
     registry.executeCommand('editor:open-search')
 

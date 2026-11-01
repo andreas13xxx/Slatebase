@@ -1334,6 +1334,7 @@ function AppContent() {
                   filePath={breadcrumbFilePath}
                   onSegmentClick={handleBreadcrumbSegmentClick}
                   {...(activeTab && !activeTab.isBinary
+                    && !activeTab.filePath.startsWith('__')
                     && !activeTab.fileName.endsWith('.canvas')
                     && !activeTab.fileName.endsWith('.base')
                     ? {

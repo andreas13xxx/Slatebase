@@ -22,6 +22,7 @@ export function PaneHeader({ pane, vaults, onSegmentClick, onModeChange }: PaneH
   const tab = pane.tabState.tabs.find((tb) => tb.id === pane.tabState.activeTabId)
   const vault = tab ? vaults.find((v) => v.id === tab.vaultId) : undefined
   const showModeSwitcher = tab !== undefined && !tab.isBinary
+    && !tab.filePath.startsWith('__')
     && !tab.fileName.endsWith('.canvas') && !tab.fileName.endsWith('.base')
   return (
     <EditorHeaderRow>
