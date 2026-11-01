@@ -21,9 +21,8 @@ import { WebViewerPrompt } from './WebViewerPrompt'
 import { WorkspacesModal } from './WorkspacesModal'
 import {
   buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
-  renameWorkspace, deleteWorkspace, onWorkspacesChange,
+  renameWorkspace, deleteWorkspace, onWorkspacesChange, workspaceSaveProblem,
 } from '../state/workspacesStore'
-import { isValidWorkspaceName } from '@slatebase/shared-contracts'
 import { fetchPaneTreeContent } from '../state/paneTreeRestore'
 import { loadPanelLayout, savePanelLayout } from './side-panel/utils/persistence'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
@@ -342,7 +341,8 @@ export function CommandPaletteContainer({
       loadPanelLayout('context'),
     )
     if (!saveWorkspace(ws)) {
-      showToast('error', isValidWorkspaceName(ws.name) ? t('workspaces.limitReached') : t('workspaces.invalidName'))
+      const problem = workspaceSaveProblem(ws)
+      showToast('error', problem === 'limit' ? t('workspaces.limitReached') : problem === 'invalid-name' ? t('workspaces.invalidName') : t('workspaces.noVault'))
       return
     }
     showToast('success', t('workspaces.saved', { name: ws.name }))

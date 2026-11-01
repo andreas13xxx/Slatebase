@@ -948,6 +948,7 @@ export const en: TranslationShape = {
     saved: 'Workspace “{name}” saved.',
     limitReached: 'Maximum number of workspaces reached.',
     invalidName: 'This name is not allowed for a workspace.',
+    noVault: 'No vault is open: the workspace was not saved.',
   },
 
 } as const

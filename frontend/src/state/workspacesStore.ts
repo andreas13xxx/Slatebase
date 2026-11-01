@@ -59,6 +59,12 @@ const listeners = new Set<() => void>()
 /** Writes run one after another, so a rename cannot overtake the save before it. */
 let writeChain: Promise<void> = Promise.resolve()
 let pendingWrites = 0
+/** Bumped on disconnect, so a write that outlives its session cannot touch the next one's counter. */
+let generation = 0
+/** A read was asked for while a write was running or the vault was just switched; do it when the writes are done. */
+let reloadRequested = false
+/** The parsed list for the current `layouts`, so a render does not parse every layout again. */
+let parsedCache: { layouts: Map<string, Layout>; vaultId: string; list: NamedWorkspace[] } | null = null
 /** Skipped-leaf reports already written to the console (once per layout). */
 const reported = new Set<string>()
 
@@ -73,6 +79,9 @@ export function disconnect(): void {
   activeName = null
   writeChain = Promise.resolve()
   pendingWrites = 0
+  generation++
+  reloadRequested = false
+  parsedCache = null
   try {
     for (const key of Object.keys(localStorage)) if (key.startsWith(TAKEN_OVER_PREFIX)) localStorage.removeItem(key)
   } catch {
@@ -134,10 +143,18 @@ export function parseWorkspace(data: unknown): NamedWorkspace | null {
   return ws
 }
 
+/** A short fingerprint of a layout tree, to notice that it was changed after Slatebase saved it. */
+function fingerprint(value: unknown): string {
+  const text = JSON.stringify(value)
+  let hash = 5381
+  for (let i = 0; i < text.length; i++) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0
+  return hash.toString(16)
+}
+
 /** The file entry for a workspace: Obsidian's layout plus Slatebase's own snapshot. */
 function toLayout(ws: NamedWorkspace, vaultId: string): Layout {
   const { main, active, lastOpenFiles } = paneTreeToObsidian(ws.paneTree, vaultId)
-  const slatebase: Layout = { savedAt: ws.savedAt, paneTree: ws.paneTree }
+  const slatebase: Layout = { savedAt: ws.savedAt, paneTree: ws.paneTree, mainHash: fingerprint(main) }
   if (ws.sidebarPanel) slatebase['sidebarPanel'] = ws.sidebarPanel
   if (ws.contextPanel) slatebase['contextPanel'] = ws.contextPanel
   return { main, active, lastOpenFiles, slatebase }
@@ -148,15 +165,15 @@ function fromLayout(name: string, layout: unknown, vaultId: string): NamedWorksp
   if (!isObject(layout)) return null
   const own = isObject(layout['slatebase']) ? layout['slatebase'] : null
   const exact = own ? parsePersistedPaneTree(own['paneTree']) : null
-  if (own && exact) {
-    return {
-      name,
-      savedAt: typeof own['savedAt'] === 'string' ? own['savedAt'] : new Date(0).toISOString(),
-      paneTree: exact,
-      ...(isObject(own['sidebarPanel']) ? { sidebarPanel: own['sidebarPanel'] as unknown as PersistedPanelLayout } : {}),
-      ...(isObject(own['contextPanel']) ? { contextPanel: own['contextPanel'] as unknown as PersistedPanelLayout } : {}),
-    }
+  // The exact snapshot is only right while `main` is what Slatebase wrote: a layout changed in Obsidian
+  // since (a different fingerprint) is read from `main`, keeping Slatebase's panel layouts
+  const unchanged = own !== null && (own['mainHash'] === undefined || own['mainHash'] === fingerprint(layout['main']))
+  const savedAt = own && typeof own['savedAt'] === 'string' ? own['savedAt'] : new Date(0).toISOString()
+  const panels = {
+    ...(own && isObject(own['sidebarPanel']) ? { sidebarPanel: own['sidebarPanel'] as unknown as PersistedPanelLayout } : {}),
+    ...(own && isObject(own['contextPanel']) ? { contextPanel: own['contextPanel'] as unknown as PersistedPanelLayout } : {}),
   }
+  if (exact && unchanged) return { name, savedAt, paneTree: exact, ...panels }
   const converted = obsidianToPaneTree(layout['main'], vaultId)
   if (!converted) return null
   const key = `${vaultId}\0${name}`
@@ -164,7 +181,7 @@ function fromLayout(name: string, layout: unknown, vaultId: string): NamedWorksp
     reported.add(key)
     console.warn(`[workspaces.json] ${name}: ${converted.skipped} element(s) of the layout cannot be shown in Slatebase; they stay in the file`)
   }
-  return { name, savedAt: new Date(0).toISOString(), paneTree: converted.tree }
+  return { name, savedAt, paneTree: converted.tree, ...panels }
 }
 
 // ─── Reading ─────────────────────────────────────────────────────────────────
@@ -173,7 +190,10 @@ function fromLayout(name: string, layout: unknown, vaultId: string): NamedWorksp
 export function getWorkspaces(): NamedWorkspace[] {
   if (!currentVaultId) return []
   const vaultId = currentVaultId
-  return [...layouts].map(([name, layout]) => fromLayout(name, layout, vaultId)).filter((w): w is NamedWorkspace => w !== null)
+  if (parsedCache && parsedCache.layouts === layouts && parsedCache.vaultId === vaultId) return parsedCache.list
+  const list = [...layouts].map(([name, layout]) => fromLayout(name, layout, vaultId)).filter((w): w is NamedWorkspace => w !== null)
+  parsedCache = { layouts, vaultId, list }
+  return list
 }
 
 /** Finds a workspace by name (case-insensitive). */
@@ -199,9 +219,7 @@ function applyFile(config: Record<string, unknown>): void {
 
 /** The name the file already uses for `name` ignoring case, else `name`. */
 function fileNameFor(name: string): string {
-  const lower = name.toLowerCase()
-  for (const existing of layouts.keys()) if (existing.toLowerCase() === lower) return existing
-  return name
+  return findByLowerName(name) ?? name
 }
 
 // ─── Loading the file ────────────────────────────────────────────────────────
@@ -221,14 +239,20 @@ export async function loadVaultWorkspaces(vaultId: string): Promise<boolean> {
     activeName = null
     notify()
   }
-  if (pendingWrites > 0) return false
+  if (pendingWrites > 0) {
+    reloadRequested = true
+    return false
+  }
   let config: Record<string, unknown>
   try {
     config = await client.getWorkspacesConfig(vaultId)
   } catch {
     return false // unknown, not gone: the cache stays
   }
-  if (currentVaultId !== vaultId || pendingWrites > 0) return false
+  if (currentVaultId !== vaultId || pendingWrites > 0) {
+    if (currentVaultId === vaultId) reloadRequested = true
+    return false
+  }
   applyFile(config)
   if (!isTakenOver(vaultId)) await takeOverUserWorkspaces(client, vaultId)
   notify()
@@ -237,7 +261,15 @@ export async function loadVaultWorkspaces(vaultId: string): Promise<boolean> {
 
 /** Moves the per-user workspaces of older versions into the file. */
 async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Promise<void> {
-  const legacy = (Array.isArray(getVaultSettings().workspaces) ? getVaultSettings().workspaces : [])
+  // The server's own copy of this vault's settings, read here: the settings store may not have loaded
+  // yet, or may be showing another vault
+  let stored: unknown
+  try {
+    stored = (await client.getVaultSettings(vaultId)).settings.workspaces
+  } catch {
+    return // not known yet: try again the next time this vault is opened
+  }
+  const legacy = (Array.isArray(stored) ? stored : [])
     .map(parseWorkspace)
     .filter((w): w is NamedWorkspace => w !== null && isValidWorkspaceName(w.name))
   if (legacy.length === 0) {
@@ -270,12 +302,19 @@ async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Prom
     }
     taken.set(free.toLowerCase(), free)
   }
+  pendingWrites++ // a read of the file must not overwrite the cache with the state from before this write
+  const session = generation
   try {
     applyFile(await client.patchWorkspacesConfig(vaultId, { workspaces: patch }))
+    await client.saveVaultSettings(vaultId, { workspaces: [] })
   } catch {
-    return // no write access or server down: try again the next time this vault is opened
+    // No write access or server down: try again the next time this vault is opened. If the file took the
+    // layouts and the old list is still there, that run finds the names taken and keeps what the file has.
+    return
+  } finally {
+    if (session === generation) pendingWrites--
   }
-  updateVaultSettings({ workspaces: [] })
+  if (getVaultSettings().workspaces.length > 0) updateVaultSettings({ workspaces: [] })
   markTakenOver(vaultId)
 }
 
@@ -314,30 +353,48 @@ function markTakenOver(vaultId: string): void {
 function write(vaultId: string, patch: Record<string, unknown>): void {
   const client = apiClient
   if (!client) return
+  const session = generation
   pendingWrites++
-  writeChain = writeChain.then(async () => {
-    try {
-      const saved = await client.patchWorkspacesConfig(vaultId, patch)
-      reportSyncSuccess(SYNC_STORE_KEY)
-      if (currentVaultId === vaultId && pendingWrites === 1) {
-        applyFile(saved)
-        notify()
-      }
-    } catch (error) {
-      reportSyncFailure(SYNC_STORE_KEY, error, 'Arbeitsbereiche')
-      if (currentVaultId === vaultId && pendingWrites === 1) {
-        // What was refused must not stay on screen as if saved: show the file again
-        try {
-          applyFile(await client.getWorkspacesConfig(vaultId))
+  writeChain = writeChain
+    .then(async () => {
+      if (session !== generation) return // logged out meanwhile
+      try {
+        const saved = await client.patchWorkspacesConfig(vaultId, patch)
+        reportSyncSuccess(SYNC_STORE_KEY)
+        if (session === generation && currentVaultId === vaultId && pendingWrites === 1) {
+          applyFile(saved)
           notify()
-        } catch {
-          // The cache stays; the next read corrects it
+        }
+      } catch (error) {
+        reportSyncFailure(SYNC_STORE_KEY, error, 'Arbeitsbereiche')
+        if (session === generation && currentVaultId === vaultId && pendingWrites === 1) {
+          // What was refused must not stay on screen as if saved: show the file again
+          try {
+            applyFile(await client.getWorkspacesConfig(vaultId))
+            notify()
+          } catch {
+            // The cache stays; the next read corrects it
+          }
         }
       }
-    } finally {
+    })
+    .catch(() => undefined) // one failing write must not stop the ones after it
+    .finally(() => {
+      if (session !== generation) return
       pendingWrites--
-    }
-  })
+      // A read that was held back while writing (the file changed elsewhere, or the vault was switched)
+      if (pendingWrites === 0 && reloadRequested && currentVaultId) {
+        reloadRequested = false
+        void loadVaultWorkspaces(currentVaultId)
+      }
+    })
+}
+
+/** Why {@link saveWorkspace} refused a workspace, for the message. */
+export function workspaceSaveProblem(ws: NamedWorkspace): 'no-vault' | 'invalid-name' | 'limit' {
+  if (!currentVaultId) return 'no-vault'
+  if (!isValidWorkspaceName(ws.name)) return 'invalid-name'
+  return 'limit'
 }
 
 /**
