@@ -1,5 +1,77 @@
 # Changelog
 
+## [0.71.0](https://github.com/andreas13xxx/Slatebase/compare/v0.70.0...v0.71.0) (2026-11-01)
+
+
+### Features
+
+* **app-config:** keep the previous alwaysUpdateLinks default in existing vaults ([d1a9998](https://github.com/andreas13xxx/Slatebase/commit/d1a9998e8c22daa3dd8ffa79e079886ffc1c30a6))
+* **app-config:** make alwaysUpdateLinks switchable and add vault.setConfig ([346769f](https://github.com/andreas13xxx/Slatebase/commit/346769f52d3ebd7121fde4bb533a49bd224509db))
+* **app-config:** shared key table, Obsidian defaults and console diagnostics ([dcfee47](https://github.com/andreas13xxx/Slatebase/commit/dcfee47a120b439d99ac6c6767ba4a062f522154))
+* **app-json:** functions behind the stored editor and file keys, with settings ([7cd1228](https://github.com/andreas13xxx/Slatebase/commit/7cd1228f7cd6a3857a5ae1e410da7a4b4be06c63))
+* **appearance:** accent colour, fonts, font size and vault base theme in the UI ([7154d44](https://github.com/andreas13xxx/Slatebase/commit/7154d44b0fb00c11967c7427c77ef39c2ac21f40))
+* **appearance:** backend for appearance.json (accent colour, font size, fonts, base theme) ([8d608a5](https://github.com/andreas13xxx/Slatebase/commit/8d608a5695a4f17e4578ca242893afa807ee1e01))
+* **bookmarks:** backend for the vault's bookmarks.json ([e4322e0](https://github.com/andreas13xxx/Slatebase/commit/e4322e0243452d922424a3c4ba7ce4656fddda73))
+* **bookmarks:** keep the vault's bookmarks in Obsidian's bookmarks.json ([23faeac](https://github.com/andreas13xxx/Slatebase/commit/23faeac11df54dd1b49f5c2a25ec99430de9b5c1))
+* **daily-notes:** name daily notes by the Moment format in daily-notes.json ([41d027b](https://github.com/andreas13xxx/Slatebase/commit/41d027b74d3a7a8003bb9eb3b1e6f7cea15f4879))
+* **git-sync:** sync workspaces.json and resolve config file conflicts on its own ([c4d3fcf](https://github.com/andreas13xxx/Slatebase/commit/c4d3fcf5b032ff8d3778ef0366c6690a94c8a172))
+* **graph:** keep the graph forces and the tag switch in the vault's graph.json ([e22dfa8](https://github.com/andreas13xxx/Slatebase/commit/e22dfa8455ea737d2881b7d18bba2e4fd5d4c5df))
+* **hotkeys:** app.hotkeyManager reads and writes the vault's hotkeys.json ([1c7563d](https://github.com/andreas13xxx/Slatebase/commit/1c7563d761d0c8cf0312d477830a4d03dec16b6c))
+* **hotkeys:** backend for the vault's hotkeys.json ([e1bf4fd](https://github.com/andreas13xxx/Slatebase/commit/e1bf4fdfd2297661ec44129e512788f72180735b))
+* **hotkeys:** keep the vault's key bindings in Obsidian's hotkeys.json ([0b95091](https://github.com/andreas13xxx/Slatebase/commit/0b950913caeb84c0e35d25767658ebc940c82550))
+* **hotkeys:** run Obsidian's core commands and plugin commands from hotkeys.json ([921dfa8](https://github.com/andreas13xxx/Slatebase/commit/921dfa80b0e3e831e75dbc0636e690d8f2a41993))
+* Obsidian compatibility for app.json, appearance.json, daily notes, types.json and git sync ([cc72444](https://github.com/andreas13xxx/Slatebase/commit/cc7244453f1e55818eadfa9d347117c4a9106330))
+* **plugins:** raise the plugin size limits from one shared definition ([4481885](https://github.com/andreas13xxx/Slatebase/commit/448188558194c05857c04ada0cdd69867758a294))
+* **property-types:** keep the property types in Obsidian's types.json ([8cf0537](https://github.com/andreas13xxx/Slatebase/commit/8cf0537021f778e8b2a0dd93a76c0ffe08c71a9d))
+* **ui:** add palette commands for profile and sessions settings ([8afb5e1](https://github.com/andreas13xxx/Slatebase/commit/8afb5e18c6ba1b24fbb4b9f641dfd457069d15bd))
+* **ui:** add palette commands for profile and sessions settings ([0286f81](https://github.com/andreas13xxx/Slatebase/commit/0286f8173c5dbe3cc951699d581c866f1503366d))
+* **ui:** replace user menu page entries with a Settings item ([9951431](https://github.com/andreas13xxx/Slatebase/commit/99514317292ac9d79cb1e54b8ae48e49d8c305d2))
+* **ui:** replace user menu page entries with a Settings item ([ed883ac](https://github.com/andreas13xxx/Slatebase/commit/ed883acfe194901e32f2b4aa608da9da579d617e))
+* **vault-config:** migrate all legacy settings into Obsidian files at start ([d089fda](https://github.com/andreas13xxx/Slatebase/commit/d089fda75a005bd1ce0adba8dbfff862bfc41407))
+* **vault-config:** migrate all legacy settings into Obsidian files at start ([f635a42](https://github.com/andreas13xxx/Slatebase/commit/f635a428a06cd29a8d0aa03ab8ef1cb872dd41fe))
+* **workspaces:** backend for the vault's workspaces.json ([c7be530](https://github.com/andreas13xxx/Slatebase/commit/c7be530a49ac3a1e9bd884b45858bc2e9aef9f6a))
+* **workspaces:** keep the vault's saved layouts in Obsidian's workspaces.json ([3f26889](https://github.com/andreas13xxx/Slatebase/commit/3f26889b5c908353f023b8fc3053553d38ba1ed3))
+
+
+### Bugfixes
+
+* **app-config:** review findings for alwaysUpdateLinks and vault.setConfig ([64d7213](https://github.com/andreas13xxx/Slatebase/commit/64d72131b90fe8cd68cb0ddc3ca5b75af7d6e98b))
+* **app-config:** review findings for the shared key table ([2bbd43d](https://github.com/andreas13xxx/Slatebase/commit/2bbd43df066f0449ab2da08550486083b04dc395))
+* **app-config:** run the defaults migration as a single pass ([9db7bb3](https://github.com/andreas13xxx/Slatebase/commit/9db7bb3aab99791cd0d55f65e10f8bcefdd3d62a))
+* **app-json:** review findings for the editor and file settings ([3b1eeff](https://github.com/andreas13xxx/Slatebase/commit/3b1eeff6f7104e8ce0fe81611275fa81e37d3eca))
+* **appearance:** review findings for the appearance UI ([7f9deb6](https://github.com/andreas13xxx/Slatebase/commit/7f9deb642ff90bd8ba9ef8b2d17256305c5ad674))
+* **bookmarks:** review findings for the bookmarks.json store ([6bc7160](https://github.com/andreas13xxx/Slatebase/commit/6bc7160b8b1c6692dd803ab779ca067218ef9350))
+* **daily-notes:** review findings for the daily note format ([2dafd51](https://github.com/andreas13xxx/Slatebase/commit/2dafd51fb56bea8f03de059c3f59093f32bc6f4c))
+* **git-sync:** review findings for the config conflict resolution ([d45b45d](https://github.com/andreas13xxx/Slatebase/commit/d45b45daa411d65bbbcc231f92ba070762bfe394))
+* **graph:** review findings for graph.json ([470e493](https://github.com/andreas13xxx/Slatebase/commit/470e493877b593319b3760d2e9bd9d799eaf7827))
+* **hotkeys:** review findings for app.hotkeyManager ([4ca0691](https://github.com/andreas13xxx/Slatebase/commit/4ca0691974690937cbfb92fe8e68eab4b9852f5b))
+* **hotkeys:** review findings for the hotkeys.json store ([c969ee3](https://github.com/andreas13xxx/Slatebase/commit/c969ee30bd741c16b2d19ba7e3c5ea08b0d0722c))
+* **hotkeys:** review findings for the registry hotkeys ([901010b](https://github.com/andreas13xxx/Slatebase/commit/901010b356c3edeacbf86b83950f4aa28eb96954))
+* **plugin-compat:** emulate app.viewRegistry.typeByExtension ([c6b1607](https://github.com/andreas13xxx/Slatebase/commit/c6b1607cbb4962b526715ae85ab7246db1960bac))
+* **plugin-compat:** emulate app.viewRegistry.typeByExtension ([2726034](https://github.com/andreas13xxx/Slatebase/commit/272603467a1cce8e5501d0c6aa39f238eedaa8ba))
+* **plugin-compat:** make app.viewRegistry.registerExtensions a visible no-op ([47599a7](https://github.com/andreas13xxx/Slatebase/commit/47599a7e36955fa88076021542fbf18c91312540))
+* **plugins:** review findings for the plugin size limits ([74ec50f](https://github.com/andreas13xxx/Slatebase/commit/74ec50fb1af398eb4f175a480fc5fcd4e55e0152))
+* **property-types:** review findings for the types.json store ([f4531ce](https://github.com/andreas13xxx/Slatebase/commit/f4531ce70bdc91432b22976006abf8295b216f65))
+* review findings (bookmarks re-read before write, take-over markers, workspace cap) ([9ac5580](https://github.com/andreas13xxx/Slatebase/commit/9ac55808c7a3eb44a5ac5de299366f2ceebfb9f0))
+* review findings (plugin ZIP size, types.json cap, editor defaults, git-sync format) ([a32b4f8](https://github.com/andreas13xxx/Slatebase/commit/a32b4f8bab01710dc72416acf357d354e5d5a676))
+* **ui:** address review findings for the user menu settings entry ([b424710](https://github.com/andreas13xxx/Slatebase/commit/b424710e0787d342641bcecf72a8bf5564378b08))
+* **vault-config:** address review findings of the settings migration ([d7ceae1](https://github.com/andreas13xxx/Slatebase/commit/d7ceae15bea9c0e80261bf70a38a4c429734193b))
+* **workspaces:** review findings for the workspaces store ([172e792](https://github.com/andreas13xxx/Slatebase/commit/172e7925bd80e337da9e45f91cb9a1f69648ce42))
+* **workspaces:** type of the remaining legacy list for the build ([c7b8383](https://github.com/andreas13xxx/Slatebase/commit/c7b83833a59eecb0f02a0e415a5f8800384e970a))
+
+
+### Sonstige Änderungen
+
+* final reference for the .obsidian config files (structure, README, route authorization, AGENTS) ([34a1309](https://github.com/andreas13xxx/Slatebase/commit/34a13099848743c6595e1dcaef0b3366733df0b5))
+* graph.json and bookmarks.json in the reference, spec status ([08d8ccf](https://github.com/andreas13xxx/Slatebase/commit/08d8ccf6b034a1f504b415e631e52e4066ca0ca5))
+* hotkeys.json in the reference, route addendum, spec status ([631aa20](https://github.com/andreas13xxx/Slatebase/commit/631aa203267305871451e059c8d17ac284a88002))
+* longer timeout for two large-input tests under coverage ([7d8a2d9](https://github.com/andreas13xxx/Slatebase/commit/7d8a2d9cdd511cf5d8194d916d446f9bec4c1b2c))
+* reference for the .obsidian/ config files and status of the spec ([58e3414](https://github.com/andreas13xxx/Slatebase/commit/58e34145870bf30a3df39fb04e06194817ec29cd))
+* **specs:** add obsidian-app-json-compat spec ([3c59632](https://github.com/andreas13xxx/Slatebase/commit/3c5963207c25466fa70ba52a84bc947e992bb637))
+* **specs:** record file format research and plugin size measurements ([24e82da](https://github.com/andreas13xxx/Slatebase/commit/24e82daedc0126ef6fb9bf360fa183f3c5ef70b3))
+* **ui:** remove unused VaultSharing page and its page labels ([11d4113](https://github.com/andreas13xxx/Slatebase/commit/11d411353956a4a1695905aa1a6fcac57c25d8f6))
+* **ui:** translate settings palette commands and cover them with tests ([58a60ec](https://github.com/andreas13xxx/Slatebase/commit/58a60ec803403daec8bda499f1d909f0861acc9d))
+
 ## [0.70.0](https://github.com/andreas13xxx/Slatebase/compare/v0.69.0...v0.70.0) (2026-10-30)
 
 
