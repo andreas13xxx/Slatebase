@@ -64,6 +64,11 @@ export interface WidgetDecorationOptions {
   typeRegistry?: PropertyTypeEntry[] | null
   /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
+  /**
+   * How the frontmatter shows (app.json `propertiesInDocument`): `visible` as the properties block,
+   * `hidden` not at all, `source` as the raw YAML. Default `visible`.
+   */
+  propertiesInDocument?: 'visible' | 'hidden' | 'source'
   /** API client, for the embedded Bases view (`![[file.base]]`) to query the vault. */
   apiClient?: IBasesEmbedApiClient | null
   /** Whether the `bases` feature is on; an inline ```` ```base ```` block only renders as a table then, else it stays code. */
@@ -1779,12 +1784,19 @@ export function buildWidgetDecorations(
         const fullEnd = afterEnd === '\n' ? fmEnd + 1 : (afterEnd === '\r' ? fmEnd + 2 : fmEnd)
         frontmatterEndPos = Math.min(fullEnd, doc.length)
 
-        const widget = new FrontmatterWidget(yamlContent, state.readOnly, options.typeRegistry, options.onPropertyTypeChange)
-        addStandaloneLineTightening(doc, 0, frontmatterEndPos, decorations, hideableRanges)
-        decorations.push(
-          Decoration.replace({ widget }).range(0, frontmatterEndPos)
-        )
-        hideableRanges.push({ from: 0, to: frontmatterEndPos, groupFrom: 0, groupTo: frontmatterEndPos })
+        const propertiesMode = options.propertiesInDocument ?? 'visible'
+        if (propertiesMode === 'visible') {
+          const widget = new FrontmatterWidget(yamlContent, state.readOnly, options.typeRegistry, options.onPropertyTypeChange)
+          addStandaloneLineTightening(doc, 0, frontmatterEndPos, decorations, hideableRanges)
+          decorations.push(
+            Decoration.replace({ widget }).range(0, frontmatterEndPos)
+          )
+          hideableRanges.push({ from: 0, to: frontmatterEndPos, groupFrom: 0, groupTo: frontmatterEndPos })
+        } else if (propertiesMode === 'hidden') {
+          // Replaced by nothing and not revealed under the cursor: the note starts at its first line of text
+          decorations.push(Decoration.replace({ block: true }).range(0, frontmatterEndPos))
+        }
+        // 'source': no decoration, the YAML stays editable text (frontmatterEndPos still keeps the --- out of the HR scan)
       }
     }
   }

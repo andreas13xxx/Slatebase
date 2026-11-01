@@ -31,6 +31,8 @@ export interface LivePreviewOptions {
   typeRegistry?: PropertyTypeEntry[] | null
   /** Callback to persist an explicit type choice for a property key to the vault's type registry. */
   onPropertyTypeChange?: (key: string, type: PropertyType) => void
+  /** How the frontmatter shows (app.json `propertiesInDocument`); default `visible`. */
+  propertiesInDocument?: 'visible' | 'hidden' | 'source'
   /** API client, for an embedded Bases view (`![[file.base]]`) to query the vault. */
   apiClient?: IBasesEmbedApiClient | null
   /** Whether the `bases` feature is on; gates rendering of inline ```` ```base ```` blocks. */
@@ -132,6 +134,7 @@ function buildDecorations(
     directoryTree: options.directoryTree,
     typeRegistry: options.typeRegistry,
     onPropertyTypeChange: options.onPropertyTypeChange,
+    propertiesInDocument: options.propertiesInDocument,
     apiClient: options.apiClient,
     basesEnabled: options.basesEnabled,
   })

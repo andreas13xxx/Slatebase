@@ -25,7 +25,7 @@ import {
   RemoveFormatting, Plus, Table, List, ListOrdered, ListChecks, FileCode,
   Asterisk, Minus, Brackets, Image, TableProperties, Columns3, Rows3,
   AlignLeft, AlignCenter, AlignRight, GripVertical, ArrowUp, ArrowDown,
-  Trash2, FileOutput, StretchHorizontal, SpellCheck, BookPlus, Ban, Languages,
+  Trash2, FileOutput, StretchHorizontal, SpellCheck, BookPlus, Ban, Languages, ListTree,
 } from 'lucide-react'
 import type { EditorView } from '@codemirror/view'
 import type { ContextMenuItem } from '../components/ContextMenu'
@@ -33,6 +33,8 @@ import { applyFormatting } from './formatting'
 import { editorInfoField } from './editor-state-fields'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { showToast } from '../components/ToastNotification'
+import { getAppConfigValue } from '../state/vaultAppConfigStore'
+import { togglePropertiesInDocument } from '../hooks/propertiesInDocument'
 import { HIGHLIGHT_COLORS } from '../plugins/highlight-colors'
 import {
   learnWord, ignoreWordForSession, refreshSpellcheck,
@@ -474,6 +476,14 @@ export function buildEditorContextMenuItems(
       // lives in EditMode's useReadableLineLength() hook, reached via a
       // window event since this menu only has a plain EditorView reference.
       run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleReadableLineLength' } })),
+    },
+    {
+      id: 'toggle-properties-in-document',
+      label: 'Eigenschaften anzeigen',
+      icon: createElement(ListTree, { size: ICON_SIZE }),
+      checked: getAppConfigValue('propertiesInDocument') === 'visible',
+      // A vault setting (app.json `propertiesInDocument`): visible <-> hidden; raw YAML is chosen in the settings
+      run: () => togglePropertiesInDocument(),
     },
     buildSpellcheckSettingsItem(spellcheck),
   )

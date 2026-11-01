@@ -111,6 +111,7 @@ export function EditorFilesSection() {
   useAppConfigValue('defaultViewMode')
   const defaultViewMode = getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'preview'
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
+  const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const useTab = useAppConfigValue('useTab')
   const tabSize = useAppConfigValue('tabSize')
   const autoPairBrackets = useAppConfigValue('autoPairBrackets')
@@ -191,6 +192,19 @@ export function EditorFilesSection() {
           >
             <option value="preview">Leseansicht</option>
             <option value="source">Bearbeiten</option>
+          </select>
+        </SettingRow>
+        <SettingRow label="Eigenschaften im Dokument" htmlFor="editor-properties-in-document" hint="Wie der Frontmatter-Block am Anfang einer Notiz erscheint: als Eigenschaften, ausgeblendet oder als YAML-Quelltext. Gilt im Editor, in der Leseansicht und in der Hover-Vorschau; die Eigenschaften-Ansicht im Seitenbereich bleibt unverändert.">
+          <select
+            id="editor-properties-in-document"
+            className="settings-field-input"
+            value={propertiesInDocument}
+            disabled={disabled}
+            onChange={(e) => void save({ propertiesInDocument: e.target.value as AppConfigValues['propertiesInDocument'] })}
+          >
+            <option value="visible">Sichtbar</option>
+            <option value="hidden">Ausgeblendet</option>
+            <option value="source">Quelltext</option>
           </select>
         </SettingRow>
         <SettingRow label="Strikte Zeilenumbrüche" htmlFor="editor-strict-breaks" hint="Aus: ein einzelner Zeilenumbruch erscheint in der Leseansicht als Umbruch. An: er bleibt ein Leerzeichen, wie in CommonMark.">

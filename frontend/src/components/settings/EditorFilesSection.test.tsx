@@ -101,6 +101,21 @@ describe('EditorFilesSection', () => {
     await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { foldHeading: false }))
   })
 
+  it('shows and saves how the properties appear in the document', async () => {
+    const client = createClient({ propertiesInDocument: 'hidden' })
+    await renderSection(client)
+    const select = screen.getByLabelText('Eigenschaften im Dokument')
+
+    expect(select).toHaveValue('hidden')
+    fireEvent.change(select, { target: { value: 'source' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { propertiesInDocument: 'source' }))
+  })
+
+  it('shows the properties as visible when the file does not say', async () => {
+    await renderSection(createClient())
+    expect(screen.getByLabelText('Eigenschaften im Dokument')).toHaveValue('visible')
+  })
+
   it('saves a valid tab width on blur and puts back an invalid one', async () => {
     const client = createClient()
     await renderSection(client)

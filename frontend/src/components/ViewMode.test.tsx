@@ -853,6 +853,36 @@ def hello():
       resetAppConfig()
     })
 
+    describe('propertiesInDocument', () => {
+      const note = '---\ntitle: Hello\n---\nBody text'
+      async function renderWith(mode?: string) {
+        resetAppConfig()
+        initializeAppConfig({ getAppConfig: async () => (mode ? { propertiesInDocument: mode } : {}) } as unknown as IApiClient)
+        await setActiveVault('v1')
+        return render(<ViewMode {...defaultProps} content={note} />).container
+      }
+      afterEach(() => { resetAppConfig() })
+
+      it('shows the properties table by default and for visible', async () => {
+        expect((await renderWith()).querySelector('.view-mode-frontmatter')).not.toBeNull()
+        expect((await renderWith('visible')).querySelector('.view-mode-frontmatter')).not.toBeNull()
+      })
+
+      it('drops the frontmatter for hidden', async () => {
+        const container = await renderWith('hidden')
+        expect(container.querySelector('.view-mode-frontmatter')).toBeNull()
+        expect(container.textContent).not.toContain('Hello')
+        expect(container.textContent).toContain('Body text')
+      })
+
+      it('shows the raw YAML with its fences for source', async () => {
+        const container = await renderWith('source')
+        expect(container.querySelector('.view-mode-frontmatter')).toBeNull()
+        expect(container.textContent).toContain('title: Hello')
+        expect(container.textContent).toContain('---')
+      })
+    })
+
     it('renders a literal <br> as a line break', () => {
       const { container } = render(
         <ViewMode {...defaultProps} content={'line one<br>line two'} />

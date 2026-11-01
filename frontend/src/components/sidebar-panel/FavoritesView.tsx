@@ -3,13 +3,17 @@
  * Used as a tab in the sidebar panel (not the collapsible section in FileExplorer).
  *
  * Supports the four bookmark types (file/heading/block/search — Requirements
- * 11-14), manual drag-and-drop reordering (Requirement 1), a context menu
- * for remove/reveal/rename (Requirement 2), and custom display labels
- * (Requirement 3).
+ * 11-14), groups that nest and fold (Obsidian's bookmark groups), manual
+ * drag-and-drop reordering and moving into groups (Requirement 1), a context
+ * menu for remove/reveal/rename/move (Requirement 2), and custom display
+ * labels (Requirement 3).
  */
 
 import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react'
-import { Star, StarOff, Heading, Hash, Search as SearchIcon, FolderOpen, Pencil } from 'lucide-react'
+import {
+  Star, StarOff, Heading, Hash, Search as SearchIcon, FolderOpen, Folder, FolderPlus, FolderInput,
+  ChevronRight, ChevronDown, CornerLeftUp, Pencil, Trash2,
+} from 'lucide-react'
 import { favoritesStore, onFavoritesChange } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { useSearchContext } from '../../state/searchContext'
@@ -17,6 +21,7 @@ import { useAppContext } from '../../state'
 import { performSearch } from '../../state/searchActions'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../../utils/fileIcons'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { ConfirmModal } from '../ConfirmModal'
 import { InlineInput } from '../InlineInput'
 import type { FavoriteEntry } from '../../state/favoritesStore'
 import type { PanelState, PanelAction } from '../../state/panelState'
@@ -55,6 +60,24 @@ interface ContextMenuState {
   y: number
 }
 
+/** One visible line of the list: an entry, how deep it sits, and the group (null: top level) it is in. */
+interface Row {
+  entry: FavoriteEntry
+  depth: number
+  parent: string | null
+}
+
+/** Where a dragged entry would land: before a row, or (on a group) inside it. */
+interface DropTarget {
+  id: string
+  mode: 'before' | 'into'
+}
+
+const DEFAULT_GROUP_NAME = 'Gruppe'
+const NEW_GROUP_NAME = 'Neue Gruppe'
+
+const isGroup = (entry: FavoriteEntry): boolean => entry.type === 'group'
+
 /** Extracts the filename from a full path. */
 function getFileName(filePath: string): string {
   const parts = filePath.split('/')
@@ -65,6 +88,8 @@ function getFileName(filePath: string): string {
 function getEntryDisplayText(entry: FavoriteEntry): string {
   if (entry.label) return entry.label
   switch (entry.type ?? 'file') {
+    case 'group':
+      return DEFAULT_GROUP_NAME
     case 'heading':
       return `${getDisplayName(getFileName(entry.path))} › ${entry.heading ?? ''}`
     case 'block':
@@ -81,6 +106,8 @@ function getEntryTooltip(entry: FavoriteEntry): string {
   switch (entry.type ?? 'file') {
     case 'search':
       return entry.searchQuery ?? ''
+    case 'group':
+      return getEntryDisplayText(entry)
     default:
       return entry.path
   }
@@ -112,11 +139,44 @@ function entryIconClass(entry: FavoriteEntry): string {
   return getFileIconClass(getFileName(entry.path))
 }
 
+/** The entries grouped by the group they sit in. An entry whose group is gone counts as top level. */
+function groupByParent(entries: FavoriteEntry[]): Map<string | null, FavoriteEntry[]> {
+  const known = new Set(entries.map((e) => e.id))
+  const byParent = new Map<string | null, FavoriteEntry[]>()
+  for (const entry of entries) {
+    const parent = entry.parentId !== undefined && known.has(entry.parentId) ? entry.parentId : null
+    const list = byParent.get(parent) ?? []
+    list.push(entry)
+    byParent.set(parent, list)
+  }
+  return byParent
+}
+
+/** The visible lines, depth first; the content of a folded group is left out. */
+function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set<string>): Row[] {
+  const rows: Row[] = []
+  const walk = (parent: string | null, depth: number): void => {
+    for (const entry of byParent.get(parent) ?? []) {
+      rows.push({ entry, depth, parent })
+      if (isGroup(entry) && !collapsed.has(entry.id)) walk(entry.id, depth + 1)
+    }
+  }
+  walk(null, 0)
+  return rows
+}
+
+/** Whether `id` is `ancestorId` or sits somewhere inside it. */
+function isInside(byParent: Map<string | null, FavoriteEntry[]>, id: string, ancestorId: string): boolean {
+  if (id === ancestorId) return true
+  return (byParent.get(ancestorId) ?? []).some((child) => isInside(byParent, id, child.id))
+}
+
 /**
  * Displays all bookmarks for the current vault.
  * Each entry shows a type-appropriate icon + display text and resolves the
- * click according to its bookmark type. Supports drag-and-drop reordering,
- * a context menu (remove/reveal/rename), and custom labels.
+ * click according to its bookmark type. Groups fold and unfold. Supports
+ * drag-and-drop reordering and moving into groups, a context menu
+ * (remove/reveal/rename/move), and custom labels.
  */
 export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _refreshKey, panelState, panelDispatch }: FavoritesViewProps): React.ReactElement {
   const longPress = useLongPress()
@@ -126,7 +186,9 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
-  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const [groupToDelete, setGroupToDelete] = useState<FavoriteEntry | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
   const favorites: FavoriteEntry[] = useMemo(
@@ -134,14 +196,29 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vaultId, _refreshKey, internalRefreshTick]
   )
+  const byParent = useMemo(() => groupByParent(favorites), [favorites])
+  const rows = useMemo(() => buildRows(byParent, collapsed), [byParent, collapsed])
 
   const refresh = useCallback(() => setInternalRefreshTick((n) => n + 1), [])
 
   // The vault's bookmarks.json was read (vault opened, or changed by Obsidian, a sync or another user).
   useEffect(() => onFavoritesChange(refresh), [refresh])
 
+  const toggleCollapsed = useCallback((id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
   const handleEntryClick = useCallback((entry: FavoriteEntry) => {
     const type = entry.type ?? 'file'
+    if (type === 'group') {
+      toggleCollapsed(entry.id)
+      return
+    }
     if (type === 'search') {
       const query = { query: entry.searchQuery ?? '', caseSensitive: entry.searchCaseSensitive, regex: entry.searchRegex }
       if (onOpenSearch) {
@@ -165,7 +242,40 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     onOpenFile(entry.vaultId, entry.path)
     // TODO: scroll-to-heading/scroll-to-block once the editor exposes a
     // programmatic scroll target API for anchors opened outside a rendered link.
-  }, [onOpenFile, onOpenSearch, vaultId, apiClient, searchDispatch])
+  }, [onOpenFile, onOpenSearch, vaultId, apiClient, searchDispatch, toggleCollapsed])
+
+  // ─── Groups ──────────────────────────────────────────────────────────────
+
+  /** Adds a group (inside `parentId` if given) and puts its name into edit mode. */
+  const handleAddGroup = useCallback((parentId?: string) => {
+    if (!vaultId) return
+    const id = favoritesStore.addGroup(vaultId, NEW_GROUP_NAME, parentId)
+    if (id === null) return
+    if (parentId !== undefined) {
+      setCollapsed((prev) => {
+        if (!prev.has(parentId)) return prev
+        const next = new Set(prev)
+        next.delete(parentId)
+        return next
+      })
+    }
+    setRenamingId(id)
+    refresh()
+  }, [vaultId, refresh])
+
+  const handleMove = useCallback((entry: FavoriteEntry, parentId: string | null) => {
+    if (!vaultId) return
+    favoritesStore.moveEntry(vaultId, entry.id, parentId)
+    if (parentId !== null) {
+      setCollapsed((prev) => {
+        if (!prev.has(parentId)) return prev
+        const next = new Set(prev)
+        next.delete(parentId)
+        return next
+      })
+    }
+    refresh()
+  }, [vaultId, refresh])
 
   // ─── Context menu ────────────────────────────────────────────────────────
 
@@ -188,12 +298,17 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
   const handleRemove = useCallback((entry: FavoriteEntry) => {
     if (!vaultId) return
+    // A group with content asks first: the content goes with it
+    if (isGroup(entry) && (byParent.get(entry.id)?.length ?? 0) > 0) {
+      setGroupToDelete(entry)
+      return
+    }
     favoritesStore.removeById(vaultId, entry.id)
     refresh()
-  }, [vaultId, refresh])
+  }, [vaultId, refresh, byParent])
 
   const handleReveal = useCallback((entry: FavoriteEntry) => {
-    if (entry.type === 'search') return
+    if (entry.type === 'search' || isGroup(entry)) return
     // Switch whichever split section is currently showing Favorites over to
     // the Explorer view, then ask FileExplorer to expand/scroll to the path
     // (same event 'file-explorer:reveal-active-file' dispatches).
@@ -222,9 +337,12 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     if (action === 'remove') handleRemove(entry)
     else if (action === 'reveal') handleReveal(entry)
     else if (action === 'rename') handleRenameStart(entry)
-  }, [contextMenu, handleRemove, handleReveal, handleRenameStart])
+    else if (action === 'new-group') handleAddGroup(entry.id)
+    else if (action === 'ungroup') handleMove(entry, null)
+    else if (action.startsWith('move:')) handleMove(entry, action.slice('move:'.length))
+  }, [contextMenu, handleRemove, handleReveal, handleRenameStart, handleAddGroup, handleMove])
 
-  // ─── Drag and drop reorder (Requirement 1) ──────────────────────────────
+  // ─── Drag and drop: reorder and move into groups (Requirement 1) ─────────
 
   const handleDragStart = useCallback((e: React.DragEvent, entry: FavoriteEntry) => {
     setDragId(entry.id)
@@ -232,30 +350,45 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     e.dataTransfer.setData('text/plain', entry.id)
   }, [])
 
-  const handleDragOverItem = useCallback((e: React.DragEvent, index: number) => {
+  const handleDragOverItem = useCallback((e: React.DragEvent, row: Row) => {
     if (!dragId) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDropIndex(index)
+    // On a group, the upper part puts the entry before it, the rest puts it inside
+    let mode: DropTarget['mode'] = 'before'
+    if (isGroup(row.entry)) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      if (e.clientY - rect.top > rect.height * 0.3) mode = 'into'
+    }
+    setDropTarget((prev) => (prev?.id === row.entry.id && prev.mode === mode ? prev : { id: row.entry.id, mode }))
   }, [dragId])
 
   const handleDragEnd = useCallback(() => {
     setDragId(null)
-    setDropIndex(null)
+    setDropTarget(null)
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent, index: number) => {
+  const handleDrop = useCallback((e: React.DragEvent, row: Row) => {
     e.preventDefault()
-    if (!vaultId || !dragId) return
-    favoritesStore.reorder(vaultId, dragId, index)
+    const mode = dropTarget?.id === row.entry.id ? dropTarget.mode : 'before'
+    if (vaultId && dragId && dragId !== row.entry.id) {
+      if (mode === 'into') {
+        favoritesStore.moveEntry(vaultId, dragId, row.entry.id)
+      } else {
+        // The entry takes the place of the one it is dropped on (so moving down puts it after that one,
+        // moving up before it): the target's position among the entries of that level
+        const siblings = byParent.get(row.parent) ?? []
+        favoritesStore.moveEntry(vaultId, dragId, row.parent, Math.max(0, siblings.findIndex((s) => s.id === row.entry.id)))
+      }
+    }
     setDragId(null)
-    setDropIndex(null)
+    setDropTarget(null)
     refresh()
-  }, [vaultId, dragId, refresh])
+  }, [vaultId, dragId, dropTarget, byParent, refresh])
 
   const handleListDragLeave = useCallback((e: React.DragEvent) => {
     if (listRef.current && !listRef.current.contains(e.relatedTarget as Node)) {
-      setDropIndex(null)
+      setDropTarget(null)
     }
   }, [])
 
@@ -268,63 +401,106 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     )
   }
 
+  const toolbar = (
+    <div className="favorites-view__toolbar">
+      <button
+        type="button"
+        className="favorites-view__toolbar-button"
+        onClick={() => handleAddGroup()}
+        aria-label="Neue Gruppe"
+        title="Neue Gruppe"
+      >
+        <FolderPlus size={14} />
+      </button>
+    </div>
+  )
+
   if (favorites.length === 0) {
     return (
-      <div className="favorites-view favorites-view--empty" role="region" aria-label="Favoriten">
-        <Star size={24} className="favorites-view__empty-icon" />
-        <span className="favorites-view__empty-text">Keine Favoriten in diesem Vault</span>
+      <div className="favorites-view" role="region" aria-label="Favoriten">
+        {toolbar}
+        <div className="favorites-view--empty favorites-view__empty-body">
+          <Star size={24} className="favorites-view__empty-icon" />
+          <span className="favorites-view__empty-text">Keine Favoriten in diesem Vault</span>
+        </div>
       </div>
     )
   }
 
+  // Groups the entry could be moved into: every group but itself and what sits inside it
+  const moveTargets = (entry: FavoriteEntry): FavoriteEntry[] =>
+    favorites.filter((g) => isGroup(g) && g.id !== entry.parentId && !isInside(byParent, g.id, entry.id))
+
   const menuItems: ContextMenuItem[] = contextMenu ? [
-    ...(contextMenu.entry.type !== 'search' ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen', icon: <FolderOpen size={14} /> }] : []),
+    ...(contextMenu.entry.type !== 'search' && !isGroup(contextMenu.entry) ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen', icon: <FolderOpen size={14} /> }] : []),
     { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} /> },
-    { id: 'remove', label: 'Aus Favoriten entfernen', icon: <StarOff size={14} /> },
+    ...(isGroup(contextMenu.entry) ? [{ id: 'new-group', label: 'Neue Untergruppe', icon: <FolderPlus size={14} /> }] : []),
+    ...moveTargets(contextMenu.entry).map((g) => ({ id: `move:${g.id}`, label: `Verschieben nach „${getEntryDisplayText(g)}“`, icon: <FolderInput size={14} /> })),
+    ...(contextMenu.entry.parentId !== undefined && favorites.some((g) => g.id === contextMenu.entry.parentId)
+      ? [{ id: 'ungroup', label: 'Aus Gruppe herausnehmen', icon: <CornerLeftUp size={14} /> }]
+      : []),
+    isGroup(contextMenu.entry)
+      ? { id: 'remove', label: 'Gruppe löschen', icon: <Trash2 size={14} /> }
+      : { id: 'remove', label: 'Aus Favoriten entfernen', icon: <StarOff size={14} /> },
   ] : []
 
   return (
     <div className="favorites-view" role="region" aria-label="Favoriten">
+      {toolbar}
       <ul
         className="favorites-view__list"
         role="list"
         ref={listRef}
         onDragLeave={handleListDragLeave}
       >
-        {favorites.map((entry, index) => {
+        {rows.map((row) => {
+          const { entry, depth } = row
           const displayText = getEntryDisplayText(entry)
+          const group = isGroup(entry)
+          const folded = group && collapsed.has(entry.id)
           const isDragging = dragId === entry.id
-          const showDropMarkerBefore = dropIndex === index && dragId !== null && dragId !== entry.id
+          const isTarget = dropTarget?.id === entry.id && dragId !== null && dragId !== entry.id
+          const showDropMarkerBefore = isTarget && dropTarget.mode === 'before'
+          const showDropMarkerInto = isTarget && dropTarget.mode === 'into'
 
           return (
             <li
               key={entry.id}
-              className={`favorites-view__item${isDragging ? ' favorites-view__item--dragging' : ''}${showDropMarkerBefore ? ' favorites-view__item--drop-before' : ''}`}
+              className={`favorites-view__item${isDragging ? ' favorites-view__item--dragging' : ''}${showDropMarkerBefore ? ' favorites-view__item--drop-before' : ''}${showDropMarkerInto ? ' favorites-view__item--drop-into' : ''}${group ? ' favorites-view__item--group' : ''}`}
               draggable
               onDragStart={(e) => handleDragStart(e, entry)}
-              onDragOver={(e) => handleDragOverItem(e, index)}
-              onDrop={(e) => handleDrop(e, index)}
+              onDragOver={(e) => handleDragOverItem(e, row)}
+              onDrop={(e) => handleDrop(e, row)}
               onDragEnd={handleDragEnd}
             >
               {renamingId === entry.id ? (
-                <InlineInput
-                  initialValue={displayText}
-                  onConfirm={(value) => handleRenameConfirm(entry, value)}
-                  onCancel={() => setRenamingId(null)}
-                  validate={() => null}
-                />
+                <div style={{ paddingLeft: depth * 14 }}>
+                  <InlineInput
+                    initialValue={displayText}
+                    onConfirm={(value) => handleRenameConfirm(entry, value)}
+                    onCancel={() => setRenamingId(null)}
+                    validate={() => null}
+                  />
+                </div>
               ) : (
                 <button
                   className="favorites-view__entry"
+                  style={depth > 0 ? { paddingLeft: 12 + depth * 14 } : undefined}
                   onClick={() => handleEntryClick(entry)}
                   onContextMenu={(e) => handleContextMenuTrigger(e, entry)}
                   {...longPress}
                   onKeyDown={(e) => handleKeyDownEntry(e, entry)}
                   title={getEntryTooltip(entry)}
                   type="button"
+                  {...(group ? { 'aria-expanded': !folded } : {})}
                 >
+                  {group && (
+                    <span className="favorites-view__chevron">
+                      {folded ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                    </span>
+                  )}
                   <span className={`favorites-view__file-icon ${entryIconClass(entry)}`}>
-                    <EntryIcon entry={entry} />
+                    {group ? (folded ? <Folder size={14} /> : <FolderOpen size={14} />) : <EntryIcon entry={entry} />}
                   </span>
                   <span className="favorites-view__file-name">{displayText}</span>
                 </button>
@@ -343,6 +519,21 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
           onSelect={handleContextMenuSelect}
         />
       )}
+
+      <ConfirmModal
+        open={groupToDelete !== null}
+        title="Gruppe löschen"
+        message={groupToDelete
+          ? `Die Gruppe „${getEntryDisplayText(groupToDelete)}“ enthält Lesezeichen. Sie werden mit der Gruppe gelöscht.`
+          : ''}
+        confirmLabel="Löschen"
+        onConfirm={() => {
+          if (vaultId && groupToDelete) favoritesStore.removeById(vaultId, groupToDelete.id)
+          setGroupToDelete(null)
+          refresh()
+        }}
+        onCancel={() => setGroupToDelete(null)}
+      />
     </div>
   )
 }

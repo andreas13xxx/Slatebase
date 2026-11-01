@@ -48,7 +48,8 @@ no function yet), **durchgereicht** (kept for Obsidian and plugins, no function 
 | `autoPairBrackets` | boolean | `true` | no | wirkt: closes `( [ { ' "` while typing |
 | `autoPairMarkdown` | boolean | `true` | no | wirkt, narrower than Obsidian: with text selected, `*`, `_` and `` ` `` wrap the selection; nothing is paired without a selection, so a list marker stays one star |
 | `rightToLeft` | boolean | `false` | no | wirkt: text direction of the editor and the reading view |
-| `showFrontmatter`, `propertiesInDocument` (`visible` `hidden` `source`), `autoConvertHtml`, `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `spellcheckLanguages`, `smartIndentList`, `showIndentGuide`, `showInlineTitle`, `userIgnoreFilters`, `showUnsupportedFiles` | see `app-config.ts` | Obsidian-like | no | gespeichert |
+| `propertiesInDocument` (`visible` `hidden` `source`) | enum | `visible` | no | wirkt: how the frontmatter of a note shows in the editor (Live Preview), the reading view and the hover preview: as the properties block, not at all (the YAML stays in the file), or as raw YAML. Settings → Editor and files, the editor context menu ("Eigenschaften anzeigen", visible ↔ hidden) and the command "Editor: Eigenschaften im Dokument ein-/ausblenden". The Properties view in the side panel and the commands that add properties are not affected; `hidden` also hides what they add until the setting is switched back. Source mode always shows the YAML. |
+| `showFrontmatter` (legacy), `autoConvertHtml`, `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `spellcheckLanguages`, `smartIndentList`, `showIndentGuide`, `showInlineTitle`, `userIgnoreFilters`, `showUnsupportedFiles` | see `app-config.ts` | Obsidian-like | no | gespeichert |
 | `mobilePullAction` (verified), `vimMode`, `nativeMenus` | string / boolean | – | partly | durchgereicht |
 
 **Defaults.** `alwaysUpdateLinks` used to default to `true` in Slatebase. The first start of this
@@ -144,10 +145,15 @@ migrated; a vault starts from Obsidian's defaults.
 
 API: `GET/PATCH /api/v1/vaults/:vaultId/bookmarks-config`; the list is replaced as a whole. Files,
 headings (`subpath: "#Heading"`), blocks (`"#^id"`) and searches map to Obsidian's items; the label is
-`title`; a search's case/regex switches are kept as two extra fields. Groups, folders, URLs, graphs,
-unknown types and unknown fields are kept where they are when Slatebase writes. **Entries inside
-groups are kept but not shown, and groups cannot be created in Slatebase yet.** A rename in Obsidian
-counts as remove + add for the sync merge. The limit is 5000 (was 50). The bookmarks used to be per
+`title`; a search's case/regex switches are kept as two extra fields. Groups (`type: "group"`, `title`,
+`items`) nest and are shown as folding folders in the Favorites view: create one with the button at the top
+(or "Neue Untergruppe" in a group's menu), rename and delete from the context menu (a group with content asks
+first and takes the content along), and move entries in by dragging (the lower part of a group's row drops
+inside, the upper part before it) or with "Verschieben nach …" / "Aus Gruppe herausnehmen" in the entry's menu.
+The folded state is not stored, groups start unfolded. Folders, URLs, graphs, unknown types and unknown fields
+(also inside groups) are kept where they are when Slatebase writes. An entry's id depends on its group, so the
+same file in two groups is two bookmarks; if a group is renamed elsewhere while its content changes here, the
+content can end up at the top level. A rename in Obsidian counts as remove + add for the sync merge. The limit is 5000 (was 50). The bookmarks used to be per
 user on the server; that list is only read now: the first time a vault whose file has no bookmarks is
 opened on a device, its entries are written into the file. **Privacy:** that file is readable by everyone who
 opens the vault and is synced to the git remote, so the first user's old bookmarks (paths, saved search queries)
@@ -226,6 +232,6 @@ user) is not written and is not synced.
 
 ## Not done yet
 
-groups in the bookmarks UI, and the functions behind the `app.json` keys
+The functions behind the `app.json` keys
 marked *gespeichert* above (they are kept and offered to plugins; Settings → Editor and files has the ones that work). See
 `.kiro/specs/obsidian-app-json-compat/tasks.md`. `core-plugins.json` is left to its own spec.

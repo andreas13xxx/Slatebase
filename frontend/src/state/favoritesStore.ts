@@ -26,20 +26,22 @@ import {
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
 /** Discriminates what a bookmark points at. Absent means 'file' (legacy entries). */
-export type BookmarkType = 'file' | 'heading' | 'block' | 'search'
+export type BookmarkType = 'file' | 'heading' | 'block' | 'search' | 'group'
 
 /** A single favorite (bookmark) entry. */
 export interface FavoriteEntry {
   /** Unique per entry. Primary key for reorder/rename/removal of non-file bookmarks. */
   id: string
   vaultId: string
-  /** Empty string for type='search' (no file target). */
+  /** Empty string for type='search' and type='group' (no file target). */
   path: string
   addedAt: string // ISO 8601
   /** Ascending sort position — determines display order (ties broken by insertion order). */
   order: number
-  /** Optional user-chosen display name overriding the filename/default label. */
+  /** Optional user-chosen display name overriding the filename/default label; a group's name. */
   label?: string
+  /** The id of the group (type='group') this entry sits in. Absent for entries on the top level. */
+  parentId?: string
   /** Defaults to 'file' when absent (legacy entries and the plain add()/remove() API). */
   type?: BookmarkType
   /** Only for type='heading': the heading text. */
@@ -80,6 +82,13 @@ export interface IFavoritesStore {
   addBlockBookmark(vaultId: string, path: string, blockId: string): void
   /** Add a bookmark for a saved search query. */
   addSearchBookmark(vaultId: string, query: string, caseSensitive: boolean, regex: boolean): void
+  /** Add a group (inside another group if `parentId` is given) and return its id; null if the cap is reached. */
+  addGroup(vaultId: string, name: string, parentId?: string): string | null
+  /**
+   * Move an entry into a group (`parentId`) or to the top level (null), at `index` among the
+   * entries there (end if absent). A group cannot go into itself or into its own content.
+   */
+  moveEntry(vaultId: string, id: string, parentId: string | null, index?: number): void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -100,6 +109,7 @@ interface RawFavoriteEntry {
   addedAt?: unknown
   order?: unknown
   label?: unknown
+  parentId?: unknown
   type?: unknown
   heading?: unknown
   blockId?: unknown
@@ -245,6 +255,7 @@ function migrateEntries(entries: RawFavoriteEntry[]): { migrated: FavoriteEntry[
       addedAt: e.addedAt as string,
       order: typeof e.order === 'number' ? e.order : index,
       label: typeof e.label === 'string' ? e.label : undefined,
+      parentId: typeof e.parentId === 'string' ? e.parentId : undefined,
       type: isBookmarkType(e.type) ? e.type : undefined,
       heading: typeof e.heading === 'string' ? e.heading : undefined,
       blockId: typeof e.blockId === 'string' ? e.blockId : undefined,
@@ -258,7 +269,7 @@ function migrateEntries(entries: RawFavoriteEntry[]): { migrated: FavoriteEntry[
 }
 
 function isBookmarkType(value: unknown): value is BookmarkType {
-  return value === 'file' || value === 'heading' || value === 'block' || value === 'search'
+  return value === 'file' || value === 'heading' || value === 'block' || value === 'search' || value === 'group'
 }
 
 /** Read favorites for a vault from storage, migrating legacy entries as needed. */
@@ -366,18 +377,18 @@ async function syncToServer(): Promise<void> {
       } catch {
         // Unknown, not gone: write from what this device has, as before
       }
-      const items = entriesToItems(written, previous)
+      const { items, ids } = entriesToItems(written, previous)
       try {
         const saved = await client.patchBookmarksConfig(vaultId, { items })
         const savedItems = Array.isArray(saved['items']) ? saved['items'] : items
         // What is in the file now, with the ids the cache already has for the entries that were written
-        // (they were written in `order`, so they line up with the entries read back).
+        // (`ids` lists them in the order they are read back in, so they line up with the entries read back).
         const fresh = itemsToEntries(vaultId, savedItems)
         const rawById = new Map<string, Record<string, unknown>>()
-        written.forEach((entry, index) => {
+        ids.forEach((id, index) => {
           const freshEntry = fresh.entries[index]
           const raw = freshEntry ? fresh.rawById.get(freshEntry.id) : undefined
-          if (raw !== undefined) rawById.set(entry.id, raw)
+          if (raw !== undefined) rawById.set(id, raw)
         })
         loadedFiles.set(vaultId, { entries: fresh.entries, items: fresh.items, rawById })
         if (takeoverPending.delete(vaultId)) markTakenOver(vaultId)
@@ -580,6 +591,83 @@ export function reorder(vaultId: string, id: string, newIndex: number): void {
   saveFavorites(vaultId, reindexed)
 }
 
+/** The entries sitting in this group (null: the top level), in display order. */
+function childrenOf(sorted: FavoriteEntry[], parentId: string | null): FavoriteEntry[] {
+  return sorted.filter((e) => (e.parentId ?? null) === parentId)
+}
+
+/** Whether `id` is `ancestorId` itself or sits somewhere inside it. */
+function isInside(entries: FavoriteEntry[], id: string, ancestorId: string): boolean {
+  const byId = new Map(entries.map((e) => [e.id, e]))
+  const visited = new Set<string>()
+  for (let current = byId.get(id); current !== undefined && !visited.has(current.id); current = current.parentId !== undefined ? byId.get(current.parentId) : undefined) {
+    if (current.id === ancestorId) return true
+    visited.add(current.id)
+  }
+  return false
+}
+
+/**
+ * Move an entry into a group or to the top level, at a position among the entries there.
+ * No-op for an unknown id or group, and for a group that would end up inside itself.
+ */
+export function moveEntry(vaultId: string, id: string, parentId: string | null, index?: number): void {
+  const sorted = getForVault(vaultId)
+  const moved = sorted.find((e) => e.id === id)
+  if (!moved) return
+  if (parentId !== null) {
+    const target = sorted.find((e) => e.id === parentId)
+    if (!target || (target.type ?? 'file') !== 'group' || isInside(sorted, parentId, id)) return
+  }
+  // The new siblings (without the moved entry), the moved one put in at its place
+  const siblings = childrenOf(sorted, parentId).filter((e) => e.id !== id)
+  const at = Math.max(0, Math.min(index ?? siblings.length, siblings.length))
+  siblings.splice(at, 0, { ...moved, ...(parentId !== null ? { parentId } : { parentId: undefined }) })
+
+  // Rebuild the list depth-first so the global `order` keeps every level in its order
+  const rest = sorted.filter((e) => e.id !== id)
+  const placed = new Map(siblings.map((e) => [e.id, e]))
+  const byParent = new Map<string | null, FavoriteEntry[]>()
+  const known = new Set(rest.map((e) => e.id).concat(id))
+  for (const entry of [...rest, placed.get(id)!]) {
+    const parent = entry.parentId !== undefined && known.has(entry.parentId) ? entry.parentId : null
+    const list = byParent.get(parent) ?? []
+    list.push(entry)
+    byParent.set(parent, list)
+  }
+  byParent.set(parentId, siblings.map((e) => placed.get(e.id) ?? e))
+  const result: FavoriteEntry[] = []
+  const emit = (parent: string | null): void => {
+    for (const entry of byParent.get(parent) ?? []) {
+      result.push({ ...entry, order: result.length })
+      emit(entry.id)
+    }
+  }
+  emit(null)
+  saveFavorites(vaultId, result)
+}
+
+/** Add a group; returns its id, or null if the cap is reached (or the parent is not a group). */
+export function addGroup(vaultId: string, name: string, parentId?: string): string | null {
+  const entries = loadFavorites(vaultId)
+  if (entries.length >= MAX_FAVORITES_PER_VAULT) return null
+  if (parentId !== undefined && !entries.some((e) => e.id === parentId && e.type === 'group')) return null
+  const trimmed = name.trim().slice(0, MAX_LABEL_LENGTH)
+  const id = generateId()
+  entries.push({
+    id,
+    vaultId,
+    path: '',
+    addedAt: new Date().toISOString(),
+    order: nextOrder(entries),
+    type: 'group',
+    ...(trimmed !== '' ? { label: trimmed } : {}),
+    ...(parentId !== undefined ? { parentId } : {}),
+  })
+  saveFavorites(vaultId, entries)
+  return id
+}
+
 /**
  * Set (non-empty, trimmed, max 100 chars) or clear (null/empty/whitespace-only) an entry's label.
  * No-op if the id does not exist.
@@ -603,7 +691,8 @@ export function setLabel(vaultId: string, id: string, label: string | null): voi
  */
 export function removeById(vaultId: string, id: string): void {
   const entries = loadFavorites(vaultId)
-  const filtered = entries.filter(e => e.id !== id)
+  // A group takes everything inside it along (also in nested groups)
+  const filtered = entries.filter(e => !isInside(entries, e.id, id))
   if (filtered.length !== entries.length) {
     saveFavorites(vaultId, filtered)
   }
@@ -659,4 +748,6 @@ export const favoritesStore: IFavoritesStore = {
   addHeadingBookmark,
   addBlockBookmark,
   addSearchBookmark,
+  addGroup,
+  moveEntry,
 }

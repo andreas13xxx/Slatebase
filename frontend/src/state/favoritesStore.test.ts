@@ -12,6 +12,8 @@ import {
   addHeadingBookmark,
   addBlockBookmark,
   addSearchBookmark,
+  addGroup,
+  moveEntry,
   favoritesStore,
   initialize,
   disconnect,
@@ -749,6 +751,167 @@ describe('favoritesStore', () => {
       await vi.advanceTimersByTimeAsync(2500)
       const items = (client.patchBookmarksConfig.mock.calls.at(-1)?.[1] as { items: Array<{ path: string }> }).items
       expect(items.map((i) => i.path)).toEqual(['a.md', 'b.md', 'c.md'])
+    })
+  })
+  describe('groups', () => {
+    const names = (id: string) => getForVault(id).map((e) => [e.label ?? e.path, e.parentId === undefined ? null : getForVault(id).find((p) => p.id === e.parentId)?.label])
+
+    beforeEach(() => { disconnect() })
+
+    it('adds a group with a trimmed name and returns its id', () => {
+      const id = addGroup('v1', '  Work  ')
+      expect(id).not.toBeNull()
+      expect(getForVault('v1')).toMatchObject([{ id, type: 'group', path: '', label: 'Work' }])
+    })
+
+    it('adds a group inside a group, and refuses a parent that is not a group', () => {
+      const outer = addGroup('v1', 'Outer')!
+      add('v1', 'a.md')
+      const fileId = getForVault('v1').find((e) => e.path === 'a.md')!.id
+
+      expect(addGroup('v1', 'Inner', outer)).not.toBeNull()
+      expect(addGroup('v1', 'Bad', fileId)).toBeNull()
+      expect(addGroup('v1', 'Bad', 'missing')).toBeNull()
+      expect(names('v1')).toEqual([['Outer', null], ['a.md', null], ['Inner', 'Outer']])
+    })
+
+    it('moves an entry into a group and back to the top level', () => {
+      add('v1', 'a.md')
+      add('v1', 'b.md')
+      const g = addGroup('v1', 'G')!
+      const a = getForVault('v1').find((e) => e.path === 'a.md')!
+
+      moveEntry('v1', a.id, g)
+      expect(names('v1')).toEqual([['b.md', null], ['G', null], ['a.md', 'G']])
+
+      moveEntry('v1', a.id, null, 0)
+      expect(names('v1')).toEqual([['a.md', null], ['b.md', null], ['G', null]])
+    })
+
+    it('puts a moved entry at the wanted place among the entries of the group', () => {
+      const g = addGroup('v1', 'G')!
+      add('v1', 'a.md')
+      add('v1', 'b.md')
+      add('v1', 'c.md')
+      const byPath = (path: string) => getForVault('v1').find((e) => e.path === path)!.id
+      moveEntry('v1', byPath('a.md'), g)
+      moveEntry('v1', byPath('b.md'), g)
+      moveEntry('v1', byPath('c.md'), g, 1)
+
+      expect(getForVault('v1').filter((e) => e.parentId === g).map((e) => e.path)).toEqual(['a.md', 'c.md', 'b.md'])
+    })
+
+    it('does not move a group into itself or into its own content', () => {
+      const outer = addGroup('v1', 'Outer')!
+      const inner = addGroup('v1', 'Inner', outer)!
+
+      moveEntry('v1', outer, outer)
+      moveEntry('v1', outer, inner)
+
+      expect(names('v1')).toEqual([['Outer', null], ['Inner', 'Outer']])
+    })
+
+    it('ignores a move to something that is not a group, and of an unknown entry', () => {
+      add('v1', 'a.md')
+      add('v1', 'b.md')
+      const [a, b] = getForVault('v1') as [FavoriteEntry, FavoriteEntry]
+
+      moveEntry('v1', a.id, b.id)
+      moveEntry('v1', 'missing', null)
+
+      expect(getForVault('v1').every((e) => e.parentId === undefined)).toBe(true)
+    })
+
+    it('moves a group together with its content', () => {
+      const g = addGroup('v1', 'G')!
+      add('v1', 'a.md')
+      const target = addGroup('v1', 'Target')!
+      moveEntry('v1', getForVault('v1').find((e) => e.path === 'a.md')!.id, g)
+
+      moveEntry('v1', g, target)
+
+      expect(names('v1')).toEqual([['Target', null], ['G', 'Target'], ['a.md', 'G']])
+    })
+
+    it('removes a group with everything inside it, nested groups included', () => {
+      const outer = addGroup('v1', 'Outer')!
+      const inner = addGroup('v1', 'Inner', outer)!
+      add('v1', 'keep.md')
+      add('v1', 'deep.md')
+      moveEntry('v1', getForVault('v1').find((e) => e.path === 'deep.md')!.id, inner)
+
+      removeById('v1', outer)
+
+      expect(getForVault('v1').map((e) => e.path)).toEqual(['keep.md'])
+    })
+
+    it('removes only the entry when an entry in a group is removed', () => {
+      const g = addGroup('v1', 'G')!
+      add('v1', 'a.md')
+      moveEntry('v1', getForVault('v1').find((e) => e.path === 'a.md')!.id, g)
+
+      removeByPath('v1', 'a.md')
+
+      expect(names('v1')).toEqual([['G', null]])
+    })
+
+    it('renames a group and keeps it in its place', () => {
+      const g = addGroup('v1', 'Old')!
+      setLabel('v1', g, 'New')
+      expect(getForVault('v1')[0]?.label).toBe('New')
+    })
+
+    it('keeps the group of an entry through a reload of the cache', () => {
+      const g = addGroup('v1', 'G')!
+      add('v1', 'a.md')
+      moveEntry('v1', getForVault('v1').find((e) => e.path === 'a.md')!.id, g)
+
+      expect(getForVault('v1').find((e) => e.path === 'a.md')?.parentId).toBe(g)
+    })
+
+    it('writes a group and its entries into the file as Obsidian\'s group item', async () => {
+      vi.useFakeTimers()
+      try {
+        const client = {
+          state: { file: { items: [{ type: 'file', path: 'x.md' }] } as Record<string, unknown> },
+          getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+          getBookmarksConfig: vi.fn(async () => client.state.file),
+          patchBookmarksConfig: vi.fn(async (_v: string, patch: Record<string, unknown>) => {
+            client.state.file = { ...client.state.file, ...patch }
+            return client.state.file
+          }),
+        }
+        await initialize(client as unknown as IApiClient)
+        await loadVaultBookmarks('v1')
+
+        const g = addGroup('v1', 'Work')!
+        moveEntry('v1', getForVault('v1').find((e) => e.path === 'x.md')!.id, g)
+        await vi.advanceTimersByTimeAsync(2500)
+
+        expect(client.state.file['items']).toEqual([
+          expect.objectContaining({ type: 'group', title: 'Work', items: [expect.objectContaining({ type: 'file', path: 'x.md' })] }),
+        ])
+        // A later change still lines the entries up with the file: renaming the group keeps its content
+        setLabel('v1', g, 'Renamed')
+        await vi.advanceTimersByTimeAsync(2500)
+        expect(client.state.file['items']).toEqual([
+          expect.objectContaining({ type: 'group', title: 'Renamed', items: [expect.objectContaining({ path: 'x.md' })] }),
+        ])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('reads groups from the file with their entries', async () => {
+      const client = {
+        getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+        getBookmarksConfig: vi.fn().mockResolvedValue({ items: [{ type: 'group', title: 'G', items: [{ type: 'file', path: 'in.md' }] }] }),
+        patchBookmarksConfig: vi.fn(),
+      }
+      await initialize(client as unknown as IApiClient)
+      await loadVaultBookmarks('v1')
+
+      expect(names('v1')).toEqual([['G', null], ['in.md', 'G']])
     })
   })
 })
