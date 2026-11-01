@@ -27,6 +27,7 @@ import type { FavoriteEntry } from '../../state/favoritesStore'
 import type { PanelState, PanelAction } from '../../state/panelState'
 import type { Dispatch } from 'react'
 import { useLongPress } from '../../hooks/useLongPress'
+import { useTranslation } from '../../i18n'
 import './FavoritesView.css'
 
 export interface FavoritesViewProps {
@@ -73,9 +74,6 @@ interface DropTarget {
   mode: 'before' | 'into'
 }
 
-const DEFAULT_GROUP_NAME = 'Gruppe'
-const NEW_GROUP_NAME = 'Neue Gruppe'
-
 const isGroup = (entry: FavoriteEntry): boolean => entry.type === 'group'
 
 /** Extracts the filename from a full path. */
@@ -85,11 +83,11 @@ function getFileName(filePath: string): string {
 }
 
 /** Display text for an entry: label override, or a type-appropriate default. */
-function getEntryDisplayText(entry: FavoriteEntry): string {
+function getEntryDisplayText(entry: FavoriteEntry, groupName: string): string {
   if (entry.label) return entry.label
   switch (entry.type ?? 'file') {
     case 'group':
-      return DEFAULT_GROUP_NAME
+      return groupName
     case 'heading':
       return `${getDisplayName(getFileName(entry.path))} › ${entry.heading ?? ''}`
     case 'block':
@@ -107,7 +105,7 @@ function getEntryTooltip(entry: FavoriteEntry): string {
     case 'search':
       return entry.searchQuery ?? ''
     case 'group':
-      return getEntryDisplayText(entry)
+      return entry.label ?? ''
     default:
       return entry.path
   }
@@ -182,6 +180,8 @@ function isInside(byParent: Map<string | null, FavoriteEntry[]>, id: string, anc
  */
 export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _refreshKey, panelState, panelDispatch }: FavoritesViewProps): React.ReactElement {
   const longPress = useLongPress()
+  const { t } = useTranslation()
+  const groupName = t('bookmarkGroups.defaultName')
   const { dispatch: searchDispatch } = useSearchContext()
   const { apiClient } = useAppContext()
   const [internalRefreshTick, setInternalRefreshTick] = useState(0)
@@ -251,7 +251,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   /** Adds a group (inside `parentId` if given) and puts its name into edit mode. */
   const handleAddGroup = useCallback((parentId?: string) => {
     if (!vaultId) return
-    const id = favoritesStore.addGroup(vaultId, NEW_GROUP_NAME, parentId)
+    const id = favoritesStore.addGroup(vaultId, t('bookmarkGroups.newGroup'), parentId)
     if (id === null) return
     if (parentId !== undefined) {
       setCollapsed((prev) => {
@@ -263,7 +263,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     }
     setRenamingId(id)
     refresh()
-  }, [vaultId, refresh])
+  }, [vaultId, refresh, t])
 
   const handleMove = useCallback((entry: FavoriteEntry, parentId: string | null) => {
     if (!vaultId) return
@@ -328,11 +328,11 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
   const handleRenameConfirm = useCallback((entry: FavoriteEntry, value: string) => {
     if (!vaultId) return
-    const currentDefault = getEntryDisplayText({ ...entry, label: undefined })
+    const currentDefault = getEntryDisplayText({ ...entry, label: undefined }, groupName)
     favoritesStore.setLabel(vaultId, entry.id, value === currentDefault ? null : value)
     setRenamingId(null)
     refresh()
-  }, [vaultId, refresh])
+  }, [vaultId, refresh, groupName])
 
   const handleContextMenuSelect = useCallback((action: string) => {
     if (!contextMenu) return
@@ -417,8 +417,8 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
         type="button"
         className="favorites-view__toolbar-button"
         onClick={() => handleAddGroup()}
-        aria-label="Neue Gruppe"
-        title="Neue Gruppe"
+        aria-label={t('bookmarkGroups.newGroup')}
+        title={t('bookmarkGroups.newGroup')}
       >
         <FolderPlus size={14} />
       </button>
@@ -444,13 +444,13 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   const menuItems: ContextMenuItem[] = contextMenu ? [
     ...(contextMenu.entry.type !== 'search' && !isGroup(contextMenu.entry) ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen', icon: <FolderOpen size={14} /> }] : []),
     { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} /> },
-    ...(isGroup(contextMenu.entry) ? [{ id: 'new-group', label: 'Neue Untergruppe', icon: <FolderPlus size={14} /> }] : []),
-    ...moveTargets(contextMenu.entry).map((g) => ({ id: `move:${g.id}`, label: `Verschieben nach „${getEntryDisplayText(g)}“`, icon: <FolderInput size={14} /> })),
+    ...(isGroup(contextMenu.entry) ? [{ id: 'new-group', label: t('bookmarkGroups.newSubgroup'), icon: <FolderPlus size={14} /> }] : []),
+    ...moveTargets(contextMenu.entry).map((g) => ({ id: `move:${g.id}`, label: t('bookmarkGroups.moveTo', { name: getEntryDisplayText(g, groupName) }), icon: <FolderInput size={14} /> })),
     ...(contextMenu.entry.parentId !== undefined && favorites.some((g) => g.id === contextMenu.entry.parentId)
-      ? [{ id: 'ungroup', label: 'Aus Gruppe herausnehmen', icon: <CornerLeftUp size={14} /> }]
+      ? [{ id: 'ungroup', label: t('bookmarkGroups.ungroup'), icon: <CornerLeftUp size={14} /> }]
       : []),
     isGroup(contextMenu.entry)
-      ? { id: 'remove', label: 'Gruppe löschen', icon: <Trash2 size={14} /> }
+      ? { id: 'remove', label: t('bookmarkGroups.deleteGroup'), icon: <Trash2 size={14} /> }
       : { id: 'remove', label: 'Aus Favoriten entfernen', icon: <StarOff size={14} /> },
   ] : []
 
@@ -465,7 +465,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
       >
         {rows.map((row) => {
           const { entry, depth } = row
-          const displayText = getEntryDisplayText(entry)
+          const displayText = getEntryDisplayText(entry, groupName)
           const group = isGroup(entry)
           const folded = group && collapsed.has(entry.id)
           const isDragging = dragId === entry.id
@@ -532,11 +532,11 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
       <ConfirmModal
         open={groupToDelete !== null}
-        title="Gruppe löschen"
+        title={t('bookmarkGroups.deleteGroup')}
         message={groupToDelete
-          ? `Die Gruppe „${getEntryDisplayText(groupToDelete)}“ enthält Lesezeichen. Sie werden mit der Gruppe gelöscht.`
+          ? t('bookmarkGroups.deleteMessage', { name: getEntryDisplayText(groupToDelete, groupName) })
           : ''}
-        confirmLabel="Löschen"
+        confirmLabel={t('bookmarkGroups.delete')}
         onConfirm={() => {
           if (vaultId && groupToDelete) favoritesStore.removeById(vaultId, groupToDelete.id)
           setGroupToDelete(null)

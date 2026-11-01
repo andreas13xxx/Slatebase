@@ -944,4 +944,25 @@ export const de = {
     invalidName: 'Dieser Name ist als Arbeitsbereich nicht erlaubt.',
     noVault: 'Kein Vault geöffnet: Der Arbeitsbereich wurde nicht gespeichert.',
   },
+
+  bookmarkGroups: {
+    newGroup: 'Neue Gruppe',
+    defaultName: 'Gruppe',
+    newSubgroup: 'Neue Untergruppe',
+    moveTo: 'Verschieben nach „{name}“',
+    ungroup: 'Aus Gruppe herausnehmen',
+    deleteGroup: 'Gruppe löschen',
+    deleteMessage: 'Die Gruppe „{name}“ enthält Lesezeichen. Sie werden mit der Gruppe gelöscht.',
+    delete: 'Löschen',
+  },
+
+  propertiesInDocument: {
+    label: 'Eigenschaften im Dokument',
+    hint: 'Wie der Frontmatter-Block am Anfang einer Notiz erscheint: als Eigenschaften, ausgeblendet oder als YAML-Quelltext. Gilt im Editor, in der Leseansicht und in der Hover-Vorschau; die Eigenschaften-Ansicht im Seitenbereich bleibt unverändert.',
+    visible: 'Sichtbar',
+    hidden: 'Ausgeblendet',
+    source: 'Quelltext',
+    menuItem: 'Eigenschaften anzeigen',
+    command: 'Editor: Eigenschaften im Dokument ein-/ausblenden',
+  },
 } as const

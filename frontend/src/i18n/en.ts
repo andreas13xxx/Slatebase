@@ -951,4 +951,24 @@ export const en: TranslationShape = {
     noVault: 'No vault is open: the workspace was not saved.',
   },
 
+  bookmarkGroups: {
+    newGroup: 'New group',
+    defaultName: 'Group',
+    newSubgroup: 'New subgroup',
+    moveTo: 'Move to “{name}”',
+    ungroup: 'Remove from group',
+    deleteGroup: 'Delete group',
+    deleteMessage: 'The group “{name}” contains bookmarks. They are deleted with the group.',
+    delete: 'Delete',
+  },
+
+  propertiesInDocument: {
+    label: 'Properties in document',
+    hint: 'How the frontmatter block at the top of a note appears: as properties, hidden, or as raw YAML. Applies in the editor, the reading view and the hover preview; the Properties view in the side panel is not affected.',
+    visible: 'Visible',
+    hidden: 'Hidden',
+    source: 'Source',
+    menuItem: 'Show properties',
+    command: 'Editor: Toggle properties in document',
+  },
 } as const

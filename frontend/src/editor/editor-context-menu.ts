@@ -255,6 +255,7 @@ export function buildEditorContextMenuItems(
   showLineNumbers: boolean,
   readableLineLength: boolean,
   spellcheck?: SpellcheckMenuContext,
+  propertiesLabel = 'Eigenschaften anzeigen',
 ): ContextMenuItem[] {
   const { state } = view
   const sel = state.selection.main
@@ -479,7 +480,7 @@ export function buildEditorContextMenuItems(
     },
     {
       id: 'toggle-properties-in-document',
-      label: 'Eigenschaften anzeigen',
+      label: propertiesLabel,
       icon: createElement(ListTree, { size: ICON_SIZE }),
       checked: getAppConfigValue('propertiesInDocument') === 'visible',
       // A vault setting (app.json `propertiesInDocument`): visible <-> hidden; raw YAML is chosen in the settings

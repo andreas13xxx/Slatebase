@@ -1159,7 +1159,7 @@ export function CommandPaletteContainer({
 
       commands.push({
         id: 'slatebase:editor-toggle-properties',
-        name: 'Editor: Eigenschaften im Dokument ein-/ausblenden',
+        name: t('propertiesInDocument.command'),
         callback: () => togglePropertiesInDocument(),
         pluginId: 'slatebase',
       })

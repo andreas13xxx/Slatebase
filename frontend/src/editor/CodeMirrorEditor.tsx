@@ -53,6 +53,7 @@ import { codeFolding } from '@codemirror/language'
 import { markdownFoldService } from './folding'
 import { isEmbeddableFile } from '../utils/internalLink'
 import { showToast } from '../components/ToastNotification'
+import { useTranslation } from '../i18n'
 import './live-preview/live-preview.css'
 
 /** MIME types accepted for clipboard-paste upload (screenshots and PDF files). */
@@ -147,6 +148,11 @@ export function CodeMirrorEditor({
   // tabId change — without this ref, toggling line numbers would leave the
   // context menu's checkbox showing the state from whenever the tab was
   // last (re)mounted instead of the current one.
+  const { t } = useTranslation()
+  const propertiesLabelRef = useRef(t('propertiesInDocument.menuItem'))
+  useEffect(() => {
+    propertiesLabelRef.current = t('propertiesInDocument.menuItem')
+  }, [t])
   const showLineNumbersRef = useRef(showLineNumbers)
   // Same reasoning as showLineNumbersRef — the context menu's checkbox needs
   // the current value without re-running the mount-effect's listener.
@@ -263,7 +269,7 @@ export function CodeMirrorEditor({
         suggestions,
         enabled: spellcheckRef.current,
         language: spellcheckLanguageRef.current,
-      })
+      }, propertiesLabelRef.current)
 
     setContextMenu({ x, y, items: buildItems(misspelled ? null : []) })
     if (!misspelled) return

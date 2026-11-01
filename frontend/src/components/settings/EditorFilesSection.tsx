@@ -8,6 +8,7 @@
  *
  * @module components/settings/EditorFilesSection
  */
+import { useTranslation } from '../../i18n'
 import { useState } from 'react'
 import { useAppContext } from '../../state'
 import { extractErrorMessage } from '../../utils/error'
@@ -97,6 +98,7 @@ function AttachmentSettings({ storedPath, disabled, saving, onSave }: {
 }
 
 export function EditorFilesSection() {
+  const { t } = useTranslation()
   const { state } = useAppContext()
   const vaultId = state.selectedVaultId
   const canWrite = state.vaults.find((vault) => vault.id === vaultId)?.permission !== 'read'
@@ -194,7 +196,7 @@ export function EditorFilesSection() {
             <option value="source">Bearbeiten</option>
           </select>
         </SettingRow>
-        <SettingRow label="Eigenschaften im Dokument" htmlFor="editor-properties-in-document" hint="Wie der Frontmatter-Block am Anfang einer Notiz erscheint: als Eigenschaften, ausgeblendet oder als YAML-Quelltext. Gilt im Editor, in der Leseansicht und in der Hover-Vorschau; die Eigenschaften-Ansicht im Seitenbereich bleibt unverändert.">
+        <SettingRow label={t('propertiesInDocument.label')} htmlFor="editor-properties-in-document" hint={t('propertiesInDocument.hint')}>
           <select
             id="editor-properties-in-document"
             className="settings-field-input"
@@ -202,9 +204,9 @@ export function EditorFilesSection() {
             disabled={disabled}
             onChange={(e) => void save({ propertiesInDocument: e.target.value as AppConfigValues['propertiesInDocument'] })}
           >
-            <option value="visible">Sichtbar</option>
-            <option value="hidden">Ausgeblendet</option>
-            <option value="source">Quelltext</option>
+            <option value="visible">{t('propertiesInDocument.visible')}</option>
+            <option value="hidden">{t('propertiesInDocument.hidden')}</option>
+            <option value="source">{t('propertiesInDocument.source')}</option>
           </select>
         </SettingRow>
         <SettingRow label="Strikte Zeilenumbrüche" htmlFor="editor-strict-breaks" hint="Aus: ein einzelner Zeilenumbruch erscheint in der Leseansicht als Umbruch. An: er bleibt ein Leerzeichen, wie in CommonMark.">
