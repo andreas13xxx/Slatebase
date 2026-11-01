@@ -28,7 +28,8 @@ import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { useLongPress } from '../hooks/useLongPress'
 import { FeatureContext } from '../state/featureContext'
 import { notifyPublicSharesChanged, openPublicShareDialog, PUBLIC_SHARES_CHANGED_EVENT } from '../public-share/publicShareEvents'
-import { getAppConfigValue } from '../state/vaultAppConfigStore'
+import { getAppConfigValue, useAppConfigValue, getAppConfigFileValue } from '../state/vaultAppConfigStore'
+import { filterUnsupportedFiles } from '../utils/supportedFiles'
 import { resolveNewNoteFolder } from '../utils/newNoteLocation'
 
 /**
@@ -73,6 +74,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   const { state, dispatch, apiClient } = useAppContext()
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
+  // app.json showUnsupportedFiles: hide files Slatebase cannot open from the tree only when the key is
+  // EXPLICITLY false. Slatebase has always shown every file, so an absent key (and `true`) keeps that —
+  // we do not adopt Obsidian's hide-by-default here, or existing vaults would suddenly lose every
+  // non-note/media file. Subscribe for re-render, decide on the file's own value.
+  useAppConfigValue('showUnsupportedFiles')
+  const hideUnsupportedFiles = getAppConfigFileValue('showUnsupportedFiles') === false
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedPaths))
   const [expandedVaults, setExpandedVaults] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedVaults))
   const [showCreateVaultForm, setShowCreateVaultForm] = useState(false)
@@ -1327,7 +1334,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             {state.vaults.map((vault) => {
               const isExpanded = expandedVaults.has(vault.id)
               const isSelected = state.selectedVaultId === vault.id
-              const tree = state.vaultTrees[vault.id]
+              const rawTree = state.vaultTrees[vault.id]
+              // Hide unsupported files only when explicitly turned off (folders always stay).
+              const tree = rawTree && hideUnsupportedFiles ? filterUnsupportedFiles(rawTree) : rawTree
               const isLoading = state.vaultTreesLoading.has(vault.id)
               const permission = vault.permission
 

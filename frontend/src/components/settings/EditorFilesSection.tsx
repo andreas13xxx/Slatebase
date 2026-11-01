@@ -123,6 +123,13 @@ export function EditorFilesSection() {
   const rightToLeft = useAppConfigValue('rightToLeft')
   const smartIndentList = useAppConfigValue('smartIndentList')
   const showIndentGuide = useAppConfigValue('showIndentGuide')
+  const showInlineTitle = useAppConfigValue('showInlineTitle')
+  const autoConvertHtml = useAppConfigValue('autoConvertHtml')
+  // Slatebase shows every file unless the key is explicitly false (see FileExplorer). So the checkbox
+  // (“show unsupported files”) is on whenever the file does not say false, and turning it off writes an
+  // explicit false; turning it on removes the key (back to Slatebase's show-everything behaviour).
+  useAppConfigValue('showUnsupportedFiles')
+  const showUnsupportedFiles = getAppConfigFileValue('showUnsupportedFiles') !== false
   const spellcheckLanguages = useAppConfigValue('spellcheckLanguages')
   const foldHeading = useAppConfigValue('foldHeading')
   const foldIndent = useAppConfigValue('foldIndent')
@@ -243,6 +250,24 @@ export function EditorFilesSection() {
             checked={rightToLeft}
             disabled={disabled}
             onChange={(e) => void save({ rightToLeft: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.showInlineTitle')} htmlFor="editor-inline-title" hint={t('editorSettings.showInlineTitleHint')}>
+          <input
+            id="editor-inline-title"
+            type="checkbox"
+            checked={showInlineTitle}
+            disabled={disabled}
+            onChange={(e) => void save({ showInlineTitle: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.autoConvertHtml')} htmlFor="editor-auto-convert-html" hint={t('editorSettings.autoConvertHtmlHint')}>
+          <input
+            id="editor-auto-convert-html"
+            type="checkbox"
+            checked={autoConvertHtml}
+            disabled={disabled}
+            onChange={(e) => void save({ autoConvertHtml: e.target.checked })}
           />
         </SettingRow>
       </SettingSection>
@@ -370,6 +395,15 @@ export function EditorFilesSection() {
             checked={promptDelete}
             disabled={disabled}
             onChange={(e) => void save({ promptDelete: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.showUnsupportedFiles')} htmlFor="files-show-unsupported" hint={t('editorSettings.showUnsupportedFilesHint')}>
+          <input
+            id="files-show-unsupported"
+            type="checkbox"
+            checked={showUnsupportedFiles}
+            disabled={disabled}
+            onChange={(e) => void save({ showUnsupportedFiles: e.target.checked ? null : false })}
           />
         </SettingRow>
       </SettingSection>
