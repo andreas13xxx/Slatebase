@@ -30,6 +30,9 @@ push, PR, CI grün (max. 3 Iterationen). Dokumentation nach Abschluss der Featur
 ## Phase 4 — Bild-Upload/Paste
 - [ ] 4.1 `utils/imageResize.ts` (Canvas-Downscale 128×128, webp/png, 256-KB-Grenze).
 - [ ] 4.2 Upload-Button + Dropzone + Paste-Handler im Avatar-Editor.
+      Hinweis: Der Avatar-Editor-Block in ProfilePage entsteht erst in Phase 6 (6.1/6.2).
+      Phase 4 liefert die reine `imageResize`-Utility + Paste-Extraktion + Tests; die
+      Button/Dropzone/Paste-Verdrahtung wird in Phase 6 beim Editor-Zusammenbau eingehängt.
 - [ ] 4.3 Tests: `imageResize` (Downscale, Ablehnung > 256 KB).
 
 ## Phase 5 — DiceBear-Galerie
