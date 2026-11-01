@@ -444,7 +444,8 @@ export function CodeMirrorEditor({
       // own search/replace panel.
       keymap.of([
         { key: 'Mod-d', run: selectNextOccurrence, preventDefault: true },
-        ...defaultKeymap,
+        // Mod-i is Obsidian's key for italic (editor:toggle-italics), not "select parent syntax"
+        ...defaultKeymap.filter((binding) => binding.key !== 'Mod-i'),
         ...historyKeymap,
         indentWithTab,
       ]),

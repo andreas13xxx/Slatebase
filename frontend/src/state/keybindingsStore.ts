@@ -94,12 +94,13 @@ export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
 
   // Vault
   { commandId: 'slatebase:daily-note', label: 'Tagesnotiz öffnen/erstellen', defaultShortcut: '', category: 'vault' },
-  { commandId: 'slatebase:create-file', label: 'Neue Datei', defaultShortcut: '', category: 'vault' },
+  // Obsidian's default (a browser keeps Ctrl+N for a new window; the installed app and a PWA do not)
+  { commandId: 'slatebase:create-file', label: 'Neue Datei', defaultShortcut: 'Mod+N', category: 'vault' },
   { commandId: 'slatebase:new-from-template', label: 'Neue Notiz aus Vorlage', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:insert-template', label: 'Vorlage einfügen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:open-random-note', label: 'Zufällige Notiz öffnen', defaultShortcut: '', category: 'vault' },
   { commandId: 'slatebase:create-unique-note', label: 'Eindeutige Notiz anlegen', defaultShortcut: '', category: 'vault' },
-  { commandId: 'slatebase:open-graph', label: 'Knowledge Graph öffnen', defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:open-graph', label: 'Knowledge Graph öffnen', defaultShortcut: 'Mod+G', category: 'vault' },
   { commandId: 'slatebase:open-trash', label: 'Papierkorb öffnen', defaultShortcut: '', category: 'vault' },
 ]
 

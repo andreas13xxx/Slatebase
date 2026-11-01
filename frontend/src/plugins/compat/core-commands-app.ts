@@ -48,6 +48,7 @@ import { getActiveBasesController } from '../../state/activeBasesBridge'
 import { parseCanvas } from '../../canvas'
 import { canvasToMarkdown } from '../../canvas/canvasToMarkdown'
 import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
+import { defaultHotkeysFor } from './core-default-hotkeys'
 import { findHeadingSectionAtCursor, sanitizeFileNameFromHeading, extractRangeToNewFile } from '../../state/noteComposer'
 
 /** Pages the CommandPalette / core commands can navigate to (mirrors CommandPaletteContainer's NavigablePage). */
@@ -920,15 +921,16 @@ export function registerCoreAppCommands(registry: ICommandRegistry, getHandlers:
   for (const spec of buildSpecs()) {
     const { pluginId, id } = splitId(spec.id)
     const name = translateCoreCommandName(spec.id, locale, spec.name)
+    const hotkeys = defaultHotkeysFor(spec.id)
     if (spec.unsupported) {
       // Registered so `executeCommandById()` still resolves it, but saying so
       // beats a menu entry that swallows every click without a word.
       const message = unsupportedCommandMessage(name, spec.unsupported, locale)
-      registry.addCommand(pluginId, { id, name, callback: () => { showToast('info', message) } })
+      registry.addCommand(pluginId, { id, name, callback: () => { showToast('info', message) }, hotkeys })
     } else if (spec.editor) {
-      registry.addCommand(pluginId, { id, name, editorCallback: (editor) => { void spec.run(getHandlers(), editor) } })
+      registry.addCommand(pluginId, { id, name, editorCallback: (editor) => { void spec.run(getHandlers(), editor) }, hotkeys })
     } else {
-      registry.addCommand(pluginId, { id, name, callback: () => { void spec.run(getHandlers(), null as unknown as IEditor) } })
+      registry.addCommand(pluginId, { id, name, callback: () => { void spec.run(getHandlers(), null as unknown as IEditor) }, hotkeys })
     }
   }
 }

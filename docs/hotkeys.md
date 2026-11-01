@@ -29,9 +29,16 @@ bound, unbound and reset, and are written to the vault's `hotkeys.json` under th
 
 - **Defaults.** Slatebase ships its own default shortcuts for its native commands only (for example Alt+Left/Right
   for history and Ctrl+Shift+]/[ for tabs, since Ctrl+Tab belongs to the browser); they may differ from Obsidian's
-  and were not compared with a real install. Obsidian's default for the other ~180 core commands is not set: the editor's own keymap covers the
-  common formatting keys (Ctrl+B, Ctrl+I, …), the rest start unbound and are bound through the settings or the file.
-  The bindings Obsidian writes into `hotkeys.json` are honoured.
+  and were not compared with a real install. For the other core commands `core-default-hotkeys.ts` holds the
+  defaults that two sources agree on (KeyCombiner's Obsidian collection and the key names in Obsidian's Hotkeys
+  settings; not checked against a running Obsidian): `editor:toggle-bold` Ctrl+B, `editor:toggle-italics` Ctrl+I
+  (the editor's "select parent syntax" on that key is gone), `editor:insert-link` Ctrl+K, `editor:open-search` Ctrl+F,
+  `editor:open-search-replace` Ctrl+H, `editor:follow-link` Alt+Enter, `editor:open-link-in-new-leaf` Ctrl+Alt+Enter,
+  `workspace:close` Ctrl+W (a browser keeps this key), and for Slatebase's own commands Ctrl+G (graph) and Ctrl+N (new
+  file, which a browser keeps too). Not set: `editor:delete-paragraph` (Obsidian: Ctrl+D; here Ctrl+D selects the
+  next occurrence) and the help command (F1; ID not known). Obsidian has further defaults that are not in this list; those
+  commands start unbound and are bound through the settings or the file. The bindings Obsidian writes into `hotkeys.json`
+  are honoured and win over these defaults.
 - **Defaults give way.** If the file gives another command the keys of a Slatebase default, the default is dropped.
 - **Editor commands** bound through the file run only while an editor is open (`editorCallback`).
 - Commands bound through the file replace the editor's own key only if the editor does not handle that key first.
