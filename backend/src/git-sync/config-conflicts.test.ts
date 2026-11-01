@@ -136,6 +136,20 @@ describe('resolveConfigConflicts (real git)', () => {
     expect(await readFile(join(ours, '.obsidian/app.json'), 'utf-8')).toBe('{\r\n\t"a": 2,\r\n\t"b": 2\r\n}\r\n')
   })
 
+  it('writes the format of the newer side, so both devices write the same bytes', async () => {
+    await setUp({ '.obsidian/app.json': '{"a":1,"b":1}' })
+    // ours is older and tab-indented, theirs is newer and indented with four spaces
+    await write(ours, '.obsidian/app.json', '{\n\t"a": 2,\n\t"b": 1\n}\n')
+    await commit(ours, 'ours', '2026-01-02T00:00:00Z')
+    await write(theirs, '.obsidian/app.json', '{\n    "a": 1,\n    "b": 2\n}')
+    await commit(theirs, 'theirs', '2026-01-03T00:00:00Z')
+
+    await mergeTheirs()
+    await resolve()
+
+    expect(await readFile(join(ours, '.obsidian/app.json'), 'utf-8')).toBe('{\n    "a": 2,\n    "b": 2\n}')
+  })
+
   it('takes the remote value when the remote commit is newer', async () => {
     await setUp({ '.obsidian/app.json': '{"tabSize":4}' })
     await write(ours, '.obsidian/app.json', '{"tabSize":2}')

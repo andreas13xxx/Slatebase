@@ -21,7 +21,10 @@ function parseObject(raw: string | null): JsonObject | null {
   }
 }
 
-/** Writes the merged object the way our file was written: same indentation, line endings, final newline. */
+/**
+ * Writes the merged object the way the newer side's file was written: same indentation, line endings, final
+ * newline. The newer side is the same on both ends (see isOursNewer), so both devices write the same bytes.
+ */
 function serialize(merged: JsonObject, original: string): string {
   const eol = original.includes('\r\n') ? '\r\n' : '\n'
   const indent = /^([ \t]+)\S/m.exec(original)?.[1] ?? '  '
@@ -69,10 +72,11 @@ export async function resolveConfigConflicts(deps: {
 
       const oursTime = await gitCli.lastChangeTime(cwd, 'HEAD', file)
       const theirsTime = await gitCli.lastChangeTime(cwd, 'MERGE_HEAD', file)
-      const result = mergeObsidianConfig(name, base, ours, theirs, isOursNewer(oursTime, theirsTime, oursRaw, theirsRaw))
+      const oursNewer = isOursNewer(oursTime, theirsTime, oursRaw, theirsRaw)
+      const result = mergeObsidianConfig(name, base, ours, theirs, oursNewer)
       if (result === null) { skip('structure not supported'); continue }
 
-      await writeFile(join(cwd, file), serialize(result.merged, oursRaw), 'utf-8')
+      await writeFile(join(cwd, file), serialize(result.merged, oursNewer ? oursRaw : theirsRaw), 'utf-8')
       await gitCli.stageFile(cwd, file)
       resolved.push(file)
 

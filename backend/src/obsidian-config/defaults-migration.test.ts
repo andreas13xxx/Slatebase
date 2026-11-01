@@ -6,6 +6,9 @@ import type { ILogger } from '../logger/index.js'
 import { AppConfigService } from './app-config.js'
 import { migrateAppConfigDefaults } from './defaults-migration.js'
 
+/** The editor keys that did not work before they were wired, pinned to their old behaviour. */
+const EDITOR_PINS = { useTab: false, autoPairBrackets: false, autoPairMarkdown: false }
+
 describe('migrateAppConfigDefaults', () => {
   let root: string
   let dataDir: string
@@ -33,13 +36,13 @@ describe('migrateAppConfigDefaults', () => {
   it('keeps the old alwaysUpdateLinks default in a vault without app.json', async () => {
     const vault = await vaultAt('v-new')
     expect(await run([vault])).toMatchObject({ pinned: 1, skipped: 0, failed: 0 })
-    expect(await appJson(vault.storagePath)).toEqual({ alwaysUpdateLinks: true })
+    expect(await appJson(vault.storagePath)).toEqual({ alwaysUpdateLinks: true, ...EDITOR_PINS })
   })
 
   it('keeps it in a vault Slatebase has worked in, and keeps the other keys', async () => {
     const vault = await vaultAt('v-old', { '.obsidian/app.json': '{"showLineNumber":true}' }, ['.slatebase'])
     await run([vault])
-    expect(await appJson(vault.storagePath)).toEqual({ showLineNumber: true, alwaysUpdateLinks: true })
+    expect(await appJson(vault.storagePath)).toEqual({ showLineNumber: true, alwaysUpdateLinks: true, ...EDITOR_PINS })
   })
 
   it('does not touch a vault whose app.json was written by Obsidian', async () => {
@@ -52,13 +55,13 @@ describe('migrateAppConfigDefaults', () => {
   it('never overwrites a value that is already in the file', async () => {
     const vault = await vaultAt('v-set', { '.obsidian/app.json': '{"alwaysUpdateLinks":false}' }, ['.slatebase'])
     await run([vault])
-    expect(await appJson(vault.storagePath)).toEqual({ alwaysUpdateLinks: false })
+    expect(await appJson(vault.storagePath)).toEqual({ alwaysUpdateLinks: false, ...EDITOR_PINS })
   })
 
   it('is a single pass: vaults created later and later changes by the user are never touched', async () => {
     const first = await vaultAt('v-first')
     await run([first])
-    await service.patch(first.storagePath, { alwaysUpdateLinks: null })
+    await service.patch(first.storagePath, { alwaysUpdateLinks: null, ...Object.fromEntries(Object.keys(EDITOR_PINS).map((k) => [k, null])) })
     const later = await vaultAt('v-later')
 
     expect(await run([first, later])).toMatchObject({ pinned: 0, skipped: 0, alreadyDone: true })

@@ -171,4 +171,22 @@ describe('PropertyTypeStore', () => {
       expect(result.entries[0]!.type).toBe('number')
     })
   })
+
+  describe('a types.json bigger than the registry cap', () => {
+    it('keeps the types the caller was never shown when it saves the part it got', async () => {
+      const dir = path.join(tmpDir, 'big')
+      await fs.mkdir(path.join(dir, '.obsidian'), { recursive: true })
+      const types: Record<string, string> = {}
+      for (let i = 0; i < MAX_PROPERTY_TYPE_ENTRIES + 3; i++) types[`k${i}`] = 'text'
+      await fs.writeFile(path.join(dir, '.obsidian', 'types.json'), JSON.stringify({ types }))
+      const big = new PropertyTypeStore((vaultId) => (vaultId === 'big' ? dir : null), createMockLogger())
+
+      const shown = await big.getRegistry('big')
+      expect(shown.entries).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
+      await big.saveRegistry('big', shown)
+
+      const after = JSON.parse(await fs.readFile(path.join(dir, '.obsidian', 'types.json'), 'utf-8')) as { types: Record<string, string> }
+      expect(Object.keys(after.types)).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES + 3)
+    })
+  })
 })

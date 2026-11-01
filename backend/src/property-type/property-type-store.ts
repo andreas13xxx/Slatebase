@@ -126,6 +126,9 @@ export class PropertyTypeStore implements IPropertyTypeService {
     const wanted = new Map(capped.filter((entry) => entry.key !== '__proto__').map((entry) => [entry.key, toObsidianType(entry.type)]))
     await updateObsidianConfig(vaultPath, 'types.json', (current) => {
       const previous = typesOf(current)
+      // A file with more types than getRegistry returns was only shown to the caller in part: a key
+      // missing from the registry is then not "removed by the caller", and stays
+      const mayBeCut = Object.keys(previous).length > MAX_PROPERTY_TYPE_ENTRIES
       // The file keeps its order. Types Slatebase does not know stay where they are; the others are
       // replaced by the registry or, if it no longer has them, removed. New keys follow.
       // No prototype, so a key called __proto__ in the file stays an ordinary key.
@@ -133,6 +136,7 @@ export class PropertyTypeStore implements IPropertyTypeService {
       for (const [key, name] of Object.entries(previous)) {
         if (RESERVED_PROPERTY_KEYS[key] === undefined && fromObsidianType(key, name) === null) next[key] = name
         else if (wanted.has(key)) next[key] = wanted.get(key)
+        else if (mayBeCut) next[key] = name
       }
       for (const [key, name] of wanted) if (!Object.hasOwn(next, key)) next[key] = name
       current['types'] = next

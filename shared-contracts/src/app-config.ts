@@ -86,6 +86,11 @@ export const APP_CONFIG_DEFAULTS: Readonly<AppConfigValues> = configDefaults(APP
 /** Defaults Slatebase used before they were aligned with Obsidian. Used to keep existing vaults unchanged. */
 export const LEGACY_APP_CONFIG_DEFAULTS: Partial<AppConfigValues> = {
   alwaysUpdateLinks: true,
+  // The editor neither closed brackets nor inserted tab characters before these keys had an effect
+  // (Tab inserted CodeMirror's two spaces; it now inserts `tabSize` spaces, four by default)
+  useTab: false,
+  autoPairBrackets: false,
+  autoPairMarkdown: false,
 }
 
 export function isAppConfigKey(key: string): key is AppConfigKey {

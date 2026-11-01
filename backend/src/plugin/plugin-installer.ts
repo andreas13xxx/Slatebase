@@ -59,10 +59,10 @@ export class PluginInstallError extends Error {
  * Installation logic:
  * 1. Validate ZIP size ≤ PLUGIN_LIMITS.maxZipBytes (50 MB)
  * 2. Extract ZIP into memory
- * 3. Find manifest.json + main.js (in root or single subdirectory)
+ * 3. Total declared size — reject if > PLUGIN_LIMITS.maxExtractedBytes (100 MB), before anything is
+ *    decompressed; then find manifest.json + main.js (in root or single subdirectory)
  * 4. Validate manifest (Zod schema)
  * 5. Check bundle integrity (warn about eval, new Function, document.write)
- * 6. Calculate total extracted size — reject if > PLUGIN_LIMITS.maxExtractedBytes (100 MB)
  * 7. Check if plugin already installed:
  *    - Not installed → fresh install
  *    - Installed with lower version → upgrade (preserve data.json)
@@ -102,7 +102,11 @@ export class PluginInstaller implements IPluginInstaller {
 
     const entries = zip.getEntries()
 
-    // Step 3: Find manifest.json + main.js
+    // Step 3: Total extracted size, from the sizes the archive declares, before anything is
+    // decompressed (finding the files below inflates them)
+    this.validateExtractedSize(entries)
+
+    // Step 3b: Find manifest.json + main.js
     const extracted = this.findPluginFiles(entries)
 
     // Step 4: Validate manifest
@@ -110,9 +114,6 @@ export class PluginInstaller implements IPluginInstaller {
 
     // Step 5: Check bundle integrity (warnings, non-blocking)
     const warnings = this.checkBundleIntegrity(extracted.bundleContent, manifest.id)
-
-    // Step 6: Calculate total extracted size
-    this.validateExtractedSize(entries)
 
     // Step 7: Check existing installation (version comparison)
     const existingManifest = await this.pluginStore.loadManifest(vaultId, manifest.id)

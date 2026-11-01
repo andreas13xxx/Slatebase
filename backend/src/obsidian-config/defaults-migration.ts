@@ -1,4 +1,5 @@
-// Slatebase's app.json defaults were aligned with Obsidian's (alwaysUpdateLinks was true, is false).
+// Slatebase's app.json defaults were aligned with Obsidian's (alwaysUpdateLinks was true, is false; the editor did not close
+// brackets or indent with tabs, and now does).
 // A vault that already existed when this version first started would silently change behaviour, so
 // in that one pass the old default is written into app.json where the key is missing. The default
 // then no longer matters for that vault, and the change is visible to anyone who opens the file.
@@ -65,10 +66,10 @@ export async function migrateAppConfigDefaults(deps: {
         const current = await readObsidianConfig(vault.storagePath, 'app.json')
         const slatebaseVault = current === null || (await exists(path.join(vault.storagePath, '.slatebase')))
 
-        const patch: Partial<typeof LEGACY_APP_CONFIG_DEFAULTS> = {}
+        const patch: Record<string, unknown> = {}
         if (slatebaseVault) {
-          if (LEGACY_APP_CONFIG_DEFAULTS.alwaysUpdateLinks !== undefined && current?.['alwaysUpdateLinks'] === undefined) {
-            patch.alwaysUpdateLinks = LEGACY_APP_CONFIG_DEFAULTS.alwaysUpdateLinks
+          for (const [key, value] of Object.entries(LEGACY_APP_CONFIG_DEFAULTS)) {
+            if (value !== undefined && current?.[key] === undefined) patch[key] = value
           }
         }
         if (Object.keys(patch).length > 0) {
