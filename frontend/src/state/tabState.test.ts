@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import type { IApiClient } from '../api'
+import { _reset as resetAppConfig, initialize as initializeAppConfig, setActiveVault } from './vaultAppConfigStore'
 import {
   tabReducer,
   generateTabId,
@@ -300,6 +302,21 @@ describe('tabReducer', () => {
       expect(state.tabs[0].mode).toBe('view')
       expect(state.tabs[0].loading).toBe(false)
       expect(state.tabs[0].error).toBeNull()
+    })
+
+    it('opens a note in the editor with defaultViewMode "source", other files in the reading view', async () => {
+      resetAppConfig()
+      initializeAppConfig({ getAppConfig: async () => ({ defaultViewMode: 'source' }) } as unknown as IApiClient)
+      await setActiveVault('v1')
+      const open = (name: string, isBinary = false) =>
+        tabReducer(
+          { tabs: [createTab('v1', name, name, { loading: true })], activeTabId: `v1::${name}` },
+          { type: 'TAB_CONTENT_LOADED', payload: { tabId: `v1::${name}`, content: 'x', isBinary } },
+        ).tabs[0]!.mode
+      expect(open('a.md')).toBe('edit')
+      expect(open('a.txt')).toBe('view')
+      expect(open('image.png', true)).toBe('view')
+      resetAppConfig()
     })
 
     it('sets mode to view for binary files', () => {

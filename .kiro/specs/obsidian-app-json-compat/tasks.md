@@ -31,23 +31,23 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - _Requirements: 4_
 
 - [ ] 4. Funktion hinter vorhandenen toten Schlüsseln
-  - [ ] 4.1 `newFileLocation`/`newFileFolderPath`
-  - [ ] 4.2 `defaultViewMode`
-  - [ ] 4.3 `strictLineBreaks`
-  - [ ] 4.4 `showFrontmatter`/`propertiesInDocument`
-  - [ ] 4.5 `foldHeading`/`foldIndent`
+  - [x] 4.1 `newFileLocation`/`newFileFolderPath`
+  - [x] 4.2 `defaultViewMode` (Abweichung: fehlender Schlüssel = Leseansicht, nicht Obsidians `source`)
+  - [x] 4.3 `strictLineBreaks`
+  - [ ] 4.4 `showFrontmatter`/`propertiesInDocument` (offen: bleiben gespeichert)
+  - [x] 4.5 `foldHeading`/`foldIndent`
   - [x] 4.6 `alwaysUpdateLinks` abschaltbar (Routen, Shim, Tests); `getConfig("updateInternalLinks")` folgt dem Wert
   - _Requirements: 6.1–6.6, 6.13, 7.3_
 
 - [ ] 5. Neue Schlüssel mit Funktion
-  - [ ] 5.1 Editor: `useTab`/`tabSize`, `autoPair*`, `showInlineTitle`, `smartIndentList`, `showIndentGuide`, `rightToLeft`
-  - [ ] 5.2 Dateien: `userIgnoreFilters`, `showUnsupportedFiles`, `trashOption`/`promptDelete`
-  - [ ] 5.3 `spellcheckLanguages`
-  - [ ] 5.4 Nicht umsetzbare Schlüssel als Pass-Through dokumentieren (`vimMode`, `nativeMenus`, `mobilePullAction`)
+  - [x] 5.1 Editor: `useTab`/`tabSize`, `autoPairBrackets`, `autoPairMarkdown` (nur Umschließen einer Auswahl), `rightToLeft`; offen: `showInlineTitle`, `smartIndentList`, `showIndentGuide`
+  - [ ] 5.2 Dateien: `promptDelete` erledigt; offen: `userIgnoreFilters`, `showUnsupportedFiles`, `trashOption`
+  - [ ] 5.3 `spellcheckLanguages` (offen)
+  - [x] 5.4 Nicht umsetzbare Schlüssel als Pass-Through dokumentieren (`vimMode`, `nativeMenus`, `mobilePullAction`)
   - _Requirements: 5, 6.7–6.13_
 
 - [ ] 6. Einstellungs-UI
-  - [ ] 6.1 `EditorFilesSection.tsx` erweitern oder in Unterabschnitte teilen
+  - [x] 6.1 `EditorFilesSection.tsx` um Editor, Einrückung/Eingabe, neue Notizen und Löschen erweitert
   - [ ] 6.2 Palette-Befehle für Schalter, i18n de/en, axe-Test
   - _Requirements: 5.2_
 

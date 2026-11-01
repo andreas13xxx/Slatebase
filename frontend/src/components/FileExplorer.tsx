@@ -28,6 +28,8 @@ import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { useLongPress } from '../hooks/useLongPress'
 import { FeatureContext } from '../state/featureContext'
 import { notifyPublicSharesChanged, openPublicShareDialog, PUBLIC_SHARES_CHANGED_EVENT } from '../public-share/publicShareEvents'
+import { getAppConfigValue } from '../state/vaultAppConfigStore'
+import { resolveNewNoteFolder } from '../utils/newNoteLocation'
 
 /**
  * Monotonic per-vault sequence counter used to discard out-of-order fetchVaultTree
@@ -100,6 +102,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     node: null,
     vaultId: null,
   })
+  // The current render's delete, for the effect that handles delete requests from the palette
+  const performDeleteRef = useRef<(node: DirectoryTree | null, vaultId: string | null) => void>(() => {})
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; node: DirectoryTree | null; vaultId: string | null }>({
     open: false,
     node: null,
@@ -198,22 +202,40 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       onRegisterCreateFile(() => {
         const vaultId = state.selectedVaultId
         if (!vaultId) return
+        // app.json `newFileLocation` / `newFileFolderPath`: the vault root, the open note's folder or a fixed folder
+        const parentPath = resolveNewNoteFolder(
+          getAppConfigValue('newFileLocation'),
+          getAppConfigValue('newFileFolderPath'),
+          selectedFileVaultId === vaultId ? selectedFilePath : null,
+          state.vaultTrees[vaultId],
+        )
         setInlineInputState({
           visible: true,
           mode: 'newFile',
-          parentPath: '',
+          parentPath,
           node: null,
           vaultId,
         })
-        // Ensure the vault is expanded
+        // Ensure the vault, and the folder the note goes into, are expanded
         setExpandedVaults((prev) => {
           const next = new Set(prev)
           next.add(vaultId)
           return next
         })
+        if (parentPath !== '') {
+          setExpandedPaths((prev) => {
+            const next = new Set(prev)
+            let acc = ''
+            for (const segment of parentPath.split('/')) {
+              acc = acc ? `${acc}/${segment}` : segment
+              next.add(`${vaultId}::${acc}`)
+            }
+            return next
+          })
+        }
       })
     }
-  }, [onRegisterCreateFile, state.selectedVaultId])
+  }, [onRegisterCreateFile, state.selectedVaultId, state.vaultTrees, selectedFilePath, selectedFileVaultId])
 
   // Register the create folder trigger for core commands (file-explorer:new-folder)
   useEffect(() => {
@@ -345,8 +367,13 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       const vaultId = state.selectedVaultId
       if (!detail || !vaultId) return
       const kind = detail.kind ?? 'file'
+      const node = buildSyntheticNode(detail.path, kind)
+      if (!getAppConfigValue('promptDelete')) {
+        performDeleteRef.current(node, vaultId)
+        return
+      }
       expandAncestors(vaultId, detail.path, kind)
-      setDeleteConfirm({ open: true, node: buildSyntheticNode(detail.path, kind), vaultId })
+      setDeleteConfirm({ open: true, node, vaultId })
     }
 
     function handleRenameRequest(e: Event) {
@@ -779,6 +806,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   }
 
   function handleDelete(node: DirectoryTree) {
+    // app.json `promptDelete` off: no confirmation (the item still goes to the trash)
+    if (!getAppConfigValue('promptDelete')) {
+      performDelete(node, contextMenuState.vaultId)
+      return
+    }
     setDeleteConfirm({ open: true, node, vaultId: contextMenuState.vaultId })
   }
 
@@ -786,6 +818,10 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     const node = deleteConfirm.node
     const vaultId = deleteConfirm.vaultId
     setDeleteConfirm({ open: false, node: null, vaultId: null })
+    performDelete(node, vaultId)
+  }
+
+  function performDelete(node: DirectoryTree | null, vaultId: string | null) {
     if (!node || !vaultId || !apiClient) return
 
     // Close affected tabs and drop favorites immediately, before the delete request
@@ -809,6 +845,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       showToast('error', extractErrorMessage(err, t('fileOps.deleteError')))
     })
   }
+
+  useEffect(() => { performDeleteRef.current = performDelete })
 
   function handleDeleteCancelled() {
     setDeleteConfirm({ open: false, node: null, vaultId: null })

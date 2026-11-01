@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useImperativeHandle, useCallback, useState } from 'react'
+import React, { useRef, useEffect, useImperativeHandle, useCallback, useState, useMemo } from 'react'
 import { ExternalLink, Copy, FileText, FolderOpen } from 'lucide-react'
 import { EditorState, Compartment, Annotation, type Extension } from '@codemirror/state'
 import { EditorView, lineNumbers as cmLineNumbers, dropCursor, drawSelection, rectangularSelection, keymap } from '@codemirror/view'
@@ -47,6 +47,8 @@ import {
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
+import { useAppConfigValue } from '../state/vaultAppConfigStore'
+import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
 import { codeFolding } from '@codemirror/language'
 import { markdownFoldService } from './folding'
 import { isEmbeddableFile } from '../utils/internalLink'
@@ -167,6 +169,18 @@ export function CodeMirrorEditor({
   const lineNumbersCompartment = useRef(new Compartment())
   const livePreviewCompartment = useRef(new Compartment())
   const spellcheckCompartment = useRef(new Compartment())
+  const editorPrefsCompartment = useRef(new Compartment())
+
+  // The vault's editor preferences (app.json); a stable object so a note is not rebuilt for nothing.
+  const tabSize = useAppConfigValue('tabSize')
+  const useTab = useAppConfigValue('useTab')
+  const autoPairBrackets = useAppConfigValue('autoPairBrackets')
+  const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
+  const rightToLeft = useAppConfigValue('rightToLeft')
+  const editorPrefs = useMemo<EditorPrefs>(
+    () => ({ tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft }),
+    [tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft],
+  )
 
   // Keep onContentChange ref up to date without recreating extensions
   useEffect(() => {
@@ -407,6 +421,7 @@ export function CodeMirrorEditor({
       spellcheckCompartment.current.of(
         spellcheck ? spellcheckExtension() : []
       ),
+      editorPrefsCompartment.current.of(editorPrefsExtension(editorPrefs)),
       createLivePreviewCompartmentExtension(
         livePreviewCompartment.current,
         buildLivePreviewOptionsWithMenu(),
@@ -433,7 +448,7 @@ export function CodeMirrorEditor({
     extensions.push(autocompletion({ override: [highlightColorCompletions, ...pluginCompletionSources] }))
 
     return extensions
-  }, [readOnly, showLineNumbers, spellcheck, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
+  }, [readOnly, showLineNumbers, spellcheck, editorPrefs, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
 
   /**
    * Save the current editor state to the store.
@@ -656,6 +671,13 @@ export function CodeMirrorEditor({
       ),
     })
   }, [spellcheck])
+
+  // Indentation, automatic pairs and text direction come from the vault's app.json.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({ effects: editorPrefsCompartment.current.reconfigure(editorPrefsExtension(editorPrefs)) })
+  }, [editorPrefs])
 
   // Load the selected dictionary. The worker ignores a repeat of the language
   // it already has, so this is free on every render but the first.

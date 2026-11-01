@@ -10,6 +10,7 @@ import { initialState } from '../state'
 import type { IApiClient } from '../api'
 import type { Dispatch } from 'react'
 import { clear as clearWorkspaceStore } from '../state/workspaceStore'
+import { _reset as resetAppConfig, initialize as initializeAppConfig, setActiveVault } from '../state/vaultAppConfigStore'
 
 /** Creates a mock API client with all required interface methods. */
 function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
@@ -631,6 +632,28 @@ describe('FileExplorer', () => {
       await user.click(confirmBtn)
 
       expect(mockApiClient.deleteContent).toHaveBeenCalledWith('vault-123', 'readme.md')
+    })
+
+    it('deletes at once, without the confirmation, when promptDelete is off in app.json', async () => {
+      resetAppConfig()
+      initializeAppConfig({ getAppConfig: async () => ({ promptDelete: false }) } as unknown as IApiClient)
+      await setActiveVault('vault-123')
+      const user = userEvent.setup()
+      const mockApiClient = createMockApiClient({
+        fetchVaultTree: vi.fn().mockResolvedValue({ name: 'root', type: 'directory', path: '', children: [] }),
+        deleteContent: vi.fn().mockResolvedValue(undefined),
+      })
+      renderFileExplorer(
+        { vaults: [testVault], vaultTrees: { 'vault-123': sampleTree }, vaultTreesLoading: new Set(), selectedVaultId: 'vault-123' },
+        mockApiClient,
+      )
+      await user.click(screen.getByText('Test Vault'))
+      await user.pointer({ keys: '[MouseRight]', target: screen.getByText('readme') })
+      await user.click(screen.getByText('Löschen'))
+
+      expect(mockApiClient.deleteContent).toHaveBeenCalledWith('vault-123', 'readme.md')
+      expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull()
+      resetAppConfig()
     })
 
     it('does not call deleteContent when deletion is cancelled', async () => {

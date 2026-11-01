@@ -32,14 +32,23 @@ no function yet), **durchgereicht** (kept for Obsidian and plugins, no function 
 | `readableLineLength` | boolean | `true` | yes | wirkt |
 | `showLineNumber` | boolean | `false` | yes | wirkt |
 | `showUnsupportedFiles` | boolean | `false` | yes (name) | gespeichert |
-| `promptDelete` | boolean | `true` | yes (name) | gespeichert |
+| `promptDelete` | boolean | `true` | yes (name) | wirkt: off deletes without asking (the item still goes to the trash) |
 | `userIgnoreFilters` | list of strings | `[]` | yes (name) | gespeichert |
 | `spellcheck` | boolean | `true` | no | wirkt |
 | `livePreview` | boolean | `true` | no | wirkt |
-| `newFileLocation` | `root` `current` `folder` | `root` | no | Plugin-API |
+| `newFileLocation` | `root` `current` `folder` | `root` | no | wirkt: the folder a new note is created in (the vault root, the open note's folder, or `newFileFolderPath`; a missing folder falls back to the root); also Plugin-API |
 | `useMarkdownLinks` | boolean | `false` | no | Plugin-API |
 | `newLinkFormat` | `shortest` `relative` `absolute` | `shortest` | no | Plugin-API |
-| `newFileFolderPath`, `defaultViewMode` (`source` `preview`), `strictLineBreaks`, `showFrontmatter`, `propertiesInDocument` (`visible` `hidden` `source`), `foldHeading`, `foldIndent`, `autoConvertHtml`, `trashOption` (`system` `local` `none`), `spellcheckLanguages`, `tabSize` (1–16, default 4), `useTab`, `autoPairBrackets`, `autoPairMarkdown`, `smartIndentList`, `showIndentGuide`, `showInlineTitle`, `rightToLeft` | see `app-config.ts` | Obsidian-like | no | gespeichert |
+| `newFileFolderPath` | string (folder in the vault) | empty | no | wirkt (with `newFileLocation: folder`) |
+| `defaultViewMode` | `source` `preview` | `preview` | no | wirkt: `source` opens a Markdown file in the editor, `preview` in the reading view. **Deviation:** Obsidian's own default is `source`; an absent key means `preview` here, because Slatebase always opened notes reading |
+| `strictLineBreaks` | boolean | `false` | no | wirkt: on, a single newline stays a space in the reading view (off = line break, as in Obsidian) |
+| `foldHeading`, `foldIndent` | boolean | `true` | no | wirkt: off removes the fold marker and commands for headings / lists |
+| `tabSize` (1–16) | number | 4 | no | wirkt: tab width of the editor |
+| `useTab` | boolean | `true` | no | wirkt: Tab indents with a tab character; off, with `tabSize` spaces |
+| `autoPairBrackets` | boolean | `true` | no | wirkt: closes `( [ { ' "` while typing |
+| `autoPairMarkdown` | boolean | `true` | no | wirkt, narrower than Obsidian: with text selected, `*`, `_` and `` ` `` wrap the selection; nothing is paired without a selection, so a list marker stays one star |
+| `rightToLeft` | boolean | `false` | no | wirkt: text direction of the editor |
+| `showFrontmatter`, `propertiesInDocument` (`visible` `hidden` `source`), `autoConvertHtml`, `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `spellcheckLanguages`, `smartIndentList`, `showIndentGuide`, `showInlineTitle`, `userIgnoreFilters`, `showUnsupportedFiles` | see `app-config.ts` | Obsidian-like | no | gespeichert |
 | `mobilePullAction` (verified), `vimMode`, `nativeMenus` | string / boolean | – | partly | durchgereicht |
 
 **Defaults.** `alwaysUpdateLinks` used to default to `true` in Slatebase. The first start of this
@@ -176,6 +185,6 @@ be bound through the file. The aliases are from docs and the command palette, no
 
 ## Not done yet
 
-`workspaces.json` as a shared vault file, groups in the bookmarks UI, `app.hotkeyManager` reading the file
-(commands and shortcuts: see [hotkeys.md](hotkeys.md)), the functions behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
+`workspaces.json` as a shared vault file, groups in the bookmarks UI, and the functions behind the `app.json` keys
+marked *gespeichert* above (they are kept and offered to plugins; Settings → Editor and files has the ones that work). See
 `.kiro/specs/obsidian-app-json-compat/tasks.md`. `core-plugins.json` is left to its own spec.

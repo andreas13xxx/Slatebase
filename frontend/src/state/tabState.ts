@@ -3,6 +3,8 @@
  * Manages open tabs, active tab, mode switching, and edit buffers.
  */
 
+import { getAppConfigValue } from './vaultAppConfigStore'
+
 /** Display mode for a tab: edit (plain text editor) or view (rendered Markdown). */
 export type TabMode = 'edit' | 'view'
 
@@ -193,8 +195,8 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
             ...tab,
             content,
             isBinary,
-            // Initial mode: always view (user can switch to edit manually)
-            mode: 'view',
+            // Initial mode: the vault's `defaultViewMode` (app.json) for notes, the reading view for the rest
+            mode: !isBinary && /\.md$/i.test(tab.filePath) && getAppConfigValue('defaultViewMode') === 'source' ? 'edit' : 'view',
             loading: false,
             error: null,
           }
