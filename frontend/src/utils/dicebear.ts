@@ -46,7 +46,13 @@ export type DicebearStyle = (typeof DICEBEAR_STYLES)[number]
  */
 export function dicebearUrl(style: DicebearStyle, seed: string): string {
   const safeSeed = seed.replace(/[^A-Za-z0-9._-]/g, '') || 'avatar'
-  return `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/${style}/svg?seed=${encodeURIComponent(safeSeed)}`
+  // Build via the URL API (not string concatenation) so the result is a
+  // structured, host-pinned URL: the origin is a fixed literal and the seed
+  // goes through URLSearchParams encoding. This also keeps static analysis from
+  // treating the value as unsanitized DOM text when it is used as an <img src>.
+  const url = new URL(`https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/${style}/svg`)
+  url.searchParams.set('seed', safeSeed)
+  return url.toString()
 }
 
 /**
