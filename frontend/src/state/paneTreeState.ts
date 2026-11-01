@@ -17,6 +17,8 @@ import {
   tabReducer,
   initialTabState,
   generateTabId,
+  editModeFor,
+  migratePersistedMode,
   type TabState,
   type TabEntry,
   type TabAction,
@@ -513,6 +515,7 @@ function rehydrateTab(tab: PersistedPaneTab): TabEntry {
     filePath: tab.filePath,
     fileName: tab.fileName,
     mode: tab.mode,
+    lastEditMode: editModeFor(tab.mode),
     isBinary: false,
     content: '',
     editBuffer: null,
@@ -579,12 +582,13 @@ function parsePersistedTab(data: unknown): PersistedPaneTab | null {
   if (typeof data.vaultId !== 'string') return null
   if (typeof data.filePath !== 'string') return null
   if (typeof data.fileName !== 'string') return null
-  if (data.mode !== 'edit' && data.mode !== 'view') return null
+  const mode = migratePersistedMode(data.mode)
+  if (mode === null) return null
   const tab: PersistedPaneTab = {
     vaultId: data.vaultId,
     filePath: data.filePath,
     fileName: data.fileName,
-    mode: data.mode,
+    mode,
     pinned: typeof data.pinned === 'boolean' ? data.pinned : false,
   }
   if (typeof data.icon === 'string') tab.icon = data.icon

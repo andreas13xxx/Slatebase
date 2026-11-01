@@ -73,7 +73,7 @@ describe('TabProvider and useTabContext', () => {
       })
     })
 
-    // Load content so it's a text file (mode starts as 'view' by default)
+    // Load content so it's a text file (mode starts as 'reading' by default)
     act(() => {
       result.current.tabDispatch({
         type: 'TAB_CONTENT_LOADED',
@@ -81,7 +81,7 @@ describe('TabProvider and useTabContext', () => {
       })
     })
 
-    expect(result.current.tabState.tabs[0].mode).toBe('view')
+    expect(result.current.tabState.tabs[0].mode).toBe('reading')
 
     act(() => {
       result.current.tabDispatch({
@@ -90,7 +90,7 @@ describe('TabProvider and useTabContext', () => {
       })
     })
 
-    expect(result.current.tabState.tabs[0].mode).toBe('edit')
+    expect(result.current.tabState.tabs[0].mode).toBe('live-preview')
   })
 
   it('keeps the context value referentially stable across re-renders with unchanged state', () => {

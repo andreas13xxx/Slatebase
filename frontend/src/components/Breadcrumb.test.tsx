@@ -57,4 +57,40 @@ describe('Breadcrumb', () => {
     expect(screen.getByRole('menuitem', { name: 'A' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'B' })).toBeInTheDocument()
   })
+
+  it('shows no mode switcher when mode/onModeChange are not given', () => {
+    render(<Breadcrumb vaultName="MyVault" filePath="notes.md" onSegmentClick={() => {}} />)
+    expect(screen.queryByRole('radiogroup', { name: 'Editor-Modus' })).not.toBeInTheDocument()
+  })
+
+  it('renders the three-mode switcher with the current mode checked', () => {
+    render(
+      <Breadcrumb
+        vaultName="MyVault"
+        filePath="notes.md"
+        onSegmentClick={() => {}}
+        mode="reading"
+        onModeChange={() => {}}
+      />,
+    )
+    expect(screen.getByRole('radiogroup', { name: 'Editor-Modus' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Quelltext' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'Live-Vorschau' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('radio', { name: 'Lesemodus' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('calls onModeChange with the clicked mode', () => {
+    const onModeChange = vi.fn()
+    render(
+      <Breadcrumb
+        vaultName="MyVault"
+        filePath="notes.md"
+        onSegmentClick={() => {}}
+        mode="reading"
+        onModeChange={onModeChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole('radio', { name: 'Quelltext' }))
+    expect(onModeChange).toHaveBeenCalledWith('source')
+  })
 })

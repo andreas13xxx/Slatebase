@@ -10,8 +10,42 @@ function isNoteTab(filePath: string, isBinary: boolean): boolean {
   return !isBinary && !filePath.startsWith('__') && /\.md$/i.test(filePath)
 }
 
-/** Display mode for a tab: edit (plain text editor) or view (rendered Markdown). */
-export type TabMode = 'edit' | 'view'
+/**
+ * Display mode for a tab:
+ * - `source`       — CM6 editor, raw Markdown source
+ * - `live-preview` — CM6 editor, cursor-aware inline rendering
+ * - `reading`      — read-only rendered Markdown (ViewMode, the reading view)
+ */
+export type TabMode = 'source' | 'live-preview' | 'reading'
+
+/** The two editable modes, between which `editor:toggle-source` flips. */
+export type EditTabMode = 'source' | 'live-preview'
+
+/**
+ * Normalizes a persisted `mode` value (from workspace/pane-tree storage) to a
+ * current `TabMode`. Accepts the three current values and migrates the two
+ * legacy ones: `'edit'` was the source editor → `source`, `'view'` was Live
+ * Preview (not reading) → `live-preview`. Returns null for anything else.
+ */
+export function migratePersistedMode(value: unknown): TabMode | null {
+  switch (value) {
+    case 'source':
+    case 'live-preview':
+    case 'reading':
+      return value
+    case 'edit':
+      return 'source'
+    case 'view':
+      return 'live-preview'
+    default:
+      return null
+  }
+}
+
+/** The editable mode a reading↔edit toggle should return to, derived from a mode. */
+export function editModeFor(mode: TabMode): EditTabMode {
+  return mode === 'reading' ? 'live-preview' : mode
+}
 
 /** A single open tab entry with its associated state. */
 export interface TabEntry {
@@ -25,6 +59,13 @@ export interface TabEntry {
   /** Obsidian icon name, for plugin-view tabs (`filePath` starting with `__view::`). Unset for regular file tabs. */
   icon?: string
   mode: TabMode
+  /**
+   * The editable mode (`source`/`live-preview`) the tab last showed. Lets
+   * `markdown:toggle-preview` and the reading↔edit toggle return to the mode
+   * the user was actually editing in, instead of a fixed default. Defaults to
+   * `live-preview`.
+   */
+  lastEditMode: EditTabMode
   isBinary: boolean
   /** Last loaded/saved content (server truth). */
   content: string
@@ -53,6 +94,7 @@ export type TabAction =
   | { type: 'CLOSE_TAB'; payload: { tabId: string } }
   | { type: 'ACTIVATE_TAB'; payload: { tabId: string } }
   | { type: 'TOGGLE_MODE'; payload: { tabId: string } }
+  | { type: 'SET_MODE'; payload: { tabId: string; mode: TabMode } }
   | { type: 'TAB_CONTENT_LOADED'; payload: { tabId: string; content: string; isBinary: boolean } }
   | { type: 'TAB_LOADING'; payload: { tabId: string } }
   | { type: 'TAB_ERROR'; payload: { tabId: string; error: string } }
@@ -112,7 +154,8 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         filePath,
         fileName,
         icon,
-        mode: 'view', // default, will be confirmed on TAB_CONTENT_LOADED
+        mode: 'reading', // default, will be confirmed on TAB_CONTENT_LOADED
+        lastEditMode: 'live-preview',
         isBinary: false,
         content: '',
         editBuffer: null,
@@ -175,6 +218,8 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
     }
 
     case 'TOGGLE_MODE': {
+      // "Toggle reading view" (markdown:toggle-preview): reading ⇄ the editable
+      // mode the user last had open.
       const { tabId } = action.payload
       return {
         ...state,
@@ -184,7 +229,24 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
           if (tab.isBinary) return tab
           return {
             ...tab,
-            mode: tab.mode === 'edit' ? 'view' : 'edit',
+            mode: tab.mode === 'reading' ? tab.lastEditMode : 'reading',
+          }
+        }),
+      }
+    }
+
+    case 'SET_MODE': {
+      const { tabId, mode } = action.payload
+      return {
+        ...state,
+        tabs: state.tabs.map((tab) => {
+          if (tab.id !== tabId) return tab
+          if (tab.isBinary) return tab
+          return {
+            ...tab,
+            mode,
+            // Remember the editable mode so a later reading⇄edit toggle returns here.
+            lastEditMode: mode === 'reading' ? tab.lastEditMode : mode,
           }
         }),
       }
@@ -200,10 +262,11 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
             ...tab,
             content,
             isBinary,
-            // Initial mode: a note that is opened for the first time follows the vault's `defaultViewMode`, but
-            // only when the file says `source` itself (Slatebase reads by default); a reload, and every
-            // other kind of tab (graph, plugin views, non-Markdown files), keeps the reading view.
-            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') === 'source' ? 'edit' : 'view',
+            // Initial mode: a note opened for the first time follows the vault's `defaultViewMode`
+            // (`source` → source editor, anything else → reading view), but only when it is the
+            // note's first load. A reload, and every other kind of tab (graph, plugin views,
+            // non-Markdown files), keeps the reading view.
+            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'reading',
             loading: false,
             error: null,
           }

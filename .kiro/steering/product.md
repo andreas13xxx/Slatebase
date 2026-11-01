@@ -15,7 +15,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 
 ### Editor & Rendering
 - Tabbed editor/viewer (auto-save, GFM, syntax highlighting, collapsible headings, recent files, image paste)
-- Live Preview Editor (CodeMirror 6 — Source + Live Preview mode, cursor-aware inline rendering, plugin extensions via Compartments; tables, Mermaid, KaTeX, images, audio/video, highlights, frontmatter properties box, readable line length, click-to-follow links, callout folding)
+- Three editor modes — Source and Live Preview (CodeMirror 6, cursor-aware inline rendering, plugin extensions via Compartments; tables, Mermaid, KaTeX, images, audio/video, highlights, frontmatter properties box, readable line length, click-to-follow links, callout folding) plus a read-only Reading view (the same rendered-Markdown `ViewMode` as note embeds and the hover preview). Switched via a three-segment switcher at the right end of the breadcrumb (no longer a per-tab button); the initial mode follows the vault's `app.json` `defaultViewMode`
 - Obsidian-compatible rendering (Wikilinks, Embeds incl. inline PDF/Audio/Video, Callouts, Tags incl. frontmatter tags, Block References, soft→hard line breaks)
 - Highlights with colors: `==text==` (yellow) plus five emoji-selected colors (`==🔴 text==` red, 🟠 orange, 🟢 green, 🔵 blue, 🟣 purple), rendered in both Live Preview and reading view; `==`-autocomplete and an editor context-menu color submenu to apply them (Obsidian 1.14 syntax, portable Markdown)
 - Mermaid diagrams and LaTeX math (KaTeX), both lazy-loaded, dark/light aware, with error/timeout fallback to raw source

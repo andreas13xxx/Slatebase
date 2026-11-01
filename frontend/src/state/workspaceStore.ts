@@ -14,6 +14,7 @@
  */
 
 import type { TabMode } from './tabState'
+import { migratePersistedMode } from './tabState'
 import type { AppPage } from '../App'
 import { parsePersistedPaneTree, type PersistedPaneTree } from './paneTreeState'
 
@@ -142,12 +143,13 @@ function validateState(data: unknown): WorkspaceState | null {
     if (typeof t.vaultId !== 'string') continue
     if (typeof t.filePath !== 'string') continue
     if (typeof t.fileName !== 'string') continue
-    if (t.mode !== 'edit' && t.mode !== 'view') continue
+    const mode = migratePersistedMode(t.mode)
+    if (mode === null) continue
     validTabs.push({
       vaultId: t.vaultId,
       filePath: t.filePath,
       fileName: t.fileName,
-      mode: t.mode,
+      mode,
       pinned: typeof t.pinned === 'boolean' ? t.pinned : false,
     })
   }

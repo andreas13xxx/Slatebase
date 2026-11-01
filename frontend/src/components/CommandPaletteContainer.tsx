@@ -657,7 +657,7 @@ export function CommandPaletteContainer({
 
     // Determine if there's an active tab in edit mode (for editor commands)
     const activeTab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
-    const isEditing = activeTab !== undefined && activeTab.mode === 'edit' && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::')
+    const isEditing = activeTab !== undefined && activeTab.mode !== 'reading' && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::')
     const isCanvasActive = activeTab !== undefined && activeTab.fileName.endsWith('.canvas')
 
     // ── Navigation ──────────────────────────────────────────────────────────

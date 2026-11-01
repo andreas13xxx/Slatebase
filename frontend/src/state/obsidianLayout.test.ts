@@ -3,7 +3,7 @@ import type { PersistedPaneTree, PersistedPaneTab } from './paneTreeState'
 import { obsidianToPaneTree, paneTreeToObsidian } from './obsidianLayout'
 
 const tab = (filePath: string, over: Partial<PersistedPaneTab> = {}): PersistedPaneTab => ({
-  vaultId: 'v1', filePath, fileName: filePath.split('/').pop()!, mode: 'view', pinned: false, ...over,
+  vaultId: 'v1', filePath, fileName: filePath.split('/').pop()!, mode: 'live-preview', pinned: false, ...over,
 })
 
 const split: PersistedPaneTree = {
@@ -11,7 +11,7 @@ const split: PersistedPaneTree = {
   root: {
     kind: 'split', id: 's', direction: 'horizontal', sizes: [0.5, 0.5],
     children: [
-      { kind: 'pane', id: 'p1', tabs: [tab('a.md', { mode: 'edit' }), tab('dir/b.md', { pinned: true })], activeTabId: 'v1::dir/b.md' },
+      { kind: 'pane', id: 'p1', tabs: [tab('a.md', { mode: 'source' }), tab('dir/b.md', { pinned: true })], activeTabId: 'v1::dir/b.md' },
       { kind: 'pane', id: 'p2', tabs: [tab('c.canvas'), tab('__graph__')], activeTabId: 'v1::c.canvas' },
     ],
   },
@@ -33,8 +33,8 @@ describe('paneTreeToObsidian', () => {
 
   it('writes files as typed leaves, the editing mode as source, pins and the current tab', () => {
     const [a, b] = leaves(groups[0]!)
-    expect(view(a!)).toMatchObject({ type: 'markdown', state: { file: 'a.md', mode: 'source' } })
-    expect(view(b!).state).toMatchObject({ file: 'dir/b.md', mode: 'preview' })
+    expect(view(a!)).toMatchObject({ type: 'markdown', state: { file: 'a.md', mode: 'source', source: true } })
+    expect(view(b!).state).toMatchObject({ file: 'dir/b.md', mode: 'source', source: false })
     expect(b!['pinned']).toBe(true)
     expect(groups[0]!['currentTab']).toBe(1)
     const [canvas, graph] = leaves(groups[1]!)
@@ -71,7 +71,7 @@ describe('obsidianToPaneTree', () => {
     const [first, second] = root.children
     expect(first).toMatchObject({ kind: 'pane', activeTabId: 'v1::dir/b.md' })
     if (first?.kind === 'pane') {
-      expect(first.tabs.map((t) => [t.filePath, t.mode, t.pinned])).toEqual([['a.md', 'edit', false], ['dir/b.md', 'view', true]])
+      expect(first.tabs.map((t) => [t.filePath, t.mode, t.pinned])).toEqual([['a.md', 'source', false], ['dir/b.md', 'live-preview', true]])
     }
     if (second?.kind === 'pane') expect(second.tabs.map((t) => t.filePath)).toEqual(['c.canvas', '__graph__'])
     expect(result.tree.activePaneId).toBe((first as { id: string }).id)

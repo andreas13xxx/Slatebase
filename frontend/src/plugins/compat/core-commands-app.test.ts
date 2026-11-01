@@ -63,7 +63,8 @@ function makeTab(overrides: Partial<TabEntry> = {}): TabEntry {
     vaultId: 'vault-1',
     filePath: 'note.md',
     fileName: 'note.md',
-    mode: 'edit',
+    mode: 'live-preview',
+    lastEditMode: 'live-preview',
     isBinary: false,
     content: 'hello',
     editBuffer: null,
@@ -250,26 +251,26 @@ describe('registerCoreAppCommands', () => {
   })
 
   it('workspace:export-pdf switches an edit-mode tab to reading mode, then prints', () => {
-    handlers.tabState = { tabs: [makeTab({ mode: 'edit' })], activeTabId: 'vault-1::note.md' }
+    handlers.tabState = { tabs: [makeTab({ mode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
     const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
 
     registry.executeCommand('workspace:export-pdf')
 
-    expect(tabDispatch).toHaveBeenCalledWith({ type: 'TOGGLE_MODE', payload: { tabId: 'vault-1::note.md' } })
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'reading' } })
     expect(printSpy).toHaveBeenCalled()
     printSpy.mockRestore()
     rafSpy.mockRestore()
   })
 
-  it('workspace:export-pdf does not toggle mode when already in reading mode', () => {
-    handlers.tabState = { tabs: [makeTab({ mode: 'view' })], activeTabId: 'vault-1::note.md' }
+  it('workspace:export-pdf does not change mode when already in reading mode', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'reading' })], activeTabId: 'vault-1::note.md' }
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
     const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
 
     registry.executeCommand('workspace:export-pdf')
 
-    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'TOGGLE_MODE' }))
+    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_MODE' }))
     expect(printSpy).toHaveBeenCalled()
     printSpy.mockRestore()
     rafSpy.mockRestore()
@@ -536,6 +537,24 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
     registry.executeCommand('editor:follow-link')
 
     expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_TAB' }))
+  })
+
+  it('editor:toggle-source flips source -> live-preview', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'source', lastEditMode: 'source' })], activeTabId: 'vault-1::note.md' }
+    registry.executeCommand('editor:toggle-source')
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'live-preview' } })
+  })
+
+  it('editor:toggle-source flips live-preview -> source', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'live-preview', lastEditMode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
+    registry.executeCommand('editor:toggle-source')
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'source' } })
+  })
+
+  it('editor:toggle-source from reading returns to the last edit mode', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'reading', lastEditMode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
+    registry.executeCommand('editor:toggle-source')
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'live-preview' } })
   })
 
   it('editor:open-search opens the CM6 search panel', () => {

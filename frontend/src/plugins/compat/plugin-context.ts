@@ -1360,8 +1360,8 @@ export function PluginProvider({
       const tabId = tabState.activeTabId
       if (!tabId) return
       const tab = tabState.tabs.find(t => t.id === tabId)
-      if (tab && tab.mode !== 'edit') {
-        tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId } })
+      if (tab && tab.mode !== 'source') {
+        tabDispatch({ type: 'SET_MODE', payload: { tabId, mode: 'source' } })
       }
     }
   }, [tabState, tabDispatch])

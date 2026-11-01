@@ -351,8 +351,8 @@ function exportActiveFileToPdf(h: CoreAppCommandHandlers): void {
     showToast('error', 'Keine Datei zum Exportieren geöffnet')
     return
   }
-  if (tab.mode === 'edit') {
-    h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: tab.id } })
+  if (tab.mode !== 'reading') {
+    h.tabDispatch({ type: 'SET_MODE', payload: { tabId: tab.id, mode: 'reading' } })
   }
   // One frame is enough for the mode-switch re-render to paint the reading view.
   requestAnimationFrame(() => window.print())
@@ -889,7 +889,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
 
     // ── editor:* commands needing app context (not just IEditor) ──
     { id: 'editor:save-file', name: 'Save current file', editor: true, run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) void saveTab(h.tabDispatch, h.apiClient, h.vaultId, t.filePath, t.editBuffer ?? t.content) } },
-    { id: 'editor:toggle-source', name: 'Toggle Live Preview/Source mode', editor: true, run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: t.id } }) } },
+    { id: 'editor:toggle-source', name: 'Toggle Live Preview/Source mode', editor: true, run: (h) => { const t = getActiveTab(h); if (t) h.tabDispatch({ type: 'SET_MODE', payload: { tabId: t.id, mode: t.mode === 'source' ? 'live-preview' : t.mode === 'live-preview' ? 'source' : t.lastEditMode } }) } },
     { id: 'editor:toggle-line-numbers', name: 'Toggle line numbers', editor: true, run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleLineNumbers' } })) },
     { id: 'editor:follow-link', name: 'Follow link under cursor', editor: true, run: followLink },
     { id: 'editor:open-link-in-new-leaf', name: 'Open link under cursor in new tab', editor: true, run: followLink },

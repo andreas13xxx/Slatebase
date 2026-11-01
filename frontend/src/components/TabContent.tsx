@@ -6,6 +6,7 @@ import { openTab, saveTab } from '../state/tabActions'
 import type { DirectoryTree } from '../types'
 import type { PropertyType, PropertyTypeEntry } from '../state/propertyTypes'
 import { EditMode } from './EditMode'
+import { ViewMode } from './ViewMode'
 import { BinaryViewer } from './BinaryViewer'
 import { ErrorBoundary } from './ErrorBoundary'
 import { PageLoadingFallback } from './PageLoadingFallback'
@@ -513,8 +514,9 @@ export function TabContent() {
   }
 
   // Plugin file view — render plugin's TextFileView container (e.g. Kanban board)
-  // Only in view mode — edit mode shows raw markdown so the user can see/edit the source.
-  if (fileViewMatch && activeTab && activeTab.mode !== 'edit') {
+  // Only in reading mode — the editable modes (source/live-preview) show raw
+  // markdown so the user can see/edit the source.
+  if (fileViewMatch && activeTab && activeTab.mode === 'reading') {
     const activeFileView = getActiveFileView(activeTab.vaultId, activeTab.filePath)
     if (activeFileView) {
       return (
@@ -543,8 +545,8 @@ export function TabContent() {
     )
   }
 
-  // Edit mode
-  if (activeTab.mode === 'edit') {
+  // Source mode — raw-Markdown CM6 editor
+  if (activeTab.mode === 'source') {
     const editContent = activeTab.editBuffer ?? activeTab.content
     const currentVault = appState.vaults.find((v) => v.id === activeTab.vaultId)
     const isReadOnly = currentVault?.permission === 'read'
@@ -569,7 +571,38 @@ export function TabContent() {
     )
   }
 
-  // Preview mode — editable CM6 Live Preview (Variante 1)
+  // Reading mode — read-only rendered Markdown. Reuses the same ViewMode as note
+  // embeds and the hover preview, so callouts/embeds/footnotes/links all behave
+  // identically. Shows the edit buffer so unsaved changes are visible when
+  // switching into reading, and opens internal links the same way the editor does.
+  if (activeTab.mode === 'reading') {
+    const readingContent = activeTab.editBuffer ?? activeTab.content
+    return (
+      <div className="tab-content tab-content--reading" role="tabpanel" aria-label={activeTab.fileName}>
+        {linkError && (
+          <div className="tab-content-link-error" role="alert">
+            <span>{linkError}</span>
+            <button
+              className="tab-content-link-error-dismiss"
+              onClick={() => setLinkError(null)}
+              aria-label={t('tabContent.dismissError')}
+            >
+              ×
+            </button>
+          </div>
+        )}
+        <ViewMode
+          content={readingContent}
+          vaultId={activeTab.vaultId}
+          directoryTree={directoryTreeForActiveVault}
+          onInternalLinkClick={handleInternalLinkClick}
+          sourcePath={activeTab.filePath}
+        />
+      </div>
+    )
+  }
+
+  // Live Preview mode — editable CM6 Live Preview (fallthrough)
   const editContentPreview = activeTab.editBuffer ?? activeTab.content
   const currentVaultPreview = appState.vaults.find((v) => v.id === activeTab.vaultId)
   const isReadOnlyPreview = currentVaultPreview?.permission === 'read'

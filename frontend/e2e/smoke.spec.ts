@@ -73,8 +73,8 @@ test('login, edit a file, save, reload, content persists', async ({ page }) => {
   await inlineInput.fill(fileName)
   await inlineInput.press('Enter')
 
-  // --- Switch to Edit mode and type content ---
-  await page.locator('.tab-bar-mode-btn').first().click()
+  // --- Switch to an editable mode (Live Preview) and type content ---
+  await page.locator('.breadcrumb-mode-btn[title="Live-Vorschau"]').first().click()
   const editorContent = page.locator('.cm-content')
   await editorContent.click()
   await editorContent.pressSequentially(editedText, { delay: 10 })
@@ -91,7 +91,7 @@ test('login, edit a file, save, reload, content persists', async ({ page }) => {
   const fileNode = page.locator('.tree-node-file').filter({ hasText: String(runId) }).first()
   await fileNode.click()
 
-  const editToggle = page.locator('.tab-bar-mode-btn').first()
+  const editToggle = page.locator('.breadcrumb-mode-btn[title="Live-Vorschau"]').first()
   if (await editToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
     await editToggle.click()
   }

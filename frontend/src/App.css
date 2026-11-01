@@ -674,6 +674,39 @@
   padding: 2px 4px;
 }
 
+/* Editor-mode switcher at the right end of the breadcrumb (Source/Live Preview/Reading). */
+.breadcrumb-mode-switcher {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+}
+
+.breadcrumb-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-subtle);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.breadcrumb-mode-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.breadcrumb-mode-btn--active {
+  background: var(--bg-elevated);
+  color: var(--accent);
+}
+
 /* ===== Tab Bar ===== */
 .tab-bar {
   display: flex;
