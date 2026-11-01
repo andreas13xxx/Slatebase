@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { IApiClient } from '../api'
 import { initialize as initializeSettings, setActiveVault, updateVaultSettings, _reset as resetSettings } from './vaultSettingsStore'
 import {
-  initialize, loadVaultWorkspaces, buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
+  MAX_WORKSPACES, initialize, loadVaultWorkspaces, buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
   renameWorkspace, deleteWorkspace, parseWorkspace, getActiveWorkspaceName, onWorkspacesChange, workspaceSaveProblem, disconnect, _reset,
 } from './workspacesStore'
 import type { PersistedPaneTree } from './paneTreeState'
@@ -306,6 +306,14 @@ describe('taking over the per-user workspaces', () => {
     await loadVaultWorkspaces('v1')
     expect(getWorkspaces().map((w) => w.name)).toEqual(['Mine'])
     expect(c.legacy()).toEqual([])
+  })
+
+  it('keeps the layouts that do not fit under the cap in the old list instead of deleting them', async () => {
+    const full: Record<string, unknown> = {}
+    for (let i = 0; i < MAX_WORKSPACES; i++) full[`W${i}`] = { main: {}, slatebase: { savedAt: 'x', paneTree: tree(`w${i}.md`) } }
+    const c = await connect({ workspaces: full }, [legacy('Extra', '2026-01-01T00:00:00.000Z')])
+    expect(c.legacy().map((w) => (w as { name: string }).name)).toEqual(['Extra'])
+    expect(Object.keys(c.file()['workspaces'] as object)).toHaveLength(MAX_WORKSPACES)
   })
 
   it('skips entries that are unusable or have a name the file cannot hold', async () => {

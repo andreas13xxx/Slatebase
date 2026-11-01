@@ -584,6 +584,43 @@ describe('favoritesStore', () => {
       stop()
     })
 
+    it('keeps a bookmark someone added to the file since it was read, instead of replacing the list from an older view', async () => {
+      const client = createClient({ items: [file('a.md')] })
+      await initialize(client)
+      await loadVaultBookmarks('vault1')
+
+      // Obsidian, a sync or another user adds one before this device writes
+      client.state.file = { items: [file('a.md'), file('theirs.md')] }
+      add('vault1', 'mine.md')
+      await vi.advanceTimersByTimeAsync(2500)
+
+      const items = (client.patchBookmarksConfig.mock.calls.at(-1)?.[1] as { items: Array<{ path: string }> }).items
+      expect(items.map((i) => i.path)).toEqual(['a.md', 'mine.md', 'theirs.md'])
+      expect(getForVault('vault1').map((e) => e.path).sort()).toEqual(['a.md', 'mine.md', 'theirs.md'])
+    })
+
+    it('does not count the old list as taken over when the file refused it, and asks again at the next load', async () => {
+      seedLocal('vault1', ['old.md'])
+      const client = createClient({})
+      client.patchBookmarksConfig.mockRejectedValueOnce(new Error('403'))
+      await initialize(client)
+
+      await loadVaultBookmarks('vault1')
+      await vi.advanceTimersByTimeAsync(100)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(1) // not retried in a loop
+
+      await loadVaultBookmarks('vault1')
+      await vi.advanceTimersByTimeAsync(100)
+      expect(client.patchBookmarksConfig).toHaveBeenCalledTimes(2)
+      expect((client.state.file['items'] as Array<{ path: string }>).map((i) => i.path)).toEqual(['old.md'])
+
+      client.patchBookmarksConfig.mockClear()
+      await loadVaultBookmarks('vault1')
+      expect(client.patchBookmarksConfig).not.toHaveBeenCalled() // taken over now
+    })
+
     it('writes a change into the file after the debounce, keeping what Slatebase does not show', async () => {
       const client = createClient({ items: [file('a.md', { custom: 1 }), { type: 'group', title: 'G', items: [] }] })
       await initialize(client)

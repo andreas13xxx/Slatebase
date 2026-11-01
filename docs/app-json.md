@@ -149,7 +149,11 @@ unknown types and unknown fields are kept where they are when Slatebase writes. 
 groups are kept but not shown, and groups cannot be created in Slatebase yet.** A rename in Obsidian
 counts as remove + add for the sync merge. The limit is 5000 (was 50). The bookmarks used to be per
 user on the server; that list is only read now: the first time a vault whose file has no bookmarks is
-opened on a device, its entries are written into the file.
+opened on a device, its entries are written into the file. **Privacy:** that file is readable by everyone who
+opens the vault and is synced to the git remote, so the first user's old bookmarks (paths, saved search queries)
+become visible to them; the same holds for old workspaces (file paths of open tabs). The take-over is automatic and
+has no prompt. It counts as done only when the file took the entries (a read-only user is asked again at the next
+open). Before a write, the file is read again and bookmarks added meanwhile (Obsidian, a sync, another user) are kept.
 
 ## hotkeys.json
 

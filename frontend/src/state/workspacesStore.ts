@@ -279,8 +279,13 @@ async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Prom
   // Names in use, lower-cased, with the file's own spelling; names the patch adds count too
   const taken = new Map<string, string>([...layouts.keys()].map((n) => [n.toLowerCase(), n]))
   const patch: Record<string, Layout> = {}
-  for (const ws of legacy) {
-    if (taken.size >= MAX_WORKSPACES) break
+  // Layouts that did not fit under the cap stay in the old list instead of being deleted with it
+  let left: NamedWorkspace[] = []
+  for (const [index, ws] of legacy.entries()) {
+    if (taken.size >= MAX_WORKSPACES) {
+      left = legacy.slice(index)
+      break
+    }
     const clash = taken.get(ws.name.toLowerCase())
     if (clash === undefined) {
       patch[ws.name] = toLayout(ws, vaultId)
@@ -306,7 +311,7 @@ async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Prom
   const session = generation
   try {
     applyFile(await client.patchWorkspacesConfig(vaultId, { workspaces: patch }))
-    await client.saveVaultSettings(vaultId, { workspaces: [] })
+    await client.saveVaultSettings(vaultId, { workspaces: left })
   } catch {
     // No write access or server down: try again the next time this vault is opened. If the file took the
     // layouts and the old list is still there, that run finds the names taken and keeps what the file has.
@@ -314,8 +319,8 @@ async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Prom
   } finally {
     if (session === generation) pendingWrites--
   }
-  if (getVaultSettings().workspaces.length > 0) updateVaultSettings({ workspaces: [] })
-  markTakenOver(vaultId)
+  if (getVaultSettings().workspaces.length > 0) updateVaultSettings({ workspaces: left })
+  if (left.length === 0) markTakenOver(vaultId)
 }
 
 function findByLowerName(name: string): string | null {

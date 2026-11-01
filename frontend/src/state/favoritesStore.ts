@@ -332,6 +332,9 @@ function emptyFile(): LoadedBookmarks {
   return { entries: [], items: [], rawById: new Map() }
 }
 
+/** Vaults whose old per-user list is being written into an empty file; marked taken over when that worked. */
+const takeoverPending = new Set<string>()
+
 /** Writes the bookmarks of every changed vault into its `.obsidian/bookmarks.json`. */
 async function syncToServer(): Promise<void> {
   const client = apiClient
@@ -344,9 +347,25 @@ async function syncToServer(): Promise<void> {
   let failed = false
   try {
     for (const [vaultId, version] of [...dirtyVaults]) {
-      const previous = loadedFiles.get(vaultId) ?? emptyFile()
+      let previous = loadedFiles.get(vaultId) ?? emptyFile()
       // What is written is fixed here; changes made while the request runs are written next time.
-      const written = [...loadFavorites(vaultId)].sort((a, b) => a.order - b.order)
+      let written = [...loadFavorites(vaultId)].sort((a, b) => a.order - b.order)
+      let addedElsewhere = 0
+      try {
+        // The file replaces the whole list, so look at it right before: bookmarks Obsidian, a sync or
+        // another user added since this device read it are kept (not removed by our older view)
+        const current = await client.getBookmarksConfig(vaultId)
+        if (Array.isArray(current['items']) && JSON.stringify(current['items']) !== JSON.stringify(previous.items)) {
+          const fresh = itemsToEntries(vaultId, current['items'])
+          const known = new Set([...previous.entries, ...written].map((entry) => entry.id))
+          const added = fresh.entries.filter((entry) => !known.has(entry.id))
+          addedElsewhere = added.length
+          written = [...written, ...added.map((entry, index) => ({ ...entry, order: written.length + index }))]
+          previous = fresh
+        }
+      } catch {
+        // Unknown, not gone: write from what this device has, as before
+      }
       const items = entriesToItems(written, previous)
       try {
         const saved = await client.patchBookmarksConfig(vaultId, { items })
@@ -361,6 +380,11 @@ async function syncToServer(): Promise<void> {
           if (raw !== undefined) rawById.set(entry.id, raw)
         })
         loadedFiles.set(vaultId, { entries: fresh.entries, items: fresh.items, rawById })
+        if (takeoverPending.delete(vaultId)) markTakenOver(vaultId)
+        if (addedElsewhere > 0 && dirtyVaults.get(vaultId) === version) {
+          saveFavoritesLocal(vaultId, fresh.entries) // the ones added elsewhere show up here too
+          for (const cb of changeListeners) cb()
+        }
         // Only a vault nobody changed meanwhile is clean again.
         if (dirtyVaults.get(vaultId) === version) dirtyVaults.delete(vaultId)
         reportSyncSuccess(SYNC_STORE_KEY)
@@ -369,6 +393,12 @@ async function syncToServer(): Promise<void> {
         // told once per failure streak (typically: no write access).
         failed = true
         reportSyncFailure(SYNC_STORE_KEY, error, 'Lesezeichen')
+        // A take-over the file refused (typically: no write access) is not retried in a loop: the old
+        // entries stay in this device's cache and the next load of the vault asks again
+        if (takeoverPending.delete(vaultId) && dirtyVaults.get(vaultId) === version) {
+          dirtyVaults.delete(vaultId)
+          failed = false
+        }
       }
     }
   } finally {
@@ -401,9 +431,11 @@ export async function loadVaultBookmarks(vaultId: string): Promise<boolean> {
   const items: unknown[] = Array.isArray(config['items']) ? config['items'] : []
   const takenOver = isTakenOver(vaultId)
   if (items.length === 0 && !takenOver) {
-    markTakenOver(vaultId)
-    // No bookmarks in the file yet: hand over what the old list had.
+    // No bookmarks in the file yet: hand over what the old list had. The vault counts as taken over
+    // once the file has them (see syncToServer), so a refused write (no write access) is tried again
+    // the next time the vault is opened, not forgotten.
     if (loadFavorites(vaultId).length > 0) {
+      takeoverPending.add(vaultId)
       loadedFiles.set(vaultId, { entries: [], items: [], rawById: new Map() })
       dirtyVaults.set(vaultId, 1)
       await syncToServer()
