@@ -14,9 +14,25 @@ describe('dicebearUrl', () => {
     )
   })
 
-  it('URL-encodes the seed', () => {
+  it('strips unsafe characters from the seed before encoding', () => {
+    // Spaces, &, <, quotes etc. are removed so nothing user-controlled reaches the URL.
     expect(dicebearUrl('lorelei', 'a b&c')).toBe(
-      `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/lorelei/svg?seed=a%20b%26c`,
+      `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/lorelei/svg?seed=abc`,
+    )
+    expect(dicebearUrl('lorelei', '"><img>')).toBe(
+      `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/lorelei/svg?seed=img`,
+    )
+  })
+
+  it('keeps safe identifier characters', () => {
+    expect(dicebearUrl('bottts', 'andreas-1.foo_bar')).toBe(
+      `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/bottts/svg?seed=andreas-1.foo_bar`,
+    )
+  })
+
+  it('falls back to a default seed when nothing safe remains', () => {
+    expect(dicebearUrl('icons', '世界')).toBe(
+      `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/icons/svg?seed=avatar`,
     )
   })
 

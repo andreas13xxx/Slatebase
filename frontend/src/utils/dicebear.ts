@@ -36,11 +36,17 @@ export const DICEBEAR_STYLES = [
 export type DicebearStyle = (typeof DICEBEAR_STYLES)[number]
 
 /**
- * Builds a DiceBear SVG URL for a style + seed. The seed is URL-encoded, so any
- * username or derived string is safe to pass.
+ * Builds a DiceBear SVG URL for a style + seed.
+ *
+ * The seed is first reduced to a safe identifier character set
+ * (`[A-Za-z0-9._-]`) and then URL-encoded, so no user-controlled
+ * meta-characters from the username can reach the URL that is later used as an
+ * `<img src>`. The host and path segments are fixed literals, so the result is
+ * always a constant-host `https://api.dicebear.com/...` URL.
  */
 export function dicebearUrl(style: DicebearStyle, seed: string): string {
-  return `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/${style}/svg?seed=${encodeURIComponent(seed)}`
+  const safeSeed = seed.replace(/[^A-Za-z0-9._-]/g, '') || 'avatar'
+  return `https://${DICEBEAR_HOST}/${DICEBEAR_VERSION}/${style}/svg?seed=${encodeURIComponent(safeSeed)}`
 }
 
 /**
