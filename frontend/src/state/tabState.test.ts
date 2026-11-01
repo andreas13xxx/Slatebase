@@ -33,7 +33,7 @@ describe('tabReducer', () => {
       expect(state.tabs[0].filePath).toBe('notes/hello.md')
       expect(state.tabs[0].fileName).toBe('hello.md')
       expect(state.tabs[0].loading).toBe(true)
-      expect(state.tabs[0].mode).toBe('view')
+      expect(state.tabs[0].mode).toBe('reading')
       expect(state.tabs[0].isBinary).toBe(false)
       expect(state.tabs[0].content).toBe('')
       expect(state.tabs[0].editBuffer).toBeNull()
@@ -210,9 +210,9 @@ describe('tabReducer', () => {
   })
 
   describe('TOGGLE_MODE', () => {
-    it('toggles mode from edit to view', () => {
+    it('toggles from an edit mode to reading', () => {
       const stateWithTab: TabState = {
-        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'edit' })],
+        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'live-preview' })],
         activeTabId: 'v1::a.md',
       }
 
@@ -221,12 +221,12 @@ describe('tabReducer', () => {
         payload: { tabId: 'v1::a.md' },
       })
 
-      expect(state.tabs[0].mode).toBe('view')
+      expect(state.tabs[0].mode).toBe('reading')
     })
 
-    it('toggles mode from view to edit', () => {
+    it('toggles from reading back to the last edit mode', () => {
       const stateWithTab: TabState = {
-        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'view' })],
+        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'reading', lastEditMode: 'source' })],
         activeTabId: 'v1::a.md',
       }
 
@@ -235,12 +235,12 @@ describe('tabReducer', () => {
         payload: { tabId: 'v1::a.md' },
       })
 
-      expect(state.tabs[0].mode).toBe('edit')
+      expect(state.tabs[0].mode).toBe('source')
     })
 
     it('does not toggle mode for binary files', () => {
       const stateWithTab: TabState = {
-        tabs: [createTab('v1', 'image.png', 'image.png', { mode: 'view', isBinary: true })],
+        tabs: [createTab('v1', 'image.png', 'image.png', { mode: 'reading', isBinary: true })],
         activeTabId: 'v1::image.png',
       }
 
@@ -249,14 +249,14 @@ describe('tabReducer', () => {
         payload: { tabId: 'v1::image.png' },
       })
 
-      expect(state.tabs[0].mode).toBe('view')
+      expect(state.tabs[0].mode).toBe('reading')
     })
 
     it('only affects the targeted tab', () => {
       const stateWithTabs: TabState = {
         tabs: [
-          createTab('v1', 'a.md', 'a.md', { mode: 'edit' }),
-          createTab('v1', 'b.md', 'b.md', { mode: 'view' }),
+          createTab('v1', 'a.md', 'a.md', { mode: 'live-preview' }),
+          createTab('v1', 'b.md', 'b.md', { mode: 'reading' }),
         ],
         activeTabId: 'v1::a.md',
       }
@@ -266,13 +266,13 @@ describe('tabReducer', () => {
         payload: { tabId: 'v1::a.md' },
       })
 
-      expect(state.tabs[0].mode).toBe('view')
-      expect(state.tabs[1].mode).toBe('view') // unchanged
+      expect(state.tabs[0].mode).toBe('reading')
+      expect(state.tabs[1].mode).toBe('reading') // unchanged
     })
 
     it('preserves editBuffer across mode toggle', () => {
       const stateWithTab: TabState = {
-        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'edit', editBuffer: 'unsaved changes' })],
+        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'live-preview', editBuffer: 'unsaved changes' })],
         activeTabId: 'v1::a.md',
       }
 
@@ -282,6 +282,65 @@ describe('tabReducer', () => {
       })
 
       expect(state.tabs[0].editBuffer).toBe('unsaved changes')
+    })
+  })
+
+  describe('SET_MODE', () => {
+    it('sets the tab to the given mode', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'reading' })],
+        activeTabId: 'v1::a.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'SET_MODE',
+        payload: { tabId: 'v1::a.md', mode: 'source' },
+      })
+
+      expect(state.tabs[0].mode).toBe('source')
+    })
+
+    it('records an editable mode as lastEditMode', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'reading', lastEditMode: 'live-preview' })],
+        activeTabId: 'v1::a.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'SET_MODE',
+        payload: { tabId: 'v1::a.md', mode: 'source' },
+      })
+
+      expect(state.tabs[0].lastEditMode).toBe('source')
+    })
+
+    it('leaves lastEditMode unchanged when switching to reading', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'a.md', 'a.md', { mode: 'source', lastEditMode: 'source' })],
+        activeTabId: 'v1::a.md',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'SET_MODE',
+        payload: { tabId: 'v1::a.md', mode: 'reading' },
+      })
+
+      expect(state.tabs[0].mode).toBe('reading')
+      expect(state.tabs[0].lastEditMode).toBe('source')
+    })
+
+    it('does not change mode for binary files', () => {
+      const stateWithTab: TabState = {
+        tabs: [createTab('v1', 'image.png', 'image.png', { mode: 'reading', isBinary: true })],
+        activeTabId: 'v1::image.png',
+      }
+
+      const state = tabReducer(stateWithTab, {
+        type: 'SET_MODE',
+        payload: { tabId: 'v1::image.png', mode: 'source' },
+      })
+
+      expect(state.tabs[0].mode).toBe('reading')
     })
   })
 
@@ -299,12 +358,12 @@ describe('tabReducer', () => {
 
       expect(state.tabs[0].content).toBe('# Hello')
       expect(state.tabs[0].isBinary).toBe(false)
-      expect(state.tabs[0].mode).toBe('view')
+      expect(state.tabs[0].mode).toBe('reading')
       expect(state.tabs[0].loading).toBe(false)
       expect(state.tabs[0].error).toBeNull()
     })
 
-    it('opens a note in the editor with defaultViewMode "source", other files in the reading view', async () => {
+    it('opens a note in the source editor with defaultViewMode "source", other files in the reading view', async () => {
       resetAppConfig()
       initializeAppConfig({ getAppConfig: async () => ({ defaultViewMode: 'source' }) } as unknown as IApiClient)
       await setActiveVault('v1')
@@ -313,17 +372,17 @@ describe('tabReducer', () => {
           { tabs: [createTab('v1', name, name, { loading: true })], activeTabId: `v1::${name}` },
           { type: 'TAB_CONTENT_LOADED', payload: { tabId: `v1::${name}`, content: 'x', isBinary } },
         ).tabs[0]!.mode
-      expect(open('a.md')).toBe('edit')
-      expect(open('a.txt')).toBe('view')
-      expect(open('image.png', true)).toBe('view')
-      expect(open('__local-graph::a.md')).toBe('view')
+      expect(open('a.md')).toBe('source')
+      expect(open('a.txt')).toBe('reading')
+      expect(open('image.png', true)).toBe('reading')
+      expect(open('__local-graph::a.md')).toBe('reading')
 
       // a reload of a note that is already open keeps the reading view
       const reloaded = tabReducer(
         { tabs: [createTab('v1', 'a.md', 'a.md', { loading: true, content: 'old' })], activeTabId: 'v1::a.md' },
         { type: 'TAB_CONTENT_LOADED', payload: { tabId: 'v1::a.md', content: 'new', isBinary: false } },
       )
-      expect(reloaded.tabs[0]!.mode).toBe('view')
+      expect(reloaded.tabs[0]!.mode).toBe('reading')
       resetAppConfig()
     })
 
@@ -335,11 +394,11 @@ describe('tabReducer', () => {
         { tabs: [createTab('v1', 'a.md', 'a.md', { loading: true })], activeTabId: 'v1::a.md' },
         { type: 'TAB_CONTENT_LOADED', payload: { tabId: 'v1::a.md', content: 'x', isBinary: false } },
       )
-      expect(tabs[0]!.mode).toBe('view')
+      expect(tabs[0]!.mode).toBe('reading')
       resetAppConfig()
     })
 
-    it('sets mode to view for binary files', () => {
+    it('sets mode to reading for binary files', () => {
       const stateWithTab: TabState = {
         tabs: [createTab('v1', 'image.png', 'image.png', { loading: true })],
         activeTabId: 'v1::image.png',
@@ -351,7 +410,7 @@ describe('tabReducer', () => {
       })
 
       expect(state.tabs[0].isBinary).toBe(true)
-      expect(state.tabs[0].mode).toBe('view')
+      expect(state.tabs[0].mode).toBe('reading')
       expect(state.tabs[0].loading).toBe(false)
     })
   })
@@ -833,7 +892,8 @@ function createTab(
     vaultId,
     filePath,
     fileName,
-    mode: 'view',
+    mode: 'reading',
+    lastEditMode: 'live-preview',
     isBinary: false,
     content: '',
     editBuffer: null,

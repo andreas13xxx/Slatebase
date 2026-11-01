@@ -63,7 +63,8 @@ function makeTab(overrides: Partial<TabEntry> = {}): TabEntry {
     vaultId: 'vault-1',
     filePath: 'note.md',
     fileName: 'note.md',
-    mode: 'edit',
+    mode: 'live-preview',
+    lastEditMode: 'live-preview',
     isBinary: false,
     content: 'hello',
     editBuffer: null,
@@ -250,26 +251,26 @@ describe('registerCoreAppCommands', () => {
   })
 
   it('workspace:export-pdf switches an edit-mode tab to reading mode, then prints', () => {
-    handlers.tabState = { tabs: [makeTab({ mode: 'edit' })], activeTabId: 'vault-1::note.md' }
+    handlers.tabState = { tabs: [makeTab({ mode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
     const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
 
     registry.executeCommand('workspace:export-pdf')
 
-    expect(tabDispatch).toHaveBeenCalledWith({ type: 'TOGGLE_MODE', payload: { tabId: 'vault-1::note.md' } })
+    expect(tabDispatch).toHaveBeenCalledWith({ type: 'SET_MODE', payload: { tabId: 'vault-1::note.md', mode: 'reading' } })
     expect(printSpy).toHaveBeenCalled()
     printSpy.mockRestore()
     rafSpy.mockRestore()
   })
 
-  it('workspace:export-pdf does not toggle mode when already in reading mode', () => {
-    handlers.tabState = { tabs: [makeTab({ mode: 'view' })], activeTabId: 'vault-1::note.md' }
+  it('workspace:export-pdf does not change mode when already in reading mode', () => {
+    handlers.tabState = { tabs: [makeTab({ mode: 'reading' })], activeTabId: 'vault-1::note.md' }
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
     const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
 
     registry.executeCommand('workspace:export-pdf')
 
-    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'TOGGLE_MODE' }))
+    expect(tabDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_MODE' }))
     expect(printSpy).toHaveBeenCalled()
     printSpy.mockRestore()
     rafSpy.mockRestore()

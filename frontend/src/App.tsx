@@ -1333,6 +1333,14 @@ function AppContent() {
                   vaultName={selectedVault.name}
                   filePath={breadcrumbFilePath}
                   onSegmentClick={handleBreadcrumbSegmentClick}
+                  {...(activeTab && !activeTab.isBinary
+                    && !activeTab.fileName.endsWith('.canvas')
+                    && !activeTab.fileName.endsWith('.base')
+                    ? {
+                        mode: activeTab.mode,
+                        onModeChange: (mode) => tabDispatch({ type: 'SET_MODE', payload: { tabId: activeTab.id, mode } }),
+                      }
+                    : {})}
                 />
               )}
             </EditorHeaderRow>
@@ -1368,7 +1376,12 @@ function AppContent() {
                           />
                         )}
                         {singlePaneId === null && (
-                          <PaneHeader pane={pane} vaults={state.vaults} onSegmentClick={handleBreadcrumbSegmentClick} />
+                          <PaneHeader
+                            pane={pane}
+                            vaults={state.vaults}
+                            onSegmentClick={handleBreadcrumbSegmentClick}
+                            onModeChange={(tabId, mode) => paneTreeDispatch({ type: 'PANE_TAB_ACTION', payload: { paneId: pane.id, action: { type: 'SET_MODE', payload: { tabId, mode } } } })}
+                          />
                         )}
                         <ErrorBoundary>
                           <TabContent />

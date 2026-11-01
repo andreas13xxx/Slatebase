@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
-import { Eye, Pencil, X, Share2, Puzzle, Pin } from 'lucide-react'
+import { X, Share2, Puzzle, Pin } from 'lucide-react'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../utils/fileIcons'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../utils/pluginIcon'
 import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
@@ -86,11 +86,6 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
   function handleClose(e: React.MouseEvent, tabId: string) {
     e.stopPropagation()
     tabDispatch({ type: 'CLOSE_TAB', payload: { tabId } })
-  }
-
-  function handleToggleMode(e: React.MouseEvent, tabId: string) {
-    e.stopPropagation()
-    tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId } })
   }
 
   function handleTogglePin(e: React.MouseEvent, tabId: string) {
@@ -241,10 +236,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
       {tabs.map((tab, index) => {
         const isActive = !isShowingSettings && tab.id === activeTabId
         const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
-        const modeLabel = tab.mode === 'edit' ? t('tabs.showPreview') : t('tabs.edit')
-        const ModeIcon = tab.mode === 'edit' ? Eye : Pencil
         const isGraphTab = tab.filePath === '__graph__'
-        const isCanvasTab = tab.fileName.endsWith('.canvas')
         // Plugin-view tabs (opened via workspace.getLeaf().setViewState()) carry the
         // view's own Obsidian icon name instead of a real filename — resolving it
         // through getFileIcon() would just guess from "__view::..." and show a generic
@@ -288,17 +280,6 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
             <span className="tab-bar-tab-label">
               {hasUnsaved ? '● ' : ''}{displayName}
             </span>
-            {!tab.isBinary && !isGraphTab && !isCanvasTab && (
-              <button
-                type="button"
-                className="tab-bar-mode-btn"
-                aria-label={modeLabel}
-                title={modeLabel}
-                onClick={(e) => handleToggleMode(e, tab.id)}
-              >
-                <ModeIcon size={12} />
-              </button>
-            )}
             {tab.pinned ? (
               <button
                 type="button"

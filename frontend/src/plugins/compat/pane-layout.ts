@@ -136,7 +136,7 @@ export function buildLayoutJson(tree: PaneTree): Record<string, unknown> {
         state: {
           type: viewTypeForTab(tab),
           // Obsidian's markdown modes: 'source' (editing) / 'preview' (reading).
-          state: tab.filePath.startsWith('__') ? {} : { file: tab.filePath, mode: tab.mode === 'view' ? 'preview' : 'source' },
+          state: tab.filePath.startsWith('__') ? {} : { file: tab.filePath, mode: tab.mode === 'reading' ? 'preview' : 'source' },
         },
       })),
     }

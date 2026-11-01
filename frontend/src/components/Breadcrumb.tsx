@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ChevronRight, MoreHorizontal } from 'lucide-react'
+import { ChevronRight, MoreHorizontal, Code2, Eye, BookOpen } from 'lucide-react'
+import { useTranslation } from '../i18n'
+import type { TranslationKey } from '../i18n'
+import type { TabMode } from '../state/tabState'
 
 export interface BreadcrumbProps {
   vaultName: string
@@ -7,6 +10,14 @@ export interface BreadcrumbProps {
   filePath: string | null
   /** Called with a folder path ('' = vault root) when a segment is clicked. */
   onSegmentClick: (folderPath: string) => void
+  /**
+   * Current editor mode of the active tab. When set together with `onModeChange`,
+   * the breadcrumb renders the Source/Live-Preview/Reading switcher at its right
+   * end. Omit both for tabs that have no mode (binary, graph, canvas, plugin view).
+   */
+  mode?: TabMode
+  /** Switches the active tab's mode. See `mode`. */
+  onModeChange?: (mode: TabMode) => void
 }
 
 interface Segment {
@@ -24,7 +35,7 @@ const MAX_VISIBLE_MIDDLE_SEGMENTS = 2
  *
  * Validates: Requirements 7.1–7.7 of navigation-link-polish
  */
-export function Breadcrumb({ vaultName, filePath, onSegmentClick }: BreadcrumbProps) {
+export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeChange }: BreadcrumbProps) {
   const [collapsedOpen, setCollapsedOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -115,6 +126,47 @@ export function Breadcrumb({ vaultName, filePath, onSegmentClick }: BreadcrumbPr
 
       <ChevronRight size={12} className="breadcrumb-separator" aria-hidden="true" />
       <span className="breadcrumb-filename" title={fileName}>{fileName}</span>
+
+      {mode !== undefined && onModeChange && (
+        <BreadcrumbModeSwitcher mode={mode} onModeChange={onModeChange} />
+      )}
+    </div>
+  )
+}
+
+/** The three editor modes, in switcher order, with their icon + i18n key. */
+const MODE_ORDER: ReadonlyArray<{ mode: TabMode; icon: typeof Code2; labelKey: TranslationKey }> = [
+  { mode: 'source', icon: Code2, labelKey: 'tabs.modeSource' },
+  { mode: 'live-preview', icon: Eye, labelKey: 'tabs.modeLivePreview' },
+  { mode: 'reading', icon: BookOpen, labelKey: 'tabs.modeReading' },
+]
+
+/**
+ * Three-segment editor-mode switcher shown at the right end of the breadcrumb:
+ * Source · Live Preview · Reading. Replaces the old per-tab mode button.
+ */
+function BreadcrumbModeSwitcher({ mode, onModeChange }: { mode: TabMode; onModeChange: (mode: TabMode) => void }) {
+  const { t } = useTranslation()
+  return (
+    <div className="breadcrumb-mode-switcher" role="radiogroup" aria-label={t('tabs.modeSwitcherLabel')}>
+      {MODE_ORDER.map(({ mode: m, icon: Icon, labelKey }) => {
+        const active = m === mode
+        const label = t(labelKey)
+        return (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={label}
+            title={label}
+            className={`breadcrumb-mode-btn${active ? ' breadcrumb-mode-btn--active' : ''}`}
+            onClick={() => onModeChange(m)}
+          >
+            <Icon size={14} aria-hidden="true" />
+          </button>
+        )
+      })}
     </div>
   )
 }

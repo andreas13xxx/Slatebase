@@ -68,8 +68,10 @@ function tabToLeaf(tab: PersistedPaneTab, vaultId: string): Json | null {
     if (!type) return null
     const fileState: Json = { file: tab.filePath }
     if (type === 'markdown') {
-      fileState['mode'] = tab.mode === 'edit' ? 'source' : 'preview'
-      fileState['source'] = false
+      // Obsidian markdown modes: 'source' (editing) / 'preview' (reading). Live
+      // Preview is 'source' with source:false; reading view is 'preview'.
+      fileState['mode'] = tab.mode === 'reading' ? 'preview' : 'source'
+      fileState['source'] = tab.mode === 'source'
     }
     state = { type, state: fileState, title: basename(tab.filePath).replace(/\.[^.]+$/, '') }
   }
@@ -120,7 +122,7 @@ function leafToTab(leaf: Json, vaultId: string): PersistedPaneTab | null {
   if (!view || !type) return null
   const inner = isObject(view['state']) ? view['state'] : {}
   const pinned = leaf['pinned'] === true
-  if (type === 'graph') return { vaultId, filePath: GRAPH_PATH, fileName: 'Graph', mode: 'view', pinned }
+  if (type === 'graph') return { vaultId, filePath: GRAPH_PATH, fileName: 'Graph', mode: 'reading', pinned }
   if (!FILE_VIEW_TYPES.has(type) || typeof inner['file'] !== 'string' || inner['file'] === '') return null
   const filePath = inner['file']
   if (filePath.startsWith('/') || filePath.split('/').some((segment) => segment === '..')) return null
@@ -128,7 +130,8 @@ function leafToTab(leaf: Json, vaultId: string): PersistedPaneTab | null {
     vaultId,
     filePath,
     fileName: basename(filePath),
-    mode: type === 'markdown' && inner['mode'] === 'source' ? 'edit' : 'view',
+    // 'preview' → reading; a 'source' markdown mode → source editor; otherwise Live Preview.
+    mode: type !== 'markdown' ? 'reading' : inner['mode'] === 'preview' ? 'reading' : inner['source'] === true ? 'source' : 'live-preview',
     pinned,
   }
 }
