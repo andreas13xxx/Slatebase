@@ -351,6 +351,26 @@ describe('FavoritesView', () => {
       expect(getForVault('vault1')).toHaveLength(0)
     })
 
+    it('opens a folded group when an entry is dropped into it', () => {
+      const g = addGroup('vault1', 'Work')!
+      add('vault1', 'in.md')
+      moveEntry('vault1', idOf('in.md'), g)
+      add('vault1', 'a.md')
+      renderView()
+      fireEvent.click(screen.getByText('Work')) // fold
+      expect(screen.queryByText('in')).not.toBeInTheDocument()
+      const items = screen.getAllByRole('listitem') // Work, a
+      const dt = dataTransfer()
+      items[0]!.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 100, width: 100, x: 0, y: 0, toJSON: () => ({}) })
+
+      fireEvent.dragStart(within(items[1]!).getByText('a'), { dataTransfer: dt })
+      dragAt('dragOver', items[0]!, dt, 15)
+      dragAt('drop', items[0]!, dt, 15)
+
+      expect(screen.getByText('a')).toBeInTheDocument()
+      expect(screen.getByText('Work').closest('button')).toHaveAttribute('aria-expanded', 'true')
+    })
+
     it('renames a group', () => {
       const g = addGroup('vault1', 'Old')!
       renderView()

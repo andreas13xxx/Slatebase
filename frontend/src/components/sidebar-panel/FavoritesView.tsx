@@ -166,9 +166,11 @@ function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set
 }
 
 /** Whether `id` is `ancestorId` or sits somewhere inside it. */
-function isInside(byParent: Map<string | null, FavoriteEntry[]>, id: string, ancestorId: string): boolean {
+function isInside(byParent: Map<string | null, FavoriteEntry[]>, id: string, ancestorId: string, visited: Set<string> = new Set()): boolean {
   if (id === ancestorId) return true
-  return (byParent.get(ancestorId) ?? []).some((child) => isInside(byParent, id, child.id))
+  if (visited.has(ancestorId)) return false // a loop in stored data
+  visited.add(ancestorId)
+  return (byParent.get(ancestorId) ?? []).some((child) => isInside(byParent, id, child.id, visited))
 }
 
 /**
@@ -298,14 +300,15 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
   const handleRemove = useCallback((entry: FavoriteEntry) => {
     if (!vaultId) return
-    // A group with content asks first: the content goes with it
-    if (isGroup(entry) && (byParent.get(entry.id)?.length ?? 0) > 0) {
+    // A group with content asks first: the content goes with it, also what is not shown here
+    // (folders, URLs and the like in a group made in Obsidian)
+    if (isGroup(entry) && favoritesStore.groupContentCount(vaultId, entry.id) > 0) {
       setGroupToDelete(entry)
       return
     }
     favoritesStore.removeById(vaultId, entry.id)
     refresh()
-  }, [vaultId, refresh, byParent])
+  }, [vaultId, refresh])
 
   const handleReveal = useCallback((entry: FavoriteEntry) => {
     if (entry.type === 'search' || isGroup(entry)) return
@@ -374,6 +377,13 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     if (vaultId && dragId && dragId !== row.entry.id) {
       if (mode === 'into') {
         favoritesStore.moveEntry(vaultId, dragId, row.entry.id)
+        // A folded group opens, so the entry does not seem to be gone
+        setCollapsed((prev) => {
+          if (!prev.has(row.entry.id)) return prev
+          const next = new Set(prev)
+          next.delete(row.entry.id)
+          return next
+        })
       } else {
         // The entry takes the place of the one it is dropped on (so moving down puts it after that one,
         // moving up before it): the target's position among the entries of that level

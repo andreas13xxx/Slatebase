@@ -81,6 +81,8 @@ export interface WidgetDecorationOptions {
 export interface WidgetDecorationResult {
   decorations: Range<Decoration>[]
   hideableRanges: HideableRange[]
+  /** Where the frontmatter block ends (0 if the document has none); the other passes leave it alone unless it is shown as properties. */
+  frontmatterEnd: number
 }
 
 /**
@@ -1751,6 +1753,24 @@ const INLINE_MATH_REGEX = /(?<![\\$])\$([^\s$](?:[^\n$\\]|\\.)*?[^\s$\\]|[^\s$\\
 const BLOCK_MATH_REGEX = /^\$\$([\s\S]*?)\$\$\s*$/gm
 
 /**
+ * The frontmatter block at the start of a document: the YAML between the `---` lines, and the position
+ * after the closing line and its line break. Null if the document does not start with one.
+ * Only the first 2 KB are looked at.
+ */
+export function locateFrontmatter(doc: Text): { yaml: string; end: number } | null {
+  const docText = doc.sliceString(0, Math.min(doc.length, 2000))
+  if (!docText.startsWith('---\n') && !docText.startsWith('---\r\n')) return null
+  const endMatch = docText.indexOf('\n---', 3)
+  if (endMatch === -1) return null
+  const fmEnd = endMatch + 4 // includes the closing \n---
+  // Verify it ends at a line boundary (either end of doc or followed by newline)
+  const afterEnd = fmEnd < doc.length ? doc.sliceString(fmEnd, fmEnd + 1) : '\n'
+  if (afterEnd !== '\n' && afterEnd !== '\r' && fmEnd < doc.length) return null
+  const fullEnd = afterEnd === '\n' ? fmEnd + 1 : (afterEnd === '\r' ? fmEnd + 2 : fmEnd)
+  return { yaml: doc.sliceString(4, endMatch), end: Math.min(fullEnd, doc.length) }
+}
+
+/**
  * Build widget decorations from the document.
  * Handles embeds, checkboxes, callouts, code blocks, and blockquotes.
  *
@@ -1772,33 +1792,22 @@ export function buildWidgetDecorations(
 
   // --- Frontmatter: ---\nyaml\n--- at document start ---
   let frontmatterEndPos = 0
-  const docText = doc.sliceString(0, Math.min(doc.length, 2000)) // only check first 2KB
-  if (docText.startsWith('---\n') || docText.startsWith('---\r\n')) {
-    const endMatch = docText.indexOf('\n---', 3)
-    if (endMatch !== -1) {
-      const fmEnd = endMatch + 4 // includes the closing \n---
-      // Verify it ends at a line boundary (either end of doc or followed by newline)
-      const afterEnd = fmEnd < doc.length ? doc.sliceString(fmEnd, fmEnd + 1) : '\n'
-      if (afterEnd === '\n' || afterEnd === '\r' || fmEnd >= doc.length) {
-        const yamlContent = doc.sliceString(4, endMatch) // content between the --- markers
-        const fullEnd = afterEnd === '\n' ? fmEnd + 1 : (afterEnd === '\r' ? fmEnd + 2 : fmEnd)
-        frontmatterEndPos = Math.min(fullEnd, doc.length)
-
-        const propertiesMode = options.propertiesInDocument ?? 'visible'
-        if (propertiesMode === 'visible') {
-          const widget = new FrontmatterWidget(yamlContent, state.readOnly, options.typeRegistry, options.onPropertyTypeChange)
-          addStandaloneLineTightening(doc, 0, frontmatterEndPos, decorations, hideableRanges)
-          decorations.push(
-            Decoration.replace({ widget }).range(0, frontmatterEndPos)
-          )
-          hideableRanges.push({ from: 0, to: frontmatterEndPos, groupFrom: 0, groupTo: frontmatterEndPos })
-        } else if (propertiesMode === 'hidden') {
-          // Replaced by nothing and not revealed under the cursor: the note starts at its first line of text
-          decorations.push(Decoration.replace({ block: true }).range(0, frontmatterEndPos))
-        }
-        // 'source': no decoration, the YAML stays editable text (frontmatterEndPos still keeps the --- out of the HR scan)
-      }
+  const frontmatter = locateFrontmatter(doc)
+  if (frontmatter) {
+    frontmatterEndPos = frontmatter.end
+    const propertiesMode = options.propertiesInDocument ?? 'visible'
+    if (propertiesMode === 'visible') {
+      const widget = new FrontmatterWidget(frontmatter.yaml, state.readOnly, options.typeRegistry, options.onPropertyTypeChange)
+      addStandaloneLineTightening(doc, 0, frontmatterEndPos, decorations, hideableRanges)
+      decorations.push(
+        Decoration.replace({ widget }).range(0, frontmatterEndPos)
+      )
+      hideableRanges.push({ from: 0, to: frontmatterEndPos, groupFrom: 0, groupTo: frontmatterEndPos })
+    } else if (propertiesMode === 'hidden') {
+      // Replaced by nothing and not revealed under the cursor: the note starts at its first line of text
+      decorations.push(Decoration.replace({ block: true }).range(0, frontmatterEndPos))
     }
+    // 'source': no decoration, the YAML stays editable text (frontmatterEndPos still keeps the --- out of the HR scan)
   }
 
   // --- Block Math: $$...$$ ---
@@ -2320,7 +2329,7 @@ export function buildWidgetDecorations(
     }
   })
 
-  return { decorations, hideableRanges }
+  return { decorations, hideableRanges, frontmatterEnd: frontmatterEndPos }
 }
 
 // ---------------------------------------------------------------------------

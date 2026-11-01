@@ -122,6 +122,39 @@ export function itemsToEntries(vaultId: string, items: unknown[]): LoadedBookmar
   return { entries, items: items as RawItem[], rawById }
 }
 
+/** What identifies an entry, apart from its id: type, target, label, and the group it sits in. */
+function entryKey(entry: FavoriteEntry, byId: Map<string, FavoriteEntry>, seen: Set<string> = new Set()): string {
+  const own = [entry.type ?? 'file', entry.path, entry.heading ?? '', entry.blockId ?? '', entry.searchQuery ?? '', entry.label ?? ''].join('\0')
+  const parent = entry.parentId !== undefined ? byId.get(entry.parentId) : undefined
+  if (parent === undefined || seen.has(entry.id)) return own
+  seen.add(entry.id)
+  return `${entryKey(parent, byId, seen)}\u0001${own}`
+}
+
+/**
+ * A fresh read of the file, with its raw items also reachable by the ids of `entries` (the cache's).
+ * Entries made in Slatebase have random ids while the same items read from the file have derived ones;
+ * matching them by what they are lets a write keep the unknown fields and the items inside a group
+ * that the file holds for them.
+ */
+export function adoptEntryIds(fresh: LoadedBookmarks, entries: FavoriteEntry[]): LoadedBookmarks {
+  const freshById = new Map(fresh.entries.map((entry) => [entry.id, entry]))
+  const queues = new Map<string, FavoriteEntry[]>()
+  for (const entry of fresh.entries) {
+    const key = entryKey(entry, freshById)
+    queues.set(key, [...(queues.get(key) ?? []), entry])
+  }
+  const byId = new Map(entries.map((entry) => [entry.id, entry]))
+  const rawById = new Map(fresh.rawById)
+  for (const entry of [...entries].sort((a, b) => a.order - b.order)) {
+    if (rawById.has(entry.id)) continue // the same id in both: already matched
+    const match = queues.get(entryKey(entry, byId))?.shift()
+    const raw = match !== undefined ? fresh.rawById.get(match.id) : undefined
+    if (raw !== undefined) rawById.set(entry.id, raw)
+  }
+  return { entries: fresh.entries, items: fresh.items, rawById }
+}
+
 /** The item for an entry, on top of the raw item it came from (if any) so unknown fields survive. */
 function entryToItem(entry: FavoriteEntry, raw: RawItem | undefined): RawItem {
   const type = entry.type ?? 'file'

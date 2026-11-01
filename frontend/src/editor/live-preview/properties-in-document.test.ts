@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Transaction } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { createLivePreviewField } from './live-preview-extension'
@@ -49,5 +49,61 @@ describe('propertiesInDocument in the editor', () => {
     const v = mount('source')
     expect(v.dom.querySelector('.cm-lp-frontmatter')).toBeNull()
     expect(v.dom.textContent).toContain('title: Hello')
+  })
+
+  it('does not style the YAML lines as headings in source mode', () => {
+    // The last property line followed by the closing --- parses as a setext heading
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: DOC.replace('title: Hello', '# comment\ntitle: Hello'),
+        extensions: [markdown({ extensions: GFM }), createLivePreviewField({ vaultId: 'v1', directoryTree: null, propertiesInDocument: 'source' })],
+      }),
+    })
+
+    expect(view.dom.querySelector('[class*="cm-lp-h"], .HyperMD-header')).toBeNull()
+  })
+
+  describe('hidden: the user cannot edit what cannot be seen', () => {
+    it('drops typing at the start of the note and deleting into the block', () => {
+      const v = mount('hidden')
+
+      v.dispatch({ changes: { from: 0, insert: 'x' }, userEvent: 'input.type' })
+      expect(v.state.doc.toString()).toBe(DOC)
+
+      const end = DOC.indexOf('Body')
+      v.dispatch({ changes: { from: end - 1, to: end }, userEvent: 'delete.backward' })
+      expect(v.state.doc.toString()).toBe(DOC)
+    })
+
+    it('lets the user edit the text below the block', () => {
+      const v = mount('hidden')
+      const end = DOC.indexOf('Body')
+
+      v.dispatch({ changes: { from: end, insert: 'new ' }, userEvent: 'input.type' })
+
+      expect(v.state.doc.toString()).toBe('---\ntitle: Hello\n---\nnew Body text\n')
+    })
+
+    it('lets code change the block, such as a reload from disk or a command that adds a property', () => {
+      const v = mount('hidden')
+
+      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: '---\ntitle: Other\n---\nBody text\n' } })
+
+      expect(v.state.doc.toString()).toContain('title: Other')
+    })
+
+    it('does not guard the visible and source modes', () => {
+      for (const mode of ['visible', 'source'] as const) {
+        view?.destroy()
+        view = null
+        document.body.innerHTML = ''
+        const v = mount(mode)
+        v.dispatch({ changes: { from: 0, insert: 'x' }, userEvent: 'input.type', annotations: Transaction.addToHistory.of(true) })
+        expect(v.state.doc.toString().startsWith('x')).toBe(true)
+      }
+    })
   })
 })

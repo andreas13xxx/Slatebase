@@ -1,4 +1,4 @@
-import { Compartment, type Extension } from '@codemirror/state'
+import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state'
 import { StateField } from '@codemirror/state'
 import { type DecorationSet, Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
@@ -7,7 +7,7 @@ import type { DirectoryTree } from '../../types'
 import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
-import { buildWidgetDecorations, toggleCalloutFoldEffect } from './widget-decorations'
+import { buildWidgetDecorations, locateFrontmatter, toggleCalloutFoldEffect } from './widget-decorations'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../../state/aliasStore'
@@ -139,16 +139,21 @@ function buildDecorations(
     basesEnabled: options.basesEnabled,
   })
 
+  // Frontmatter that is not shown as properties (hidden, or raw YAML) is left alone by the other passes:
+  // its lines would otherwise be styled like headings, lists or links
+  const frontmatterEnd = (options.propertiesInDocument ?? 'visible') === 'visible' ? 0 : widgets.frontmatterEnd
+  const outsideFrontmatter = <T extends { from: number }>(item: T): boolean => item.from >= frontmatterEnd
+
   // Merge all decorations and hideable ranges
   const decorations = [
-    ...inline.decorations,
-    ...links.decorations,
+    ...inline.decorations.filter(outsideFrontmatter),
+    ...links.decorations.filter(outsideFrontmatter),
     ...widgets.decorations,
   ]
 
   const hideableRanges = [
-    ...inline.hideableRanges,
-    ...links.hideableRanges,
+    ...inline.hideableRanges.filter(outsideFrontmatter),
+    ...links.hideableRanges.filter(outsideFrontmatter),
     ...widgets.hideableRanges,
   ]
 
@@ -258,8 +263,30 @@ export function createLivePreviewField(options: LivePreviewOptions): Extension {
     }
   })
 
-  return [calloutFoldState, field]
+  return [calloutFoldState, field, ...(options.propertiesInDocument === 'hidden' ? [hiddenFrontmatterGuard] : [])]
 }
+
+/**
+ * With the properties hidden, the user cannot see the frontmatter, so typing and deleting must not
+ * reach it: an edit of the user that starts inside the block (including at the very start of the note,
+ * where the cursor sits when a note opens) is dropped. Edits made by code (a reload from disk, a
+ * command that adds a property) go through.
+ */
+const hiddenFrontmatterGuard: Extension = [
+  EditorState.transactionFilter.of((tr) => {
+    if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) return tr
+    const block = locateFrontmatter(tr.startState.doc)
+    if (!block) return tr
+    let touches = false
+    tr.changes.iterChanges((fromA) => { if (fromA < block.end) touches = true })
+    return touches ? [] : tr
+  }),
+  // Arrow keys and clicks skip over the hidden block
+  EditorView.atomicRanges.of((view) => {
+    const block = locateFrontmatter(view.state.doc)
+    return block ? Decoration.set([Decoration.replace({}).range(0, block.end)]) : Decoration.none
+  }),
+]
 
 /**
  * Creates the Live Preview extension set.

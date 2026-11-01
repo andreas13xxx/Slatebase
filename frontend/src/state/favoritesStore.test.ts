@@ -14,6 +14,7 @@ import {
   addSearchBookmark,
   addGroup,
   moveEntry,
+  groupContentCount,
   favoritesStore,
   initialize,
   disconnect,
@@ -896,6 +897,100 @@ describe('favoritesStore', () => {
         await vi.advanceTimersByTimeAsync(2500)
         expect(client.state.file['items']).toEqual([
           expect.objectContaining({ type: 'group', title: 'Renamed', items: [expect.objectContaining({ path: 'x.md' })] }),
+        ])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps an entry whose group is gone when another entry is moved to the top level', () => {
+      add('v1', 'a.md')
+      add('v1', 'orphan.md')
+      add('v1', 'b.md')
+      const [a, orphan, b] = getForVault('v1') as [FavoriteEntry, FavoriteEntry, FavoriteEntry]
+      localStorage.setItem('slatebase:favorites:v1', JSON.stringify([a, { ...orphan, parentId: 'gone' }, b]))
+
+      moveEntry('v1', b.id, null, 0)
+
+      expect(getForVault('v1').map((e) => e.path)).toEqual(['b.md', 'a.md', 'orphan.md'])
+    })
+
+    it('keeps entries that hang in a loop of stored data instead of losing them', () => {
+      add('v1', 'a.md')
+      add('v1', 'b.md')
+      const [a, b] = getForVault('v1') as [FavoriteEntry, FavoriteEntry]
+      localStorage.setItem('slatebase:favorites:v1', JSON.stringify([{ ...a, type: 'group', parentId: b.id }, { ...b, type: 'group', parentId: a.id }]))
+
+      moveEntry('v1', a.id, null)
+
+      expect(getForVault('v1')).toHaveLength(2)
+    })
+
+    it('leaves groups and searches alone when a path is empty', () => {
+      addGroup('v1', 'G')
+      addSearchBookmark('v1', 'q', false, false)
+
+      removeByPath('v1', '')
+      updatePath('v1', '', 'x.md')
+
+      expect(getForVault('v1').map((e) => [e.type, e.path])).toEqual([['group', ''], ['search', '']])
+    })
+
+    it('removes a large group quickly', () => {
+      const g = addGroup('v1', 'Big')!
+      const entries = getForVault('v1')
+      const many = Array.from({ length: 2000 }, (_, i) => ({ id: `e${i}`, vaultId: 'v1', path: `f${i}.md`, addedAt: '2026-01-01T00:00:00.000Z', order: i + 1, type: 'file', parentId: g }))
+      localStorage.setItem('slatebase:favorites:v1', JSON.stringify([...entries, ...many]))
+
+      const started = Date.now()
+      removeById('v1', g)
+
+      expect(getForVault('v1')).toHaveLength(0)
+      expect(Date.now() - started).toBeLessThan(2000)
+    })
+
+    it('counts the items of a group made elsewhere that it does not show, so deleting asks first', async () => {
+      const client = {
+        getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+        getBookmarksConfig: vi.fn().mockResolvedValue({ items: [{ type: 'group', title: 'G', items: [{ type: 'url', url: 'u' }, { type: 'folder', path: 'D' }] }] }),
+        patchBookmarksConfig: vi.fn(),
+      }
+      await initialize(client as unknown as IApiClient)
+      await loadVaultBookmarks('v1')
+      const g = getForVault('v1')[0]!
+
+      expect(getForVault('v1')).toHaveLength(1) // nothing of it is shown
+      expect(groupContentCount('v1', g.id)).toBe(2)
+      expect(groupContentCount('v1', 'missing')).toBe(0)
+    })
+
+    it('keeps what another device put into a group made here, when the file changed since the last write', async () => {
+      vi.useFakeTimers()
+      try {
+        const client = {
+          state: { file: { items: [] } as Record<string, unknown> },
+          getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
+          getBookmarksConfig: vi.fn(async () => client.state.file),
+          patchBookmarksConfig: vi.fn(async (_v: string, patch: Record<string, unknown>) => {
+            client.state.file = { ...client.state.file, ...patch }
+            return client.state.file
+          }),
+        }
+        await initialize(client as unknown as IApiClient)
+        await loadVaultBookmarks('v1')
+        const g = addGroup('v1', 'Work')!
+        await vi.advanceTimersByTimeAsync(2500)
+
+        // Obsidian adds a URL bookmark to the group
+        const written = (client.state.file['items'] as Array<Record<string, unknown>>)[0]!
+        client.state.file = { items: [{ ...written, items: [...(written['items'] as unknown[]), { type: 'url', url: 'https://example.com' }] }] }
+        add('v1', 'x.md')
+        await vi.advanceTimersByTimeAsync(2500)
+
+        expect(g).toBeDefined()
+        expect(client.state.file['items']).toEqual([
+          expect.objectContaining({ type: 'group', title: 'Work', items: [{ type: 'url', url: 'https://example.com' }] }),
+          expect.objectContaining({ type: 'file', path: 'x.md' }),
         ])
       } finally {
         vi.useRealTimers()
