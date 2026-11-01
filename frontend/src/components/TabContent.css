@@ -7,6 +7,19 @@
   min-height: 0;
 }
 
+/* Inline title (app.json showInlineTitle): the note's file name as an H1 above the document.
+   flex: none so it never eats the editor's height; sits inside the edit/reading flex column. */
+.tab-content-inline-title {
+  flex: none;
+  margin: 0;
+  padding: 0.6rem 2rem 0.2rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-normal, var(--text-primary));
+  word-break: break-word;
+}
+
 .tab-content--empty {
   display: flex;
   align-items: center;

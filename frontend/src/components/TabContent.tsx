@@ -24,7 +24,16 @@ import { PluginContext } from '../plugins/compat/plugin-context'
 import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
 import { resolveAttachmentTargetDir } from '../utils/internalLink'
 import { getAppConfigValue, useAppConfigValue } from '../state/vaultAppConfigStore'
+import { inlineTitleFromPath } from '../hooks/useShowInlineTitle'
 import './TabContent.css'
+
+/**
+ * The note's file name shown as an inline title above the document (app.json `showInlineTitle`).
+ * Pure presentation — not part of the note's content, and not editable here.
+ */
+function InlineTitle({ filePath }: { filePath: string }) {
+  return <h1 className="tab-content-inline-title">{inlineTitleFromPath(filePath)}</h1>
+}
 
 /**
  * Extracts the file extension from a filename (including the dot).
@@ -283,6 +292,7 @@ export function TabContent() {
     : null
   const basesEnabled = isEnabled('bases')
   const propertiesInDocument = useAppConfigValue('propertiesInDocument')
+  const showInlineTitle = useAppConfigValue('showInlineTitle')
   const editModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
@@ -552,6 +562,7 @@ export function TabContent() {
     const isReadOnly = currentVault?.permission === 'read'
     return (
       <div className="tab-content tab-content--edit" role="tabpanel" aria-label={activeTab.fileName}>
+        {showInlineTitle && <InlineTitle filePath={activeTab.filePath} />}
         <EditMode
           content={editContent}
           onChange={handleEditChange}
@@ -591,6 +602,7 @@ export function TabContent() {
             </button>
           </div>
         )}
+        {showInlineTitle && <InlineTitle filePath={activeTab.filePath} />}
         <ViewMode
           content={readingContent}
           vaultId={activeTab.vaultId}
@@ -620,6 +632,7 @@ export function TabContent() {
           </button>
         </div>
       )}
+      {showInlineTitle && <InlineTitle filePath={activeTab.filePath} />}
       <EditMode
         content={editContentPreview}
         onChange={handleEditChange}

@@ -45,6 +45,9 @@ import { getTranscriptionLanguage, getSaveAudioAttachment } from '../hooks/useTr
 import { useRegistryHotkeys } from '../hooks/useRegistryHotkeys'
 import { toggleToolbarVisible } from '../state/toolbarStore'
 import { togglePropertiesInDocument } from '../hooks/propertiesInDocument'
+import { toggleShowInlineTitle } from '../hooks/useShowInlineTitle'
+import { toggleShowUnsupportedFiles } from '../hooks/useShowUnsupportedFiles'
+import { toggleAppConfigFlag } from '../hooks/appConfigToggle'
 
 /**
  * Obsidian core-command IDs (from core-commands.ts / core-commands-app.ts) that do
@@ -1161,6 +1164,27 @@ export function CommandPaletteContainer({
         id: 'slatebase:editor-toggle-properties',
         name: t('propertiesInDocument.command'),
         callback: () => togglePropertiesInDocument(),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-toggle-inline-title',
+        name: t('editorSettings.toggleInlineTitle'),
+        callback: () => toggleShowInlineTitle(),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-toggle-auto-convert-html',
+        name: t('editorSettings.toggleAutoConvertHtml'),
+        callback: () => toggleAppConfigFlag('autoConvertHtml'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:files-toggle-unsupported',
+        name: t('editorSettings.toggleShowUnsupportedFiles'),
+        callback: () => toggleShowUnsupportedFiles(),
         pluginId: 'slatebase',
       })
 

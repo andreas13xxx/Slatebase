@@ -47,7 +47,8 @@ import {
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
-import { useAppConfigValue } from '../state/vaultAppConfigStore'
+import { useAppConfigValue, getAppConfigValue } from '../state/vaultAppConfigStore'
+import { htmlToMarkdown } from '../utils/htmlToMarkdown'
 import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
 import { codeFolding } from '@codemirror/language'
 import { markdownFoldService } from './folding'
@@ -388,12 +389,25 @@ export function CodeMirrorEditor({
         },
         paste(event, view) {
           if (readOnlyRef.current) return false
+          // autoConvertHtml: turn pasted rich text (clipboard text/html) into Markdown. Runs before
+          // the image-paste branch returns, and only when the clipboard carries no files.
+          const files = event.clipboardData?.files
+          const pasteFiles = files ? Array.from(files).filter(isPasteableFile) : []
+          if (pasteFiles.length === 0 && getAppConfigValue('autoConvertHtml')) {
+            const html = event.clipboardData?.getData('text/html')
+            if (html && html.trim()) {
+              const markdown = htmlToMarkdown(html)
+              if (markdown) {
+                event.preventDefault()
+                view.dispatch(view.state.replaceSelection(markdown), { userEvent: 'input.paste' })
+                return true
+              }
+            }
+          }
           const onPaste = onImagePasteRef.current
           if (!onPaste) return false
           // Only intercept genuine file pastes (screenshots, copied PDFs) —
           // plain text paste (even from rich sources) carries no File entries.
-          const files = event.clipboardData?.files
-          const pasteFiles = files ? Array.from(files).filter(isPasteableFile) : []
           if (pasteFiles.length === 0) return false
 
           event.preventDefault()

@@ -31,7 +31,7 @@ no function yet), **durchgereicht** (kept for Obsidian and plugins, no function 
 | `alwaysUpdateLinks` | boolean | `false` | yes | wirkt: a rename or move rewrites links in other notes only if on |
 | `readableLineLength` | boolean | `true` | yes | wirkt |
 | `showLineNumber` | boolean | `false` | yes | wirkt |
-| `showUnsupportedFiles` | boolean | `false` | yes (name) | gespeichert |
+| `showUnsupportedFiles` | boolean | `false` | yes (name) | wirkt: nur ein **explizites** `false` blendet Dateien mit unbekannter Endung aus dem Datei-Explorer aus (Ordner bleiben). Ein fehlender Schlüssel zeigt weiter alles — Slatebase hat immer alles gezeigt und übernimmt Obsidians Ausblenden-per-Default bewusst nicht. Frontend-Filter, keine Serveränderung |
 | `promptDelete` | boolean | `true` | yes (name) | wirkt: off deletes without asking (the item still goes to the trash) |
 | `userIgnoreFilters` | list of strings | `[]` | yes (name) | gespeichert |
 | `spellcheck` | boolean | `true` | no | wirkt |
@@ -52,7 +52,9 @@ no function yet), **durchgereicht** (kept for Obsidian and plugins, no function 
 | `smartIndentList` | boolean | `true` | no | wirkt, Slatebase's reading (the key is not documented by Obsidian): on, Enter in a list or quote continues it with a new marker; off, Enter keeps only the indentation |
 | `showIndentGuide` | boolean | `true` | no | wirkt: thin vertical lines at every indentation level of a line's leading whitespace (one per tab, or per `tabSize` spaces). Now on by default, as in Obsidian; vaults that did not have it see the lines after this update |
 | `spellcheckLanguages` | string[] | `[]` | no | wirkt: language codes such as `en-US` or `de`; the part before the region picks the dictionary. Slatebase ships German and English and runs one dictionary at a time, so the first code with a dictionary is used, for everyone who opens the vault; other codes are kept in the file. Without one the personal language of the editor context menu applies. Switching the language in the menu then writes the file (needs write access). Settings → Editor and files has a select for it |
-| `showFrontmatter` (legacy), `autoConvertHtml`, `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `showInlineTitle`, `userIgnoreFilters`, `showUnsupportedFiles` | see `app-config.ts` | Obsidian-like | no | gespeichert |
+| `showInlineTitle` | boolean | `true` | no | wirkt: an, der Dateiname steht als Überschrift über der Notiz (Editor und Leseansicht); reine Anzeige, nicht Teil des Inhalts |
+| `autoConvertHtml` | boolean | `false` | no | wirkt: an, wird beim Einfügen das `text/html` der Zwischenablage in Markdown umgewandelt statt roh eingefügt (eigener schlanker HTML→Markdown-Konverter, kein `turndown`) |
+| `showFrontmatter` (legacy), `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `userIgnoreFilters` | see `app-config.ts` | Obsidian-like | no | gespeichert |
 | `mobilePullAction` (verified), `vimMode`, `nativeMenus` | string / boolean | – | partly | durchgereicht |
 
 **Defaults.** `alwaysUpdateLinks` used to default to `true` in Slatebase. The first start of this
