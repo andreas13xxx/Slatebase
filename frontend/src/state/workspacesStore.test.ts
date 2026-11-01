@@ -10,7 +10,7 @@ import type { PersistedPaneTree } from './paneTreeState'
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
 const tree = (file = 'a.md'): PersistedPaneTree => ({
-  root: { kind: 'pane', id: 'p1', tabs: [{ vaultId: 'v1', filePath: file, fileName: file, mode: 'view', pinned: false }], activeTabId: `v1::${file}` },
+  root: { kind: 'pane', id: 'p1', tabs: [{ vaultId: 'v1', filePath: file, fileName: file, mode: 'live-preview', pinned: false }], activeTabId: `v1::${file}` },
   activePaneId: 'p1',
 })
 
