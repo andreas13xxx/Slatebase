@@ -62,6 +62,64 @@ export const avatarUrlSchema = z
     'Avatar URL must start with http:// or https://',
   )
 
+// --- Avatar (configurable) Validation ---
+
+/**
+ * Maximum length of an `avatarData` base64 data URL. 256 KB of raw bytes
+ * becomes ~341 KB of base64 (overhead 4/3); 358_000 leaves headroom for the
+ * `data:image/...;base64,` prefix.
+ */
+export const MAX_AVATAR_DATA_LENGTH = 358_000
+
+/**
+ * Avatar type enum: how the avatar is rendered.
+ * - `initials`: coloured initials tile
+ * - `url`: external image URL (legacy `avatarUrl`)
+ * - `dicebear`: external DiceBear image URL
+ * - `image`: uploaded/pasted image stored inline as a data URL
+ */
+export const avatarTypeSchema = z.enum(['initials', 'url', 'dicebear', 'image'])
+
+/**
+ * Avatar colour schema: empty string or a `#rrggbb` hex colour.
+ */
+export const avatarColorSchema = z
+  .string()
+  .refine(
+    (val) => val === '' || /^#[0-9a-fA-F]{6}$/.test(val),
+    'Avatar colour must be empty or a #rrggbb hex colour',
+  )
+
+/**
+ * DiceBear avatar URL schema: empty string, or an https URL on
+ * `api.dicebear.com` (max 2048 chars). No other host is allowed — DiceBear is
+ * loaded via `<img src>`, so the server pins the host rather than relying on CSP.
+ */
+export const avatarDicebearSchema = z
+  .string()
+  .max(2048, 'DiceBear URL must be at most 2048 characters')
+  .refine((val) => {
+    if (val === '') return true
+    try {
+      const parsed = new URL(val)
+      return parsed.protocol === 'https:' && parsed.hostname === 'api.dicebear.com'
+    } catch {
+      return false
+    }
+  }, 'DiceBear URL must be an https URL on api.dicebear.com')
+
+/**
+ * Inline image data URL schema: empty string, or a `data:image/...;base64,...`
+ * URL (png/jpeg/webp/gif) no longer than MAX_AVATAR_DATA_LENGTH characters.
+ */
+export const avatarDataSchema = z
+  .string()
+  .max(MAX_AVATAR_DATA_LENGTH, 'Avatar image data is too large (max ~256 KB)')
+  .refine(
+    (val) => val === '' || /^data:image\/(png|jpeg|webp|gif);base64,/.test(val),
+    'Avatar image must be a data:image/(png|jpeg|webp|gif);base64 URL',
+  )
+
 // --- Enum Schemas ---
 
 /**
@@ -109,6 +167,10 @@ export const updateProfileSchema = z.object({
   displayName: displayNameSchema.optional(),
   email: emailSchema.optional(),
   avatarUrl: avatarUrlSchema.optional(),
+  avatarType: avatarTypeSchema.optional(),
+  avatarColor: avatarColorSchema.optional(),
+  avatarData: avatarDataSchema.optional(),
+  avatarDicebear: avatarDicebearSchema.optional(),
   preferredLanguage: preferredLanguageSchema.optional(),
   colorScheme: colorSchemeSchema.optional(),
 })

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { UserRepository, ensureDefaultAdmin, UserConflictError } from './index.js'
+import { UserRepository, ensureDefaultAdmin, UserConflictError, normalizeAvatarFields } from './index.js'
 import type { UserRecord } from './index.js'
 import type { ILogger } from '../logger/index.js'
 
@@ -15,6 +15,10 @@ function createTestUser(overrides: Partial<UserRecord> = {}): UserRecord {
     displayName: 'Test User',
     email: 'test@example.com',
     avatarUrl: '',
+    avatarType: 'initials',
+    avatarColor: '',
+    avatarData: '',
+    avatarDicebear: '',
     preferredLanguage: 'en',
     colorScheme: 'system',
     suspended: false,
@@ -278,6 +282,76 @@ describe('UserRepository', () => {
       const indexPath = path.join(tempDir, 'users', '_index.json')
       const index = JSON.parse(await fs.readFile(indexPath, 'utf-8'))
       expect(index).toEqual({ 'shared-name': winner!.userId })
+    })
+  })
+
+  describe('normalizeAvatarFields (legacy-record backfill on read)', () => {
+    it('defaults a legacy record without avatar fields to initials', async () => {
+      // Write a pre-avatar-feature record directly, bypassing save().
+      await fs.mkdir(path.join(tempDir, 'users'), { recursive: true })
+      const legacy = {
+        userId: 'legacy-1',
+        username: 'legacy',
+        passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$hash',
+        role: 'user',
+        displayName: 'Legacy',
+        email: '',
+        avatarUrl: '',
+        preferredLanguage: 'en',
+        colorScheme: 'system',
+        suspended: false,
+        mustChangePassword: false,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      }
+      await fs.writeFile(
+        path.join(tempDir, 'users', 'legacy-1.json'),
+        JSON.stringify(legacy),
+        'utf-8',
+      )
+
+      const read = await repo.findById('legacy-1')
+      expect(read?.avatarType).toBe('initials')
+      expect(read?.avatarColor).toBe('')
+      expect(read?.avatarData).toBe('')
+      expect(read?.avatarDicebear).toBe('')
+    })
+
+    it('defaults a legacy record with an avatarUrl to type url', async () => {
+      await fs.mkdir(path.join(tempDir, 'users'), { recursive: true })
+      const legacy = {
+        userId: 'legacy-2',
+        username: 'legacyurl',
+        passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$hash',
+        role: 'user',
+        displayName: 'Legacy URL',
+        email: '',
+        avatarUrl: 'https://example.com/a.png',
+        preferredLanguage: 'en',
+        colorScheme: 'system',
+        suspended: false,
+        mustChangePassword: false,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      }
+      await fs.writeFile(
+        path.join(tempDir, 'users', 'legacy-2.json'),
+        JSON.stringify(legacy),
+        'utf-8',
+      )
+
+      const read = await repo.findById('legacy-2')
+      expect(read?.avatarType).toBe('url')
+    })
+
+    it('leaves an already-normalized record untouched', () => {
+      const normalized = createTestUser({
+        avatarType: 'image',
+        avatarData: 'data:image/png;base64,AAAA',
+        avatarColor: '#112233',
+        avatarDicebear: '',
+      })
+      expect(normalizeAvatarFields(normalized)).toEqual(normalized)
     })
   })
 })
