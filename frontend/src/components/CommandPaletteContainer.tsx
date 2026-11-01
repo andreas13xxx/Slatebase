@@ -42,6 +42,7 @@ import { collectFilesSorted } from '../plugins/link-resolver'
 import { getActiveEditorView } from '../editor/plugin-extensions'
 import { getDictationController } from '../editor/dictation/dictation-controller'
 import { getTranscriptionLanguage, getSaveAudioAttachment } from '../hooks/useTranscriptionLanguage'
+import { useRegistryHotkeys } from '../hooks/useRegistryHotkeys'
 import { toggleToolbarVisible } from '../state/toolbarStore'
 
 /**
@@ -590,6 +591,10 @@ export function CommandPaletteContainer({
     window.addEventListener('keydown', handleTabCycleShortcut)
     return () => window.removeEventListener('keydown', handleTabCycleShortcut)
   }, [commandRegistry])
+
+  // Every other registry command (Obsidian's core commands, plugins') runs from the shortcut the
+  // vault's hotkeys.json gives it. Registered after the handlers above, which take their keys first.
+  useRegistryHotkeys(commandRegistry)
 
   const handleQuickSwitcherClose = useCallback(() => {
     setQuickSwitcherOpen(false)

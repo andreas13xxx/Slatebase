@@ -6,7 +6,7 @@
  * @module components/settings/KeybindingsSection
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useContext, useEffect, useRef } from 'react'
 import React from 'react'
 import {
   getAllBindings,
@@ -18,10 +18,13 @@ import {
   resetAll,
   formatShortcut,
   findConflict,
+  isOverridden,
   onKeybindingsChange,
   DEFAULT_KEYBINDINGS,
   type KeybindingCategory,
 } from '../../state/keybindingsStore'
+import { PluginContext } from '../../plugins/compat/plugin-context'
+import { NATIVE_TWINS, registryShortcuts } from '../../hooks/useRegistryHotkeys'
 import { showToast } from '../ToastNotification'
 import { SettingSection, Button } from './ui'
 
@@ -161,11 +164,33 @@ export function KeybindingsSection() {
     b.label.toLowerCase().includes(needle) ||
     b.commandId.toLowerCase().includes(needle) ||
     b.effectiveShortcuts.some(s => formatShortcut(s).toLowerCase().includes(needle))
-  const grouped = CATEGORY_ORDER.map(cat => ({
-    category: cat,
-    label: CATEGORY_LABELS[cat],
-    items: bindings.filter(b => b.category === cat && matches(b)),
-  })).filter(g => g.items.length > 0)
+  // Obsidian's core commands and plugins' commands from the command registry (outside the plugin
+  // provider, e.g. in tests, there are none). The ones Slatebase binds itself are listed above.
+  const registry = useContext(PluginContext)?.commandRegistry
+  const registryItems: typeof bindings = (registry?.getCommands() ?? [])
+    .filter(c => !NATIVE_TWINS.has(c.id))
+    .map(c => {
+      const shortcuts = registryShortcuts(c)
+      return {
+        commandId: c.id,
+        label: c.name,
+        defaultShortcut: '',
+        category: 'panel' as KeybindingCategory,
+        effectiveShortcut: shortcuts[0] ?? '',
+        effectiveShortcuts: shortcuts,
+        isOverridden: isOverridden(c.id),
+      }
+    })
+    .filter(matches)
+    .sort((a, b) => a.label.localeCompare(b.label))
+  const grouped = [
+    ...CATEGORY_ORDER.map(cat => ({
+      category: cat as string,
+      label: CATEGORY_LABELS[cat],
+      items: bindings.filter(b => b.category === cat && matches(b)),
+    })),
+    { category: 'registry', label: `Weitere Befehle (Obsidian und Plugins) — ${registryItems.length}`, items: registryItems },
+  ].filter(g => g.items.length > 0)
 
   return (
     <div className="keybindings-section">

@@ -176,7 +176,6 @@ be bound through the file. The aliases are from docs and the command palette, no
 
 ## Not done yet
 
-`workspaces.json` as a shared vault file, groups in the bookmarks UI, the audit of Obsidian's commands against
-Slatebase's (and the missing commands), plugin commands in the shortcut list and `app.hotkeyManager` reading the
-file, the functions behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
+`workspaces.json` as a shared vault file, groups in the bookmarks UI, `app.hotkeyManager` reading the file
+(commands and shortcuts: see [hotkeys.md](hotkeys.md)), the functions behind the stored `app.json` keys, and settings pages for the new `app.json` keys. See
 `.kiro/specs/obsidian-app-json-compat/tasks.md`. `core-plugins.json` is left to its own spec.

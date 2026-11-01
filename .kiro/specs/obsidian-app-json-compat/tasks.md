@@ -98,10 +98,10 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - _Requirements: 13_
 
 - [ ] 14. Tastenkürzel
-  - [ ] 14.1 Abgleich Obsidian-Kernbefehle ↔ Slatebase (`docs/hotkeys.md`)
-  - [ ] 14.2 Fehlende Befehle umsetzen, nach Aufwand in Gruppen, jede Gruppe ein Commit
+  - [x] 14.1 Abgleich Obsidian-Kernbefehle ↔ Slatebase (`docs/hotkeys.md`; gegen die registrierten Befehle, nicht gegen eine echte Obsidian-Installation)
+  - [x] 14.2 Fehlende Befehle: ~180 Kernbefehle waren registriert, aber keine Taste löste sie aus; `useRegistryHotkeys` führt sie jetzt aus der Datei aus; nicht umsetzbare sind als "nicht unterstützt" dokumentiert
   - [x] 14.3 `hotkeys.json` Service, Route, Store; ID-Aliase (offen: `app.hotkeyManager` spiegelt die Datei noch nicht)
-  - [ ] 14.4 `KeybindingsSection.tsx`: Suche, Konflikte, mehrere Kürzel, Zurücksetzen sind da; offen: Plugin-Befehle und die noch fehlenden Befehle in der Liste
+  - [x] 14.4 `KeybindingsSection.tsx`: alle Befehle (auch Registry und Plugins), Suche, Konflikte, mehrere Kürzel, Zurücksetzen
   - [x] 14.5 Migration der Belegungen pro User (einmal je Vault und Gerät); Tests
   - _Requirements: 14_
 

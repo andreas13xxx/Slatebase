@@ -363,7 +363,7 @@ function eventKey(event: KeyboardEvent): string {
 /**
  * Check if a keyboard event matches a parsed shortcut.
  */
-function matchesParsed(parsed: ParsedShortcut, event: KeyboardEvent): boolean {
+export function matchesParsed(parsed: ParsedShortcut, event: KeyboardEvent): boolean {
   if (event.ctrlKey !== parsed.ctrl) return false
   if (event.shiftKey !== parsed.shift) return false
   if (event.altKey !== parsed.alt) return false
