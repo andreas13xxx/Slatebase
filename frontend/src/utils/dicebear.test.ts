@@ -52,14 +52,15 @@ describe('dicebearUrl', () => {
 })
 
 describe('dicebearSeeds', () => {
-  it('returns the requested count with the base first', () => {
+  it('returns the requested count of fixed seeds', () => {
     const seeds = dicebearSeeds('andreas', 4)
     expect(seeds).toHaveLength(4)
-    expect(seeds[0]).toBe('andreas')
-    expect(seeds[1]).toBe('andreas-1')
+    expect(seeds.every((s) => /^[a-z]+$/.test(s))).toBe(true)
   })
 
-  it('is deterministic for the same base', () => {
-    expect(dicebearSeeds('bob')).toEqual(dicebearSeeds('bob'))
+  it('does not derive seeds from the base (no user input in the gallery URL)', () => {
+    // The base argument is ignored — the same seeds regardless of the username.
+    expect(dicebearSeeds('andreas')).toEqual(dicebearSeeds('someone-else'))
+    expect(dicebearSeeds('andreas').join()).not.toContain('andreas')
   })
 })

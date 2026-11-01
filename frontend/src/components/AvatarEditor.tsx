@@ -97,7 +97,9 @@ export function AvatarEditor({ username, displayName, value, onChange }: AvatarE
     }
   }
 
-  const seeds = dicebearSeeds(username || displayName || 'avatar')
+  // Gallery seeds are fixed constants (see dicebearSeeds) — deliberately not the
+  // username, so no user-controlled string flows into the gallery `<img src>`.
+  const seeds = dicebearSeeds('')
 
   return (
     <div className="avatar-editor">

@@ -50,14 +50,20 @@ export function dicebearUrl(style: DicebearStyle, seed: string): string {
 }
 
 /**
- * Derives a stable set of gallery seeds from a base string (the username),
- * so a given user always sees the same gallery and a picked avatar is
- * reproducible. Returns `count` seeds.
+ * Fixed gallery seed words. The gallery is only a picker, so the seeds are
+ * constant literals — deliberately NOT derived from the username. Deriving them
+ * from user input would route a user-controlled string into the `<img src>`
+ * sink (a DOM-XSS taint path), and the stable-per-user nicety is not worth that.
  */
-export function dicebearSeeds(base: string, count: number = 6): string[] {
-  const seeds: string[] = []
-  for (let i = 0; i < count; i++) {
-    seeds.push(i === 0 ? base : `${base}-${i}`)
-  }
-  return seeds
+const GALLERY_SEEDS = [
+  'avatar', 'nova', 'ember', 'coral', 'slate', 'willow',
+  'maple', 'pebble', 'quartz', 'iris', 'cedar', 'flint',
+] as const
+
+/**
+ * Returns a stable set of gallery seeds. The `_base` argument is accepted for
+ * call-site compatibility but intentionally ignored — see {@link GALLERY_SEEDS}.
+ */
+export function dicebearSeeds(_base: string, count: number = 6): string[] {
+  return GALLERY_SEEDS.slice(0, Math.min(count, GALLERY_SEEDS.length))
 }
