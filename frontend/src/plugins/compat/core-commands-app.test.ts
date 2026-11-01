@@ -75,7 +75,7 @@ function makeTab(overrides: Partial<TabEntry> = {}): TabEntry {
 
 function makeUser(overrides: Partial<PublicUserInfo> = {}): PublicUserInfo {
   return {
-    userId: 'u1', username: 'u1', displayName: 'U1', email: 'u1@example.com', avatarUrl: '',
+    userId: 'u1', username: 'u1', displayName: 'U1', email: 'u1@example.com', avatarUrl: '', avatarType: 'initials', avatarColor: '', avatarData: '', avatarDicebear: '',
     role: 'user', preferredLanguage: 'de', colorScheme: 'light', suspended: false,
     mustChangePassword: false, createdAt: '2024-01-01',
     ...overrides,

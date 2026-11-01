@@ -52,6 +52,10 @@ function createAuthWrapper(overrides: Partial<AuthState> = {}) {
       displayName: 'Test User',
       email: 'test@example.com',
       avatarUrl: '',
+      avatarType: 'initials',
+      avatarColor: '',
+      avatarData: '',
+      avatarDicebear: '',
       role: 'user',
       preferredLanguage: 'de',
       colorScheme: 'system',
@@ -117,6 +121,10 @@ function createAdminWrapper() {
     displayName: 'Admin User',
     email: 'admin@example.com',
     avatarUrl: '',
+    avatarType: 'initials',
+    avatarColor: '',
+    avatarData: '',
+    avatarDicebear: '',
     role: 'admin',
     preferredLanguage: 'de',
     colorScheme: 'system',
@@ -302,7 +310,7 @@ describe('SettingsPanel', () => {
       render(
         React.createElement(
           AuthContext.Provider,
-          { value: { authState: { isAuthenticated: true, user: { userId: 'u1', username: 'testuser', displayName: 'Test User', email: 'test@example.com', avatarUrl: '', role: 'user', preferredLanguage: 'de', colorScheme: 'system', suspended: false, mustChangePassword: false, createdAt: '2024-01-01T00:00:00Z' }, token: 'test-token', csrfToken: 'test-csrf', mustChangePassword: false, isLoading: false, error: null }, authDispatch: vi.fn() } },
+          { value: { authState: { isAuthenticated: true, user: { userId: 'u1', username: 'testuser', displayName: 'Test User', email: 'test@example.com', avatarUrl: '', avatarType: 'initials', avatarColor: '', avatarData: '', avatarDicebear: '', role: 'user', preferredLanguage: 'de', colorScheme: 'system', suspended: false, mustChangePassword: false, createdAt: '2024-01-01T00:00:00Z' }, token: 'test-token', csrfToken: 'test-csrf', mustChangePassword: false, isLoading: false, error: null }, authDispatch: vi.fn() } },
           React.createElement(
             AppContext.Provider,
             { value: appValue as unknown as AppContextValue },
