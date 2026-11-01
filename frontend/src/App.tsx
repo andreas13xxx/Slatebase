@@ -17,6 +17,7 @@ import { openTab } from './state/tabActions'
 import { initialize as initializeRecentFiles, disconnect as disconnectRecentFiles } from './state/recentFilesStore'
 import { initialize as initializeFavorites, disconnect as disconnectFavorites } from './state/favoritesStore'
 import { initialize as initializeKeybindings, disconnect as disconnectKeybindings } from './state/keybindingsStore'
+import { initialize as initializeWorkspaces, disconnect as disconnectWorkspaces } from './state/workspacesStore'
 import {
   initialize as initializeUiSettings,
   disconnect as disconnectUiSettings,
@@ -70,6 +71,7 @@ import { AppearanceLifecycle } from './components/AppearanceLifecycle'
 import { GraphConfigLifecycle } from './components/GraphConfigLifecycle'
 import { BookmarksLifecycle } from './components/BookmarksLifecycle'
 import { HotkeysLifecycle } from './components/HotkeysLifecycle'
+import { WorkspacesLifecycle } from './components/WorkspacesLifecycle'
 import { getAppearanceValue, useAppearanceValue } from './state/vaultAppearanceStore'
 import { resolveColorScheme } from '@slatebase/shared-contracts'
 import { DictationIndicator } from './components/DictationIndicator'
@@ -374,6 +376,7 @@ function AppContent() {
     initializeRecentFiles(apiClient).catch(() => { /* ignore */ })
     initializeFavorites(apiClient).catch(() => { /* ignore */ })
     initializeKeybindings(apiClient).catch(() => { /* ignore */ })
+    initializeWorkspaces(apiClient)
     initializeUiSettings(apiClient).catch(() => { /* ignore */ })
     // Per-vault settings only need the client here; the active vault is set by
     // the effect below, which also fetches that vault's values.
@@ -1450,6 +1453,7 @@ function AppContent() {
         <GraphConfigLifecycle />
         <BookmarksLifecycle />
         <HotkeysLifecycle />
+        <WorkspacesLifecycle />
         <SnippetLifecycle />
         {isEnabled('voice-transcription') && (
           <DictationIndicator vaultId={state.selectedVaultId} apiClient={apiClient} />
@@ -1552,6 +1556,7 @@ function AuthGuard() {
       disconnectRecentFiles()
       disconnectFavorites()
       disconnectKeybindings()
+      disconnectWorkspaces()
       disconnectUiSettings()
       disconnectVaultSettings()
       authDispatch({ type: 'SESSION_EXPIRED' })

@@ -583,9 +583,9 @@ export interface UserVaultSettings {
   /** Whether `![](url)` in a note auto-embeds the page in a sandboxed iframe (default off). */
   webEmbedEnabled: boolean
   /**
-   * Named workspace snapshots (content-free pane tree + tabs + panel layouts).
-   * Typed loosely here to avoid an api←state import cycle; the precise
-   * `NamedWorkspace` shape lives in `state/workspacesStore.ts`.
+   * Named workspace snapshots of earlier versions (content-free pane tree + tabs + panel layouts).
+   * Read only now: the first time a vault is opened on a version with workspaces.json they are moved
+   * into that file (see `state/workspacesStore.ts`) and this list is emptied.
    */
   workspaces: Record<string, unknown>[]
 }
@@ -784,6 +784,10 @@ export interface IApiClient {
   getHotkeysConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Sets (list), unbinds (empty list) or removes (`null`) single commands of the vault's hotkeys.json. */
   patchHotkeysConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/workspaces.json` (`{ workspaces: { name: layout }, active }`). */
+  getWorkspacesConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Sets (layout) or deletes (`null`) single layouts of the vault's workspaces.json and sets `active`. */
+  patchWorkspacesConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
 
   // --- Vault Keychain ---
   /** List the keychain entry IDs of a vault (NOT the values). */
@@ -1523,6 +1527,18 @@ export class ApiClient implements IApiClient {
 
   async patchHotkeysConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/hotkeys-config`, patch)
+    return result.config
+  }
+
+  // --- Vault workspaces.json ---
+
+  async getWorkspacesConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/workspaces-config`)
+    return result.config
+  }
+
+  async patchWorkspacesConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/workspaces-config`, patch)
     return result.config
   }
 

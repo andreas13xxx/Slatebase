@@ -83,11 +83,11 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - [ ] 11.4 Plugin-API (Calendar, Daily Notes Interface) auf denselben Formatierer
   - _Requirements: 11_
 
-- [ ] 12. Workspaces vault-weit
-  - [ ] 12.1 Format von `workspaces.json` belegen, inklusive Rundreise durch Obsidian (Task 0.5)
-  - [ ] 12.2 Konverter Pane-Baum ↔ Obsidian-Layout, Tests mit echten Layouts
-  - [ ] 12.3 Service, Route, Store; UI auf vault-weite Datei umstellen; Schreibrechte
-  - [ ] 12.4 Migration der Workspaces pro User, Entfernen aus `vaultSettings`
+- [x] 12. Workspaces vault-weit (Abweichung: Layoutfelder von Obsidian sind angenommen, nicht an einer echten workspaces.json belegt; Slatebase legt einen `slatebase`-Block für verlustfreies Laden daneben)
+  - [ ] 12.1 Format von `workspaces.json` belegen, inklusive Rundreise durch Obsidian (offen: keine echte Datei, keine Rundreise geprüft)
+  - [x] 12.2 Konverter Pane-Baum ↔ Obsidian-Layout (`state/obsidianLayout.ts`; Tests mit nachgebauten, nicht mit echten Layouts)
+  - [x] 12.3 Service, Route, Store; Befehle auf die vault-weite Datei umgestellt; Schreibrechte
+  - [x] 12.4 Migration der Workspaces pro User (die Liste in `vaultSettings` wird geleert; das Feld bleibt im Backend-Schema)
   - _Requirements: 12_
 
 - [x] 13. Lesezeichen (Teilumfang: Gruppen werden erhalten, aber nicht angezeigt oder angelegt; Pfadnachführung bleibt im Client)

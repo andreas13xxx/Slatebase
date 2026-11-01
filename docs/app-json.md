@@ -183,8 +183,45 @@ be bound through the file. The aliases are from docs and the command palette, no
 - The default shortcuts are Slatebase's (Ctrl+Shift+]/[ for tabs, Alt+Left/Right for history), not Obsidian's
   everywhere; the Obsidian default applies only if the file says so.
 
+## workspaces.json
+
+API: `GET/PATCH /api/v1/vaults/:vaultId/workspaces-config`. Store: `state/workspacesStore`. UI: the palette commands
+"Arbeitsbereich speichern/laden" (Obsidian: `workspaces:save`, `workspaces:load`).
+
+```json
+{ "workspaces": { "Writing": { "main": { "type": "split", "direction": "vertical", "children": [ ... ] },
+                               "active": "<leaf id>", "lastOpenFiles": ["Note.md"],
+                               "slatebase": { "savedAt": "...", "paneTree": { ... } } } },
+  "active": "Writing" }
+```
+
+The saved layouts are the vault's, the same for everyone who opens it and for Obsidian's Workspaces plugin; saving,
+renaming and deleting need write access, loading needs read access. The file's `workspace.json` (open tabs of one
+user) is not written and is not synced.
+
+- **Format.** `workspaces` maps a name to a layout, `active` names the layout last *saved*. Loading a layout is local
+  and does not change `active`, so nobody is made to switch. Seen in real files: `workspaces`, `active`. **Assumed**
+  (not seen inside a workspaces.json): the layout fields, which are workspace.json's `main`, `active`, `lastOpenFiles`
+  with nodes `split` (`direction`, `children`), `tabs` (`currentTab`, `children`) and `leaf` (`pinned`,
+  `state: { type, state: { file, mode } }`).
+- **Translation.** Slatebase writes the pane tree as Obsidian's `main` tree: side-by-side panes are `direction:
+  "vertical"` (Slatebase `horizontal`), files become typed leaves (`markdown`, `canvas`, `bases`, `pdf`, `image`,
+  `audio`, `video`; the editing mode is `source`, the reading view `preview`), the graph tab is a `graph` leaf, pins are
+  kept. Tabs of another vault, plugin views and web viewers have no place in this vault's file and are left out of
+  `main`.
+- **Exact snapshot.** Beside `main` Slatebase writes a `slatebase` block with the pane tree and the sidebar/context
+  panel layouts, so loading a layout Slatebase saved loses nothing. A layout without that block (saved by Obsidian) is
+  read from `main`; leaves Slatebase cannot show (side panels, views of plugins it lacks) are skipped, reported once in the
+  browser console, and stay in the file because only the named layout is ever replaced.
+- **Names** may not be empty, contain control characters, be longer than 200 characters or be `__proto__`,
+  `constructor`, `prototype`. A layout may be 1 MB, a vault keeps up to 500 (guards, not product limits). A name that
+  differs only in case is the same workspace.
+- **Migration.** The per-user lists of older versions are moved into the file once per vault and device, when the
+  vault is opened with write access; a name both have goes to the later saved layout, the other gets a number
+  (`Name (2)`). Then the old list is emptied. Without write access it is tried again the next time.
+
 ## Not done yet
 
-`workspaces.json` as a shared vault file, groups in the bookmarks UI, and the functions behind the `app.json` keys
+groups in the bookmarks UI, and the functions behind the `app.json` keys
 marked *gespeichert* above (they are kept and offered to plugins; Settings → Editor and files has the ones that work). See
 `.kiro/specs/obsidian-app-json-compat/tasks.md`. `core-plugins.json` is left to its own spec.

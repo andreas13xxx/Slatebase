@@ -947,6 +947,7 @@ export const en: TranslationShape = {
     deleteLabel: 'Delete “{name}”',
     saved: 'Workspace “{name}” saved.',
     limitReached: 'Maximum number of workspaces reached.',
+    invalidName: 'This name is not allowed for a workspace.',
   },
 
 } as const

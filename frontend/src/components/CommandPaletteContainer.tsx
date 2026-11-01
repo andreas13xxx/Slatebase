@@ -21,8 +21,9 @@ import { WebViewerPrompt } from './WebViewerPrompt'
 import { WorkspacesModal } from './WorkspacesModal'
 import {
   buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
-  renameWorkspace, deleteWorkspace,
+  renameWorkspace, deleteWorkspace, onWorkspacesChange,
 } from '../state/workspacesStore'
+import { isValidWorkspaceName } from '@slatebase/shared-contracts'
 import { fetchPaneTreeContent } from '../state/paneTreeRestore'
 import { loadPanelLayout, savePanelLayout } from './side-panel/utils/persistence'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
@@ -206,6 +207,9 @@ export function CommandPaletteContainer({
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
   const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
   const [workspacesModal, setWorkspacesModal] = useState<{ open: boolean; mode: 'save' | 'load' }>({ open: false, mode: 'load' })
+  // The saved layouts are the vault's workspaces.json: they change when it is read, written or changed elsewhere
+  const [, setWorkspacesVersion] = useState(0)
+  useEffect(() => onWorkspacesChange(() => setWorkspacesVersion((v) => v + 1)), [])
 
   /** Opens the template picker in "create a new note" mode. */
   const openTemplateSelector = useCallback(() => {
@@ -338,7 +342,7 @@ export function CommandPaletteContainer({
       loadPanelLayout('context'),
     )
     if (!saveWorkspace(ws)) {
-      showToast('error', t('workspaces.limitReached'))
+      showToast('error', isValidWorkspaceName(ws.name) ? t('workspaces.limitReached') : t('workspaces.invalidName'))
       return
     }
     showToast('success', t('workspaces.saved', { name: ws.name }))

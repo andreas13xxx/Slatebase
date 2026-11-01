@@ -1,22 +1,32 @@
 /**
- * Workspaces store — named layout snapshots, per user and per vault (R2).
+ * Workspaces store — the vault's named layout snapshots, from `.obsidian/workspaces.json`.
  *
- * A workspace is a content-free snapshot of the current layout: the pane tree
- * (via `serializePaneTree`), the panel layouts (sidebar/context), and a name.
- * It is NOT vault content — it is a personal working preference that must travel
- * across devices — so it lives in `vaultSettingsStore.workspaces` alongside the
- * graph and panel layouts, server-backed, never in `.slatebase/`.
+ * The file is the vault's, so the saved layouts are the same for everyone who opens the vault and for
+ * Obsidian (whose core Workspaces plugin keeps the same file). A workspace is a content-free snapshot
+ * of the layout: the pane tree and the panel layouts. It is written as an Obsidian layout (`main` tree)
+ * plus a `slatebase` block with the exact snapshot, so loading it here loses nothing; a layout without
+ * that block (saved by Obsidian) is read from its `main` tree, and what Slatebase cannot show is left
+ * out of the loaded layout and stays in the file. The current layout with the open tabs
+ * (`workspace.json`) stays per user and is never written.
  *
- * This module owns capture + persistence + lenient parsing. The RESTORE path
- * (replacing the live pane tree and re-fetching tab content) needs React state
- * and lives in the command handler, which calls `getWorkspaces()`/`parseWorkspace`.
+ * Reads are synchronous from a cache the lifecycle component fills (`loadVaultWorkspaces`); changes
+ * apply to the cache at once and are written in order. Loading a workspace is local and writes nothing;
+ * only saving sets the file's `active`. The per-user lists of older versions are moved into the file once
+ * per vault (the later saved layout keeps a name both have, the other gets a number).
  *
  * @module state/workspacesStore
  */
 
+import { MAX_WORKSPACES, isValidWorkspaceName } from '@slatebase/shared-contracts'
+import type { IApiClient } from '../api'
 import type { PersistedPaneTree } from './paneTreeState'
+import { parsePersistedPaneTree } from './paneTreeState'
 import type { PersistedPanelLayout } from '../components/side-panel/utils/persistence'
 import { getVaultSettings, updateVaultSettings } from './vaultSettingsStore'
+import { obsidianToPaneTree, paneTreeToObsidian } from './obsidianLayout'
+import { reportSyncFailure, reportSyncSuccess } from './preferenceSync'
+
+export { MAX_WORKSPACES }
 
 /** A named, content-free layout snapshot. */
 export interface NamedWorkspace {
@@ -32,8 +42,55 @@ export interface NamedWorkspace {
   contextPanel?: PersistedPanelLayout
 }
 
-/** Max workspaces kept per vault (mirrors the backend array cap). */
-export const MAX_WORKSPACES = 50
+type Layout = Record<string, unknown>
+
+/** Identifies this store to the shared failure bookkeeping. */
+const SYNC_STORE_KEY = 'workspaces'
+const TAKEN_OVER_PREFIX = 'slatebase:workspaces-taken-over:'
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let apiClient: IApiClient | null = null
+let currentVaultId: string | null = null
+/** The file's layouts by name, in file order. */
+let layouts = new Map<string, Layout>()
+let activeName: string | null = null
+const listeners = new Set<() => void>()
+/** Writes run one after another, so a rename cannot overtake the save before it. */
+let writeChain: Promise<void> = Promise.resolve()
+let pendingWrites = 0
+/** Skipped-leaf reports already written to the console (once per layout). */
+const reported = new Set<string>()
+
+export function initialize(client: IApiClient): void {
+  apiClient = client
+}
+
+export function disconnect(): void {
+  apiClient = null
+  currentVaultId = null
+  layouts = new Map()
+  activeName = null
+  writeChain = Promise.resolve()
+  pendingWrites = 0
+  try {
+    for (const key of Object.keys(localStorage)) if (key.startsWith(TAKEN_OVER_PREFIX)) localStorage.removeItem(key)
+  } catch {
+    // Silently fail
+  }
+}
+
+/** Calls `cb` whenever the saved layouts may have changed. Returns the unsubscribe function. */
+export function onWorkspacesChange(cb: () => void): () => void {
+  listeners.add(cb)
+  return () => { listeners.delete(cb) }
+}
+
+function notify(): void {
+  for (const cb of listeners) cb()
+}
+
+// ─── Building and reading a workspace ────────────────────────────────────────
 
 /**
  * Builds a NamedWorkspace from live layout data. Pure — the caller reads the
@@ -53,15 +110,13 @@ export function buildWorkspace(
   return ws
 }
 
-// ─── Lenient parsing ─────────────────────────────────────────────────────────
-
 function isObject(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object'
+  return v !== null && typeof v === 'object' && !Array.isArray(v)
 }
 
 /**
- * Leniently parse one stored workspace, or null if it is structurally unusable.
- * The pane-tree/panel internals are NOT deep-validated here — a workspace whose
+ * Leniently parse one workspace of the per-user list of older versions, or null if it is structurally
+ * unusable. The pane-tree/panel internals are NOT deep-validated here — a workspace whose
  * tree has stale entries is handled at restore time (unresolvable tabs are
  * skipped), matching `parsePersistedPaneTree`'s tolerance.
  */
@@ -79,13 +134,46 @@ export function parseWorkspace(data: unknown): NamedWorkspace | null {
   return ws
 }
 
-/** The active vault's saved workspaces (leniently parsed; bad entries dropped). */
+/** The file entry for a workspace: Obsidian's layout plus Slatebase's own snapshot. */
+function toLayout(ws: NamedWorkspace, vaultId: string): Layout {
+  const { main, active, lastOpenFiles } = paneTreeToObsidian(ws.paneTree, vaultId)
+  const slatebase: Layout = { savedAt: ws.savedAt, paneTree: ws.paneTree }
+  if (ws.sidebarPanel) slatebase['sidebarPanel'] = ws.sidebarPanel
+  if (ws.contextPanel) slatebase['contextPanel'] = ws.contextPanel
+  return { main, active, lastOpenFiles, slatebase }
+}
+
+/** A workspace from a file entry, or null if nothing in it can be shown. */
+function fromLayout(name: string, layout: unknown, vaultId: string): NamedWorkspace | null {
+  if (!isObject(layout)) return null
+  const own = isObject(layout['slatebase']) ? layout['slatebase'] : null
+  const exact = own ? parsePersistedPaneTree(own['paneTree']) : null
+  if (own && exact) {
+    return {
+      name,
+      savedAt: typeof own['savedAt'] === 'string' ? own['savedAt'] : new Date(0).toISOString(),
+      paneTree: exact,
+      ...(isObject(own['sidebarPanel']) ? { sidebarPanel: own['sidebarPanel'] as unknown as PersistedPanelLayout } : {}),
+      ...(isObject(own['contextPanel']) ? { contextPanel: own['contextPanel'] as unknown as PersistedPanelLayout } : {}),
+    }
+  }
+  const converted = obsidianToPaneTree(layout['main'], vaultId)
+  if (!converted) return null
+  const key = `${vaultId}\0${name}`
+  if (converted.skipped > 0 && !reported.has(key)) {
+    reported.add(key)
+    console.warn(`[workspaces.json] ${name}: ${converted.skipped} element(s) of the layout cannot be shown in Slatebase; they stay in the file`)
+  }
+  return { name, savedAt: new Date(0).toISOString(), paneTree: converted.tree }
+}
+
+// ─── Reading ─────────────────────────────────────────────────────────────────
+
+/** The active vault's saved workspaces (entries that cannot be shown are left out). */
 export function getWorkspaces(): NamedWorkspace[] {
-  const raw = getVaultSettings().workspaces
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map(parseWorkspace)
-    .filter((w): w is NamedWorkspace => w !== null)
+  if (!currentVaultId) return []
+  const vaultId = currentVaultId
+  return [...layouts].map(([name, layout]) => fromLayout(name, layout, vaultId)).filter((w): w is NamedWorkspace => w !== null)
 }
 
 /** Finds a workspace by name (case-insensitive). */
@@ -94,48 +182,227 @@ export function findWorkspace(name: string): NamedWorkspace | null {
   return getWorkspaces().find((w) => w.name.toLowerCase() === lower) ?? null
 }
 
-// ─── Mutations (persist to vaultSettings) ─────────────────────────────────────
-
-function persist(list: NamedWorkspace[]): void {
-  // Cast through unknown: the store field is the opaque backend shape.
-  updateVaultSettings({ workspaces: list as unknown as Record<string, unknown>[] })
+/** The name the file calls active (the layout last saved), or null. */
+export function getActiveWorkspaceName(): string | null {
+  return activeName
 }
 
-/**
- * Saves (upserts) a workspace. A same-name entry (case-insensitive) is
- * overwritten; the caller confirms the overwrite first. Returns false when the
- * cap is reached and this would be a new entry.
- */
-export function saveWorkspace(ws: NamedWorkspace): boolean {
-  const list = getWorkspaces()
-  const idx = list.findIndex((w) => w.name.toLowerCase() === ws.name.toLowerCase())
-  if (idx === -1) {
-    if (list.length >= MAX_WORKSPACES) return false
-    persist([...list, ws])
-  } else {
-    const next = [...list]
-    next[idx] = ws
-    persist(next)
+function applyFile(config: Record<string, unknown>): void {
+  const map = new Map<string, Layout>()
+  const raw = config['workspaces']
+  if (isObject(raw)) {
+    for (const [name, layout] of Object.entries(raw)) if (isObject(layout)) map.set(name, layout)
   }
+  layouts = map
+  activeName = typeof config['active'] === 'string' ? config['active'] : null
+}
+
+/** The name the file already uses for `name` ignoring case, else `name`. */
+function fileNameFor(name: string): string {
+  const lower = name.toLowerCase()
+  for (const existing of layouts.keys()) if (existing.toLowerCase() === lower) return existing
+  return name
+}
+
+// ─── Loading the file ────────────────────────────────────────────────────────
+
+/**
+ * Read the vault's workspaces.json into the cache. Called when a vault is opened and when the file
+ * changed elsewhere (Obsidian, a sync, another user). Not while a change of this session is still
+ * being written. The first time a vault is read on a device, the per-user list of older versions is
+ * moved into the file. Returns whether the cache was replaced.
+ */
+export async function loadVaultWorkspaces(vaultId: string): Promise<boolean> {
+  const client = apiClient
+  if (!client) return false
+  if (currentVaultId !== vaultId) {
+    currentVaultId = vaultId
+    layouts = new Map()
+    activeName = null
+    notify()
+  }
+  if (pendingWrites > 0) return false
+  let config: Record<string, unknown>
+  try {
+    config = await client.getWorkspacesConfig(vaultId)
+  } catch {
+    return false // unknown, not gone: the cache stays
+  }
+  if (currentVaultId !== vaultId || pendingWrites > 0) return false
+  applyFile(config)
+  if (!isTakenOver(vaultId)) await takeOverUserWorkspaces(client, vaultId)
+  notify()
   return true
 }
 
-/** Renames a workspace. No-op when `from` is missing or `to` collides. */
+/** Moves the per-user workspaces of older versions into the file. */
+async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Promise<void> {
+  const legacy = (Array.isArray(getVaultSettings().workspaces) ? getVaultSettings().workspaces : [])
+    .map(parseWorkspace)
+    .filter((w): w is NamedWorkspace => w !== null && isValidWorkspaceName(w.name))
+  if (legacy.length === 0) {
+    markTakenOver(vaultId)
+    return
+  }
+  // Names in use, lower-cased, with the file's own spelling; names the patch adds count too
+  const taken = new Map<string, string>([...layouts.keys()].map((n) => [n.toLowerCase(), n]))
+  const patch: Record<string, Layout> = {}
+  for (const ws of legacy) {
+    if (taken.size >= MAX_WORKSPACES) break
+    const clash = taken.get(ws.name.toLowerCase())
+    if (clash === undefined) {
+      patch[ws.name] = toLayout(ws, vaultId)
+      taken.set(ws.name.toLowerCase(), ws.name)
+      continue
+    }
+    // The later saved layout keeps the name, the other one is kept under a number. A file entry that
+    // cannot be read is not replaced.
+    const current = Object.hasOwn(patch, clash) ? patch[clash] : layouts.get(clash)
+    const inFile = fromLayout(clash, current, vaultId)
+    const free = freeName(ws.name, taken)
+    if (!inFile || inFile.savedAt >= ws.savedAt) {
+      patch[free] = toLayout({ ...ws, name: free }, vaultId)
+    } else {
+      patch[free] = current!
+      patch[clash] = toLayout({ ...ws, name: clash }, vaultId)
+      taken.set(free.toLowerCase(), free)
+      continue
+    }
+    taken.set(free.toLowerCase(), free)
+  }
+  try {
+    applyFile(await client.patchWorkspacesConfig(vaultId, { workspaces: patch }))
+  } catch {
+    return // no write access or server down: try again the next time this vault is opened
+  }
+  updateVaultSettings({ workspaces: [] })
+  markTakenOver(vaultId)
+}
+
+function findByLowerName(name: string): string | null {
+  const lower = name.toLowerCase()
+  for (const existing of layouts.keys()) if (existing.toLowerCase() === lower) return existing
+  return null
+}
+
+function freeName(base: string, taken: Map<string, string>): string {
+  for (let n = 2; ; n++) {
+    const candidate = `${base} (${n})`
+    if (!taken.has(candidate.toLowerCase())) return candidate
+  }
+}
+
+function isTakenOver(vaultId: string): boolean {
+  try {
+    return localStorage.getItem(TAKEN_OVER_PREFIX + vaultId) !== null
+  } catch {
+    return false
+  }
+}
+
+function markTakenOver(vaultId: string): void {
+  try {
+    localStorage.setItem(TAKEN_OVER_PREFIX + vaultId, '1')
+  } catch {
+    // Silently fail
+  }
+}
+
+// ─── Mutations (written to the file) ─────────────────────────────────────────
+
+/** Writes a patch after the writes before it. A refused write puts the file's state back and says so. */
+function write(vaultId: string, patch: Record<string, unknown>): void {
+  const client = apiClient
+  if (!client) return
+  pendingWrites++
+  writeChain = writeChain.then(async () => {
+    try {
+      const saved = await client.patchWorkspacesConfig(vaultId, patch)
+      reportSyncSuccess(SYNC_STORE_KEY)
+      if (currentVaultId === vaultId && pendingWrites === 1) {
+        applyFile(saved)
+        notify()
+      }
+    } catch (error) {
+      reportSyncFailure(SYNC_STORE_KEY, error, 'Arbeitsbereiche')
+      if (currentVaultId === vaultId && pendingWrites === 1) {
+        // What was refused must not stay on screen as if saved: show the file again
+        try {
+          applyFile(await client.getWorkspacesConfig(vaultId))
+          notify()
+        } catch {
+          // The cache stays; the next read corrects it
+        }
+      }
+    } finally {
+      pendingWrites--
+    }
+  })
+}
+
+/**
+ * Saves (upserts) a workspace and makes it the file's active one. A same-name entry (case-insensitive)
+ * is overwritten; the caller confirms the overwrite first. Returns false when the cap is reached and
+ * this would be a new entry, or the name cannot be used.
+ */
+export function saveWorkspace(ws: NamedWorkspace): boolean {
+  const vaultId = currentVaultId
+  if (!vaultId || !isValidWorkspaceName(ws.name)) return false
+  const name = fileNameFor(ws.name.trim())
+  if (!layouts.has(name) && layouts.size >= MAX_WORKSPACES) return false
+  const layout = toLayout({ ...ws, name }, vaultId)
+  layouts = new Map(layouts).set(name, layout)
+  activeName = name
+  notify()
+  write(vaultId, { workspaces: { [name]: layout }, active: name })
+  return true
+}
+
+/** Renames a workspace. No-op when `from` is missing or `to` collides or cannot be used. */
 export function renameWorkspace(from: string, to: string): boolean {
-  const list = getWorkspaces()
+  const vaultId = currentVaultId
   const trimmed = to.trim()
-  if (trimmed.length === 0) return false
-  if (list.some((w) => w.name.toLowerCase() === trimmed.toLowerCase())) return false
-  const idx = list.findIndex((w) => w.name.toLowerCase() === from.toLowerCase())
-  if (idx === -1) return false
-  const next = [...list]
-  next[idx] = { ...next[idx]!, name: trimmed }
-  persist(next)
+  if (!vaultId || !isValidWorkspaceName(trimmed)) return false
+  if (findByLowerName(trimmed) !== null) return false
+  const source = findByLowerName(from)
+  if (source === null) return false
+  const layout = layouts.get(source)!
+  const next = new Map<string, Layout>()
+  for (const [name, value] of layouts) next.set(name === source ? trimmed : name, value)
+  layouts = next
+  const patch: Record<string, unknown> = { workspaces: { [source]: null, [trimmed]: layout } }
+  if (activeName === source) {
+    activeName = trimmed
+    patch['active'] = trimmed
+  }
+  notify()
+  write(vaultId, patch)
   return true
 }
 
 /** Deletes a workspace by name. */
 export function deleteWorkspace(name: string): void {
-  const lower = name.toLowerCase()
-  persist(getWorkspaces().filter((w) => w.name.toLowerCase() !== lower))
+  const vaultId = currentVaultId
+  const existing = findByLowerName(name)
+  if (!vaultId || existing === null) return
+  const next = new Map(layouts)
+  next.delete(existing)
+  layouts = next
+  const patch: Record<string, unknown> = { workspaces: { [existing]: null } }
+  if (activeName === existing) {
+    activeName = null
+    patch['active'] = null
+  }
+  notify()
+  write(vaultId, patch)
+}
+
+/**
+ * Forget all in-memory state; used by tests, which share this module-level store across cases.
+ * @internal
+ */
+export function _reset(): void {
+  disconnect()
+  listeners.clear()
+  reported.clear()
 }
