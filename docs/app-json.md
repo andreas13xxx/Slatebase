@@ -40,14 +40,14 @@ no function yet), **durchgereicht** (kept for Obsidian and plugins, no function 
 | `useMarkdownLinks` | boolean | `false` | no | Plugin-API |
 | `newLinkFormat` | `shortest` `relative` `absolute` | `shortest` | no | Plugin-API |
 | `newFileFolderPath` | string (folder in the vault) | empty | no | wirkt (with `newFileLocation: folder`) |
-| `defaultViewMode` | `source` `preview` | `preview` | no | wirkt: `source` opens a Markdown file in the editor, `preview` in the reading view. **Deviation:** Obsidian's own default is `source`; an absent key means `preview` here, because Slatebase always opened notes reading |
+| `defaultViewMode` | `source` `preview` | `source` (Obsidian's) | no | wirkt: a note opened for the first time opens in the editor only if the file says `source`; otherwise in the reading view. **Deviation:** an absent key (Obsidian's `source`) reads here, because Slatebase always opened notes reading; plugins asking `getConfig` still get `source` |
 | `strictLineBreaks` | boolean | `false` | no | wirkt: on, a single newline stays a space in the reading view (off = line break, as in Obsidian) |
-| `foldHeading`, `foldIndent` | boolean | `true` | no | wirkt: off removes the fold marker and commands for headings / lists |
+| `foldHeading`, `foldIndent` | boolean | `true` | no | wirkt: off stops headings / lists being foldable (fold markers and commands for new folds); sections already folded stay folded until unfolded |
 | `tabSize` (1–16) | number | 4 | no | wirkt: tab width of the editor |
 | `useTab` | boolean | `true` | no | wirkt: Tab indents with a tab character; off, with `tabSize` spaces |
 | `autoPairBrackets` | boolean | `true` | no | wirkt: closes `( [ { ' "` while typing |
 | `autoPairMarkdown` | boolean | `true` | no | wirkt, narrower than Obsidian: with text selected, `*`, `_` and `` ` `` wrap the selection; nothing is paired without a selection, so a list marker stays one star |
-| `rightToLeft` | boolean | `false` | no | wirkt: text direction of the editor |
+| `rightToLeft` | boolean | `false` | no | wirkt: text direction of the editor and the reading view |
 | `showFrontmatter`, `propertiesInDocument` (`visible` `hidden` `source`), `autoConvertHtml`, `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `spellcheckLanguages`, `smartIndentList`, `showIndentGuide`, `showInlineTitle`, `userIgnoreFilters`, `showUnsupportedFiles` | see `app-config.ts` | Obsidian-like | no | gespeichert |
 | `mobilePullAction` (verified), `vimMode`, `nativeMenus` | string / boolean | – | partly | durchgereicht |
 

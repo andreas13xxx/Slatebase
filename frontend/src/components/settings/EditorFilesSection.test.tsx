@@ -89,7 +89,7 @@ describe('EditorFilesSection', () => {
     expect(screen.getByLabelText('Mit Tabulator einrücken')).not.toBeChecked()
     expect(screen.getByLabelText('Tabulatorbreite')).toHaveValue(2)
     expect(screen.getByLabelText('Strikte Zeilenumbrüche')).toBeChecked()
-    expect(screen.getByLabelText('Notizen öffnen in')).toHaveValue('preview')
+    expect(screen.getByLabelText('Notizen öffnen in')).toHaveValue('preview') // an absent key reads, as in the tab reducer
     expect(screen.getByLabelText('Ordner für neue Notizen')).toHaveValue('Inbox')
     expect(screen.getByLabelText('Vor dem Löschen nachfragen')).toBeChecked()
 

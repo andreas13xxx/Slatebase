@@ -155,7 +155,7 @@ describe('vaultAppConfigStore', () => {
     await expect(updateAppConfig({ defaultViewMode: 'preview' })).rejects.toThrow()
 
     expect(getAppConfigRaw('defaultViewMode')).toBe(DEFAULT_APP_CONFIG.defaultViewMode)
-    expect(getAppConfigValue('defaultViewMode')).toBe('preview')
+    expect(getAppConfigValue('defaultViewMode')).toBe('source')
   })
 
   it('rejects a write while no vault is active', async () => {

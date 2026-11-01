@@ -4,10 +4,10 @@
  * extension that CodeMirrorEditor keeps in a Compartment, so a change in the file or the settings
  * applies to an open note without reloading it.
  */
-import { EditorState, type Extension } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
+import { EditorSelection, EditorState, type Extension } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
-import { closeBrackets } from '@codemirror/autocomplete'
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 
 export interface EditorPrefs {
   tabSize: number
@@ -33,15 +33,17 @@ const MARKDOWN_WRAP_CHARS = new Set(['*', '_', '`'])
  * With text selected, typing one of `* _ \`` wraps the selection (`**` and `_` emphasis, inline code)
  * instead of replacing it. Without a selection nothing is paired, so a list marker `* ` stays one star.
  */
-const markdownWrapHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  if (from === to || text.length !== 1 || !MARKDOWN_WRAP_CHARS.has(text)) return false
-  if (view.state.readOnly) return false
-  const selected = view.state.sliceDoc(from, to)
-  view.dispatch({
-    changes: { from, to, insert: text + selected + text },
-    selection: { anchor: from + 1, head: from + 1 + selected.length },
-    userEvent: 'input.type',
-  })
+const markdownWrapHandler = EditorView.inputHandler.of((view, _from, _to, text) => {
+  if (text.length !== 1 || !MARKDOWN_WRAP_CHARS.has(text) || view.state.readOnly) return false
+  const { ranges } = view.state.selection
+  if (ranges.every((range) => range.empty)) return false
+  // Every non-empty selection is wrapped (several cursors at once); empty ones take the character as usual
+  view.dispatch(view.state.changeByRange((range) => range.empty
+    ? { changes: { from: range.from, insert: text }, range: EditorSelection.cursor(range.from + 1) }
+    : {
+        changes: [{ from: range.from, insert: text }, { from: range.to, insert: text }],
+        range: EditorSelection.range(range.from + 1, range.to + 1),
+      }), { userEvent: 'input.type' })
   return true
 })
 
@@ -51,7 +53,8 @@ export function editorPrefsExtension(prefs: EditorPrefs): Extension {
     EditorState.tabSize.of(prefs.tabSize),
     indentUnit.of(prefs.useTab ? '\t' : ' '.repeat(prefs.tabSize)),
   ]
-  if (prefs.autoPairBrackets) extensions.push(closeBrackets())
+  // The keymap makes Backspace between an auto-inserted pair remove both characters
+  if (prefs.autoPairBrackets) extensions.push(closeBrackets(), keymap.of(closeBracketsKeymap))
   if (prefs.autoPairMarkdown) extensions.push(markdownWrapHandler)
   if (prefs.rightToLeft) extensions.push(EditorView.contentAttributes.of({ dir: 'rtl' }))
   return extensions

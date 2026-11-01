@@ -44,9 +44,9 @@ export const APP_CONFIG_KEYS = {
   userIgnoreFilters: cfg.strings(500, MAX_PATH_LENGTH, true),
   // Editor
   readableLineLength: cfg.bool(true, true),
-  // Obsidian's own default is `source` (editing view). Slatebase has always opened notes in the reading view, so an
-  // absent key means that here; opening in the editor is a choice (`source`) that is written to the file.
-  defaultViewMode: cfg.enum(['source', 'preview'], 'preview'),
+  // Obsidian's default is `source` (editing view). Slatebase opens notes in the reading view unless the file
+  // says `source` itself (see the tab reducer); plugins asking `getConfig` get Obsidian's value.
+  defaultViewMode: cfg.enum(['source', 'preview'], 'source'),
   livePreview: cfg.bool(true),
   strictLineBreaks: cfg.bool(false),
   showFrontmatter: cfg.bool(false),

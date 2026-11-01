@@ -227,6 +227,7 @@ function createSafePipeline(content: string, strictLineBreaks = false): Root {
  */
 export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, sourcePath }: ViewModeProps) {
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
+  const rightToLeft = useAppConfigValue('rightToLeft')
   const rendered = useMemo(() => {
     try {
       const tree = createSafePipeline(content, strictLineBreaks)
@@ -353,6 +354,8 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
         className: 'view-mode',
         'aria-label': 'Markdown-Ansicht',
         'data-viewmode-id': viewModeId,
+        // app.json `rightToLeft`
+        ...(rightToLeft ? { dir: 'rtl' } : {}),
       }, rendered),
     ),
     contextMenu && createElement(ContextMenu, {

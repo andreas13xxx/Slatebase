@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { EditorState } from '@codemirror/state'
+import { EditorSelection, EditorState } from '@codemirror/state'
+import { closeBracketsKeymap } from '@codemirror/autocomplete'
 import { EditorView } from '@codemirror/view'
 import { indentUnit, foldable } from '@codemirror/language'
 import { DEFAULT_EDITOR_PREFS, editorPrefsExtension, type EditorPrefs } from './editor-prefs'
@@ -11,7 +12,7 @@ const views: EditorView[] = []
 
 function viewWith(prefs: Partial<EditorPrefs>, doc = ''): EditorView {
   const view = new EditorView({
-    state: EditorState.create({ doc, extensions: [editorPrefsExtension({ ...DEFAULT_EDITOR_PREFS, ...prefs })] }),
+    state: EditorState.create({ doc, extensions: [EditorState.allowMultipleSelections.of(true), editorPrefsExtension({ ...DEFAULT_EDITOR_PREFS, ...prefs })] }),
     parent: document.body,
   })
   views.push(view)
@@ -61,6 +62,22 @@ describe('editorPrefsExtension', () => {
     off.dispatch({ selection: { anchor: 0, head: 4 } })
     type(off, '*')
     expect(off.state.doc.toString()).toBe('*')
+  })
+
+  it('wraps every selected range when there are several', () => {
+    const view = viewWith({ autoPairMarkdown: true, autoPairBrackets: false }, 'one two')
+    view.dispatch({ selection: EditorSelection.create([EditorSelection.range(0, 3), EditorSelection.range(4, 7)]) })
+    type(view, '_')
+    expect(view.state.doc.toString()).toBe('_one_ _two_')
+  })
+
+  it('removes both characters of an auto-inserted pair on Backspace', () => {
+    const view = viewWith({ autoPairBrackets: true })
+    type(view, '(')
+    expect(view.state.doc.toString()).toBe('()')
+    const backspace = closeBracketsKeymap.find((binding) => binding.key === 'Backspace')!
+    backspace.run!(view)
+    expect(view.state.doc.toString()).toBe('')
   })
 
   it('sets the text direction', () => {

@@ -18,7 +18,8 @@ export function folderExists(tree: DirectoryTree | null | undefined, path: strin
 
 /** A configured folder as a clean relative path: no leading/trailing slashes, no `.`/`..` segments. */
 function normalizeFolder(path: string): string | null {
-  const segments = path.split('/').map((s) => s.trim()).filter((s) => s !== '')
+  // Windows-authored vaults may spell the separator with a backslash
+  const segments = path.replace(/\\/g, '/').split('/').map((s) => s.trim()).filter((s) => s !== '')
   if (segments.some((s) => s === '.' || s === '..')) return null
   return segments.join('/')
 }

@@ -15,6 +15,7 @@ import { showToast } from '../ToastNotification'
 import {
   updateAppConfig,
   useAppConfigValue,
+  getAppConfigFileValue,
   type AppConfigKey,
   type AppConfigValues,
 } from '../../state/vaultAppConfigStore'
@@ -106,7 +107,9 @@ export function EditorFilesSection() {
   const readable = useAppConfigValue('readableLineLength')
   const lineNumbers = useAppConfigValue('showLineNumber')
   const spellcheck = useAppConfigValue('spellcheck')
-  const defaultViewMode = useAppConfigValue('defaultViewMode')
+  // Subscribes to the key; the value shown is the file's own, since an absent key reads here (see the tab reducer)
+  useAppConfigValue('defaultViewMode')
+  const defaultViewMode = getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'preview'
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
   const useTab = useAppConfigValue('useTab')
   const tabSize = useAppConfigValue('tabSize')
@@ -230,6 +233,7 @@ export function EditorFilesSection() {
             className="settings-field-input"
             defaultValue={tabSize}
             disabled={disabled}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
             onBlur={(e) => {
               const next = Math.round(Number(e.target.value))
               if (Number.isFinite(next) && next >= 1 && next <= 16 && next !== tabSize) void save({ tabSize: next })
@@ -300,6 +304,7 @@ export function EditorFilesSection() {
               disabled={disabled}
               autoComplete="off"
               spellCheck={false}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
               onBlur={(e) => {
                 if (e.target.value !== newFileFolderPath) void save({ newFileFolderPath: e.target.value.trim() })
               }}

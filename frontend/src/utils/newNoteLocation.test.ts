@@ -25,6 +25,7 @@ describe('resolveNewNoteFolder', () => {
   it('folder is the configured folder, cleaned up', () => {
     expect(resolveNewNoteFolder('folder', 'Inbox', null, tree)).toBe('Inbox')
     expect(resolveNewNoteFolder('folder', '/Inbox//Ideas/', null, tree)).toBe('Inbox/Ideas')
+    expect(resolveNewNoteFolder('folder', 'Inbox\\Ideas', null, tree)).toBe('Inbox/Ideas')
   })
 
   it('falls back to the root for a folder that does not exist, is empty, or leaves the vault', () => {

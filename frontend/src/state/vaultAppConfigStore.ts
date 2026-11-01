@@ -92,6 +92,14 @@ export function getAppConfigRaw(key: string): unknown {
   return key in snapshot ? snapshot[key] : null
 }
 
+/**
+ * What the file itself says for a key (undefined if it has no such key — the default is not looked up).
+ * For behaviour where Slatebase's default differs from Obsidian's.
+ */
+export function getAppConfigFileValue(key: string): unknown {
+  return fileFields[key]
+}
+
 /** Subscribes a component to one value. */
 export function useAppConfigValue<K extends AppConfigKey>(key: K): AppConfigValues[K] {
   return useSyncExternalStore(subscribe, () => getAppConfigValue(key), () => getAppConfigValue(key))
