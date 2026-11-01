@@ -978,7 +978,7 @@ export const en: TranslationShape = {
     showIndentGuide: 'Indent guides',
     showIndentGuideHint: 'Thin vertical lines at every indentation level in the editor.',
     spellcheckLanguage: 'Spellcheck language',
-    spellcheckLanguageHint: 'For everyone who opens the vault (spellcheckLanguages in app.json). Without a choice, the personal language from the editor context menu applies. Only one dictionary runs at a time; if the file lists several languages, the first one with a dictionary is used.',
+    spellcheckLanguageHint: 'For everyone who opens the vault (spellcheckLanguages in app.json). Without a choice, the personal language from the editor context menu applies. Only one dictionary runs at a time; if the file lists several languages, the first one with a dictionary is used. “Personal choice” removes the languages that have a dictionary from the file.',
     spellcheckPersonal: 'Personal choice',
   },
 } as const

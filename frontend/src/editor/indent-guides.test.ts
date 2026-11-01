@@ -8,14 +8,21 @@ describe('indentGuideRanges', () => {
     expect(indentGuideRanges(10, '\t\t- item', 4)).toEqual([[10, 11], [11, 12]])
   })
 
-  it('marks whole levels of spaces, and leaves a rest without a line', () => {
-    expect(indentGuideRanges(0, '        x', 4)).toEqual([[0, 4], [4, 8]])
-    expect(indentGuideRanges(0, '      x', 4)).toEqual([[0, 4]])
+  it('marks the first space of every whole level of spaces', () => {
+    expect(indentGuideRanges(0, '        x', 4)).toEqual([[0, 1], [4, 5]])
+    expect(indentGuideRanges(0, '      x', 4)).toEqual([[0, 1]]) // 6 spaces: the second level is not whole
     expect(indentGuideRanges(0, '  x', 4)).toEqual([])
   })
 
   it('follows the tab width', () => {
-    expect(indentGuideRanges(0, '    x', 2)).toEqual([[0, 2], [2, 4]])
+    expect(indentGuideRanges(0, '    x', 2)).toEqual([[0, 1], [2, 3]])
+  })
+
+  it('counts columns when tabs and spaces are mixed', () => {
+    // four spaces fill the first level, then a tab fills the second
+    expect(indentGuideRanges(0, '    \tx', 4)).toEqual([[0, 1], [4, 5]])
+    // a tab after two spaces ends on the next stop and starts no level of its own
+    expect(indentGuideRanges(0, '  \tx', 4)).toEqual([])
   })
 
   it('marks nothing in text that is not indented, and not whitespace inside the line', () => {

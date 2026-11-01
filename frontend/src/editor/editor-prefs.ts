@@ -9,7 +9,7 @@ import { EditorSelection, EditorState, Prec, type Extension } from '@codemirror/
 import { EditorView, keymap } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
 import { insertNewlineAndIndent } from '@codemirror/commands'
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
+import { closeBrackets, closeBracketsKeymap, completionStatus } from '@codemirror/autocomplete'
 import { indentGuides } from './indent-guides'
 
 export interface EditorPrefs {
@@ -66,8 +66,8 @@ export function editorPrefsExtension(prefs: EditorPrefs): Extension {
   if (prefs.autoPairBrackets) extensions.push(closeBrackets(), keymap.of(closeBracketsKeymap))
   if (prefs.autoPairMarkdown) extensions.push(markdownWrapHandler)
   if (prefs.rightToLeft) extensions.push(EditorView.contentAttributes.of({ dir: 'rtl' }))
-  // The Markdown language continues lists and quotes on Enter; ahead of it, a plain newline keeps only the indentation
-  if (!prefs.smartIndentList) extensions.push(Prec.highest(keymap.of([{ key: 'Enter', run: insertNewlineAndIndent }])))
+  // The Markdown language continues lists and quotes on Enter; ahead of it, a plain newline keeps only the indentation (an open completion list still takes the key)
+  if (!prefs.smartIndentList) extensions.push(Prec.highest(keymap.of([{ key: 'Enter', run: (view) => completionStatus(view.state) === 'active' ? false : insertNewlineAndIndent(view) }])))
   if (prefs.showIndentGuide) extensions.push(indentGuides())
   return extensions
 }

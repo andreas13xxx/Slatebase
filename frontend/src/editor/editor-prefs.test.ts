@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { EditorSelection, EditorState } from '@codemirror/state'
-import { closeBracketsKeymap } from '@codemirror/autocomplete'
+import { autocompletion, closeBracketsKeymap, completionStatus, startCompletion } from '@codemirror/autocomplete'
 import { EditorView, runScopeHandlers } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { indentUnit, foldable } from '@codemirror/language'
@@ -137,6 +137,29 @@ describe('markdownFoldService honours foldHeading and foldIndent', () => {
 
     expect(guides(true)).toBe(1)
     expect(guides(false)).toBe(0)
+  })
+
+  it('leaves Enter to an open completion list when smartIndentList is off', () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: '==',
+        selection: { anchor: 2 },
+        extensions: [markdown(), autocompletion({ override: [() => ({ from: 2, options: [{ label: 'x' }] })], activateOnTyping: false, interactionDelay: 0 }), editorPrefsExtension({ ...DEFAULT_EDITOR_PREFS, smartIndentList: false })],
+      }),
+      parent: document.body,
+    })
+    views.push(view)
+    startCompletion(view)
+    return new Promise<void>((resolve, reject) => setTimeout(() => {
+      try {
+        expect(completionStatus(view.state)).toBe('active')
+        runScopeHandlers(view, new KeyboardEvent('keydown', { key: 'Enter' }), 'editor')
+        expect(view.state.doc.toString()).toBe('==x')
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    }, 50))
   })
 })
 

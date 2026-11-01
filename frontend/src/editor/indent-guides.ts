@@ -1,8 +1,7 @@
 /**
  * Indent guides (app.json `showIndentGuide`): a thin vertical line at every indentation level of a
- * line's leading whitespace, as in Obsidian's editor. Each level is a decorated span over one tab, or
- * over `tabSize` spaces, so a guide sits exactly where the text indents, in any font. Leftover spaces
- * (an indent that is not a whole level) get no line.
+ * line's leading whitespace, as in Obsidian's editor. A guide is a decorated span over the first character
+ * of a level (one tab, or one of `tabSize` spaces), so it sits exactly where the text indents, in any font.
  *
  * @module indent-guides
  */
@@ -11,20 +10,24 @@ import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate
 
 const guide = Decoration.mark({ class: 'cm-indent-guide' })
 
-/** The guide spans of one line: `from` is the line start, `text` its content. */
+/**
+ * The guide spans of one line: `from` is the line start, `text` its content. A guide sits on the first
+ * character of every level (a tab, or the first of `tabSize` spaces) counted in columns, so mixed tabs
+ * and spaces line up with how the text is drawn. An indent that does not fill a level of spaces gets no line.
+ */
 export function indentGuideRanges(from: number, text: string, tabSize: number): Array<[number, number]> {
   const ranges: Array<[number, number]> = []
-  let offset = 0
-  while (offset < text.length) {
-    if (text[offset] === '\t') {
-      ranges.push([from + offset, from + offset + 1])
-      offset += 1
-    } else if (text[offset] === ' ') {
-      let end = offset
-      while (end < text.length && text[end] === ' ') end++
-      // Whole levels of spaces only; a tab after spaces starts the next run
-      for (let start = offset; start + tabSize <= end; start += tabSize) ranges.push([from + start, from + start + tabSize])
-      offset = end
+  let column = 0
+  for (let offset = 0; offset < text.length; offset++) {
+    const char = text[offset]
+    if (char === '\t') {
+      if (column % tabSize === 0) ranges.push([from + offset, from + offset + 1])
+      column += tabSize - (column % tabSize)
+    } else if (char === ' ') {
+      if (column % tabSize === 0 && text.slice(offset, offset + tabSize) === ' '.repeat(tabSize)) {
+        ranges.push([from + offset, from + offset + 1])
+      }
+      column += 1
     } else {
       break
     }

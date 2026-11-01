@@ -972,7 +972,7 @@ export const de = {
     showIndentGuide: 'Einrückungslinien',
     showIndentGuideHint: 'Dünne senkrechte Linien an jeder Einrückungsebene im Editor.',
     spellcheckLanguage: 'Sprache der Rechtschreibprüfung',
-    spellcheckLanguageHint: 'Für alle, die den Vault öffnen (spellcheckLanguages in app.json). Ohne Auswahl gilt die persönliche Sprache aus dem Editor-Kontextmenü. Es läuft immer nur ein Wörterbuch; stehen mehrere Sprachen in der Datei, gilt die erste, für die es eines gibt.',
+    spellcheckLanguageHint: 'Für alle, die den Vault öffnen (spellcheckLanguages in app.json). Ohne Auswahl gilt die persönliche Sprache aus dem Editor-Kontextmenü. Es läuft immer nur ein Wörterbuch; stehen mehrere Sprachen in der Datei, gilt die erste, für die es eines gibt. „Persönliche Auswahl“ entfernt die Sprachen mit Wörterbuch aus der Datei.',
     spellcheckPersonal: 'Persönliche Auswahl',
   },
 } as const
