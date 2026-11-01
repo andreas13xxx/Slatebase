@@ -1391,26 +1391,6 @@
   outline-offset: 2px;
 }
 
-.user-menu-avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-.user-menu-avatar--initials {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 11px;
-  font-weight: 700;
-  color: white;
-  background: var(--accent);
-  border-radius: 50%;
-}
-
 .user-menu-dropdown {
   position: fixed;
   min-width: 210px;

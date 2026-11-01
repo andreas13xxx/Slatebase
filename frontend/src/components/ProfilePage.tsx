@@ -5,6 +5,7 @@ import type { IApiClient, UpdateProfileData } from '../api'
 import type { PublicUserInfo } from '../state/authState'
 import { extractErrorMessage } from '../utils/error'
 import { PasswordInput } from './PasswordInput'
+import { AvatarEditor, type AvatarValue } from './AvatarEditor'
 
 /** Props for the ProfilePage component. */
 export interface ProfilePageProps {
@@ -69,7 +70,14 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
   // --- Profile state ---
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
+  const [username, setUsername] = useState('')
+  const [avatar, setAvatar] = useState<AvatarValue>({
+    avatarType: 'initials',
+    avatarUrl: '',
+    avatarColor: '',
+    avatarData: '',
+    avatarDicebear: '',
+  })
   const [preferredLanguage, setPreferredLanguage] = useState<'de' | 'en'>('de')
   const [colorScheme, setColorScheme] = useState<'light' | 'dark' | 'system'>('system')
   const [profileErrors, setProfileErrors] = useState<ProfileErrors>(emptyProfileErrors)
@@ -105,7 +113,14 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
         if (cancelled) return
         setDisplayName(profile.displayName ?? '')
         setEmail(profile.email ?? '')
-        setAvatarUrl(profile.avatarUrl ?? '')
+        setUsername(profile.username ?? '')
+        setAvatar({
+          avatarType: profile.avatarType ?? 'initials',
+          avatarUrl: profile.avatarUrl ?? '',
+          avatarColor: profile.avatarColor ?? '',
+          avatarData: profile.avatarData ?? '',
+          avatarDicebear: profile.avatarDicebear ?? '',
+        })
         setPreferredLanguage(profile.preferredLanguage ?? 'de')
         setColorScheme(profile.colorScheme ?? 'system')
       } catch (err: unknown) {
@@ -153,12 +168,12 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
       }
     }
 
-    // Avatar URL: max 2048 chars, must start with http:// or https:// (empty is allowed)
-    if (avatarUrl !== '') {
-      if (avatarUrl.length > 2048) {
+    // Avatar URL: max 2048 chars, must start with http:// or https:// (only for the url type)
+    if (avatar.avatarType === 'url' && avatar.avatarUrl !== '') {
+      if (avatar.avatarUrl.length > 2048) {
         errors.avatarUrl = t('profile.avatarUrlTooLong')
         valid = false
-      } else if (!isValidHttpUrl(avatarUrl)) {
+      } else if (!isValidHttpUrl(avatar.avatarUrl)) {
         errors.avatarUrl = t('profile.avatarUrlInvalid')
         valid = false
       }
@@ -198,7 +213,11 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
       const data: UpdateProfileData = {
         displayName,
         email,
-        avatarUrl,
+        avatarType: avatar.avatarType,
+        avatarUrl: avatar.avatarUrl,
+        avatarColor: avatar.avatarColor,
+        avatarData: avatar.avatarData,
+        avatarDicebear: avatar.avatarDicebear,
         preferredLanguage,
         colorScheme,
       }
@@ -356,22 +375,15 @@ export function ProfilePage({ apiClient, mode = 'full' }: ProfilePageProps) {
           </div>
 
           <div className="profile-field">
-            <label className="profile-label" htmlFor="profile-avatar-url">
-              {t('profile.avatarUrl')}
-            </label>
-            <input
-              id="profile-avatar-url"
-              className="profile-input"
-              type="url"
-              maxLength={2048}
-              value={avatarUrl}
-              onChange={(e) => {
-                setAvatarUrl(e.target.value)
+            <span className="profile-label">{t('profile.avatar.heading')}</span>
+            <AvatarEditor
+              username={username}
+              displayName={displayName}
+              value={avatar}
+              onChange={(next) => {
+                setAvatar(next)
                 if (profileErrors.avatarUrl) setProfileErrors((prev) => ({ ...prev, avatarUrl: null }))
               }}
-              aria-invalid={profileErrors.avatarUrl !== null}
-              aria-describedby={profileErrors.avatarUrl ? 'profile-avatar-url-error' : undefined}
-              placeholder="https://example.com/avatar.png"
             />
             {profileErrors.avatarUrl && (
               <p id="profile-avatar-url-error" className="profile-field-error" role="alert">

@@ -108,6 +108,18 @@ export class UserController {
       if (result.data.avatarUrl !== undefined) {
         profileData['avatarUrl'] = result.data.avatarUrl
       }
+      if (result.data.avatarType !== undefined) {
+        profileData['avatarType'] = result.data.avatarType
+      }
+      if (result.data.avatarColor !== undefined) {
+        profileData['avatarColor'] = result.data.avatarColor
+      }
+      if (result.data.avatarData !== undefined) {
+        profileData['avatarData'] = result.data.avatarData
+      }
+      if (result.data.avatarDicebear !== undefined) {
+        profileData['avatarDicebear'] = result.data.avatarDicebear
+      }
       if (result.data.preferredLanguage !== undefined) {
         profileData['preferredLanguage'] = result.data.preferredLanguage
       }

@@ -8,6 +8,7 @@ import type { IAuditService } from '../audit/index.js'
 import type { OnUserCreatedFn } from '../welcome-vault/types.js'
 import { readJsonFile, writeJsonFileAtomic, JsonFileStore } from '../shared/json-file-store.js'
 import { isNodeError } from '../shared/fs-utils.js'
+import { MAX_AVATAR_DATA_LENGTH } from './validation.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,15 @@ import { isNodeError } from '../shared/fs-utils.js'
  * Available user roles in the system.
  */
 export type UserRole = 'admin' | 'user'
+
+/**
+ * How a user's avatar is rendered.
+ * - `initials`: coloured initials tile (uses `avatarColor`)
+ * - `url`: external image URL (`avatarUrl`)
+ * - `dicebear`: external DiceBear image URL (`avatarDicebear`)
+ * - `image`: uploaded/pasted image stored inline as a data URL (`avatarData`)
+ */
+export type AvatarType = 'initials' | 'url' | 'dicebear' | 'image'
 
 /**
  * Full user record as stored in the filesystem.
@@ -27,6 +37,10 @@ export interface UserRecord {
   displayName: string
   email: string
   avatarUrl: string
+  avatarType: AvatarType
+  avatarColor: string
+  avatarData: string
+  avatarDicebear: string
   preferredLanguage: 'de' | 'en'
   colorScheme: 'light' | 'dark' | 'system'
   suspended: boolean
@@ -44,6 +58,10 @@ export interface PublicUserInfo {
   displayName: string
   email: string
   avatarUrl: string
+  avatarType: AvatarType
+  avatarColor: string
+  avatarData: string
+  avatarDicebear: string
   role: UserRole
   preferredLanguage: 'de' | 'en'
   colorScheme: 'light' | 'dark' | 'system'
@@ -63,6 +81,10 @@ export function toPublicUserInfo(user: UserRecord): PublicUserInfo {
     displayName: user.displayName,
     email: user.email,
     avatarUrl: user.avatarUrl,
+    avatarType: user.avatarType,
+    avatarColor: user.avatarColor,
+    avatarData: user.avatarData,
+    avatarDicebear: user.avatarDicebear,
     role: user.role,
     preferredLanguage: user.preferredLanguage,
     colorScheme: user.colorScheme,
@@ -90,6 +112,10 @@ export interface UpdateProfileData {
   displayName?: string
   email?: string
   avatarUrl?: string
+  avatarType?: AvatarType | undefined
+  avatarColor?: string | undefined
+  avatarData?: string | undefined
+  avatarDicebear?: string | undefined
   preferredLanguage?: 'de' | 'en'
   colorScheme?: 'light' | 'dark' | 'system'
 }
@@ -281,6 +307,35 @@ interface UsernameIndex {
   [username: string]: string
 }
 
+/**
+ * Backfills the configurable-avatar fields on a record read from disk.
+ *
+ * Old records predate `avatarType`/`avatarColor`/`avatarData`/`avatarDicebear`.
+ * Rather than a one-off on-disk migration, the defaults are applied on every
+ * read; the fields are only persisted on the next save. A legacy record with a
+ * non-empty `avatarUrl` is treated as `avatarType: 'url'`, otherwise
+ * `'initials'`; the three colour/data/dicebear fields default to `''`.
+ */
+export function normalizeAvatarFields(record: UserRecord): UserRecord {
+  if (
+    record.avatarType !== undefined &&
+    record.avatarColor !== undefined &&
+    record.avatarData !== undefined &&
+    record.avatarDicebear !== undefined
+  ) {
+    return record
+  }
+  const avatarType: AvatarType =
+    record.avatarType ?? (record.avatarUrl ? 'url' : 'initials')
+  return {
+    ...record,
+    avatarType,
+    avatarColor: record.avatarColor ?? '',
+    avatarData: record.avatarData ?? '',
+    avatarDicebear: record.avatarDicebear ?? '',
+  }
+}
+
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 /**
@@ -339,7 +394,8 @@ export class UserRepository implements IUserRepository {
    */
   private async readUserFile(userId: string): Promise<UserRecord | null> {
     const filePath = path.join(this.usersDir, `${userId}.json`)
-    return readJsonFile<UserRecord | null>(filePath, null)
+    const record = await readJsonFile<UserRecord | null>(filePath, null)
+    return record === null ? null : normalizeAvatarFields(record)
   }
 
   /** Find a user by their unique ID. */
@@ -535,6 +591,10 @@ export async function ensureDefaultAdmin(userRepo: IUserRepository, logger: ILog
     displayName: 'Administrator',
     email: '',
     avatarUrl: '',
+    avatarType: 'initials',
+    avatarColor: '',
+    avatarData: '',
+    avatarDicebear: '',
     preferredLanguage: 'de',
     colorScheme: 'system',
     suspended: false,
@@ -734,6 +794,10 @@ export class UserService implements IUserService {
       displayName: data.displayName ?? data.username,
       email: '',
       avatarUrl: '',
+      avatarType: 'initials',
+      avatarColor: '',
+      avatarData: '',
+      avatarDicebear: '',
       preferredLanguage: data.preferredLanguage ?? 'de',
       colorScheme: 'system',
       suspended: false,
@@ -831,6 +895,8 @@ export class UserService implements IUserService {
       this.validateAvatarUrl(data.avatarUrl)
     }
 
+    this.validateAvatarFields(data)
+
     if (data.preferredLanguage !== undefined) {
       if (data.preferredLanguage !== 'de' && data.preferredLanguage !== 'en') {
         throw new UserValidationError('INVALID_LANGUAGE', 'Preferred language must be "de" or "en"')
@@ -843,12 +909,18 @@ export class UserService implements IUserService {
       }
     }
 
-    // Apply changes
+    // Apply changes. Avatar fields are preserved field-by-field: switching
+    // `avatarType` does not wipe the other three — a user can flip back to a
+    // previously chosen image/colour/dicebear without re-entering it (R1.1).
     const updatedUser: UserRecord = {
       ...user,
       displayName: data.displayName !== undefined ? data.displayName : user.displayName,
       email: data.email !== undefined ? data.email : user.email,
       avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : user.avatarUrl,
+      avatarType: data.avatarType !== undefined ? data.avatarType : user.avatarType,
+      avatarColor: data.avatarColor !== undefined ? data.avatarColor : user.avatarColor,
+      avatarData: data.avatarData !== undefined ? data.avatarData : user.avatarData,
+      avatarDicebear: data.avatarDicebear !== undefined ? data.avatarDicebear : user.avatarDicebear,
       preferredLanguage: data.preferredLanguage !== undefined ? data.preferredLanguage : user.preferredLanguage,
       colorScheme: data.colorScheme !== undefined ? data.colorScheme : user.colorScheme,
       updatedAt: new Date().toISOString(),
@@ -973,7 +1045,7 @@ export class UserService implements IUserService {
   async listUsers(options?: PaginationOptions): Promise<PaginatedResult<PublicUserInfo>> {
     const result = await this.userRepository.findAll(options)
     return {
-      items: result.items.map(u => this.toPublicInfo(u)),
+      items: result.items.map(u => this.toPublicListInfo(u)),
       total: result.total,
       page: result.page,
       pageSize: result.pageSize,
@@ -987,7 +1059,7 @@ export class UserService implements IUserService {
    */
   async searchUsers(prefix: string, limit: number = 10): Promise<PublicUserInfo[]> {
     const users = await this.userRepository.searchByUsernamePrefix(prefix, limit)
-    return users.map(u => this.toPublicInfo(u))
+    return users.map(u => this.toPublicListInfo(u))
   }
 
   /**
@@ -1188,6 +1260,57 @@ export class UserService implements IUserService {
   }
 
   /**
+   * Second validation layer for the configurable-avatar fields (mirrors the
+   * Zod schemas in `validation.ts`). Each field is validated only when present,
+   * so a partial update does not force the others to be sent.
+   */
+  private validateAvatarFields(data: UpdateProfileData): void {
+    if (data.avatarType !== undefined) {
+      if (
+        data.avatarType !== 'initials' &&
+        data.avatarType !== 'url' &&
+        data.avatarType !== 'dicebear' &&
+        data.avatarType !== 'image'
+      ) {
+        throw new UserValidationError('AVATAR_TYPE_INVALID', 'Avatar type must be "initials", "url", "dicebear", or "image"')
+      }
+    }
+
+    if (data.avatarColor !== undefined && data.avatarColor !== '') {
+      if (!/^#[0-9a-fA-F]{6}$/.test(data.avatarColor)) {
+        throw new UserValidationError('AVATAR_COLOR_INVALID', 'Avatar colour must be empty or a #rrggbb hex colour')
+      }
+    }
+
+    if (data.avatarDicebear !== undefined && data.avatarDicebear !== '') {
+      if (data.avatarDicebear.length > 2048) {
+        throw new UserValidationError('AVATAR_DICEBEAR_TOO_LONG', 'DiceBear URL must be at most 2048 characters')
+      }
+      let host: string | null = null
+      let protocol: string | null = null
+      try {
+        const parsed = new URL(data.avatarDicebear)
+        host = parsed.hostname
+        protocol = parsed.protocol
+      } catch {
+        // falls through to the invalid-host error below
+      }
+      if (protocol !== 'https:' || host !== 'api.dicebear.com') {
+        throw new UserValidationError('AVATAR_DICEBEAR_INVALID', 'DiceBear URL must be an https URL on api.dicebear.com')
+      }
+    }
+
+    if (data.avatarData !== undefined && data.avatarData !== '') {
+      if (data.avatarData.length > MAX_AVATAR_DATA_LENGTH) {
+        throw new UserValidationError('AVATAR_DATA_TOO_LARGE', 'Avatar image data is too large (max ~256 KB)')
+      }
+      if (!/^data:image\/(png|jpeg|webp|gif);base64,/.test(data.avatarData)) {
+        throw new UserValidationError('AVATAR_DATA_INVALID', 'Avatar image must be a data:image/(png|jpeg|webp|gif);base64 URL')
+      }
+    }
+  }
+
+  /**
    * Generate a cryptographically secure temporary password.
    * Uses 12 characters from a reduced character set (ambiguous chars removed).
    */
@@ -1212,6 +1335,10 @@ export class UserService implements IUserService {
       displayName: user.displayName,
       email: user.email,
       avatarUrl: user.avatarUrl,
+      avatarType: user.avatarType,
+      avatarColor: user.avatarColor,
+      avatarData: user.avatarData,
+      avatarDicebear: user.avatarDicebear,
       role: user.role,
       preferredLanguage: user.preferredLanguage,
       colorScheme: user.colorScheme,
@@ -1219,5 +1346,17 @@ export class UserService implements IUserService {
       mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt,
     }
+  }
+
+  /**
+   * Convert a UserRecord to PublicUserInfo for list/bulk responses.
+   * Identical to `toPublicInfo` but drops the inline `avatarData` blob
+   * (up to ~256 KB per user), which list renderers never need — they only
+   * read `avatarType`. The full image is still returned by single-user
+   * fetches (login/self/profile). Avoids N×256 KB payloads on paginated
+   * admin lists and user-search responses.
+   */
+  private toPublicListInfo(user: UserRecord): PublicUserInfo {
+    return { ...this.toPublicInfo(user), avatarData: '' }
   }
 }

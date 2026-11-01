@@ -19,12 +19,12 @@ function createMockLogger(): ILogger {
 
 function createMockUserService(overrides: Partial<IUserService> = {}): IUserService {
   return {
-    createUser: async () => ({ userId: 'u1', username: 'test', displayName: 'Test', email: '', avatarUrl: '', role: 'user' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
+    createUser: async () => ({ userId: 'u1', username: 'test', displayName: 'Test', email: '', avatarUrl: '', avatarType: 'initials' as const, avatarColor: '', avatarData: '', avatarDicebear: '', role: 'user' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
     deleteUser: async () => {},
-    updateProfile: async () => ({ userId: 'u1', username: 'test', displayName: 'Test', email: '', avatarUrl: '', role: 'user' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
+    updateProfile: async () => ({ userId: 'u1', username: 'test', displayName: 'Test', email: '', avatarUrl: '', avatarType: 'initials' as const, avatarColor: '', avatarData: '', avatarDicebear: '', role: 'user' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
     changePassword: async () => {},
     resetPassword: async () => 'temp-pass',
-    getUser: async () => ({ userId: 'admin-1', username: 'admin', displayName: 'Admin', email: '', avatarUrl: '', role: 'admin' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
+    getUser: async () => ({ userId: 'admin-1', username: 'admin', displayName: 'Admin', email: '', avatarUrl: '', avatarType: 'initials' as const, avatarColor: '', avatarData: '', avatarDicebear: '', role: 'admin' as const, preferredLanguage: 'en' as const, colorScheme: 'system' as const, suspended: false, mustChangePassword: false, createdAt: '2025-01-01T00:00:00.000Z' }),
     listUsers: async (): Promise<PaginatedResult<PublicUserInfo>> => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
     searchUsers: async () => [],
     suspendUser: async () => {},

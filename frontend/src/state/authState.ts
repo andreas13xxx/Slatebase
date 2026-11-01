@@ -7,6 +7,15 @@
 export type UserRole = 'admin' | 'user'
 
 /**
+ * How a user's avatar is rendered. Mirrors the backend `AvatarType`.
+ * - `initials`: coloured initials tile (uses `avatarColor`)
+ * - `url`: external image URL (`avatarUrl`)
+ * - `dicebear`: external DiceBear image URL (`avatarDicebear`)
+ * - `image`: uploaded/pasted image stored inline as a data URL (`avatarData`)
+ */
+export type AvatarType = 'initials' | 'url' | 'dicebear' | 'image'
+
+/**
  * Public user information returned by the backend after login.
  * Matches the backend PublicUserInfo interface.
  */
@@ -16,6 +25,10 @@ export interface PublicUserInfo {
   displayName: string
   email: string
   avatarUrl: string
+  avatarType: AvatarType
+  avatarColor: string
+  avatarData: string
+  avatarDicebear: string
   role: UserRole
   preferredLanguage: 'de' | 'en'
   colorScheme: 'light' | 'dark' | 'system'

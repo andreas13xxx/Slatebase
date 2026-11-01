@@ -351,6 +351,8 @@ src/
 │   ├── templatePlaceholders.test.ts — Unit tests for templatePlaceholders
 │   ├── simpleMarkdownToHtml.ts — Regex-based Markdown→HTML for external, untrusted Markdown (plugin READMEs, GitHub release notes) — headings/bold/italic/code/links/images/lists/blockquotes/hr; sanitizes URLs (http(s)/mailto/relative only, others → `#`) and escapes attribute quotes before interpolation. Extracted from PluginDetailPanel.tsx so ReleaseNotesModal.tsx can reuse it
 │   ├── simpleMarkdownToHtml.test.ts — Unit tests for simpleMarkdownToHtml
+│   ├── imageResize.ts    — `resizeImageToDataUrl()`: centre-crops a picked/pasted image to a square, draws it into a 128×128 `<canvas>`, exports a WebP data URL (PNG fallback) and rejects a result over the backend's ~256 KB avatar-data limit (`ImageResizeError`). Backs the avatar image upload/paste; `imageBlobFromClipboard()` pulls the first image out of a paste event
+│   ├── dicebear.ts       — Pure DiceBear URL builder for the avatar gallery: `dicebearUrl(style, seed)` → `https://api.dicebear.com/9.x/<style>/svg?seed=…` (host pinned to match the backend `avatarDicebear` allowlist), a curated `DICEBEAR_STYLES` list and `dicebearSeeds()` for stable per-user seeds. No network — the gallery loads each URL via `<img>`, keeping DiceBear off the fetch/CSP surface
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types
@@ -621,7 +623,9 @@ src/
 │   ├── SnippetLifecycle.tsx — Renders nothing; applies a vault's enabled CSS snippets on open and swaps them for the new vault's on switch. Mounted once near the app root (reacts to `state.selectedVaultId` via useAppContext) — same "self-contained, context-only, no prop drilling" pattern as StatusBar's VaultNameItem
 │   ├── ThemeLifecycle.tsx — Renders nothing; applies the vault's active Obsidian theme on open and vault switch and re-reads it on `vault:change` for `.obsidian/appearance.json` / `.obsidian/themes/**`. A failed request keeps the applied theme (unknown is not gone); only `THEME_NOT_FOUND` or no selection removes it
 │   ├── StatusBar.css     — Status bar styles (Design Tokens)
-│   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin)
+│   ├── UserMenu.tsx      — User avatar and dropdown menu (navigation, import/export, admin); renders the avatar via the shared `UserAvatar`
+│   ├── UserAvatar.tsx    — Single avatar render path (image/dicebear/url data → `<img>`, else coloured initials tile). Shared by UserMenu, the ProfilePage AvatarEditor preview and any later site, so they cannot drift; size via a `--user-avatar-size` CSS var. Pure helpers (`getInitials`, deterministic `colorFromName`, WCAG `readableTextColor`) live in `userAvatarUtils.ts` (DOM-free, unit-tested)
+│   ├── AvatarEditor.tsx  — Configurable-avatar editor in the profile: `radiogroup` type switcher (initials/dicebear/image/url), live preview (`UserAvatar`), initials colour palette + hex, DiceBear gallery grid (styles × stable seeds from `utils/dicebear.ts`, third-party hint), image upload button + dropzone + clipboard paste (client-side downscale via `utils/imageResize.ts`). Controlled: owns no persistence, the ProfilePage form sends `avatarType` + the four fields in the PATCH
 │   ├── ErrorBoundary.tsx — React Error Boundary (fallback UI, reset button)
 │   ├── ErrorBoundary.css — ErrorBoundary fallback styles
 │   ├── SidebarToolbar.tsx — Customisable vertical toolbar, dockable left/right of the editor pane (`toolbarStore.position`); built-in buttons and plugin ribbon icons (`PluginRibbonGlyph`) are normalized into one `ToolbarItem` shape (`buildEntries`) so ordering/hiding/colouring/drag-reorder and both context menus (`toolbar-context-menu.ts`) treat them identically

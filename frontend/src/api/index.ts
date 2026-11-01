@@ -1,5 +1,5 @@
 import type { VaultInfo, DirectoryTree, FileContent, FileSaveResult, AppError, Conversation, PaginatedConversations, PaginatedMessages, Message, GraphData, GraphMeta, GraphQueryOptions, BacklinksResponse, ActivityPage, ActivityQueryParams } from '../types'
-import type { PublicUserInfo } from '../state/authState'
+import type { PublicUserInfo, AvatarType } from '../state/authState'
 import type { PropertyType, PropertyTypeRegistry } from '../state/propertyTypes'
 import type { BaseQuerySpecWire, BaseQueryResultWire } from '@slatebase/shared-contracts'
 import type { CreatedPublicShare, EmbedPreviewEntry, PublicShareSummary } from '../public-share/types'
@@ -32,6 +32,10 @@ export interface UpdateProfileData {
   displayName?: string
   email?: string
   avatarUrl?: string
+  avatarType?: AvatarType
+  avatarColor?: string
+  avatarData?: string
+  avatarDicebear?: string
   preferredLanguage?: 'de' | 'en'
   colorScheme?: 'light' | 'dark' | 'system'
 }
