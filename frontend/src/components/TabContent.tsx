@@ -22,7 +22,7 @@ import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
 import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
 import { resolveAttachmentTargetDir } from '../utils/internalLink'
-import { getAppConfigValue } from '../state/vaultAppConfigStore'
+import { getAppConfigValue, useAppConfigValue } from '../state/vaultAppConfigStore'
 import './TabContent.css'
 
 /**
@@ -281,13 +281,15 @@ export function TabContent() {
     ? appState.vaultTrees[activeTabVaultId] ?? appState.directoryTree
     : null
   const basesEnabled = isEnabled('bases')
+  const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const editModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
     onInternalLinkClick: handleInternalLinkClick,
     apiClient,
     basesEnabled,
-  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, apiClient, basesEnabled])
+    propertiesInDocument,
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, apiClient, basesEnabled, propertiesInDocument])
   const previewModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
@@ -296,7 +298,8 @@ export function TabContent() {
     onPropertyTypeChange: handlePropertyTypeChange,
     apiClient,
     basesEnabled,
-  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange, apiClient, basesEnabled])
+    propertiesInDocument,
+  }), [activeTabVaultId, directoryTreeForActiveVault, handleInternalLinkClick, typeRegistry, handlePropertyTypeChange, apiClient, basesEnabled, propertiesInDocument])
 
   // No active tab — empty state
   if (!activeTab) {

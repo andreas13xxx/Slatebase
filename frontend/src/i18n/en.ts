@@ -951,4 +951,34 @@ export const en: TranslationShape = {
     noVault: 'No vault is open: the workspace was not saved.',
   },
 
+  bookmarkGroups: {
+    newGroup: 'New group',
+    defaultName: 'Group',
+    newSubgroup: 'New subgroup',
+    moveTo: 'Move to “{name}”',
+    ungroup: 'Remove from group',
+    deleteGroup: 'Delete group',
+    deleteMessage: 'The group “{name}” contains bookmarks. They are deleted with the group.',
+    delete: 'Delete',
+  },
+
+  propertiesInDocument: {
+    label: 'Properties in document',
+    hint: 'How the frontmatter block at the top of a note appears: as properties, hidden, or as raw YAML. Applies in the editor, the reading view and the hover preview; the Properties view in the side panel is not affected.',
+    visible: 'Visible',
+    hidden: 'Hidden',
+    source: 'Source',
+    menuItem: 'Show properties',
+    command: 'Editor: Toggle properties in document',
+  },
+
+  editorSettings: {
+    smartIndentList: 'Continue lists on line break',
+    smartIndentListHint: 'On: Enter in a list or quote starts the next line with a new marker. Off: Enter keeps only the indentation.',
+    showIndentGuide: 'Indent guides',
+    showIndentGuideHint: 'Thin vertical lines at every indentation level in the editor.',
+    spellcheckLanguage: 'Spellcheck language',
+    spellcheckLanguageHint: 'For everyone who opens the vault (spellcheckLanguages in app.json). Without a choice, the personal language from the editor context menu applies. Only one dictionary runs at a time; if the file lists several languages, the first one with a dictionary is used. “Personal choice” removes the languages that have a dictionary from the file.',
+    spellcheckPersonal: 'Personal choice',
+  },
 } as const

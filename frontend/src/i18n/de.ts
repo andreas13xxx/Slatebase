@@ -944,4 +944,35 @@ export const de = {
     invalidName: 'Dieser Name ist als Arbeitsbereich nicht erlaubt.',
     noVault: 'Kein Vault geöffnet: Der Arbeitsbereich wurde nicht gespeichert.',
   },
+
+  bookmarkGroups: {
+    newGroup: 'Neue Gruppe',
+    defaultName: 'Gruppe',
+    newSubgroup: 'Neue Untergruppe',
+    moveTo: 'Verschieben nach „{name}“',
+    ungroup: 'Aus Gruppe herausnehmen',
+    deleteGroup: 'Gruppe löschen',
+    deleteMessage: 'Die Gruppe „{name}“ enthält Lesezeichen. Sie werden mit der Gruppe gelöscht.',
+    delete: 'Löschen',
+  },
+
+  propertiesInDocument: {
+    label: 'Eigenschaften im Dokument',
+    hint: 'Wie der Frontmatter-Block am Anfang einer Notiz erscheint: als Eigenschaften, ausgeblendet oder als YAML-Quelltext. Gilt im Editor, in der Leseansicht und in der Hover-Vorschau; die Eigenschaften-Ansicht im Seitenbereich bleibt unverändert.',
+    visible: 'Sichtbar',
+    hidden: 'Ausgeblendet',
+    source: 'Quelltext',
+    menuItem: 'Eigenschaften anzeigen',
+    command: 'Editor: Eigenschaften im Dokument ein-/ausblenden',
+  },
+
+  editorSettings: {
+    smartIndentList: 'Listen beim Zeilenumbruch fortsetzen',
+    smartIndentListHint: 'An: Enter in einer Liste oder einem Zitat beginnt die nächste Zeile mit einem neuen Aufzählungszeichen. Aus: Enter behält nur die Einrückung.',
+    showIndentGuide: 'Einrückungslinien',
+    showIndentGuideHint: 'Dünne senkrechte Linien an jeder Einrückungsebene im Editor.',
+    spellcheckLanguage: 'Sprache der Rechtschreibprüfung',
+    spellcheckLanguageHint: 'Für alle, die den Vault öffnen (spellcheckLanguages in app.json). Ohne Auswahl gilt die persönliche Sprache aus dem Editor-Kontextmenü. Es läuft immer nur ein Wörterbuch; stehen mehrere Sprachen in der Datei, gilt die erste, für die es eines gibt. „Persönliche Auswahl“ entfernt die Sprachen mit Wörterbuch aus der Datei.',
+    spellcheckPersonal: 'Persönliche Auswahl',
+  },
 } as const

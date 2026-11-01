@@ -67,6 +67,23 @@ Der Download läuft über `requestUrl()` und funktioniert grundsätzlich in Slat
 
 ---
 
+## Icons erscheinen in Obsidian nicht (nur der Name steht da)
+
+Wenn du denselben Vault auch in Obsidian öffnest, kann dort statt des Icons der Icon-Name als Text stehen (z. B. `LiFaceGrinning`).
+
+**Ursache:** Slatebase bringt eine neuere Lucide-Bibliothek mit, als Obsidian sie eingebaut hat. Der Icon-Picker in Slatebase bietet daher Lucide-Icons (Präfix `Li`) an, die Obsidians Version noch nicht kennt. Iconize speichert nur die ID. Findet Obsidian das Icon nicht, zeigt es den Namen als Text. Betroffen sind vor allem neuere Icons, etwa die `Face…`-Icons wie `face-grinning`.
+
+**Was nicht hilft:**
+- Das Pack „Lucide" in Obsidian laden und „Lucide icon pack type" auf „Custom" stellen. Das Custom-Pack hat den Präfix `Lu` statt `Li`, deine gespeicherten `Li…`-Zuordnungen passen dann nicht mehr dazu.
+- Der Ordner `.obsidian/icons/` ist beim Typ „Native" (Standard) leer und das ist normal. Er wird nur für nachgeladene Packs gebraucht.
+
+**Was hilft:** Nimm Icons, die es in beiden Welten gibt, z. B. `LiSmile` statt `LiFaceGrinning`. Ob ein Icon in Obsidian erscheint, siehst du dort im Iconize-Picker.
+
+> [!note] Hinweis
+> Das ist die plausibelste Erklärung, geprüft wurde sie nur durch Tests mit anderen Icons, nicht gegen die Lucide-Version deines Obsidian.
+
+---
+
 > [!tip] Alternative für sichtbare Datei-Unterscheidung
 > Solange Iconize-Icons im Dateibaum nicht zuverlässig erscheinen, eignen sich Emoji-Präfixe direkt im Dateinamen (z. B. `📌 Wichtige Notiz.md`) oder konsistente Namenskonventionen besser für die visuelle Unterscheidung in Slatebase.
 

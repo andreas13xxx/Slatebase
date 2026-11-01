@@ -37,6 +37,7 @@ import type { IEditor } from './editor-shim'
 import type { Locale } from '../../i18n'
 import { translateCoreCommandName, unsupportedCommandMessage, type UnsupportedReason } from './core-command-i18n'
 import { showToast } from '../../components/ToastNotification'
+import { defaultHotkeysFor } from './core-default-hotkeys'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { foldAll, unfoldAll, toggleFold } from '@codemirror/language'
 import { foldMore, foldLess, toggleFoldProperties } from '../../editor/folding'
@@ -476,6 +477,6 @@ export function registerCoreEditorCommands(registry: ICommandRegistry, locale: L
     const editorCallback = spec.unsupported
       ? () => { showToast('info', unsupportedCommandMessage(name, spec.unsupported, locale)) }
       : (editor: IEditor) => spec.run(editor)
-    registry.addCommand('editor', { id: spec.id, name, editorCallback })
+    registry.addCommand('editor', { id: spec.id, name, editorCallback, hotkeys: defaultHotkeysFor(`editor:${spec.id}`) })
   }
 }

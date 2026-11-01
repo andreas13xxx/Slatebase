@@ -13,6 +13,7 @@ import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AppContext } from '../state'
 import { ViewMode } from './ViewMode'
 import { HoverPreviewProperties } from './HoverPreviewProperties'
+import { useAppConfigValue } from '../state/vaultAppConfigStore'
 import { resolveWikilinkTarget } from '../plugins/link-resolver'
 import { detectPlatform, readPlatformEnvironment } from '../plugins/compat/platform-detection'
 import { onHoverPreview, type HoverPreviewRequest } from '../plugins/compat/hover-link-bus'
@@ -37,6 +38,8 @@ export function HoverPreview() {
   const [content, setContent] = useState<string | null>(null)
   const [resolvedPath, setResolvedPath] = useState<string | null>(null)
   const [placement, setPlacement] = useState<PopoverPlacement | null>(null)
+  // Hidden or raw-YAML properties (app.json `propertiesInDocument`) leave the frontmatter to ViewMode
+  const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -160,7 +163,7 @@ export function HoverPreview() {
   const isMarkdown = (resolvedPath ?? '').toLowerCase().endsWith('.md')
   const selectedVault = appContext?.state.vaults.find((v) => v.id === vaultId)
   const hasWriteAccess = selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'
-  const propertiesEditable = !isTruncated && isMarkdown && resolvedPath !== null && apiClient !== null && vaultId !== null
+  const propertiesEditable = propertiesInDocument === 'visible' && !isTruncated && isMarkdown && resolvedPath !== null && apiClient !== null && vaultId !== null
 
   // When properties are shown as an editable block, strip the frontmatter from
   // the body so it is not rendered a second time by ViewMode's read-only table.

@@ -8,6 +8,7 @@
  *
  * @module components/settings/EditorFilesSection
  */
+import { useTranslation } from '../../i18n'
 import { useState } from 'react'
 import { useAppContext } from '../../state'
 import { extractErrorMessage } from '../../utils/error'
@@ -20,6 +21,8 @@ import {
   type AppConfigValues,
 } from '../../state/vaultAppConfigStore'
 import { SettingSection, SettingRow, Button } from './ui'
+import { vaultSpellcheckLanguage, withVaultSpellcheckLanguage } from '../../hooks/useSpellcheck'
+import { isSpellcheckLanguage } from '../../editor/spellcheck/protocol'
 import { buildAttachmentPath, parseAttachmentPath, type AttachmentMode } from './attachmentPath'
 
 const MODE_LABELS: Record<AttachmentMode, string> = {
@@ -97,6 +100,7 @@ function AttachmentSettings({ storedPath, disabled, saving, onSave }: {
 }
 
 export function EditorFilesSection() {
+  const { t } = useTranslation()
   const { state } = useAppContext()
   const vaultId = state.selectedVaultId
   const canWrite = state.vaults.find((vault) => vault.id === vaultId)?.permission !== 'read'
@@ -111,11 +115,15 @@ export function EditorFilesSection() {
   useAppConfigValue('defaultViewMode')
   const defaultViewMode = getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'preview'
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
+  const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const useTab = useAppConfigValue('useTab')
   const tabSize = useAppConfigValue('tabSize')
   const autoPairBrackets = useAppConfigValue('autoPairBrackets')
   const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
   const rightToLeft = useAppConfigValue('rightToLeft')
+  const smartIndentList = useAppConfigValue('smartIndentList')
+  const showIndentGuide = useAppConfigValue('showIndentGuide')
+  const spellcheckLanguages = useAppConfigValue('spellcheckLanguages')
   const foldHeading = useAppConfigValue('foldHeading')
   const foldIndent = useAppConfigValue('foldIndent')
   const newFileLocation = useAppConfigValue('newFileLocation')
@@ -193,6 +201,19 @@ export function EditorFilesSection() {
             <option value="source">Bearbeiten</option>
           </select>
         </SettingRow>
+        <SettingRow label={t('propertiesInDocument.label')} htmlFor="editor-properties-in-document" hint={t('propertiesInDocument.hint')}>
+          <select
+            id="editor-properties-in-document"
+            className="settings-field-input"
+            value={propertiesInDocument}
+            disabled={disabled}
+            onChange={(e) => void save({ propertiesInDocument: e.target.value as AppConfigValues['propertiesInDocument'] })}
+          >
+            <option value="visible">{t('propertiesInDocument.visible')}</option>
+            <option value="hidden">{t('propertiesInDocument.hidden')}</option>
+            <option value="source">{t('propertiesInDocument.source')}</option>
+          </select>
+        </SettingRow>
         <SettingRow label="Strikte Zeilenumbrüche" htmlFor="editor-strict-breaks" hint="Aus: ein einzelner Zeilenumbruch erscheint in der Leseansicht als Umbruch. An: er bleibt ein Leerzeichen, wie in CommonMark.">
           <input
             id="editor-strict-breaks"
@@ -201,6 +222,19 @@ export function EditorFilesSection() {
             disabled={disabled}
             onChange={(e) => void save({ strictLineBreaks: e.target.checked })}
           />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.spellcheckLanguage')} htmlFor="editor-spellcheck-language" hint={t('editorSettings.spellcheckLanguageHint')}>
+          <select
+            id="editor-spellcheck-language"
+            className="settings-field-input"
+            value={vaultSpellcheckLanguage(spellcheckLanguages) ?? ''}
+            disabled={disabled}
+            onChange={(e) => void save({ spellcheckLanguages: withVaultSpellcheckLanguage(spellcheckLanguages, isSpellcheckLanguage(e.target.value) ? e.target.value : null) })}
+          >
+            <option value="">{t('editorSettings.spellcheckPersonal')}</option>
+            <option value="de">Deutsch</option>
+            <option value="en">English</option>
+          </select>
         </SettingRow>
         <SettingRow label="Rechts-nach-links-Schrift" htmlFor="editor-rtl">
           <input
@@ -214,6 +248,24 @@ export function EditorFilesSection() {
       </SettingSection>
 
       <SettingSection title="Einrückung und Eingabe">
+        <SettingRow label={t('editorSettings.smartIndentList')} htmlFor="editor-smart-indent-list" hint={t('editorSettings.smartIndentListHint')}>
+          <input
+            id="editor-smart-indent-list"
+            type="checkbox"
+            checked={smartIndentList}
+            disabled={disabled}
+            onChange={(e) => void save({ smartIndentList: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.showIndentGuide')} htmlFor="editor-show-indent-guide" hint={t('editorSettings.showIndentGuideHint')}>
+          <input
+            id="editor-show-indent-guide"
+            type="checkbox"
+            checked={showIndentGuide}
+            disabled={disabled}
+            onChange={(e) => void save({ showIndentGuide: e.target.checked })}
+          />
+        </SettingRow>
         <SettingRow label="Mit Tabulator einrücken" htmlFor="editor-use-tab" hint="Aus: Leerzeichen, so viele wie die Tabulatorbreite.">
           <input
             id="editor-use-tab"

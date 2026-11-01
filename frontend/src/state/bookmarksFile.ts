@@ -6,11 +6,12 @@
  *   file with "#Heading"    ⇄ type 'heading'   { type: 'file', path, subpath: '#Heading', title? }
  *   file with "#^block"     ⇄ type 'block'     { type: 'file', path, subpath: '#^block', title? }
  *   search                  ⇄ type 'search'    { type: 'search', query, title? }
+ *   group                   ⇄ type 'group'     { type: 'group', title?, items: [...] }
  *
- * `title` is the entry's custom label. Everything else in the file — groups, folders, URLs, graphs,
- * unknown types and the fields Slatebase does not know — is kept exactly as it is and stays where it
- * was. Entries inside groups are not shown (the group is kept as a whole). A search bookmark's
- * case/regex switches have no counterpart in Obsidian's file and are kept as two extra fields.
+ * `title` is the entry's custom label (a group's name). Groups nest: an entry inside a group has the
+ * group's id as `parentId`. Everything else in the file — folders, URLs, graphs, unknown types and
+ * the fields Slatebase does not know — is kept exactly as it is and stays where it was. A search
+ * bookmark's case/regex switches have no counterpart in Obsidian's file and are kept as two extra fields.
  *
  * @module state/bookmarksFile
  */
@@ -27,7 +28,7 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 
 /** What a mappable item stands for, or null if Slatebase has no use for it (it stays untouched). */
 interface Parsed {
-  type: 'file' | 'heading' | 'block' | 'search'
+  type: 'file' | 'heading' | 'block' | 'search' | 'group'
   path: string
   heading?: string
   blockId?: string
@@ -38,6 +39,7 @@ interface Parsed {
 function parse(item: unknown): Parsed | null {
   if (!isObject(item)) return null
   const label = str(item['title'])
+  if (item['type'] === 'group') return { type: 'group', path: '', ...(label !== undefined ? { label } : {}) }
   if (item['type'] === 'search') {
     const query = str(item['query'])
     return query === undefined ? null : { type: 'search', path: '', searchQuery: query, ...(label !== undefined ? { label } : {}) }
@@ -67,18 +69,6 @@ function identity(parsed: Parsed): string {
   return [parsed.type, parsed.path, parsed.heading ?? '', parsed.blockId ?? '', parsed.searchQuery ?? '', parsed.label ?? ''].join('\0')
 }
 
-/** Ids for the items, derived from their content (plus a counter for identical ones), so they are the same after every load. */
-function idsFor(parsedItems: Array<Parsed | null>): Array<string | null> {
-  const seen = new Map<string, number>()
-  return parsedItems.map((parsed) => {
-    if (parsed === null) return null
-    const key = identity(parsed)
-    const count = (seen.get(key) ?? 0) + 1
-    seen.set(key, count)
-    return `bm-${hash(key)}-${count}`
-  })
-}
-
 export interface LoadedBookmarks {
   entries: FavoriteEntry[]
   /** The items as the file has them, for writing back. */
@@ -87,43 +77,104 @@ export interface LoadedBookmarks {
   rawById: Map<string, RawItem>
 }
 
-/** The bookmark entries of a vault from the file's `items`. Entries come in file order. */
+/**
+ * The bookmark entries of a vault from the file's `items`. Entries come in file order, a group before
+ * its content, and carry the id of the group they sit in as `parentId`. The ids are derived from the
+ * content (and the group an entry sits in), plus a counter for identical ones, so they are the same
+ * after every load.
+ */
 export function itemsToEntries(vaultId: string, items: unknown[]): LoadedBookmarks {
-  const parsedItems = items.map(parse)
-  const ids = idsFor(parsedItems)
   const entries: FavoriteEntry[] = []
   const rawById = new Map<string, RawItem>()
-  parsedItems.forEach((parsed, index) => {
-    const id = ids[index]
-    const raw = items[index]
-    if (parsed === null || id === null || id === undefined || !isObject(raw)) return
-    const ctime = typeof raw['ctime'] === 'number' ? raw['ctime'] : 0
-    entries.push({
-      id,
-      vaultId,
-      path: parsed.path,
-      addedAt: new Date(ctime).toISOString(),
-      order: entries.length,
-      type: parsed.type,
-      ...(parsed.label !== undefined ? { label: parsed.label } : {}),
-      ...(parsed.heading !== undefined ? { heading: parsed.heading } : {}),
-      ...(parsed.blockId !== undefined ? { blockId: parsed.blockId } : {}),
-      ...(parsed.searchQuery !== undefined ? {
-        searchQuery: parsed.searchQuery,
-        searchCaseSensitive: raw['searchCaseSensitive'] === true,
-        searchRegex: raw['searchRegex'] === true,
-      } : {}),
-    })
-    rawById.set(id, raw)
-  })
+  const seen = new Map<string, number>()
+
+  const walk = (list: unknown[], parentId: string | undefined): void => {
+    for (const raw of list) {
+      const parsed = parse(raw)
+      if (parsed === null || !isObject(raw)) continue
+      const key = `${parentId ?? ''}\0${identity(parsed)}`
+      const count = (seen.get(key) ?? 0) + 1
+      seen.set(key, count)
+      const id = `bm-${hash(key)}-${count}`
+      const ctime = typeof raw['ctime'] === 'number' ? raw['ctime'] : 0
+      entries.push({
+        id,
+        vaultId,
+        path: parsed.path,
+        addedAt: new Date(ctime).toISOString(),
+        order: entries.length,
+        type: parsed.type,
+        ...(parentId !== undefined ? { parentId } : {}),
+        ...(parsed.label !== undefined ? { label: parsed.label } : {}),
+        ...(parsed.heading !== undefined ? { heading: parsed.heading } : {}),
+        ...(parsed.blockId !== undefined ? { blockId: parsed.blockId } : {}),
+        ...(parsed.searchQuery !== undefined ? {
+          searchQuery: parsed.searchQuery,
+          searchCaseSensitive: raw['searchCaseSensitive'] === true,
+          searchRegex: raw['searchRegex'] === true,
+        } : {}),
+      })
+      rawById.set(id, raw)
+      if (parsed.type === 'group' && Array.isArray(raw['items'])) walk(raw['items'], id)
+    }
+  }
+  walk(items, undefined)
   return { entries, items: items as RawItem[], rawById }
+}
+
+/** What identifies an entry, apart from its id: type, target, label, and the group it sits in. */
+function entryKey(entry: FavoriteEntry, byId: Map<string, FavoriteEntry>, seen: Set<string> = new Set()): string {
+  const own = [entry.type ?? 'file', entry.path, entry.heading ?? '', entry.blockId ?? '', entry.searchQuery ?? '', entry.label ?? ''].join('\0')
+  const parent = entry.parentId !== undefined ? byId.get(entry.parentId) : undefined
+  if (parent === undefined || seen.has(entry.id)) return own
+  seen.add(entry.id)
+  return `${entryKey(parent, byId, seen)}\u0001${own}`
+}
+
+/**
+ * A fresh read of the file, with its raw items also reachable by the ids of `entries` (the cache's).
+ * Entries made in Slatebase have random ids while the same items read from the file have derived ones;
+ * matching them by what they are lets a write keep the unknown fields and the items inside a group
+ * that the file holds for them. `idMap` says which cache id each matched file entry has, for the entries
+ * of the file that sit inside a group (their `parentId` is a file id).
+ *
+ * Limit: an entry changed here since the last write (a renamed group) has a different key than its
+ * file item and is not matched.
+ */
+export function adoptEntryIds(fresh: LoadedBookmarks, entries: FavoriteEntry[]): { loaded: LoadedBookmarks; idMap: Map<string, string> } {
+  const freshById = new Map(fresh.entries.map((entry) => [entry.id, entry]))
+  const cacheIds = new Set(entries.map((entry) => entry.id))
+  const queues = new Map<string, FavoriteEntry[]>()
+  for (const entry of fresh.entries) {
+    if (cacheIds.has(entry.id)) continue // the same id in both: matched by that, not up for another entry
+    const key = entryKey(entry, freshById)
+    queues.set(key, [...(queues.get(key) ?? []), entry])
+  }
+  const byId = new Map(entries.map((entry) => [entry.id, entry]))
+  const rawById = new Map(fresh.rawById)
+  const idMap = new Map<string, string>()
+  for (const entry of [...entries].sort((a, b) => a.order - b.order)) {
+    if (rawById.has(entry.id)) continue
+    const match = queues.get(entryKey(entry, byId))?.shift()
+    const raw = match !== undefined ? fresh.rawById.get(match.id) : undefined
+    if (match !== undefined && raw !== undefined) {
+      rawById.set(entry.id, raw)
+      idMap.set(match.id, entry.id)
+    }
+  }
+  return { loaded: { entries: fresh.entries, items: fresh.items, rawById }, idMap }
 }
 
 /** The item for an entry, on top of the raw item it came from (if any) so unknown fields survive. */
 function entryToItem(entry: FavoriteEntry, raw: RawItem | undefined): RawItem {
   const type = entry.type ?? 'file'
   const item: RawItem = { ...(raw ?? {}) }
-  if (type === 'search') {
+  if (type === 'group') {
+    item['type'] = 'group'
+    delete item['path']
+    delete item['subpath']
+    delete item['query']
+  } else if (type === 'search') {
     item['type'] = 'search'
     item['query'] = entry.searchQuery ?? ''
     delete item['path']
@@ -146,23 +197,73 @@ function entryToItem(entry: FavoriteEntry, raw: RawItem | undefined): RawItem {
   return item
 }
 
+/** What to write: the new `items`, and the ids of the entries in them in the order `itemsToEntries` reads them back. */
+export interface BuiltItems {
+  items: RawItem[]
+  ids: string[]
+}
+
 /**
  * The `items` to write: the file's previous items, with the entries Slatebase shows replaced,
- * reordered, removed or added. Items it does not show keep their place; the entries take the places
- * of the ones they replace in their new order, new entries go to the end.
+ * reordered, removed or added. Items it does not show keep their place; the entries of a level take
+ * the places of the ones they replace in their new order, new entries go to the end of their group.
+ * A group keeps the items inside it that Slatebase does not show. An entry whose group no longer
+ * exists (or is not a group), and entries that hang in a loop of stored data, go to the top level.
  */
-export function entriesToItems(entries: FavoriteEntry[], previous: LoadedBookmarks): RawItem[] {
-  const queue = [...entries].sort((a, b) => a.order - b.order).map((entry) => entryToItem(entry, previous.rawById.get(entry.id)))
-  const shown = new Set(previous.rawById.values())
-  const result: RawItem[] = []
-  for (const item of previous.items) {
-    if (!shown.has(item)) {
-      result.push(item) // not ours: kept where it is
-      continue
-    }
-    const next = queue.shift()
-    if (next !== undefined) result.push(next)
+export function entriesToItems(entries: FavoriteEntry[], previous: LoadedBookmarks): BuiltItems {
+  const groups = new Set(entries.filter((entry) => (entry.type ?? 'file') === 'group').map((entry) => entry.id))
+  const children = new Map<string | undefined, FavoriteEntry[]>()
+  for (const entry of [...entries].sort((a, b) => a.order - b.order)) {
+    const parent = entry.parentId !== undefined && groups.has(entry.parentId) ? entry.parentId : undefined
+    const list = children.get(parent) ?? []
+    list.push(entry)
+    children.set(parent, list)
   }
-  result.push(...queue)
-  return result
+  const shown = new Set(previous.rawById.values())
+  const ids: string[] = []
+  const placed = new Set<string>()
+
+  // `source` is what the file had at this level (empty for a new group)
+  const build = (parentId: string | undefined, source: unknown[]): RawItem[] => {
+    const queue = [...(children.get(parentId) ?? [])]
+    const result: RawItem[] = []
+    const place = (entry: FavoriteEntry): void => {
+      if (placed.has(entry.id)) return
+      placed.add(entry.id)
+      ids.push(entry.id)
+      const raw = previous.rawById.get(entry.id)
+      const item = entryToItem(entry, raw)
+      if ((entry.type ?? 'file') === 'group') {
+        const inner = raw?.['items']
+        item['items'] = build(entry.id, Array.isArray(inner) ? inner : [])
+      }
+      result.push(item)
+    }
+    for (const item of source) {
+      if (!isObject(item) || !shown.has(item)) {
+        result.push(item as RawItem) // not ours: kept where it is
+        continue
+      }
+      const next = queue.shift()
+      if (next !== undefined) place(next)
+    }
+    for (const entry of queue) place(entry)
+    return result
+  }
+  const items = build(undefined, previous.items)
+  // Entries only a loop of stored data leads to are not reached from the top level; they go to its end
+  for (const entry of entries) {
+    if (placed.has(entry.id)) continue
+    const { parentId: _loop, ...top } = entry
+    const raw = previous.rawById.get(entry.id)
+    ids.push(entry.id)
+    placed.add(entry.id)
+    const item = entryToItem(top, raw)
+    if ((entry.type ?? 'file') === 'group') {
+      const inner = raw?.['items']
+      item['items'] = build(entry.id, Array.isArray(inner) ? inner : [])
+    }
+    items.push(item)
+  }
+  return { items, ids }
 }

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, createEvent, within } from '@testing-library/react'
 import { AuthProvider } from '../../state/authContext'
 import { AppProvider } from '../../state'
 import { SearchProvider } from '../../state/searchContext'
 import { createInitialState } from '../../state/panelState'
-import { favoritesStore, add, addHeadingBookmark, addBlockBookmark, addSearchBookmark, getForVault } from '../../state/favoritesStore'
+import { favoritesStore, add, addHeadingBookmark, addBlockBookmark, addSearchBookmark, addGroup, moveEntry, getForVault } from '../../state/favoritesStore'
 import { FavoritesView } from './FavoritesView'
 
 function renderView(props: Partial<Parameters<typeof FavoritesView>[0]> = {}) {
@@ -212,6 +212,176 @@ describe('FavoritesView', () => {
       fireEvent.drop(items[2]!, { dataTransfer })
 
       expect(getForVault('vault1').map((e) => e.path)).toEqual(['b.md', 'c.md', 'a'])
+    })
+  })
+  describe('groups', () => {
+    const idOf = (path: string) => getForVault('vault1').find((e) => e.path === path)!.id
+    const dataTransfer = () => ({ effectAllowed: '', dropEffect: '', setData: vi.fn(), getData: vi.fn() })
+    /** jsdom has no DragEvent, so the pointer position is put on the event by hand. */
+    const dragAt = (type: 'dragOver' | 'drop', el: Element, dt: ReturnType<typeof dataTransfer>, clientY: number) => {
+      const event = createEvent[type](el, { dataTransfer: dt })
+      Object.defineProperty(event, 'clientY', { value: clientY })
+      fireEvent(el, event)
+    }
+
+    it('shows the group toolbar button even without bookmarks, and creates a group in rename mode', () => {
+      renderView()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Neue Gruppe' }))
+
+      expect(getForVault('vault1')).toMatchObject([{ type: 'group', label: 'Neue Gruppe' }])
+      expect(screen.getByDisplayValue('Neue Gruppe')).toBeInTheDocument()
+    })
+
+    it('shows the entries of a group indented under it, and folds them on click', () => {
+      const g = addGroup('vault1', 'Work')!
+      add('vault1', 'in.md')
+      moveEntry('vault1', idOf('in.md'), g)
+      add('vault1', 'out.md')
+      renderView()
+
+      expect(screen.getByText('in')).toBeInTheDocument()
+      const groupButton = screen.getByText('Work').closest('button')!
+      expect(groupButton).toHaveAttribute('aria-expanded', 'true')
+
+      fireEvent.click(groupButton)
+
+      expect(screen.queryByText('in')).not.toBeInTheDocument()
+      expect(screen.getByText('out')).toBeInTheDocument()
+      expect(groupButton).toHaveAttribute('aria-expanded', 'false')
+      fireEvent.click(groupButton)
+      expect(screen.getByText('in')).toBeInTheDocument()
+    })
+
+    it('does not open anything when a group is clicked', () => {
+      addGroup('vault1', 'Work')
+      const { onOpenFile } = renderView()
+      fireEvent.click(screen.getByText('Work'))
+      expect(onOpenFile).not.toHaveBeenCalled()
+    })
+
+    it('moves an entry into a group from its context menu, and back out', () => {
+      addGroup('vault1', 'Work')
+      add('vault1', 'a.md')
+      renderView()
+
+      fireEvent.contextMenu(screen.getByText('a'))
+      fireEvent.click(screen.getByText('Verschieben nach „Work“'))
+      expect(getForVault('vault1').find((e) => e.path === 'a.md')?.parentId).toBe(getForVault('vault1')[0]!.id)
+
+      fireEvent.contextMenu(screen.getByText('a'))
+      expect(screen.queryByText('Verschieben nach „Work“')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByText('Aus Gruppe herausnehmen'))
+      expect(getForVault('vault1').find((e) => e.path === 'a.md')?.parentId).toBeUndefined()
+    })
+
+    it('offers a group no move into itself or into its own content', () => {
+      const outer = addGroup('vault1', 'Outer')!
+      addGroup('vault1', 'Inner', outer)
+      addGroup('vault1', 'Other')
+      renderView()
+
+      fireEvent.contextMenu(screen.getByText('Outer'))
+
+      expect(screen.getByText('Verschieben nach „Other“')).toBeInTheDocument()
+      expect(screen.queryByText('Verschieben nach „Inner“')).not.toBeInTheDocument()
+      expect(screen.queryByText('Verschieben nach „Outer“')).not.toBeInTheDocument()
+    })
+
+    it('creates a subgroup from the context menu of a group', () => {
+      addGroup('vault1', 'Work')
+      renderView()
+
+      fireEvent.contextMenu(screen.getByText('Work'))
+      fireEvent.click(screen.getByText('Neue Untergruppe'))
+
+      const [work, sub] = getForVault('vault1')
+      expect(sub).toMatchObject({ type: 'group', parentId: work!.id })
+    })
+
+    it('moves a dragged entry into a group when dropped on the lower part of it', () => {
+      addGroup('vault1', 'Work')
+      add('vault1', 'a.md')
+      renderView()
+      const items = screen.getAllByRole('listitem')
+      const dt = dataTransfer()
+      items[0]!.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 100, width: 100, x: 0, y: 0, toJSON: () => ({}) })
+
+      fireEvent.dragStart(within(items[1]!).getByText('a'), { dataTransfer: dt })
+      dragAt('dragOver', items[0]!, dt, 15)
+      dragAt('drop', items[0]!, dt, 15)
+
+      expect(getForVault('vault1').find((e) => e.path === 'a.md')?.parentId).toBe(getForVault('vault1')[0]!.id)
+    })
+
+    it('puts a dragged entry before a group when dropped on the upper part of it', () => {
+      const g = addGroup('vault1', 'Work')!
+      add('vault1', 'a.md')
+      moveEntry('vault1', idOf('a.md'), g)
+      add('vault1', 'b.md')
+      renderView()
+      const items = screen.getAllByRole('listitem') // Work, a (inside), b
+      const dt = dataTransfer()
+      items[0]!.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 100, width: 100, x: 0, y: 0, toJSON: () => ({}) })
+
+      fireEvent.dragStart(within(items[2]!).getByText('b'), { dataTransfer: dt })
+      dragAt('dragOver', items[0]!, dt, 2)
+      dragAt('drop', items[0]!, dt, 2)
+
+      expect(getForVault('vault1').filter((e) => e.parentId === undefined).map((e) => e.path || e.label)).toEqual(['b.md', 'Work'])
+    })
+
+    it('deletes an empty group at once, and asks before deleting one with content', () => {
+      const empty = addGroup('vault1', 'Empty')!
+      const full = addGroup('vault1', 'Full')!
+      add('vault1', 'a.md')
+      moveEntry('vault1', idOf('a.md'), full)
+      renderView()
+
+      fireEvent.contextMenu(screen.getByText('Empty'))
+      fireEvent.click(screen.getByText('Gruppe löschen'))
+      expect(getForVault('vault1').some((e) => e.id === empty)).toBe(false)
+
+      fireEvent.contextMenu(screen.getByText('Full'))
+      fireEvent.click(screen.getByText('Gruppe löschen'))
+      expect(getForVault('vault1').some((e) => e.id === full)).toBe(true) // asks first
+      expect(screen.getByText(/enthält Lesezeichen/)).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+      expect(getForVault('vault1')).toHaveLength(0)
+    })
+
+    it('opens a folded group when an entry is dropped into it', () => {
+      const g = addGroup('vault1', 'Work')!
+      add('vault1', 'in.md')
+      moveEntry('vault1', idOf('in.md'), g)
+      add('vault1', 'a.md')
+      renderView()
+      fireEvent.click(screen.getByText('Work')) // fold
+      expect(screen.queryByText('in')).not.toBeInTheDocument()
+      const items = screen.getAllByRole('listitem') // Work, a
+      const dt = dataTransfer()
+      items[0]!.getBoundingClientRect = () => ({ top: 0, height: 20, bottom: 20, left: 0, right: 100, width: 100, x: 0, y: 0, toJSON: () => ({}) })
+
+      fireEvent.dragStart(within(items[1]!).getByText('a'), { dataTransfer: dt })
+      dragAt('dragOver', items[0]!, dt, 15)
+      dragAt('drop', items[0]!, dt, 15)
+
+      expect(screen.getByText('a')).toBeInTheDocument()
+      expect(screen.getByText('Work').closest('button')).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('renames a group', () => {
+      const g = addGroup('vault1', 'Old')!
+      renderView()
+
+      fireEvent.contextMenu(screen.getByText('Old'))
+      fireEvent.click(screen.getByText('Umbenennen'))
+      const input = screen.getByDisplayValue('Old')
+      fireEvent.change(input, { target: { value: 'Renamed' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(getForVault('vault1').find((e) => e.id === g)?.label).toBe('Renamed')
     })
   })
 })

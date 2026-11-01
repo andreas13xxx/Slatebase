@@ -37,6 +37,7 @@ import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
 import { useAppConfigValue } from '../state/vaultAppConfigStore'
+import { applyPropertiesInDocument } from './viewModeProperties'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -228,9 +229,11 @@ function createSafePipeline(content: string, strictLineBreaks = false): Root {
 export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, sourcePath }: ViewModeProps) {
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
   const rightToLeft = useAppConfigValue('rightToLeft')
+  const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const rendered = useMemo(() => {
     try {
       const tree = createSafePipeline(content, strictLineBreaks)
+      applyPropertiesInDocument(tree, propertiesInDocument)
       const anchorTracker = createAnchorTracker()
 
       return renderRoot(tree, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, anchorTracker)
@@ -238,7 +241,7 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
       // Req 5.7: Invalid/unparsable syntax rendered as plain text without crashing
       return createElement('pre', { className: 'view-mode-fallback' }, content)
     }
-  }, [content, strictLineBreaks, vaultId, directoryTree, onInternalLinkClick, onTagClick, token])
+  }, [content, strictLineBreaks, propertiesInDocument, vaultId, directoryTree, onInternalLinkClick, onTagClick, token])
 
   // After DOM render, run registered code block processors (Dataview, Tasks, etc.)
   // Uses a unique data attribute to find the container after mount.

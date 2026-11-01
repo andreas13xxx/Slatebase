@@ -34,7 +34,7 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - [x] 4.1 `newFileLocation`/`newFileFolderPath`
   - [x] 4.2 `defaultViewMode` (Abweichung: fehlender Schlüssel = Leseansicht, nicht Obsidians `source`)
   - [x] 4.3 `strictLineBreaks`
-  - [ ] 4.4 `showFrontmatter`/`propertiesInDocument` (offen: bleiben gespeichert)
+  - [x] 4.4 `propertiesInDocument` (Editor, Leseansicht, Hover-Vorschau, Kontextmenü, Befehl, Einstellung); `showFrontmatter` ist veraltet und bleibt gespeichert
   - [x] 4.5 `foldHeading`/`foldIndent`
   - [x] 4.6 `alwaysUpdateLinks` abschaltbar (Routen, Shim, Tests); `getConfig("updateInternalLinks")` folgt dem Wert
   - _Requirements: 6.1–6.6, 6.13, 7.3_
@@ -90,7 +90,7 @@ Spec zuerst. Pro Phase: Review (tsc, lint, neue und direkt betroffene Tests, Dif
   - [x] 12.4 Migration der Workspaces pro User (die Liste in `vaultSettings` wird geleert; das Feld bleibt im Backend-Schema)
   - _Requirements: 12_
 
-- [x] 13. Lesezeichen (Teilumfang: Gruppen werden erhalten, aber nicht angezeigt oder angelegt; Pfadnachführung bleibt im Client)
+- [x] 13. Lesezeichen (Gruppen anlegen, verschachteln, falten, verschieben, löschen; Pfadnachführung bleibt im Client)
   - [x] 13.1 Eintragsformate belegen (Task 0, echte Datei mit Einträgen)
   - [x] 13.2 Service und Route, Baum aus Gruppen, Limit aufheben
   - [x] 13.3 `favoritesStore` auf Baum und Datei umstellen, Gruppen-UI, Pfadnachführung serverseitig

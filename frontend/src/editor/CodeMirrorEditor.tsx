@@ -53,6 +53,7 @@ import { codeFolding } from '@codemirror/language'
 import { markdownFoldService } from './folding'
 import { isEmbeddableFile } from '../utils/internalLink'
 import { showToast } from '../components/ToastNotification'
+import { useTranslation } from '../i18n'
 import './live-preview/live-preview.css'
 
 /** MIME types accepted for clipboard-paste upload (screenshots and PDF files). */
@@ -143,6 +144,12 @@ export function CodeMirrorEditor({
   const viewRef = useRef<EditorView | null>(null)
   const prevTabIdRef = useRef<string>(tabId)
   const onContentChangeRef = useRef(onContentChange)
+  // The context menu's label for the properties entry, in the current language
+  const { t } = useTranslation()
+  const propertiesLabelRef = useRef(t('propertiesInDocument.menuItem'))
+  useEffect(() => {
+    propertiesLabelRef.current = t('propertiesInDocument.menuItem')
+  }, [t])
   // Read by the mount-effect's contextmenu listener, which only re-runs on
   // tabId change — without this ref, toggling line numbers would leave the
   // context menu's checkbox showing the state from whenever the tab was
@@ -177,9 +184,11 @@ export function CodeMirrorEditor({
   const autoPairBrackets = useAppConfigValue('autoPairBrackets')
   const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
   const rightToLeft = useAppConfigValue('rightToLeft')
+  const smartIndentList = useAppConfigValue('smartIndentList')
+  const showIndentGuide = useAppConfigValue('showIndentGuide')
   const editorPrefs = useMemo<EditorPrefs>(
-    () => ({ tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft }),
-    [tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft],
+    () => ({ tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft, smartIndentList, showIndentGuide }),
+    [tabSize, useTab, autoPairBrackets, autoPairMarkdown, rightToLeft, smartIndentList, showIndentGuide],
   )
 
   // Keep onContentChange ref up to date without recreating extensions
@@ -263,7 +272,7 @@ export function CodeMirrorEditor({
         suggestions,
         enabled: spellcheckRef.current,
         language: spellcheckLanguageRef.current,
-      })
+      }, propertiesLabelRef.current)
 
     setContextMenu({ x, y, items: buildItems(misspelled ? null : []) })
     if (!misspelled) return
@@ -437,7 +446,8 @@ export function CodeMirrorEditor({
       // own search/replace panel.
       keymap.of([
         { key: 'Mod-d', run: selectNextOccurrence, preventDefault: true },
-        ...defaultKeymap,
+        // Mod-i is Obsidian's key for italic (editor:toggle-italics), not "select parent syntax"
+        ...defaultKeymap.filter((binding) => binding.key !== 'Mod-i'),
         ...historyKeymap,
         indentWithTab,
       ]),

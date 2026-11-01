@@ -17,7 +17,7 @@
 
 import { MAX_BOOKMARK_ITEMS } from '@slatebase/shared-contracts'
 import type { IApiClient, FavoriteEntry as ApiFavoriteEntry } from '../api'
-import { entriesToItems, itemsToEntries, type LoadedBookmarks } from './bookmarksFile'
+import { adoptEntryIds, entriesToItems, itemsToEntries, type LoadedBookmarks } from './bookmarksFile'
 import {
   reportSyncFailure,
   reportSyncSuccess,
@@ -26,20 +26,22 @@ import {
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
 /** Discriminates what a bookmark points at. Absent means 'file' (legacy entries). */
-export type BookmarkType = 'file' | 'heading' | 'block' | 'search'
+export type BookmarkType = 'file' | 'heading' | 'block' | 'search' | 'group'
 
 /** A single favorite (bookmark) entry. */
 export interface FavoriteEntry {
   /** Unique per entry. Primary key for reorder/rename/removal of non-file bookmarks. */
   id: string
   vaultId: string
-  /** Empty string for type='search' (no file target). */
+  /** Empty string for type='search' and type='group' (no file target). */
   path: string
   addedAt: string // ISO 8601
   /** Ascending sort position — determines display order (ties broken by insertion order). */
   order: number
-  /** Optional user-chosen display name overriding the filename/default label. */
+  /** Optional user-chosen display name overriding the filename/default label; a group's name. */
   label?: string
+  /** The id of the group (type='group') this entry sits in. Absent for entries on the top level. */
+  parentId?: string
   /** Defaults to 'file' when absent (legacy entries and the plain add()/remove() API). */
   type?: BookmarkType
   /** Only for type='heading': the heading text. */
@@ -80,6 +82,15 @@ export interface IFavoritesStore {
   addBlockBookmark(vaultId: string, path: string, blockId: string): void
   /** Add a bookmark for a saved search query. */
   addSearchBookmark(vaultId: string, query: string, caseSensitive: boolean, regex: boolean): void
+  /** Add a group (inside another group if `parentId` is given) and return its id; null if the cap is reached. */
+  addGroup(vaultId: string, name: string, parentId?: string): string | null
+  /**
+   * Move an entry into a group (`parentId`) or to the top level (null), at `index` among the
+   * entries there (end if absent). A group cannot go into itself or into its own content.
+   */
+  moveEntry(vaultId: string, id: string, parentId: string | null, index?: number): void
+  /** How many items sit in a group, including the ones Slatebase does not show (they go with the group). */
+  groupContentCount(vaultId: string, groupId: string): number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -100,6 +111,7 @@ interface RawFavoriteEntry {
   addedAt?: unknown
   order?: unknown
   label?: unknown
+  parentId?: unknown
   type?: unknown
   heading?: unknown
   blockId?: unknown
@@ -245,6 +257,7 @@ function migrateEntries(entries: RawFavoriteEntry[]): { migrated: FavoriteEntry[
       addedAt: e.addedAt as string,
       order: typeof e.order === 'number' ? e.order : index,
       label: typeof e.label === 'string' ? e.label : undefined,
+      parentId: typeof e.parentId === 'string' ? e.parentId : undefined,
       type: isBookmarkType(e.type) ? e.type : undefined,
       heading: typeof e.heading === 'string' ? e.heading : undefined,
       blockId: typeof e.blockId === 'string' ? e.blockId : undefined,
@@ -258,7 +271,7 @@ function migrateEntries(entries: RawFavoriteEntry[]): { migrated: FavoriteEntry[
 }
 
 function isBookmarkType(value: unknown): value is BookmarkType {
-  return value === 'file' || value === 'heading' || value === 'block' || value === 'search'
+  return value === 'file' || value === 'heading' || value === 'block' || value === 'search' || value === 'group'
 }
 
 /** Read favorites for a vault from storage, migrating legacy entries as needed. */
@@ -360,24 +373,31 @@ async function syncToServer(): Promise<void> {
           const known = new Set([...previous.entries, ...written].map((entry) => entry.id))
           const added = fresh.entries.filter((entry) => !known.has(entry.id))
           addedElsewhere = added.length
-          written = [...written, ...added.map((entry, index) => ({ ...entry, order: written.length + index }))]
-          previous = fresh
+          // The file's raw items also under the ids this device uses for the same entries
+          const adopted = adoptEntryIds(fresh, written)
+          previous = adopted.loaded
+          // An entry added in a group made here sits in it under the group's id here, not the file's
+          written = [...written, ...added.map((entry, index) => ({
+            ...entry,
+            ...(entry.parentId !== undefined ? { parentId: adopted.idMap.get(entry.parentId) ?? entry.parentId } : {}),
+            order: written.length + index,
+          }))]
         }
       } catch {
         // Unknown, not gone: write from what this device has, as before
       }
-      const items = entriesToItems(written, previous)
+      const { items, ids } = entriesToItems(written, previous)
       try {
         const saved = await client.patchBookmarksConfig(vaultId, { items })
         const savedItems = Array.isArray(saved['items']) ? saved['items'] : items
         // What is in the file now, with the ids the cache already has for the entries that were written
-        // (they were written in `order`, so they line up with the entries read back).
+        // (`ids` lists them in the order they are read back in, so they line up with the entries read back).
         const fresh = itemsToEntries(vaultId, savedItems)
         const rawById = new Map<string, Record<string, unknown>>()
-        written.forEach((entry, index) => {
+        ids.forEach((id, index) => {
           const freshEntry = fresh.entries[index]
           const raw = freshEntry ? fresh.rawById.get(freshEntry.id) : undefined
-          if (raw !== undefined) rawById.set(entry.id, raw)
+          if (raw !== undefined) rawById.set(id, raw)
         })
         loadedFiles.set(vaultId, { entries: fresh.entries, items: fresh.items, rawById })
         if (takeoverPending.delete(vaultId)) markTakenOver(vaultId)
@@ -538,6 +558,7 @@ export function isFavorite(vaultId: string, path: string): boolean {
  * underlying file is renamed or moved. If no entry references the old path, does nothing.
  */
 export function updatePath(vaultId: string, oldPath: string, newPath: string): void {
+  if (oldPath === '') return // groups and searches have no file; an empty path is no file either
   const entries = loadFavorites(vaultId)
   let changed = false
   for (const entry of entries) {
@@ -555,6 +576,7 @@ export function updatePath(vaultId: string, oldPath: string, newPath: string): v
  * Remove every entry (any bookmark type) referencing this path when the file is deleted.
  */
 export function removeByPath(vaultId: string, path: string): void {
+  if (path === '') return // groups and searches have no file; an empty path is no file either
   const entries = loadFavorites(vaultId)
   const filtered = entries.filter(e => e.path !== path)
   if (filtered.length !== entries.length) {
@@ -581,6 +603,112 @@ export function reorder(vaultId: string, id: string, newIndex: number): void {
 }
 
 /**
+ * The entries by the group they sit in (null: the top level), each list in display order. An entry
+ * whose group is gone counts as top level.
+ */
+export function groupByParent(sorted: FavoriteEntry[]): Map<string | null, FavoriteEntry[]> {
+  const known = new Set(sorted.map((e) => e.id))
+  const byParent = new Map<string | null, FavoriteEntry[]>()
+  for (const entry of sorted) {
+    const parent = entry.parentId !== undefined && known.has(entry.parentId) ? entry.parentId : null
+    const list = byParent.get(parent) ?? []
+    list.push(entry)
+    byParent.set(parent, list)
+  }
+  return byParent
+}
+
+/** `id` and everything that sits inside it, at any depth. */
+export function withDescendants(byParent: Map<string | null, FavoriteEntry[]>, id: string): Set<string> {
+  const result = new Set<string>([id])
+  const queue = [id]
+  while (queue.length > 0) {
+    for (const child of byParent.get(queue.pop()!) ?? []) {
+      if (result.has(child.id)) continue // a loop in stored data
+      result.add(child.id)
+      queue.push(child.id)
+    }
+  }
+  return result
+}
+
+/**
+ * Move an entry into a group or to the top level, at a position among the entries there.
+ * No-op for an unknown id or group, and for a group that would end up inside itself.
+ */
+export function moveEntry(vaultId: string, id: string, parentId: string | null, index?: number): void {
+  const sorted = getForVault(vaultId)
+  const moved = sorted.find((e) => e.id === id)
+  if (!moved) return
+  const before = groupByParent(sorted)
+  if (parentId !== null) {
+    const target = sorted.find((e) => e.id === parentId)
+    if (!target || (target.type ?? 'file') !== 'group' || withDescendants(before, id).has(parentId)) return
+  }
+  // The moved entry leaves its place and goes in at the wanted one among the entries of its new group
+  const rest = sorted.filter((e) => e.id !== id)
+  const { parentId: _old, ...movedWithoutParent } = moved
+  const relocated: FavoriteEntry = parentId !== null ? { ...movedWithoutParent, parentId } : movedWithoutParent
+  const byParent = groupByParent([...rest, relocated])
+  const siblings = (byParent.get(parentId) ?? []).filter((e) => e.id !== id)
+  siblings.splice(Math.max(0, Math.min(index ?? siblings.length, siblings.length)), 0, relocated)
+  byParent.set(parentId, siblings)
+
+  // Rebuild the list depth-first so the global `order` keeps every level in its order
+  const result: FavoriteEntry[] = []
+  const emitted = new Set<string>()
+  const emit = (parent: string | null): void => {
+    for (const entry of byParent.get(parent) ?? []) {
+      if (emitted.has(entry.id)) continue
+      emitted.add(entry.id)
+      result.push({ ...entry, order: result.length })
+      emit(entry.id)
+    }
+  }
+  emit(null)
+  // Entries that hang in a loop of stored data cannot be reached from the top level; they are kept, at the end
+  for (const entry of rest) {
+    if (!emitted.has(entry.id)) {
+      const { parentId: _loop, ...top } = entry
+      result.push({ ...top, order: result.length })
+    }
+  }
+  saveFavorites(vaultId, result)
+}
+
+/**
+ * How many items sit in a group, counting the ones Slatebase does not show (folders, URLs, graphs of
+ * a group made in Obsidian): deleting the group deletes them too, so this is what to ask about.
+ */
+export function groupContentCount(vaultId: string, groupId: string): number {
+  const entries = loadFavorites(vaultId)
+  const shown = entries.filter((e) => e.parentId === groupId).length
+  const rawItems = loadedFiles.get(vaultId)?.rawById.get(groupId)?.['items']
+  return Math.max(shown, Array.isArray(rawItems) ? rawItems.length : 0)
+}
+
+/** Add a group; returns its id, or null if the cap is reached (or the parent is not a group). */
+export function addGroup(vaultId: string, name: string, parentId?: string): string | null {
+  const entries = loadFavorites(vaultId)
+  if (entries.length >= MAX_FAVORITES_PER_VAULT) return null
+  if (parentId !== undefined && !entries.some((e) => e.id === parentId && e.type === 'group')) return null
+  const trimmed = name.trim().slice(0, MAX_LABEL_LENGTH)
+  const id = generateId()
+  entries.push({
+    id,
+    vaultId,
+    path: '',
+    addedAt: new Date().toISOString(),
+    order: nextOrder(entries),
+    type: 'group',
+    ...(trimmed !== '' ? { label: trimmed } : {}),
+    ...(parentId !== undefined ? { parentId } : {}),
+  })
+  saveFavorites(vaultId, entries)
+  return id
+}
+
+/**
  * Set (non-empty, trimmed, max 100 chars) or clear (null/empty/whitespace-only) an entry's label.
  * No-op if the id does not exist.
  */
@@ -603,7 +731,9 @@ export function setLabel(vaultId: string, id: string, label: string | null): voi
  */
 export function removeById(vaultId: string, id: string): void {
   const entries = loadFavorites(vaultId)
-  const filtered = entries.filter(e => e.id !== id)
+  // A group takes everything inside it along (also in nested groups)
+  const doomed = withDescendants(groupByParent(entries), id)
+  const filtered = entries.filter(e => !doomed.has(e.id))
   if (filtered.length !== entries.length) {
     saveFavorites(vaultId, filtered)
   }
@@ -659,4 +789,7 @@ export const favoritesStore: IFavoritesStore = {
   addHeadingBookmark,
   addBlockBookmark,
   addSearchBookmark,
+  addGroup,
+  moveEntry,
+  groupContentCount,
 }

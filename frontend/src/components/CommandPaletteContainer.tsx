@@ -44,6 +44,7 @@ import { getDictationController } from '../editor/dictation/dictation-controller
 import { getTranscriptionLanguage, getSaveAudioAttachment } from '../hooks/useTranscriptionLanguage'
 import { useRegistryHotkeys } from '../hooks/useRegistryHotkeys'
 import { toggleToolbarVisible } from '../state/toolbarStore'
+import { togglePropertiesInDocument } from '../hooks/propertiesInDocument'
 
 /**
  * Obsidian core-command IDs (from core-commands.ts / core-commands-app.ts) that do
@@ -1153,6 +1154,13 @@ export function CommandPaletteContainer({
         id: 'slatebase:editor-toggle-line-numbers',
         name: 'Editor: Zeilennummern umschalten',
         callback: dispatch('toggleLineNumbers'),
+        pluginId: 'slatebase',
+      })
+
+      commands.push({
+        id: 'slatebase:editor-toggle-properties',
+        name: t('propertiesInDocument.command'),
+        callback: () => togglePropertiesInDocument(),
         pluginId: 'slatebase',
       })
 

@@ -101,6 +101,37 @@ describe('EditorFilesSection', () => {
     await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { foldHeading: false }))
   })
 
+  it('shows and saves how the properties appear in the document', async () => {
+    const client = createClient({ propertiesInDocument: 'hidden' })
+    await renderSection(client)
+    const select = screen.getByLabelText('Eigenschaften im Dokument')
+
+    expect(select).toHaveValue('hidden')
+    fireEvent.change(select, { target: { value: 'source' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { propertiesInDocument: 'source' }))
+  })
+
+  it('shows the properties as visible when the file does not say', async () => {
+    await renderSection(createClient())
+    expect(screen.getByLabelText('Eigenschaften im Dokument')).toHaveValue('visible')
+  })
+
+  it('saves list continuation, indent guides and the vault spellcheck language', async () => {
+    const client = createClient({ smartIndentList: false, spellcheckLanguages: ['fr', 'en-US'] })
+    await renderSection(client)
+
+    expect(screen.getByLabelText('Listen beim Zeilenumbruch fortsetzen')).not.toBeChecked()
+    expect(screen.getByLabelText('Einrückungslinien')).toBeChecked() // Obsidian's default
+    expect(screen.getByLabelText('Sprache der Rechtschreibprüfung')).toHaveValue('en')
+
+    fireEvent.click(screen.getByLabelText('Einrückungslinien'))
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { showIndentGuide: false }))
+    fireEvent.change(screen.getByLabelText('Sprache der Rechtschreibprüfung'), { target: { value: 'de' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { spellcheckLanguages: ['fr', 'de'] }))
+    fireEvent.change(screen.getByLabelText('Sprache der Rechtschreibprüfung'), { target: { value: '' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { spellcheckLanguages: ['fr'] }))
+  })
+
   it('saves a valid tab width on blur and puts back an invalid one', async () => {
     const client = createClient()
     await renderSection(client)
