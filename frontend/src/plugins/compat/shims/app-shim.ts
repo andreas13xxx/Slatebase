@@ -20,8 +20,8 @@ import { createEmbedRegistryShim } from '../embed-registry';
 import { resolveActiveTheme } from '../body-classes';
 import { getRegisteredExtensionTypeMap } from '../file-view-registry';
 import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
-import { fromFileCommandId, hotkeyToShortcut, shortcutsToFileValue, toFileCommandId, type HotkeyModifier } from '@slatebase/shared-contracts';
-import { getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
+import { fromFileCommandId, hotkeyToShortcut, isHotkey, shortcutsToFileValue, toFileCommandId } from '@slatebase/shared-contracts';
+import { getFileBinding, getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -86,31 +86,49 @@ export function createHotkeyManager(commandRegistry: ICommandRegistry | undefine
     }
     return out
   }
-  const getCustomKeys = (): Record<string, Hotkey[]> => {
-    const out: Record<string, Hotkey[]> = {}
-    for (const [commandId, shortcuts] of getFileBindings()) {
-      out[toFileCommandId(commandId)] = shortcutsToFileValue(shortcuts) as Hotkey[]
-    }
-    return out
+  const getCustom = (commandId: string): Hotkey[] | undefined => {
+    const shortcuts = getFileBinding(fromFileCommandId(commandId))
+    return shortcuts ? (shortcutsToFileValue(shortcuts) as Hotkey[]) : undefined
   }
-  return {
-    get customKeys(): Record<string, Hotkey[]> {
-      return getCustomKeys()
+  const setHotkeys = (commandId: string, hotkeys: Hotkey[]): void => {
+    // Anything the file could not hold is refused, not half-applied (a plugin may send any shape).
+    if (!Array.isArray(hotkeys) || !hotkeys.every(isHotkey)) {
+      warnNoOp('hotkeyManager', 'setHotkeys', `Hotkeys for "${commandId}" were not valid and were not saved.`)
+      return
+    }
+    setShortcuts(fromFileCommandId(commandId), hotkeys.map((h) => hotkeyToShortcut(h)))
+  }
+  const removeHotkeys = (commandId: string): void => {
+    resetShortcut(fromFileCommandId(commandId))
+  }
+  // A live view of the file, not a copy: writes and deletes (a plugin migrating command IDs does
+  // `customKeys[new] = customKeys[old]; delete customKeys[old]`) go to the file.
+  const customKeys = new Proxy(Object.create(null) as Record<string, Hotkey[]>, {
+    get: (_target, key) => (typeof key === 'string' ? getCustom(key) : undefined),
+    has: (_target, key) => typeof key === 'string' && getCustom(key) !== undefined,
+    set: (_target, key, value) => {
+      if (typeof key === 'string') setHotkeys(key, value as Hotkey[])
+      return true
     },
+    deleteProperty: (_target, key) => {
+      if (typeof key === 'string') removeHotkeys(key)
+      return true
+    },
+    ownKeys: () => getFileBindings().map(([commandId]) => toFileCommandId(commandId)),
+    getOwnPropertyDescriptor: (_target, key) =>
+      typeof key === 'string' && getCustom(key) !== undefined
+        ? { value: getCustom(key), writable: true, enumerable: true, configurable: true }
+        : undefined,
+  })
+  return {
+    customKeys,
     get defaultKeys(): Record<string, Hotkey[]> {
       return getDefaultKeys()
     },
-    getHotkeys: (commandId: string): Hotkey[] | undefined => getCustomKeys()[commandId] ?? getDefaultKeys()[commandId],
+    getHotkeys: (commandId: string): Hotkey[] | undefined => getCustom(commandId) ?? getDefaultKeys()[commandId],
     getDefaultHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
-    setHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
-      setShortcuts(
-        fromFileCommandId(commandId),
-        hotkeys.filter((h) => h.key).map((h) => hotkeyToShortcut({ modifiers: h.modifiers as HotkeyModifier[], key: h.key })),
-      )
-    },
-    removeHotkeys: (commandId: string): void => {
-      resetShortcut(fromFileCommandId(commandId))
-    },
+    setHotkeys,
+    removeHotkeys,
     addDefaultHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
       for (const hk of hotkeys) commandRegistry?.registerHotkey(commandId, hk)
     },
@@ -416,9 +434,8 @@ export class AppShim implements IAppShim {
    * hotkeyManager — Obsidian-internal hotkey manager (undocumented but widely used
    * by plugins, e.g. Excalidraw's `addDefaultHotkeys`, editing-toolbar's
    * `customKeys[id]` lookups during startup command-ID migration).
-   * `customKeys` holds user-configured overrides — always empty here since Slatebase
-   * has no hotkey-customization UI yet, but it must exist as an object or plugins
-   * that index into it directly (`customKeys[id]`) crash on `undefined[id]`.
+   * `customKeys` is a live view of the vault's `.obsidian/hotkeys.json`: reads, writes and
+   * deletes go to the file (see createHotkeyManager).
    * `defaultKeys` and `addDefaultHotkeys` are backed by the shared CommandRegistry.
    */
   readonly hotkeyManager: HotkeyManagerShim

@@ -13,6 +13,7 @@
 
 import type { IApiClient } from '../api'
 import {
+  MAX_HOTKEYS_PER_COMMAND,
   isValidHotkeyCommandId,
   readHotkeys,
   shortcutToHotkey,
@@ -261,10 +262,22 @@ export function getShortcut(commandId: string): string {
 /**
  * Bind a command to exactly these shortcuts. Pass an empty list to explicitly unbind.
  */
-export function setShortcuts(commandId: string, shortcuts: string[]): void {
+export function setShortcuts(commandId: string, shortcuts: string[]): boolean {
+  // What the file's API would refuse must not get into the queue: one bad entry would hold back every
+  // other change (a plugin's rebind call can send anything).
+  if (!isValidHotkeyCommandId(toFileCommandId(commandId)) || shortcuts.length > MAX_HOTKEYS_PER_COMMAND) {
+    console.warn(`[keybindings] Ignored bindings for "${String(commandId).slice(0, 80)}": not a usable command ID or too many shortcuts`)
+    return false
+  }
   const list = shortcuts.filter(s => shortcutToHotkey(s) !== null)
   bindings.set(commandId, list)
   queueWrite(commandId, shortcutsToFileValue(list))
+  return true
+}
+
+/** The shortcuts the vault's file sets for a command (`[]` = unbound), or undefined if it does not name it. */
+export function getFileBinding(commandId: string): string[] | undefined {
+  return bindings.get(commandId)
 }
 
 /**
@@ -420,7 +433,10 @@ export function findConflict(shortcut: string, excludeCommandId: string): string
 
 function queueWrite(commandId: string, value: Hotkey[] | null): void {
   const vaultId = currentVaultId
-  if (!vaultId) return
+  if (!vaultId) {
+    console.warn('[keybindings] No vault is open: the binding applies for now but is not saved')
+    return
+  }
   pending.set(vaultId, { ...pending.get(vaultId), [toFileCommandId(commandId)]: value })
   saveCache(vaultId)
   notify()

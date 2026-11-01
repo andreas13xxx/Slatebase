@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { IApiClient } from '../../../api'
 import { initialize, loadVaultHotkeys, getShortcut, _reset } from '../../../state/keybindingsStore'
 import { createHotkeyManager } from './app-shim'
@@ -44,5 +44,56 @@ describe('app.hotkeyManager mirrors hotkeys.json', () => {
     expect(getShortcut('slatebase:open-settings')).toBe('')
     manager.removeHotkeys('app:open-settings')
     expect(getShortcut('slatebase:open-settings')).toBe('Ctrl+,')
+  })
+})
+
+describe('app.hotkeyManager — writes and bad input', () => {
+  let patches: Array<Record<string, unknown>>
+
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    _reset()
+    patches = []
+    await initialize({
+      getHotkeysConfig: async () => ({}),
+      patchHotkeysConfig: async (_v: string, patch: Record<string, unknown>) => { patches.push(patch); return {} },
+      getKeybindings: async () => ({ entries: [] }),
+    } as unknown as IApiClient)
+    await loadVaultHotkeys('v1')
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('writes under Obsidian\'s command ID in Obsidian\'s format', async () => {
+    createHotkeyManager(registry).setHotkeys('app:open-settings', [{ modifiers: ['Mod', 'Shift'], key: 'S' }])
+    await vi.advanceTimersByTimeAsync(600)
+    expect(patches).toEqual([{ 'app:open-settings': [{ modifiers: ['Mod', 'Shift'], key: 'S' }] }])
+  })
+
+  it('customKeys is live: assigning and deleting an entry change the file', async () => {
+    const { customKeys } = createHotkeyManager(registry)
+    customKeys['my-plugin:new'] = [{ modifiers: ['Alt'], key: 'N' }]
+    expect(customKeys['my-plugin:new']).toEqual([{ modifiers: ['Alt'], key: 'N' }])
+    expect(Object.keys(customKeys)).toContain('my-plugin:new')
+    delete customKeys['my-plugin:new']
+    expect(customKeys['my-plugin:new']).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(patches).toEqual([{ 'my-plugin:new': null }])
+  })
+
+  it('refuses bad input instead of queueing it, so other changes are not held back', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const manager = createHotkeyManager(registry)
+    manager.setHotkeys('my plugin:cmd', [{ modifiers: ['Alt'], key: 'X' }])
+    manager.setHotkeys('x'.repeat(201), [])
+    manager.setHotkeys('my-plugin:many', Array.from({ length: 21 }, (_, i) => ({ modifiers: ['Alt'], key: String(i % 10) })))
+    manager.setHotkeys('my-plugin:bad', [{ modifiers: ['Control'], key: 'X' }] as never)
+    manager.setHotkeys('my-plugin:null', [null] as never)
+    manager.setHotkeys('app:open-settings', [{ modifiers: ['Alt'], key: 'S' }])
+    await vi.advanceTimersByTimeAsync(600)
+    expect(patches).toEqual([{ 'app:open-settings': [{ modifiers: ['Alt'], key: 'S' }] }])
+    warn.mockRestore()
   })
 })
