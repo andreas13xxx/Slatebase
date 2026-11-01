@@ -82,6 +82,45 @@ describe('EditorFilesSection', () => {
     expect(screen.getByLabelText('Rechtschreibprüfung')).toBeChecked()
   })
 
+  it('shows and saves the editor, folding, new-note and delete settings', async () => {
+    const client = createClient({ tabSize: 2, useTab: false, strictLineBreaks: true, newFileLocation: 'folder', newFileFolderPath: 'Inbox' })
+    await renderSection(client)
+
+    expect(screen.getByLabelText('Mit Tabulator einrücken')).not.toBeChecked()
+    expect(screen.getByLabelText('Tabulatorbreite')).toHaveValue(2)
+    expect(screen.getByLabelText('Strikte Zeilenumbrüche')).toBeChecked()
+    expect(screen.getByLabelText('Notizen öffnen in')).toHaveValue('preview') // an absent key reads, as in the tab reducer
+    expect(screen.getByLabelText('Ordner für neue Notizen')).toHaveValue('Inbox')
+    expect(screen.getByLabelText('Vor dem Löschen nachfragen')).toBeChecked()
+
+    fireEvent.change(screen.getByLabelText('Notizen öffnen in'), { target: { value: 'source' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { defaultViewMode: 'source' }))
+    fireEvent.click(screen.getByLabelText('Vor dem Löschen nachfragen'))
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { promptDelete: false }))
+    fireEvent.click(screen.getByLabelText('Überschriften falten'))
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { foldHeading: false }))
+  })
+
+  it('saves a valid tab width on blur and puts back an invalid one', async () => {
+    const client = createClient()
+    await renderSection(client)
+    const input = screen.getByLabelText('Tabulatorbreite')
+
+    fireEvent.change(input, { target: { value: '99' } })
+    fireEvent.blur(input)
+    expect(client.patchAppConfig).not.toHaveBeenCalled()
+    expect(input).toHaveValue(4)
+
+    fireEvent.change(input, { target: { value: '3' } })
+    fireEvent.blur(input)
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { tabSize: 3 }))
+  })
+
+  it('hides the folder field unless new notes go to a fixed folder', async () => {
+    await renderSection(createClient())
+    expect(screen.queryByLabelText('Ordner für neue Notizen')).toBeNull()
+  })
+
   it('saves a toggle at once, keeping other keys of the file', async () => {
     const client = createClient({ vimMode: true })
     await renderSection(client)

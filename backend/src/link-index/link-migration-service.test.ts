@@ -166,6 +166,32 @@ const tree = dir('vault', '', [
 ])
 
 describe('LinkMigrationService', () => {
+  it('does nothing when the vault turned alwaysUpdateLinks off', async () => {
+    const files = { 'other/Referrer.md': 'See [[Hello]].' }
+    const vaultService = createMockVaultService(files)
+    const searchService = createMockSearchService({})
+    const linkIndex = createMockLinkIndex(['other/Referrer.md'])
+    const isEnabled = vi.fn(async () => false)
+    const service = new LinkMigrationService(vaultService, searchService, () => linkIndex, createMockLogger(), isEnabled)
+
+    const result = await service.migrateLinks('vault-1', 'Hello.md', 'Renamed.md', tree)
+
+    expect(isEnabled).toHaveBeenCalledWith('vault-1')
+    expect(result).toEqual({ migratedFiles: [], failedFiles: [] })
+    expect(vaultService.saveFile).not.toHaveBeenCalled()
+    expect(files['other/Referrer.md']).toBe('See [[Hello]].')
+  })
+
+  it('rewrites when the vault wants links updated', async () => {
+    const files = { 'other/Referrer.md': 'See [[Hello]].' }
+    const service = new LinkMigrationService(
+      createMockVaultService(files), createMockSearchService({}), () => createMockLinkIndex(['other/Referrer.md']),
+      createMockLogger(), async () => true,
+    )
+    await service.migrateLinks('vault-1', 'Hello.md', 'Renamed.md', tree)
+    expect(files['other/Referrer.md']).toBe('See [[Renamed]].')
+  })
+
   it('rewrites and saves a file found via the index (exact-path) fast path', async () => {
     const files = { 'other/Referrer.md': 'See [[Hello]].' }
     const vaultService = createMockVaultService(files)

@@ -3,17 +3,18 @@
 // version upgrade logic, and plugin installation.
 
 import AdmZip from 'adm-zip'
+import { PLUGIN_LIMITS, formatPluginLimit } from '@slatebase/shared-contracts'
 import type { IInstalledPluginStore, PluginManifest } from './types.js'
 import { pluginManifestSchema } from './validation.js'
 import { compareSemver } from '../shared/semver.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Maximum ZIP file size: 10 MB */
-const MAX_ZIP_SIZE = 10 * 1024 * 1024
+/** Maximum ZIP file size (see shared-contracts plugin-limits.ts) */
+const MAX_ZIP_SIZE = PLUGIN_LIMITS.maxZipBytes
 
-/** Maximum total extracted size: 20 MB */
-const MAX_EXTRACTED_SIZE = 20 * 1024 * 1024
+/** Maximum total extracted size */
+const MAX_EXTRACTED_SIZE = PLUGIN_LIMITS.maxExtractedBytes
 
 /** Patterns in bundle source that indicate unsafe code */
 const UNSAFE_PATTERNS: readonly string[] = [
@@ -56,12 +57,12 @@ export class PluginInstallError extends Error {
  * Handles ZIP upload processing and plugin installation.
  *
  * Installation logic:
- * 1. Validate ZIP size ≤ 5 MB
+ * 1. Validate ZIP size ≤ PLUGIN_LIMITS.maxZipBytes (50 MB)
  * 2. Extract ZIP into memory
- * 3. Find manifest.json + main.js (in root or single subdirectory)
+ * 3. Total declared size — reject if > PLUGIN_LIMITS.maxExtractedBytes (100 MB), before anything is
+ *    decompressed; then find manifest.json + main.js (in root or single subdirectory)
  * 4. Validate manifest (Zod schema)
  * 5. Check bundle integrity (warn about eval, new Function, document.write)
- * 6. Calculate total extracted size — reject if > 10 MB
  * 7. Check if plugin already installed:
  *    - Not installed → fresh install
  *    - Installed with lower version → upgrade (preserve data.json)
@@ -83,7 +84,7 @@ export class PluginInstaller implements IPluginInstaller {
     // Step 1: Validate ZIP size
     if (zipBuffer.length > MAX_ZIP_SIZE) {
       throw new PluginInstallError(
-        `ZIP file exceeds maximum size of 5 MB (actual: ${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB)`,
+        `ZIP file exceeds maximum size of ${formatPluginLimit(MAX_ZIP_SIZE)} (actual: ${formatPluginLimit(zipBuffer.length)}, ${zipBuffer.length} bytes)`,
         'ZIP_TOO_LARGE',
       )
     }
@@ -101,7 +102,11 @@ export class PluginInstaller implements IPluginInstaller {
 
     const entries = zip.getEntries()
 
-    // Step 3: Find manifest.json + main.js
+    // Step 3: Total extracted size, from the sizes the archive declares, before anything is
+    // decompressed (finding the files below inflates them)
+    this.validateExtractedSize(entries)
+
+    // Step 3b: Find manifest.json + main.js
     const extracted = this.findPluginFiles(entries)
 
     // Step 4: Validate manifest
@@ -109,9 +114,6 @@ export class PluginInstaller implements IPluginInstaller {
 
     // Step 5: Check bundle integrity (warnings, non-blocking)
     const warnings = this.checkBundleIntegrity(extracted.bundleContent, manifest.id)
-
-    // Step 6: Calculate total extracted size
-    this.validateExtractedSize(entries)
 
     // Step 7: Check existing installation (version comparison)
     const existingManifest = await this.pluginStore.loadManifest(vaultId, manifest.id)
@@ -282,7 +284,7 @@ export class PluginInstaller implements IPluginInstaller {
   }
 
   /**
-   * Validate that total extracted size does not exceed 10 MB.
+   * Validate that total extracted size does not exceed PLUGIN_LIMITS.maxExtractedBytes.
    * @throws PluginInstallError if total size exceeds limit.
    */
   private validateExtractedSize(entries: AdmZip.IZipEntry[]): void {
@@ -295,7 +297,7 @@ export class PluginInstaller implements IPluginInstaller {
 
     if (totalSize > MAX_EXTRACTED_SIZE) {
       throw new PluginInstallError(
-        `Extracted content exceeds maximum size of 10 MB (actual: ${(totalSize / 1024 / 1024).toFixed(2)} MB)`,
+        `Extracted content exceeds maximum size of ${formatPluginLimit(MAX_EXTRACTED_SIZE)} (actual: ${formatPluginLimit(totalSize)}, ${totalSize} bytes)`,
         'EXTRACTED_TOO_LARGE',
       )
     }

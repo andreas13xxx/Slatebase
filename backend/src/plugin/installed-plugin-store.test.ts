@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
+import { PLUGIN_LIMITS } from '@slatebase/shared-contracts'
 import { InstalledPluginStore } from './installed-plugin-store.js'
 import {
   CommunityPluginsFileInvalidError,
@@ -89,8 +90,16 @@ describe('InstalledPluginStore', () => {
       expect((await store.loadManifest('vault-1', 'folder-name'))?.id).toBe('folder-name')
     })
 
-    it('rejects plugin files exceeding 10 MB', async () => {
-      const big = 'x'.repeat(10 * 1024 * 1024 + 1)
+    it('accepts a bundle exactly at the file limit, and a real-world sized one (5.2 MB, the largest measured)', async () => {
+      await store.savePlugin('vault-1', 'at-limit', { manifest: testFiles.manifest, bundle: 'x'.repeat(PLUGIN_LIMITS.maxFileBytes) })
+      await store.savePlugin('vault-1', 'copilot-sized', { manifest: testFiles.manifest, bundle: 'x'.repeat(5_224_428) })
+      expect((await store.loadBundle('vault-1', 'copilot-sized'))?.length).toBe(5_224_428)
+    })
+
+    it('rejects plugin files over the limit and names the file, the limit and the size', async () => {
+      const big = 'x'.repeat(PLUGIN_LIMITS.maxFileBytes + 1)
+      await expect(store.savePlugin('vault-1', 'big', { manifest: testFiles.manifest, bundle: big }))
+        .rejects.toThrow(/main\.js exceeds maximum size of 25 MB \(actual: 25 MB, 26214401 bytes\)/)
       await expect(store.savePlugin('vault-1', 'big', { manifest: testFiles.manifest, bundle: big })).rejects.toThrow(PluginFileTooLargeError)
       await expect(store.savePlugin('vault-1', 'big', { manifest: big, bundle: 'x' })).rejects.toThrow(PluginFileTooLargeError)
       await expect(store.savePlugin('vault-1', 'big', { manifest: testFiles.manifest, bundle: 'x', styles: big })).rejects.toThrow(PluginFileTooLargeError)
@@ -161,9 +170,9 @@ describe('InstalledPluginStore', () => {
       expect(await store.listPlugins('vault-1')).toEqual([])
     })
 
-    it('refuses to read a bundle over 10 MB', async () => {
+    it('refuses to read a bundle over the file limit', async () => {
       await fs.mkdir(pluginDir('huge'), { recursive: true })
-      await fs.writeFile(path.join(pluginDir('huge'), 'main.js'), 'x'.repeat(10 * 1024 * 1024 + 1))
+      await fs.writeFile(path.join(pluginDir('huge'), 'main.js'), 'x'.repeat(PLUGIN_LIMITS.maxFileBytes + 1))
 
       await expect(store.loadBundle('vault-1', 'huge')).rejects.toThrow(PluginFileTooLargeError)
     })
@@ -197,20 +206,21 @@ describe('InstalledPluginStore', () => {
       expect(await store.loadSettings('vault-1', 'no-settings')).toBeNull()
     })
 
-    it('rejects settings exceeding 1 MB', async () => {
-      await expect(store.saveSettings('vault-1', 'test-plugin', 'x'.repeat(1024 * 1024 + 1))).rejects.toThrow(PluginSettingsTooLargeError)
+    it('rejects settings over the settings limit', async () => {
+      await expect(store.saveSettings('vault-1', 'test-plugin', 'x'.repeat(PLUGIN_LIMITS.maxSettingsBytes + 1)))
+        .rejects.toThrow(/exceed maximum size of 10 MB \(actual: 10485761 bytes\)/)
     })
 
-    it('allows settings exactly at 1 MB', async () => {
-      const exact = 'x'.repeat(1024 * 1024)
+    it('allows settings exactly at the settings limit', async () => {
+      const exact = 'x'.repeat(PLUGIN_LIMITS.maxSettingsBytes)
       await store.saveSettings('vault-1', 'test-plugin', exact)
 
       expect(await store.loadSettings('vault-1', 'test-plugin')).toBe(exact)
     })
 
-    it('refuses to load a data.json over 1 MB', async () => {
+    it('refuses to load a data.json over the settings limit', async () => {
       await fs.mkdir(pluginDir('chatty'), { recursive: true })
-      await fs.writeFile(path.join(pluginDir('chatty'), 'data.json'), 'x'.repeat(1024 * 1024 + 1))
+      await fs.writeFile(path.join(pluginDir('chatty'), 'data.json'), 'x'.repeat(PLUGIN_LIMITS.maxSettingsBytes + 1))
 
       await expect(store.loadSettings('vault-1', 'chatty')).rejects.toThrow(PluginSettingsTooLargeError)
     })

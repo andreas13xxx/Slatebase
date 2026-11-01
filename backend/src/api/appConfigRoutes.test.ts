@@ -66,7 +66,7 @@ describe('app-config routes', () => {
   })
 
   it('rejects unknown keys, bad values and bad JSON with 400', async () => {
-    expect((await patch({ vimMode: true })).status).toBe(400)
+    expect((await patch({ notAnObsidianKey: true })).status).toBe(400)
     expect((await patch({ newLinkFormat: 'nope' })).status).toBe(400)
     expect((await patch('not json')).status).toBe(400)
     expect(publish).not.toHaveBeenCalled()

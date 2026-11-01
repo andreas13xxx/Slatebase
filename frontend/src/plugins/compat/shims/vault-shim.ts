@@ -6,7 +6,8 @@
  * Validates paths to reject traversal attacks (../, null bytes, absolute paths).
  */
 
-import { getAppConfigRaw, getAppConfigValue } from '../../../state/vaultAppConfigStore';
+import { appConfigValueProblem, isAppConfigKey } from '@slatebase/shared-contracts';
+import { getAppConfigRaw, getAppConfigValue, onAppConfigChange, updateAppConfig } from '../../../state/vaultAppConfigStore';
 import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
 import type { DataWriteOptions, EventRef, IVaultShim, TAbstractFile, TFile, TFolder } from '../types';
@@ -749,20 +750,66 @@ export class VaultShim implements IVaultShim {
    * A key the file does not contain gets Slatebase's default (see DEFAULT_APP_CONFIG); a key
    * that is neither in the file nor has a default is `null`.
    *
-   * One value is not backed by the file: "updateInternalLinks" is fixed at true, because the
-   * setting it reflects (rewrite wikilinks vault-wide on rename/move) always runs server-side
-   * and cannot be turned off. See FileManager.renameFile().
+   * "updateInternalLinks" is an old name of `alwaysUpdateLinks` (rewrite wikilinks vault-wide on
+   * rename/move, done server-side when the vault's app.json has it on).
    */
   getConfig(key: string): unknown {
-    if (key === 'updateInternalLinks') return true;
+    if (key === 'updateInternalLinks') return getAppConfigValue('alwaysUpdateLinks');
     return getAppConfigRaw(key);
+  }
+
+  /**
+   * Change a vault configuration value in `.obsidian/app.json` (not in Obsidian's public typings,
+   * but plugins call it). Only keys Slatebase knows can be written; for any other key, or when the
+   * user has no write access, nothing is written and a warning goes to the console.
+   */
+  async setConfig(key: string, value: unknown): Promise<void> {
+    const name = key === 'updateInternalLinks' ? 'alwaysUpdateLinks' : key;
+    if (!isAppConfigKey(name)) {
+      console.warn(`[vault.setConfig] "${key}" is not an app.json key Slatebase can write; ignored`);
+      return;
+    }
+    const problem = appConfigValueProblem(name, value);
+    if (problem !== null) {
+      console.warn(`[vault.setConfig] "${key}" not written: ${problem}`);
+      return;
+    }
+    try {
+      await updateAppConfig({ [name]: value } as never);
+    } catch (error) {
+      console.warn(`[vault.setConfig] could not write "${key}":`, error instanceof Error ? error.message : error);
+    }
   }
 
   /**
    * Register an event listener.
    */
   on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef {
+    if (event === 'config-changed') this.followAppConfig();
     return this.events.on(event, callback, context);
+  }
+
+  /** Stops following app.json (set once a plugin listens for `config-changed`). */
+  private unfollowAppConfig: (() => void) | null = null;
+
+  /**
+   * Fires `config-changed` whenever the vault's app.json changes (own change, another user's or an
+   * external write). Subscribes on the first listener and lets go on the first change after the
+   * last listener is gone (or the shim itself, held weakly, is); the next listener subscribes again.
+   */
+  private followAppConfig(): void {
+    if (this.unfollowAppConfig !== null) return;
+    const self = new WeakRef(this);
+    const unsubscribe = onAppConfigChange(() => {
+      const shim = self.deref();
+      if (shim === undefined || !shim.events.hasListeners('config-changed')) {
+        unsubscribe();
+        if (shim !== undefined) shim.unfollowAppConfig = null;
+        return;
+      }
+      shim.events.trigger('config-changed');
+    });
+    this.unfollowAppConfig = unsubscribe;
   }
 
   /**
@@ -1134,6 +1181,7 @@ export class VaultShim implements IVaultShim {
       'getRoot',
       'getName',
       'getConfig',
+      'setConfig',
       'on',
       'off',
       'offref',

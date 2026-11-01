@@ -3,6 +3,13 @@
  * Manages open tabs, active tab, mode switching, and edit buffers.
  */
 
+import { getAppConfigFileValue } from './vaultAppConfigStore'
+
+/** Whether a tab shows a Markdown note (not a binary file, a graph or a plugin view). */
+function isNoteTab(filePath: string, isBinary: boolean): boolean {
+  return !isBinary && !filePath.startsWith('__') && /\.md$/i.test(filePath)
+}
+
 /** Display mode for a tab: edit (plain text editor) or view (rendered Markdown). */
 export type TabMode = 'edit' | 'view'
 
@@ -193,8 +200,10 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
             ...tab,
             content,
             isBinary,
-            // Initial mode: always view (user can switch to edit manually)
-            mode: 'view',
+            // Initial mode: a note that is opened for the first time follows the vault's `defaultViewMode`, but
+            // only when the file says `source` itself (Slatebase reads by default); a reload, and every
+            // other kind of tab (graph, plugin views, non-Markdown files), keeps the reading view.
+            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') === 'source' ? 'edit' : 'view',
             loading: false,
             error: null,
           }

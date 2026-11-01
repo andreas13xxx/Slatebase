@@ -133,6 +133,7 @@ export interface IVaultShim {
   getRoot(): TFolder;
   getName(): string;
   getConfig(key: string): unknown;
+  setConfig(key: string, value: unknown): Promise<void>;
   on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
   off(event: string, callback: (...args: unknown[]) => void): void;
   trigger(event: string, ...args: unknown[]): void;

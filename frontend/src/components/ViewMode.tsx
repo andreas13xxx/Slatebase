@@ -36,6 +36,7 @@ import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
+import { useAppConfigValue } from '../state/vaultAppConfigStore'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -172,7 +173,7 @@ function preserveTabIndentation(content: string): string {
  *
  * Validates: Requirements 11.5, 11.6
  */
-function createSafePipeline(content: string): Root {
+function createSafePipeline(content: string, strictLineBreaks = false): Root {
   const preprocessed = preserveTabIndentation(content)
 
   let pipeline = unified()
@@ -183,6 +184,8 @@ function createSafePipeline(content: string): Root {
     .use(remarkPreserveTableCodeEscapes)
 
   for (const plugin of OBSIDIAN_PLUGINS) {
+    // app.json `strictLineBreaks`: a single newline stays a space, as in CommonMark (Obsidian's default is a line break)
+    if (strictLineBreaks && plugin === remarkBreaks) continue
     try {
       pipeline = pipeline.use(plugin) as unknown as typeof pipeline
     } catch (err) {
@@ -223,9 +226,11 @@ function createSafePipeline(content: string): Root {
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 11.5, 11.6
  */
 export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, sourcePath }: ViewModeProps) {
+  const strictLineBreaks = useAppConfigValue('strictLineBreaks')
+  const rightToLeft = useAppConfigValue('rightToLeft')
   const rendered = useMemo(() => {
     try {
-      const tree = createSafePipeline(content)
+      const tree = createSafePipeline(content, strictLineBreaks)
       const anchorTracker = createAnchorTracker()
 
       return renderRoot(tree, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, anchorTracker)
@@ -233,7 +238,7 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
       // Req 5.7: Invalid/unparsable syntax rendered as plain text without crashing
       return createElement('pre', { className: 'view-mode-fallback' }, content)
     }
-  }, [content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token])
+  }, [content, strictLineBreaks, vaultId, directoryTree, onInternalLinkClick, onTagClick, token])
 
   // After DOM render, run registered code block processors (Dataview, Tasks, etc.)
   // Uses a unique data attribute to find the container after mount.
@@ -349,6 +354,8 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
         className: 'view-mode',
         'aria-label': 'Markdown-Ansicht',
         'data-viewmode-id': viewModeId,
+        // app.json `rightToLeft`
+        ...(rightToLeft ? { dir: 'rtl' } : {}),
       }, rendered),
     ),
     contextMenu && createElement(ContextMenu, {

@@ -80,6 +80,11 @@ export class EventSystem implements IEventEmitter {
     return ref;
   }
 
+  /** True while at least one callback is registered for `event`. */
+  hasListeners(event: string): boolean {
+    return (this.listeners.get(event)?.length ?? 0) > 0;
+  }
+
   /**
    * Remove a specific callback from the given event.
    * Idempotent — does not throw if the callback is not registered or was already removed.

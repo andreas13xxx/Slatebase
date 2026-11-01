@@ -6,7 +6,7 @@ import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { PropertyTypeStore, PropertyTypeReservedKeyError, PropertyTypeMaxEntriesError } from './property-type-store.js'
-import type { PropertyTypeEntry, PropertyTypeRegistry } from './types.js'
+import { MAX_PROPERTY_TYPE_ENTRIES, type PropertyTypeEntry, type PropertyTypeRegistry } from './types.js'
 import type { ILogger } from '../logger/index.js'
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
@@ -102,14 +102,15 @@ describe('PropertyTypeStore', () => {
       expect(loaded.entries[0]!.options?.allowedValues).toEqual(['open', 'closed', 'in-progress'])
     })
 
-    it('caps entries at 200', async () => {
-      const entries: PropertyTypeEntry[] = Array.from({ length: 210 }, (_, i) => ({
+    it('caps entries at the guard limit, far above the old 200', async () => {
+      const entries: PropertyTypeEntry[] = Array.from({ length: MAX_PROPERTY_TYPE_ENTRIES + 10 }, (_, i) => ({
         key: `prop-${i}`,
         type: 'text' as const,
       }))
 
       const saved = await store.saveRegistry(VAULT_ID, { entries })
-      expect(saved.entries).toHaveLength(200)
+      expect(saved.entries).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
+      expect(MAX_PROPERTY_TYPE_ENTRIES).toBeGreaterThan(200)
     })
   })
 
@@ -146,7 +147,7 @@ describe('PropertyTypeStore', () => {
     })
 
     it('throws PropertyTypeMaxEntriesError when registry is full', async () => {
-      const entries: PropertyTypeEntry[] = Array.from({ length: 200 }, (_, i) => ({
+      const entries: PropertyTypeEntry[] = Array.from({ length: MAX_PROPERTY_TYPE_ENTRIES }, (_, i) => ({
         key: `full-${i}`,
         type: 'text' as const,
       }))
@@ -158,7 +159,7 @@ describe('PropertyTypeStore', () => {
     })
 
     it('updating an existing entry when at max does not throw', async () => {
-      const entries: PropertyTypeEntry[] = Array.from({ length: 200 }, (_, i) => ({
+      const entries: PropertyTypeEntry[] = Array.from({ length: MAX_PROPERTY_TYPE_ENTRIES }, (_, i) => ({
         key: `update-${i}`,
         type: 'text' as const,
       }))
@@ -166,8 +167,26 @@ describe('PropertyTypeStore', () => {
 
       // Updating an existing entry should succeed (not adding a new one)
       const result = await store.upsertEntry(VAULT_ID, { key: 'update-0', type: 'number' })
-      expect(result.entries).toHaveLength(200)
+      expect(result.entries).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
       expect(result.entries[0]!.type).toBe('number')
+    })
+  })
+
+  describe('a types.json bigger than the registry cap', () => {
+    it('keeps the types the caller was never shown when it saves the part it got', async () => {
+      const dir = path.join(tmpDir, 'big')
+      await fs.mkdir(path.join(dir, '.obsidian'), { recursive: true })
+      const types: Record<string, string> = {}
+      for (let i = 0; i < MAX_PROPERTY_TYPE_ENTRIES + 3; i++) types[`k${i}`] = 'text'
+      await fs.writeFile(path.join(dir, '.obsidian', 'types.json'), JSON.stringify({ types }))
+      const big = new PropertyTypeStore((vaultId) => (vaultId === 'big' ? dir : null), createMockLogger())
+
+      const shown = await big.getRegistry('big')
+      expect(shown.entries).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
+      await big.saveRegistry('big', shown)
+
+      const after = JSON.parse(await fs.readFile(path.join(dir, '.obsidian', 'types.json'), 'utf-8')) as { types: Record<string, string> }
+      expect(Object.keys(after.types)).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES + 3)
     })
   })
 })

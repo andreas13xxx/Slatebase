@@ -941,5 +941,7 @@ export const de = {
     deleteLabel: '„{name}“ löschen',
     saved: 'Arbeitsbereich „{name}“ gespeichert.',
     limitReached: 'Höchstzahl an Arbeitsbereichen erreicht.',
+    invalidName: 'Dieser Name ist als Arbeitsbereich nicht erlaubt.',
+    noVault: 'Kein Vault geöffnet: Der Arbeitsbereich wurde nicht gespeichert.',
   },
 } as const

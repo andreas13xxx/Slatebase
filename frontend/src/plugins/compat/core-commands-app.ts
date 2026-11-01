@@ -34,6 +34,7 @@ import { openTab, saveTab, undoCloseTab } from '../../state/tabActions'
 import type { AuthState, AuthAction } from '../../state/authState'
 import type { PanelAction, PanelViewId, PanelSplitSection } from '../../state/panelState'
 import type { SettingsCategory, SettingsSection } from '../../state/settingsState'
+import { MAX_BOOKMARK_ITEMS } from '@slatebase/shared-contracts'
 import { favoritesStore } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
@@ -565,7 +566,7 @@ function bookmarkAllTabs(h: CoreAppCommandHandlers): void {
   }
 
   if (limitReached) {
-    showToast('info', `Limit von 50 Favoriten erreicht — ${added} Tab(s) hinzugefügt`)
+    showToast('info', `Limit von ${MAX_BOOKMARK_ITEMS} Lesezeichen erreicht — ${added} Tab(s) hinzugefügt`)
   }
 }
 

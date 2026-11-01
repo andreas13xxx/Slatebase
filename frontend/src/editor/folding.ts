@@ -22,6 +22,7 @@
 import type { EditorState } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { foldService, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language'
+import { getAppConfigValue } from '../state/vaultAppConfigStore'
 import { locateFrontmatterBlock } from '../utils/frontmatterWriter'
 
 const HEADING_LINE_REGEX = /^(#{1,6})\s+(.+?)\s*#*$/
@@ -105,9 +106,12 @@ export const markdownFoldService = foldService.of((state, lineStart) => {
   const line = state.doc.lineAt(lineStart)
   const headingMatch = HEADING_LINE_REGEX.exec(line.text)
   if (headingMatch) {
+    // app.json `foldHeading` / `foldIndent`: read when asked, so a change applies at once
+    if (!getAppConfigValue('foldHeading')) return null
     const range = computeHeadingFoldRange(state, line.number, headingMatch[1]!.length)
     return range.to > range.from ? range : null
   }
+  if (!getAppConfigValue('foldIndent')) return null
   return computeListFoldRange(state, line.number)
 })
 

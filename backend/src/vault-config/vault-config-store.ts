@@ -100,6 +100,7 @@ export class VaultConfigStore implements IVaultConfigService {
       ...(config.templatesDirectory !== undefined ? { templatesFolder: config.templatesDirectory } : {}),
       ...(config.dailyNotesDirectory !== undefined ? { dailyFolder: config.dailyNotesDirectory } : {}),
       ...(config.dailyNoteTemplate !== undefined ? { dailyTemplate: config.dailyNoteTemplate } : {}),
+      ...(typeof config.dailyNoteFormat === 'string' ? { dailyFormat: config.dailyNoteFormat } : {}),
     })
 
     if (config.uniqueNoteDirectory !== undefined || config.activityRetentionDays !== undefined) {

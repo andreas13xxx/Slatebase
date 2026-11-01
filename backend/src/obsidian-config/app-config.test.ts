@@ -82,9 +82,42 @@ describe('appConfigRequestSchema', () => {
   })
 
   it('rejects unknown keys, wrong types and values outside the enums', () => {
-    expect(appConfigRequestSchema.safeParse({ vimMode: true }).success).toBe(false)
+    expect(appConfigRequestSchema.safeParse({ notAnObsidianKey: true }).success).toBe(false)
     expect(appConfigRequestSchema.safeParse({ useMarkdownLinks: 'yes' }).success).toBe(false)
     expect(appConfigRequestSchema.safeParse({ newLinkFormat: 'whatever' }).success).toBe(false)
     expect(appConfigRequestSchema.safeParse({ attachmentFolderPath: 'x'.repeat(1025) }).success).toBe(false)
+    expect(appConfigRequestSchema.safeParse({ tabSize: 99 }).success).toBe(false)
+    expect(appConfigRequestSchema.safeParse({ trashOption: 'shredder' }).success).toBe(false)
+  })
+
+  it('accepts the newer keys, lists and pass-through keys', () => {
+    expect(appConfigRequestSchema.safeParse({
+      userIgnoreFilters: ['Meta/', '.git'],
+      trashOption: 'local',
+      tabSize: 2,
+      propertiesInDocument: 'hidden',
+      mobilePullAction: 'graph:open',
+      vimMode: true,
+    }).success).toBe(true)
+    expect(appConfigRequestSchema.safeParse({ userIgnoreFilters: 'Meta/' }).success).toBe(false)
+  })
+})
+
+describe('AppConfigService deviations', () => {
+  let vaultPath: string
+  beforeEach(async () => { vaultPath = await mkdtemp(join(tmpdir(), 'app-config-dev-')) })
+  afterEach(async () => { await rm(vaultPath, { recursive: true, force: true }) })
+
+  it('reports unknown keys and contradicting values but leaves the file as it is', async () => {
+    await mkdir(join(vaultPath, '.obsidian'))
+    const content = JSON.stringify({ showLineNumber: true, mobilePullAction: 'graph:open', fancy: 1, newLinkFormat: 'diagonal' })
+    await writeFile(join(vaultPath, '.obsidian', 'app.json'), content)
+    const reported: Array<{ vaultId: string, file: string, paths: string[] }> = []
+    const service = new AppConfigService({ report: (vaultId, file, deviations) => { reported.push({ vaultId, file, paths: deviations.map((d) => d.path) }) } })
+
+    await service.get(vaultPath, 'v1')
+
+    expect(reported).toEqual([{ vaultId: 'v1', file: 'app.json', paths: ['fancy', 'newLinkFormat'] }])
+    expect(await readFile(join(vaultPath, '.obsidian', 'app.json'), 'utf-8')).toBe(content)
   })
 })

@@ -1,3 +1,5 @@
+import { PLUGIN_LIMITS, formatPluginLimit } from '@slatebase/shared-contracts'
+
 // ─── Plugin Error Classes ─────────────────────────────────────────────────────
 
 /**
@@ -14,18 +16,18 @@ export class PluginNotFoundError extends Error {
  * Thrown when a plugin file exceeds the maximum allowed size.
  */
 export class PluginFileTooLargeError extends Error {
-  constructor(public readonly maxSize: number, public readonly actualSize: number) {
-    super(`Plugin file exceeds maximum size of ${maxSize} bytes (actual: ${actualSize})`)
+  constructor(public readonly maxSize: number, public readonly actualSize: number, public readonly fileName?: string) {
+    super(`Plugin file${fileName ? ` ${fileName}` : ''} exceeds maximum size of ${formatPluginLimit(maxSize)} (actual: ${formatPluginLimit(actualSize)}, ${actualSize} bytes)`)
     this.name = 'PluginFileTooLargeError'
   }
 }
 
 /**
- * Thrown when plugin settings exceed the maximum allowed size of 1 MB.
+ * Thrown when plugin settings exceed the maximum allowed size (PLUGIN_LIMITS.maxSettingsBytes).
  */
 export class PluginSettingsTooLargeError extends Error {
-  constructor(public readonly pluginId: string) {
-    super(`Settings for plugin "${pluginId}" exceed maximum size of 1 MB`)
+  constructor(public readonly pluginId: string, public readonly actualSize?: number) {
+    super(`Settings for plugin "${pluginId}" exceed maximum size of ${formatPluginLimit(PLUGIN_LIMITS.maxSettingsBytes)}${actualSize === undefined ? '' : ` (actual: ${actualSize} bytes)`}`)
     this.name = 'PluginSettingsTooLargeError'
   }
 }

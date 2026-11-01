@@ -74,7 +74,7 @@ export async function migrateVaultConfigToObsidianFiles(deps: {
 
       if (typeof config['attachmentsDirectory'] === 'string') {
         const legacy = config['attachmentsDirectory'].trim()
-        const existing = await appConfigService.get(vault.storagePath)
+        const existing = await appConfigService.get(vault.storagePath, vault.id)
         if (typeof existing['attachmentFolderPath'] !== 'string') {
           await appConfigService.patch(vault.storagePath, { attachmentFolderPath: legacy === '' ? './' : legacy })
         }

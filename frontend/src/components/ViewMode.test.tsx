@@ -9,6 +9,7 @@ import { initialFeatureState } from '../state/featureState'
 import type { DirectoryTree, AppState } from '../types'
 import type { IApiClient } from '../api'
 import { registerExtension, resetEmbedRegistry } from '../plugins/compat/embed-registry'
+import { _reset as resetAppConfig, initialize as initializeAppConfig, setActiveVault } from '../state/vaultAppConfigStore'
 
 describe('ViewMode', () => {
   const defaultProps = {
@@ -837,6 +838,19 @@ def hello():
       )
       expect(container.querySelector('font')).toBeNull()
       expect(container.textContent).toContain('<font color="red">')
+    })
+
+    it('keeps a single newline as a line break unless strictLineBreaks is on', async () => {
+      const { container } = render(<ViewMode {...defaultProps} content={'first\nsecond'} />)
+      expect(container.querySelector('p br')).not.toBeNull()
+
+      resetAppConfig()
+      initializeAppConfig({ getAppConfig: async () => ({ strictLineBreaks: true }) } as unknown as IApiClient)
+      await setActiveVault('v1')
+      const strict = render(<ViewMode {...defaultProps} content={'first\nsecond'} />)
+      expect(strict.container.querySelector('p br')).toBeNull()
+      expect(strict.container.querySelector('p')?.textContent).toBe('first\nsecond')
+      resetAppConfig()
     })
 
     it('renders a literal <br> as a line break', () => {

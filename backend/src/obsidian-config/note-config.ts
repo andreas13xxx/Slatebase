@@ -4,9 +4,9 @@
 //   templates.json    { "folder": "template" }
 //   daily-notes.json  { "folder": "2024", "format": "MM月/MM-DD ddd", "template": "template/diary", "autorun": false }
 //
-// `template` is a vault path without the `.md` extension. `format` is a Moment pattern; Slatebase
-// names daily notes `YYYY-MM-DD.md` and cannot follow another one, so it only reads `format` (to
-// tell the user) and writes the default when it creates the file. Keys this app does not know are kept.
+// `template` is a vault path without the `.md` extension. `format` is a Moment pattern that names
+// the daily note (a `/` puts it into sub folders); the client formats the name, this module only
+// reads and writes the pattern. Keys this app does not know are kept.
 
 import {
   ObsidianConfigFileInvalidError,
@@ -15,8 +15,8 @@ import {
   type ObsidianConfigFile,
 } from '../shared/obsidian-config-file.js'
 
-/** The only date format Slatebase can produce for daily notes. */
-export const SUPPORTED_DAILY_NOTE_FORMAT = 'YYYY-MM-DD'
+/** The format daily notes use when `daily-notes.json` has none (Obsidian's default). */
+export const DEFAULT_DAILY_NOTE_FORMAT = 'YYYY-MM-DD'
 
 /** What the two files say; `null` where the file or the key is absent (or not a string). */
 export interface NoteConfig {
@@ -32,6 +32,8 @@ export interface NoteConfigPatch {
   dailyFolder?: string
   /** Vault path of the template; a trailing `.md` is stripped before it is written. */
   dailyTemplate?: string
+  /** The Moment pattern daily notes are named by (`daily-notes.json` `format`). */
+  dailyFormat?: string
 }
 
 export interface INoteConfigService {
@@ -76,7 +78,7 @@ export class NoteConfigService implements INoteConfigService {
       })
     }
 
-    if (patch.dailyFolder !== undefined || patch.dailyTemplate !== undefined) {
+    if (patch.dailyFolder !== undefined || patch.dailyTemplate !== undefined || patch.dailyFormat !== undefined) {
       await updateObsidianConfig(vaultPath, 'daily-notes.json', (current) => {
         let changed = false
         if (patch.dailyFolder !== undefined && current['folder'] !== patch.dailyFolder) {
@@ -90,8 +92,12 @@ export class NoteConfigService implements INoteConfigService {
             changed = true
           }
         }
-        // Slatebase names daily notes YYYY-MM-DD.md; say so for Obsidian when the file does not say otherwise.
-        if (changed && typeof current['format'] !== 'string') current['format'] = SUPPORTED_DAILY_NOTE_FORMAT
+        if (patch.dailyFormat !== undefined && current['format'] !== patch.dailyFormat) {
+          current['format'] = patch.dailyFormat
+          changed = true
+        }
+        // Without a format Obsidian uses YYYY-MM-DD too; write it down so the file says what Slatebase does.
+        if (changed && typeof current['format'] !== 'string') current['format'] = DEFAULT_DAILY_NOTE_FORMAT
         return changed ? current : null
       })
     }

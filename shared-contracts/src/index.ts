@@ -15,3 +15,11 @@ export type {
 } from './vault.js'
 
 export * from './bases/index.js'
+export * from './config-table.js'
+export * from './app-config.js'
+export * from './appearance-config.js'
+export * from './plugin-limits.js'
+export * from './graph-config.js'
+export * from './bookmarks-config.js'
+export * from './hotkeys-config.js'
+export * from './workspaces-config.js'

@@ -21,7 +21,7 @@ import { WebViewerPrompt } from './WebViewerPrompt'
 import { WorkspacesModal } from './WorkspacesModal'
 import {
   buildWorkspace, saveWorkspace, getWorkspaces, findWorkspace,
-  renameWorkspace, deleteWorkspace,
+  renameWorkspace, deleteWorkspace, onWorkspacesChange, workspaceSaveProblem,
 } from '../state/workspacesStore'
 import { fetchPaneTreeContent } from '../state/paneTreeRestore'
 import { loadPanelLayout, savePanelLayout } from './side-panel/utils/persistence'
@@ -42,6 +42,7 @@ import { collectFilesSorted } from '../plugins/link-resolver'
 import { getActiveEditorView } from '../editor/plugin-extensions'
 import { getDictationController } from '../editor/dictation/dictation-controller'
 import { getTranscriptionLanguage, getSaveAudioAttachment } from '../hooks/useTranscriptionLanguage'
+import { useRegistryHotkeys } from '../hooks/useRegistryHotkeys'
 import { toggleToolbarVisible } from '../state/toolbarStore'
 
 /**
@@ -205,6 +206,9 @@ export function CommandPaletteContainer({
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
   const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
   const [workspacesModal, setWorkspacesModal] = useState<{ open: boolean; mode: 'save' | 'load' }>({ open: false, mode: 'load' })
+  // The saved layouts are the vault's workspaces.json: they change when it is read, written or changed elsewhere
+  const [, setWorkspacesVersion] = useState(0)
+  useEffect(() => onWorkspacesChange(() => setWorkspacesVersion((v) => v + 1)), [])
 
   /** Opens the template picker in "create a new note" mode. */
   const openTemplateSelector = useCallback(() => {
@@ -337,7 +341,8 @@ export function CommandPaletteContainer({
       loadPanelLayout('context'),
     )
     if (!saveWorkspace(ws)) {
-      showToast('error', t('workspaces.limitReached'))
+      const problem = workspaceSaveProblem(ws)
+      showToast('error', problem === 'limit' ? t('workspaces.limitReached') : problem === 'invalid-name' ? t('workspaces.invalidName') : t('workspaces.noVault'))
       return
     }
     showToast('success', t('workspaces.saved', { name: ws.name }))
@@ -590,6 +595,10 @@ export function CommandPaletteContainer({
     window.addEventListener('keydown', handleTabCycleShortcut)
     return () => window.removeEventListener('keydown', handleTabCycleShortcut)
   }, [commandRegistry])
+
+  // Every other registry command (Obsidian's core commands, plugins') runs from the shortcut the
+  // vault's hotkeys.json gives it. Registered after the handlers above, which take their keys first.
+  useRegistryHotkeys(commandRegistry, pluginCompatEnabled)
 
   const handleQuickSwitcherClose = useCallback(() => {
     setQuickSwitcherOpen(false)

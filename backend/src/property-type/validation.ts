@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod'
+import { MAX_PROPERTY_TYPE_ENTRIES } from './types.js'
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ export const propertyTypeEntrySchema = z.object({
 export const propertyTypeRegistrySchema = z.object({
   entries: z
     .array(propertyTypeEntrySchema)
-    .max(200, 'Maximum 200 property type entries per vault'),
+    .max(MAX_PROPERTY_TYPE_ENTRIES, `Maximum ${MAX_PROPERTY_TYPE_ENTRIES} property type entries per vault`),
 })
 
 // ─── Inferred Types ──────────────────────────────────────────────────────────

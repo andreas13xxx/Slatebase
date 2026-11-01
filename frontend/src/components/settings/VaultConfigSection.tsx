@@ -12,6 +12,13 @@ import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
 import { SettingSection, SettingRow, Button } from './ui'
 import { useWebEmbed } from '../../hooks/useWebEmbed'
+import { getTodayDateString } from '../../state/dailyNoteService'
+import {
+  DEFAULT_DAILY_NOTE_FORMAT,
+  dailyNoteName,
+  effectiveDailyNoteFormat,
+  validateDailyNoteFormat,
+} from '../../state/dailyNoteFormat'
 
 interface VaultConfigSectionProps {
   apiClient: IApiClient
@@ -33,6 +40,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   const [templatesDir, setTemplatesDir] = useState('')
   const [dailyNotesDir, setDailyNotesDir] = useState('')
   const [dailyNoteTemplate, setDailyNoteTemplate] = useState('')
+  const [dailyNoteFormat, setDailyNoteFormat] = useState(DEFAULT_DAILY_NOTE_FORMAT)
   const [uniqueNoteDir, setUniqueNoteDir] = useState('')
 
   // "Aktive Datei im Explorer verfolgen" used to live here. It is an account
@@ -51,6 +59,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         setTemplatesDir(cfg.templatesDirectory)
         setDailyNotesDir(cfg.dailyNotesDirectory)
         setDailyNoteTemplate(cfg.dailyNoteTemplate)
+        setDailyNoteFormat(effectiveDailyNoteFormat(cfg.dailyNoteFormat))
         setUniqueNoteDir(cfg.uniqueNoteDirectory ?? '')
         setError(null)
       } catch (err: unknown) {
@@ -68,6 +77,10 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     return () => { cancelled = true }
   }, [apiClient, vaultId])
 
+  const formatProblem = validateDailyNoteFormat(dailyNoteFormat.trim())
+  const formatChanged = config !== null && dailyNoteFormat.trim() !== effectiveDailyNoteFormat(config.dailyNoteFormat)
+  const formatPreview = formatProblem === null ? dailyNoteName(getTodayDateString(), dailyNoteFormat.trim()) : null
+
   const handleSave = useCallback(async () => {
     setSaving(true)
     setError(null)
@@ -76,12 +89,14 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         templatesDirectory: templatesDir.trim(),
         dailyNotesDirectory: dailyNotesDir.trim(),
         dailyNoteTemplate: dailyNoteTemplate.trim(),
+        ...(formatChanged ? { dailyNoteFormat: dailyNoteFormat.trim() } : {}),
         uniqueNoteDirectory: uniqueNoteDir.trim(),
       })
       setConfig(updated)
       setTemplatesDir(updated.templatesDirectory)
       setDailyNotesDir(updated.dailyNotesDirectory)
       setDailyNoteTemplate(updated.dailyNoteTemplate)
+      setDailyNoteFormat(effectiveDailyNoteFormat(updated.dailyNoteFormat))
       setUniqueNoteDir(updated.uniqueNoteDirectory ?? '')
       showToast('success', 'Vault-Konfiguration gespeichert')
     } catch (err: unknown) {
@@ -93,12 +108,13 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
     } finally {
       setSaving(false)
     }
-  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplate, uniqueNoteDir])
+  }, [apiClient, vaultId, templatesDir, dailyNotesDir, dailyNoteTemplate, dailyNoteFormat, formatChanged, uniqueNoteDir])
 
   const hasChanges = config !== null && (
     templatesDir.trim() !== config.templatesDirectory ||
     dailyNotesDir.trim() !== config.dailyNotesDirectory ||
     dailyNoteTemplate.trim() !== config.dailyNoteTemplate ||
+    formatChanged ||
     uniqueNoteDir.trim() !== (config.uniqueNoteDirectory ?? '')
   )
 
@@ -168,12 +184,28 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
           />
         </div>
 
-        {config?.dailyNoteFormat != null && config.dailyNoteFormat !== 'YYYY-MM-DD' && (
-          <p className="settings-error" role="status">
-            Die Tagesnotizen-Einstellung dieses Vaults (Obsidian) benennt Notizen nach <code>{config.dailyNoteFormat}</code>.
-            Slatebase legt sie immer als <code>JJJJ-MM-TT.md</code> an und kann dieses Format nicht verwenden.
+        <div className="settings-field">
+          <label htmlFor="vault-daily-note-format" className="settings-field-label">
+            Tagesnotiz-Datumsformat
+          </label>
+          <p className="settings-field-hint">
+            Moment-Format wie in Obsidian, zum Beispiel <code>YYYY-MM-DD</code> oder <code>YYYY/MM/YYYY-MM-DD</code> (ein <code>/</code> legt Unterordner an). Vorhandene Notizen werden nicht umbenannt.
           </p>
-        )}
+          <input
+            id="vault-daily-note-format"
+            type="text"
+            className="settings-field-input"
+            value={dailyNoteFormat}
+            onChange={(e) => setDailyNoteFormat(e.target.value)}
+            placeholder={DEFAULT_DAILY_NOTE_FORMAT}
+            aria-invalid={formatProblem !== null}
+            aria-describedby="vault-daily-note-format-preview"
+            disabled={saving}
+          />
+          <p id="vault-daily-note-format-preview" className={formatProblem === null ? 'settings-field-hint' : 'settings-error'} role="status">
+            {formatProblem ?? <>Heute: <code>{formatPreview}.md</code></>}
+          </p>
+        </div>
 
         <div className="settings-field">
           <label htmlFor="vault-unique-note-dir" className="settings-field-label">
@@ -194,7 +226,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         </div>
 
         <div className="settings-actions">
-          <Button variant="primary" onClick={handleSave} disabled={saving || !hasChanges}>
+          <Button variant="primary" onClick={handleSave} disabled={saving || !hasChanges || (formatChanged && formatProblem !== null)}>
             {saving ? 'Speichern…' : 'Speichern'}
           </Button>
         </div>

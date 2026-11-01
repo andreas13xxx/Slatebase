@@ -12,6 +12,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { IPropertyTypeService } from '../property-type/index.js'
 import { PropertyTypeReservedKeyError, PropertyTypeMaxEntriesError } from '../property-type/index.js'
+import { ObsidianConfigFileInvalidError } from '../shared/obsidian-config-file.js'
 import { propertyTypeRegistrySchema, propertyTypeEntrySchema } from '../property-type/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
@@ -95,6 +96,9 @@ export function createPropertyTypeRoutes(deps: PropertyTypeRoutesDeps): Hono {
       if (error instanceof PropertyTypeMaxEntriesError) {
         return c.json(createApiError('VALIDATION_ERROR', error.message), 400)
       }
+      if (error instanceof ObsidianConfigFileInvalidError) {
+        return c.json(createApiError('TYPES_FILE_INVALID', error.message), 409)
+      }
       logger.error('Failed to save property type registry', { vaultId, userId: session.userId, error: String(error) })
       return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
     }
@@ -137,6 +141,9 @@ export function createPropertyTypeRoutes(deps: PropertyTypeRoutesDeps): Hono {
       }
       if (error instanceof PropertyTypeMaxEntriesError) {
         return c.json(createApiError('VALIDATION_ERROR', error.message), 400)
+      }
+      if (error instanceof ObsidianConfigFileInvalidError) {
+        return c.json(createApiError('TYPES_FILE_INVALID', error.message), 409)
       }
       logger.error('Failed to upsert property type entry', { vaultId, key, userId: session.userId, error: String(error) })
       return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
