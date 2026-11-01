@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.72.0](https://github.com/andreas13xxx/Slatebase/compare/v0.71.0...v0.72.0) (2026-11-01)
+
+
+### Features
+
+* hideable frontmatter, bookmark groups, default hotkeys, small app.json keys ([#314](https://github.com/andreas13xxx/Slatebase/issues/314)) ([5d8bfd3](https://github.com/andreas13xxx/Slatebase/commit/5d8bfd3d06c8d6cbe9d62ab347fb297a9c6a0f95))
+
 ## [0.71.0](https://github.com/andreas13xxx/Slatebase/compare/v0.70.0...v0.71.0) (2026-11-01)
 
 
