@@ -38,6 +38,8 @@ push, PR, CI grün (max. 3 Iterationen). Dokumentation nach Abschluss der Featur
 ## Phase 5 — DiceBear-Galerie
 - [ ] 5.1 `utils/dicebear.ts` (Builder + Stilliste, kein Netzwerkcode).
 - [ ] 5.2 Galerie-Grid im Avatar-Editor (Stile × seeds, Auswahl, Drittanbieter-Hinweis).
+      Hinweis: Wie bei Phase 4.2 entsteht das Grid beim Editor-Zusammenbau in Phase 6; Phase 5
+      liefert nur den reinen Builder (`dicebear.ts`) + Test.
 - [ ] 5.3 Tests: Builder-Unit-Test.
 
 ## Phase 6 — Initialen-Farbe & Editor-Zusammenbau
