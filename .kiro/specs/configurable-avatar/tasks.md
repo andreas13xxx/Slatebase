@@ -56,3 +56,11 @@ push, PR, CI grün (max. 3 Iterationen). Dokumentation nach Abschluss der Featur
 ## Phase 7 — Doku
 - [x] 7.1 `structure.md` (UserAvatar, imageResize, dicebear) und ggf. `docs/` aktualisieren.
 - [x] 7.2 README-Feature-Zeile zum Avatar, falls vorhanden. (README nennt den Avatar bisher nicht — keine Zeile vorhanden, nichts zu ändern.)
+
+## Sage-Review-Nachtrag (nach grünem CI)
+
+- [x] S.1 **must-fix (Route):** `PUT /users/me` (`api/userRoutes.ts`) reichte die vier neuen Avatar-Felder nicht durch — die feste `profileData`-Allowlist kopierte nur `avatarUrl`. Jetzt werden `avatarType`/`avatarColor`/`avatarData`/`avatarDicebear` durchgereicht; der HTTP-Pfad persistiert das Feature jetzt wirklich end-to-end.
+- [x] S.2 **must-fix (Test):** Neuer Route-Integrationstest `api/userRoutes.test.ts` — ein PUT pro `avatarType`, prüft, dass die Route die Felder an den Service durchreicht und die Response sie widerspiegelt; deckt die zuvor ungetestete Naht ab.
+- [x] S.3 **should-fix (resource):** `avatarData` (bis ~256 KB inline) wird in Listen/Such-Antworten (`listUsers`/`searchUsers`) nicht mehr mitgeliefert (neue `toPublicListInfo`-Projektion); Einzel-/Self-Fetch liefert das Bild weiterhin voll.
+- [x] S.4 **should-fix (scope):** Vier fremde `mode*`-i18n-Keys (Reading-Mode der Parallel-Session), die versehentlich in Phase-6-Commit `b85aa0f` gerutscht waren, aus `de.ts`/`en.ts` entfernt.
+- [x] S.5 **should-fix (scope):** Dieser Nachtrag korrigiert den „tested end-to-end"-Anspruch — der HTTP-Pfad ist jetzt verdrahtet UND getestet.

@@ -1045,7 +1045,7 @@ export class UserService implements IUserService {
   async listUsers(options?: PaginationOptions): Promise<PaginatedResult<PublicUserInfo>> {
     const result = await this.userRepository.findAll(options)
     return {
-      items: result.items.map(u => this.toPublicInfo(u)),
+      items: result.items.map(u => this.toPublicListInfo(u)),
       total: result.total,
       page: result.page,
       pageSize: result.pageSize,
@@ -1059,7 +1059,7 @@ export class UserService implements IUserService {
    */
   async searchUsers(prefix: string, limit: number = 10): Promise<PublicUserInfo[]> {
     const users = await this.userRepository.searchByUsernamePrefix(prefix, limit)
-    return users.map(u => this.toPublicInfo(u))
+    return users.map(u => this.toPublicListInfo(u))
   }
 
   /**
@@ -1346,5 +1346,17 @@ export class UserService implements IUserService {
       mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt,
     }
+  }
+
+  /**
+   * Convert a UserRecord to PublicUserInfo for list/bulk responses.
+   * Identical to `toPublicInfo` but drops the inline `avatarData` blob
+   * (up to ~256 KB per user), which list renderers never need — they only
+   * read `avatarType`. The full image is still returned by single-user
+   * fetches (login/self/profile). Avoids N×256 KB payloads on paginated
+   * admin lists and user-search responses.
+   */
+  private toPublicListInfo(user: UserRecord): PublicUserInfo {
+    return { ...this.toPublicInfo(user), avatarData: '' }
   }
 }
