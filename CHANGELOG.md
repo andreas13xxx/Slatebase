@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.73.0](https://github.com/andreas13xxx/Slatebase/compare/v0.72.0...v0.73.0) (2026-11-01)
+
+
+### Features
+
+* **app-json:** wire showInlineTitle, autoConvertHtml and showUnsupportedFiles ([#319](https://github.com/andreas13xxx/Slatebase/issues/319)) ([03163a6](https://github.com/andreas13xxx/Slatebase/commit/03163a60a9b63975a5c3401208380dd49d1b3179))
+* configurable user avatar (initials, URL, DiceBear, upload) ([#317](https://github.com/andreas13xxx/Slatebase/issues/317)) ([476e666](https://github.com/andreas13xxx/Slatebase/commit/476e666d44a0b0ca904512a72fce907e2a90f353))
+* **editor:** reading mode + 3-mode breadcrumb switcher ([#316](https://github.com/andreas13xxx/Slatebase/issues/316)) ([2c28252](https://github.com/andreas13xxx/Slatebase/commit/2c28252a6baa01910424afc06371f659ee94b90c))
+
 ## [0.72.0](https://github.com/andreas13xxx/Slatebase/compare/v0.71.0...v0.72.0) (2026-11-01)
 
 
