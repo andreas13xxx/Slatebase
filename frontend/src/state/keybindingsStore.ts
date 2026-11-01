@@ -303,6 +303,11 @@ export function resetAll(): void {
   for (const { commandId } of DEFAULT_KEYBINDINGS) resetShortcut(commandId)
 }
 
+/** Every binding the vault's file sets: Slatebase command ID → shortcuts (`[]` = unbound). */
+export function getFileBindings(): Array<[string, string[]]> {
+  return [...bindings.entries()]
+}
+
 /** Whether the file sets this command (as opposed to the default applying). */
 export function isOverridden(commandId: string): boolean {
   return bindings.has(commandId)

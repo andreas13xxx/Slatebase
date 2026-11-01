@@ -20,6 +20,8 @@ import { createEmbedRegistryShim } from '../embed-registry';
 import { resolveActiveTheme } from '../body-classes';
 import { getRegisteredExtensionTypeMap } from '../file-view-registry';
 import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
+import { fromFileCommandId, hotkeyToShortcut, shortcutsToFileValue, toFileCommandId, type HotkeyModifier } from '@slatebase/shared-contracts';
+import { getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -71,10 +73,10 @@ export type HotkeyManagerShim = ReturnType<typeof createHotkeyManager>
  *
  * Undocumented but widely used — Excalidraw's `addDefaultHotkeys`,
  * editing-toolbar's `customKeys[id]` lookups during startup command-ID
- * migration. `customKeys` holds user-configured overrides: always empty here
- * since Slatebase has no hotkey-customization UI, but it must exist as an object
- * or plugins that index into it directly (`customKeys[id]`) crash on
- * `undefined[id]`.
+ * migration. `customKeys` mirrors the vault's `.obsidian/hotkeys.json` (command ID → bindings, keyed by
+ * the ID Obsidian uses); it must exist as an object or plugins that index into it directly
+ * (`customKeys[id]`) crash on `undefined[id]`. `setHotkeys` writes the file (an empty list unbinds the
+ * command), `removeHotkeys` takes the command back to its default.
  */
 export function createHotkeyManager(commandRegistry: ICommandRegistry | undefined) {
   const getDefaultKeys = (): Record<string, Hotkey[]> => {
@@ -84,21 +86,30 @@ export function createHotkeyManager(commandRegistry: ICommandRegistry | undefine
     }
     return out
   }
+  const getCustomKeys = (): Record<string, Hotkey[]> => {
+    const out: Record<string, Hotkey[]> = {}
+    for (const [commandId, shortcuts] of getFileBindings()) {
+      out[toFileCommandId(commandId)] = shortcutsToFileValue(shortcuts) as Hotkey[]
+    }
+    return out
+  }
   return {
-    customKeys: {} as Record<string, Hotkey[]>,
+    get customKeys(): Record<string, Hotkey[]> {
+      return getCustomKeys()
+    },
     get defaultKeys(): Record<string, Hotkey[]> {
       return getDefaultKeys()
     },
-    getHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
+    getHotkeys: (commandId: string): Hotkey[] | undefined => getCustomKeys()[commandId] ?? getDefaultKeys()[commandId],
     getDefaultHotkeys: (commandId: string): Hotkey[] | undefined => getDefaultKeys()[commandId],
-    // Slatebase has no per-user hotkey customisation to write into, so a
-    // plugin's "rebind this command" UI reports success and changes nothing.
-    // Warning is the only thing that makes that visible from the outside.
-    setHotkeys: (commandId: string, _hotkeys: Hotkey[]): void => {
-      warnNoOp('hotkeyManager', 'setHotkeys', `Custom hotkey for "${commandId}" was not persisted.`)
+    setHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
+      setShortcuts(
+        fromFileCommandId(commandId),
+        hotkeys.filter((h) => h.key).map((h) => hotkeyToShortcut({ modifiers: h.modifiers as HotkeyModifier[], key: h.key })),
+      )
     },
     removeHotkeys: (commandId: string): void => {
-      warnNoOp('hotkeyManager', 'removeHotkeys', `Hotkey removal for "${commandId}" had no effect.`)
+      resetShortcut(fromFileCommandId(commandId))
     },
     addDefaultHotkeys: (commandId: string, hotkeys: Hotkey[]): void => {
       for (const hk of hotkeys) commandRegistry?.registerHotkey(commandId, hk)
