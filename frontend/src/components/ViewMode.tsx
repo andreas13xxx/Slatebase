@@ -312,6 +312,8 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
   const linkLongPress = useLongPress({ dispatchOnTarget: true })
   const onLinkPointerDown = (e: ReactPointerEvent<Element>): void => {
     if (!(e.target instanceof Element) || !e.target.closest('a[data-link-path], a.view-mode-link--external')) return
+    // A note embedded in this one renders its own ViewMode, which arms its own timer: leave its links to it.
+    if (e.target.closest('[data-viewmode-id]') !== e.currentTarget) return
     linkLongPress.onPointerDown(e)
   }
   useEffect(() => {

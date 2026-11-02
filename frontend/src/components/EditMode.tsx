@@ -58,6 +58,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
 
   // Editor handle ref for imperative operations (undo/redo, formatting commands)
   const editorRef = useRef<IEditorHandle>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   // Hidden <input type="file"> triggered by the "Anhang einfügen" editor command.
   const attachFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -170,7 +171,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   // ─── Listen for editor commands from the Command Palette ─────────────────
   useEffect(() => {
     function handleEditorCommand(e: Event) {
-      const detail = (e as CustomEvent<{ action: string; language?: unknown }>).detail
+      const detail = (e as CustomEvent<{ action: string; language?: unknown; paneId?: unknown }>).detail
       if (!detail?.action) return
       if (readOnly) return
 
@@ -198,6 +199,8 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
           if (isSpellcheckLanguage(detail.language)) setSpellcheckLanguage(detail.language)
           break
         case 'showContextMenu':
+          // The header button names its pane; every other mounted editor stays closed.
+          if (typeof detail.paneId === 'string' && containerRef.current?.closest('[data-pane-id]')?.getAttribute('data-pane-id') !== detail.paneId) break
           editorRef.current?.showContextMenu()
           break
         case 'attachFile':
@@ -345,7 +348,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   const statusClass = `edit-mode-status${status === 'saving' ? ' edit-mode-status--saving' : status === 'saved' ? ' edit-mode-status--saved' : status === 'error' ? ' edit-mode-status--error' : ''}`
 
   return (
-    <div className="edit-mode-container">
+    <div className="edit-mode-container" ref={containerRef}>
       {/* Read-only banner — no native toolbar; formatting is done via the Command
           Palette or an Obsidian-compatible plugin toolbar (e.g. Editing Toolbar). */}
       {readOnly && (

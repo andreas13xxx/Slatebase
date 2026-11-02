@@ -34,7 +34,12 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
   const wasOpenOnPressRef = useRef(false)
 
   const paneCount = listPanes(paneTree).length
-  const activeTabId = getActivePaneTabState(paneTree)?.activeTabId ?? null
+  const activeTabState = getActivePaneTabState(paneTree)
+  const activeTabId = activeTabState?.activeTabId ?? null
+  // The editor menu only exists for a markdown tab in an editable mode.
+  const activeTab = activeTabState?.tabs.find((tab) => tab.id === activeTabId)
+  const canOpenEditorMenu = activeTab !== undefined && activeTab.mode !== 'reading'
+    && /\.(md|markdown)$/i.test(activeTab.filePath)
 
   /** The menu items are rebuilt on every render, so this sees the latest tree and unsaved edits. */
   function closeOthers() {
@@ -81,8 +86,8 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
         className="nav-controls-button editor-header-row__editor-menu"
         aria-label={t('splitPanes.editorMenuLabel')}
         title={t('splitPanes.editorMenuLabel')}
-        disabled={!activeTabId}
-        onClick={() => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'showContextMenu' } }))}
+        disabled={!canOpenEditorMenu}
+        onClick={() => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'showContextMenu', paneId: paneTree.activePaneId } }))}
       >
         <TextCursor size={16} />
       </button>

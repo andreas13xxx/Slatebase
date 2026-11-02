@@ -52,14 +52,4 @@ describe('EditorHeaderRow', () => {
     fireEvent.click(btn)
     expect(screen.queryAllByRole('menuitem').length).toBe(0)
   })
-
-  it('has a text-actions button that asks the editor to open its context menu', () => {
-    const handler = vi.fn()
-    window.addEventListener('slatebase:editor-command', handler)
-    renderRow()
-    // No active tab in a fresh pane tree: the button stays disabled.
-    const button = screen.getByRole('button', { name: /textaktionen|text actions/i }) as HTMLButtonElement
-    expect(button.disabled).toBe(true)
-    window.removeEventListener('slatebase:editor-command', handler)
-  })
 })

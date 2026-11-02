@@ -116,6 +116,7 @@ export const EdgeRenderer = memo(function EdgeRenderer({
           <g key={edge.id}>
             {/* Invisible wider hit area */}
             <path
+              className="canvas-edge-hit"
               d={path}
               fill="none"
               stroke="transparent"
