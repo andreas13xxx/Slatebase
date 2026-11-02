@@ -181,6 +181,7 @@ export const de = {
   splitPanes: {
     noActiveTab: 'Kein aktiver Tab zum Teilen.',
     menuLabel: 'Ansichtsmenü',
+    editorMenuLabel: 'Textaktionen am Cursor',
     splitRight: 'Nach rechts teilen',
     splitDown: 'Nach unten teilen',
     focusLeft: 'Fokus nach links',

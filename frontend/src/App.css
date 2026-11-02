@@ -6828,3 +6828,24 @@
   font-size: 13px;
   color: var(--text-normal);
 }
+
+/* Reading mode: links open their context menu on touch long-press. */
+@media (pointer: coarse) {
+  .view-mode a[data-link-path],
+  .view-mode a.view-mode-link--external {
+    -webkit-touch-callout: none;
+  }
+}
+
+/* Touch has no right-click: the header offers the editor menu as a button instead. */
+.editor-header-row__editor-menu {
+  display: none;
+  margin: 0 0 0 4px;
+  flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+  .editor-header-row__editor-menu {
+    display: inline-flex;
+  }
+}

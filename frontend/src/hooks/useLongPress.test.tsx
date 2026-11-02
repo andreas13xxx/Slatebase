@@ -86,3 +86,22 @@ describe('useLongPress', () => {
     expect(onContextMenu).not.toHaveBeenCalled()
   })
 })
+
+describe('useLongPress dispatchOnTarget', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  function Container() {
+    const longPress = useLongPress({ dispatchOnTarget: true })
+    return <div data-testid="c" {...longPress}><a data-testid="link" href="#x">l</a></div>
+  }
+
+  it('fires contextmenu on the pressed child so listeners can inspect event.target', () => {
+    const { getByTestId } = render(<Container />)
+    const seen = vi.fn()
+    getByTestId('c').addEventListener('contextmenu', (e) => seen(e.target))
+    fireEvent.pointerDown(getByTestId('link'), { pointerType: 'touch', isPrimary: true })
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    expect(seen).toHaveBeenCalledWith(getByTestId('link'))
+  })
+})

@@ -1360,3 +1360,20 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-light);
 }
+
+/* Touch long-press opens the context menu: suppress the native iOS callout / text selection. */
+@media (pointer: coarse) {
+  .canvas-view {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .canvas-view textarea,
+  .canvas-view input,
+  .canvas-view [contenteditable="true"] {
+    -webkit-touch-callout: default;
+    user-select: text;
+  }
+}
