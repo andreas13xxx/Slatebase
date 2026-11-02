@@ -1,4 +1,4 @@
-import { type ReactNode, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
+import { type ReactNode, type PointerEvent as ReactPointerEvent, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
@@ -20,6 +20,7 @@ import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hove
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../state/aliasStore'
 import { getWebEmbedEnabled } from '../hooks/useWebEmbed'
+import { useLongPress } from '../hooks/useLongPress'
 import { EmbeddedWebFrame } from './EmbeddedWebFrame'
 import { warnOnce } from '../plugins/compat/log'
 import { remarkWikilink, remarkEmbed, remarkCallout, remarkTag, remarkBreaks, remarkBlockRef, remarkPreserveTableCodeEscapes, remarkMath, remarkFootnotes, remarkHighlight, getFootnoteEntries, createAnchorTracker } from '../plugins'
@@ -307,6 +308,14 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
   // with neither (a same-page `[[#Heading]]`/`[[#^block]]` link, which has
   // no file target) is left to the browser's default handling.
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  // Touch: only links get a long-press menu; a hold on plain text stays with the native text selection.
+  const linkLongPress = useLongPress({ dispatchOnTarget: true })
+  const onLinkPointerDown = (e: ReactPointerEvent<Element>): void => {
+    if (!(e.target instanceof Element) || !e.target.closest('a[data-link-path], a.view-mode-link--external')) return
+    // A note embedded in this one renders its own ViewMode, which arms its own timer: leave its links to it.
+    if (e.target.closest('[data-viewmode-id]') !== e.currentTarget) return
+    linkLongPress.onPointerDown(e)
+  }
   useEffect(() => {
     const el = document.querySelector(`[data-viewmode-id="${viewModeId}"]`) as HTMLElement | null
     if (!el) return
@@ -357,6 +366,8 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
         className: 'view-mode',
         'aria-label': 'Markdown-Ansicht',
         'data-viewmode-id': viewModeId,
+        ...linkLongPress,
+        onPointerDown: onLinkPointerDown,
         // app.json `rightToLeft`
         ...(rightToLeft ? { dir: 'rtl' } : {}),
       }, rendered),

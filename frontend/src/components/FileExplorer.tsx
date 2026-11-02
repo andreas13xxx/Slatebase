@@ -69,8 +69,13 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   // Optional context (not the throwing hook): the explorer also renders without a FeatureProvider.
   const featureContext = useContext(FeatureContext)
   const publicSharesEnabled = featureContext?.isEnabled('public-shares') ?? false
-  // Vault rows only; the container's own empty-area menu stays mouse-only, since a child's long-press would bubble into it.
   const vaultLongPress = useLongPress()
+  // Empty-area menu: a press that starts on a row belongs to that row's own menu, so don't arm a second timer for it.
+  const emptyAreaLongPress = useLongPress()
+  const emptyAreaPointerDown = (e: React.PointerEvent<Element>): void => {
+    if (e.target instanceof Element && e.target.closest('.tree-node-row')) return
+    emptyAreaLongPress.onPointerDown(e)
+  }
   const { state, dispatch, apiClient } = useAppContext()
   const { tabState, tabDispatch } = useTabContext()
   const { t } = useTranslation()
@@ -1306,6 +1311,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     <div
       className={`file-explorer-container${dragState.isMoving ? ' file-explorer--moving' : ''}`}
       onContextMenu={handleEmptyAreaContextMenu}
+      {...emptyAreaLongPress}
+      onPointerDown={emptyAreaPointerDown}
       onDragLeave={handleExplorerDragLeave}
     >
       {/* Loading indicator while moving */}

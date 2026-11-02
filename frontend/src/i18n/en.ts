@@ -187,6 +187,7 @@ export const en: TranslationShape = {
   splitPanes: {
     noActiveTab: 'No active tab to split.',
     menuLabel: 'View menu',
+    editorMenuLabel: 'Text actions at cursor',
     splitRight: 'Split right',
     splitDown: 'Split down',
     focusLeft: 'Focus pane to the left',

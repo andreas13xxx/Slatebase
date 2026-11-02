@@ -25,9 +25,12 @@ export interface LongPressHandlers {
  * handlers the single code path; where the browser also fires its own, the
  * menu state is simply set twice. Mouse and pen input are ignored.
  *
+ * @param options.dispatchOnTarget Fire on the element that was actually pressed instead of the
+ *   handler's element, for containers whose `contextmenu` listener inspects `event.target`.
  * @returns Handlers to spread onto the element.
  */
-export function useLongPress(): LongPressHandlers {
+export function useLongPress(options: { dispatchOnTarget?: boolean } = {}): LongPressHandlers {
+  const dispatchOnTarget = options.dispatchOnTarget === true
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startRef = useRef<{ x: number; y: number } | null>(null)
   const firedRef = useRef(false)
@@ -62,7 +65,7 @@ export function useLongPress(): LongPressHandlers {
     if (releaseTimerRef.current !== null) clearTimeout(releaseTimerRef.current)
     releaseTimerRef.current = null
     firedRef.current = false
-    const target = e.currentTarget
+    const target = dispatchOnTarget && e.target instanceof Element ? e.target : e.currentTarget
     const x = e.clientX
     const y = e.clientY
     startRef.current = { x, y }
@@ -71,7 +74,7 @@ export function useLongPress(): LongPressHandlers {
       firedRef.current = true
       target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y }))
     }, LONG_PRESS_MS)
-  }, [cancel])
+  }, [cancel, dispatchOnTarget])
 
   const onPointerMove = useCallback((e: React.PointerEvent<Element>) => {
     const start = startRef.current

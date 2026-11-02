@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useRef, useState, useEffect } from 'react'
+import { useLongPress } from '../../hooks/useLongPress'
 import { toBlob } from 'html-to-image'
 import { CanvasProvider, useCanvasContext } from '../../state/canvasContext'
 import type { DirectoryTree } from '../../types'
@@ -77,6 +78,13 @@ const EXPORT_PIXEL_RATIO = 2
 function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTree, token, onFileSave }: CanvasViewProps) {
   const { state, dispatch, save } = useCanvasContext()
   const containerRef = useRef<HTMLDivElement>(null)
+  // Dispatch on the pressed element so handleContextMenu can find the node under the finger.
+  const longPress = useLongPress({ dispatchOnTarget: true })
+  // Edges run their own long-press, and text fields keep the native selection/paste menu.
+  const onCanvasPointerDown = useCallback((e: React.PointerEvent<Element>) => {
+    if (e.target instanceof Element && e.target.closest('.canvas-edge-hit, textarea, input, [contenteditable="true"]')) return
+    longPress.onPointerDown(e)
+  }, [longPress])
   const transformLayerRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
@@ -780,6 +788,8 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
             onMouseLeave={handleMouseUp}
             onDoubleClick={handleDoubleClick}
             onContextMenu={handleContextMenu}
+            {...longPress}
+            onPointerDown={onCanvasPointerDown}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
