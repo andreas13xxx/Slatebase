@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.74.0](https://github.com/andreas13xxx/Slatebase/compare/v0.73.0...v0.74.0) (2026-11-02)
+
+
+### Features
+
+* **touch:** long-press context menus for canvas, explorer, reading mode + editor button ([#321](https://github.com/andreas13xxx/Slatebase/issues/321)) ([ee0e11a](https://github.com/andreas13xxx/Slatebase/commit/ee0e11a3b291e75a602a082228f620259ab597db))
+
+
+### Bugfixes
+
+* **proxy:** return address array from pinned lookup when all=true ([#320](https://github.com/andreas13xxx/Slatebase/issues/320)) ([2b2efd5](https://github.com/andreas13xxx/Slatebase/commit/2b2efd5b50407d677f8a0e6283d665027c0a55da))
+
 ## [0.73.0](https://github.com/andreas13xxx/Slatebase/compare/v0.72.0...v0.73.0) (2026-11-01)
 
 
