@@ -218,8 +218,16 @@ function isUrlAllowed(urlStr: string, allowlist: string[]): boolean {
 }
 
 /** Builds a `net.LookupFunction` that ignores the requested hostname and always returns the pinned address. */
-function createPinnedLookup(pinned: SafeAddress): LookupFunction {
-  return (_hostname, _options, callback) => {
+export function createPinnedLookup(pinned: SafeAddress): LookupFunction {
+  return (_hostname, options, callback) => {
+    // Node 20+ (autoSelectFamily) calls lookup with `all: true` and expects an array of addresses.
+    if (options?.all) {
+      ;(callback as unknown as (err: null, addresses: Array<{ address: string; family: number }>) => void)(
+        null,
+        [{ address: pinned.ip, family: pinned.family }],
+      )
+      return
+    }
     callback(null, pinned.ip, pinned.family)
   }
 }
