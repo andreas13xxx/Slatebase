@@ -7,6 +7,7 @@ import type { DirectoryTree, VaultInfo } from '../types'
 import { extractErrorMessage } from '../utils/error'
 import { ChevronRight, ChevronDown, Database, Eye, Pencil, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard, Link2 } from 'lucide-react'
 import { getValidDropTargets } from '../utils/pathUtils'
+import { MoveTargetDialog } from './MoveTargetDialog'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { InlineInput } from './InlineInput'
@@ -89,6 +90,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedPaths))
   const [expandedVaults, setExpandedVaults] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedVaults))
   const [showCreateVaultForm, setShowCreateVaultForm] = useState(false)
+  const [moveDialog, setMoveDialog] = useState<{ node: DirectoryTree; vaultId: string } | null>(null)
   const [newVaultName, setNewVaultName] = useState('')
   const [vaultValidationError, setVaultValidationError] = useState<string | null>(null)
   const [dragState, setDragState] = useState<DragState>({
@@ -752,19 +754,17 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     }
   }
 
-  async function handleMoveFile(node: DirectoryTree) {
+  /** Opens the folder picker ("Move to…"), the touch-friendly counterpart of dragging onto a folder. */
+  function handleMoveFile(node: DirectoryTree) {
     const vaultId = contextMenuState.vaultId
     if (!vaultId || !apiClient) return
+    setMoveDialog({ node, vaultId })
+  }
 
-    // Prompt for destination path using a simple approach: move to root
-    // We use the existing drag/drop mechanism implicitly — 
-    // For the context menu version, we trigger inline input for a move destination
-    const destination = window.prompt(t('fileOps.movePrompt'), '')
-    if (destination === null) return // Cancelled
-
-    const trimmedDest = destination.trim()
+  async function moveNodeToFolder(vaultId: string, node: DirectoryTree, targetFolderPath: string) {
+    if (!apiClient) return
     const fileName = node.path.split('/').pop() ?? node.name
-    const destinationPath = trimmedDest ? `${trimmedDest}/${fileName}` : fileName
+    const destinationPath = targetFolderPath ? `${targetFolderPath}/${fileName}` : fileName
 
     if (destinationPath === node.path) return
 
@@ -904,7 +904,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         void handleCopyFile(node)
         break
       case 'move':
-        void handleMoveFile(node)
+        handleMoveFile(node)
         break
       case 'export':
         handleExportVault()
@@ -1529,6 +1529,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'newCanvas', label: 'Neues Canvas', icon: <LayoutDashboard size={14} /> },
             { id: 'separator-1', label: '', separator: true },
             { id: 'rename', label: t('contextMenu.rename'), icon: <Pencil size={14} /> },
+            { id: 'move', label: t('contextMenu.move'), icon: <Move size={14} /> },
             { id: 'delete', label: t('contextMenu.delete'), icon: <Trash2 size={14} /> },
           ]
           menuItems = [...menuItems, ...buildFileMenuItems(node)]
@@ -1569,6 +1570,27 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         onConfirm={handleDeleteConfirmed}
         onCancel={handleDeleteCancelled}
       />
+
+      {/* Move-to folder picker */}
+      {moveDialog && (() => {
+        const tree = state.vaultTrees[moveDialog.vaultId]
+        if (!tree) return null
+        const parent = moveDialog.node.path.includes('/') ? moveDialog.node.path.slice(0, moveDialog.node.path.lastIndexOf('/')) : ''
+        return (
+          <MoveTargetDialog
+            itemName={moveDialog.node.name}
+            vaultName={state.vaults.find((v) => v.id === moveDialog.vaultId)?.name ?? ''}
+            folders={[...getValidDropTargets(tree, moveDialog.node.path)]}
+            currentFolder={parent}
+            onSelect={(folder) => {
+              const { vaultId, node } = moveDialog
+              setMoveDialog(null)
+              void moveNodeToFolder(vaultId, node, folder)
+            }}
+            onClose={() => setMoveDialog(null)}
+          />
+        )
+      })()}
 
       {/* Template Selector Modal */}
       {templateSelectorVaultId && apiClient && (

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useContext, useRef, useState, type ReactNode } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
 import { X, Share2, Puzzle, Pin } from 'lucide-react'
@@ -8,6 +8,8 @@ import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTabContextMenuItems } from './tab-context-menu'
 import { useLongPress } from '../hooks/useLongPress'
+import { PaneTreeContext } from '../state/paneTreeContext'
+import { listPanes } from '../state/paneTreeState'
 
 /** A single settings-page tab shown ahead of the file tabs (not draggable). */
 export interface SettingsTabDescriptor {
@@ -64,6 +66,8 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
   useIconResolutionTick()
   const { tabState, tabDispatch } = useTabContext()
   const { activeTabId } = tabState
+  // Optional: the legacy top row and tests render without a pane tree.
+  const paneTree = useContext(PaneTreeContext)?.paneTree ?? null
   const tabs = showFileTabs ? tabState.tabs : []
   const dragIndexRef = useRef<number | null>(null)
   // One instance serves all tabs: only a single finger can long-press at a time.
@@ -170,7 +174,15 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
-      items: buildTabContextMenuItems(tab, index === tabs.length - 1, tabDispatch),
+      items: buildTabContextMenuItems(tab, index === tabs.length - 1, tabDispatch, {
+        index,
+        otherPanes: paneId && onMoveTabToPane && paneTree
+          ? listPanes(paneTree)
+              .map((p, n) => ({ id: p.id, label: `Pane ${n + 1}` }))
+              .filter((p) => p.id !== paneId)
+          : [],
+        moveToPane: (toPaneId) => { if (paneId) onMoveTabToPane?.(paneId, toPaneId, tab.id) },
+      }),
     })
   }
 

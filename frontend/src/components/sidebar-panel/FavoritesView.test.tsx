@@ -384,4 +384,20 @@ describe('FavoritesView', () => {
       expect(getForVault('vault1').find((e) => e.id === g)?.label).toBe('Renamed')
     })
   })
+
+  it('moves a bookmark down and up with the context menu entries (drag alternative)', () => {
+    add('vault1', 'notes/a.md')
+    add('vault1', 'notes/b.md')
+    renderView()
+
+    const open = (label: string) => fireEvent.contextMenu(screen.getByText(label))
+    open('a')
+    fireEvent.click(within(screen.getByRole('menuitem', { name: 'Nach unten' })).getByRole('button'))
+    expect(getForVault('vault1').map((e) => e.path)).toEqual(['notes/b.md', 'notes/a.md'])
+
+    open('a')
+    expect(screen.getByRole('menuitem', { name: 'Nach unten' }).getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(within(screen.getByRole('menuitem', { name: 'Nach oben' })).getByRole('button'))
+    expect(getForVault('vault1').map((e) => e.path)).toEqual(['notes/a.md', 'notes/b.md'])
+  })
 })

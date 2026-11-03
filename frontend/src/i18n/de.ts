@@ -192,6 +192,15 @@ export const de = {
     closeOtherPanes: 'Andere Bereiche schließen',
   },
 
+  moveDialog: {
+    title: '„{name}“ verschieben',
+    searchPlaceholder: 'Ordner suchen…',
+    vaultRoot: 'Vault-Stammordner',
+    currentLocation: 'aktueller Ort',
+    noFolders: 'Keine Ordner gefunden',
+    listLabel: 'Zielordner',
+  },
+
   binaryViewer: {
     imageLoadError: 'Das Bild „{name}" konnte nicht geladen werden.',
     unsupported: 'Datei „{name}" ({type}) kann nicht angezeigt werden.',
@@ -509,7 +518,6 @@ export const de = {
     nameTooLong: 'Dateiname ist zu lang',
     copyError: 'Fehler beim Kopieren',
     copyPrompt: 'Zielordner für die Kopie:',
-    movePrompt: 'Zielordner zum Verschieben:',
   },
 
   mcpTokens: {

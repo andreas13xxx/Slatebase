@@ -198,6 +198,15 @@ export const en: TranslationShape = {
     closeOtherPanes: 'Close other panes',
   },
 
+  moveDialog: {
+    title: 'Move “{name}”',
+    searchPlaceholder: 'Search folders…',
+    vaultRoot: 'Vault root',
+    currentLocation: 'current location',
+    noFolders: 'No folders found',
+    listLabel: 'Target folders',
+  },
+
   binaryViewer: {
     imageLoadError: 'The image "{name}" could not be loaded.',
     unsupported: 'File "{name}" ({type}) cannot be displayed.',
@@ -515,7 +524,6 @@ export const en: TranslationShape = {
     nameTooLong: 'Filename is too long',
     copyError: 'Error copying file',
     copyPrompt: 'Target folder for the copy:',
-    movePrompt: 'Target folder for moving:',
   },
 
   mcpTokens: {
