@@ -350,9 +350,12 @@ export function matchesShortcut(commandId: string, event: KeyboardEvent): boolea
   })
 }
 
-/** Whether the primary modifier (`Mod`) is Cmd rather than Ctrl. */
+/**
+ * Whether the primary modifier (`Mod`) is Cmd rather than Ctrl. iPadOS in desktop mode reports
+ * `MacIntel`, but mobile mode (and iPhone) report `iPad`/`iPhone` — all of them have a Cmd key.
+ */
 export function isMacPlatform(): boolean {
-  return typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  return typeof navigator !== 'undefined' && /MAC|IPAD|IPHONE|IPOD/.test(navigator.platform.toUpperCase())
 }
 
 /**
