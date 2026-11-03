@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
-import { BasesCardsView, parseCardImage } from './BasesCardsView'
+import { BasesCardsView } from './BasesCardsView'
+import { parseCardImage } from './cardImage'
 
 const doc: BaseDocument = { views: [] }
 const row = (path: string, values: Record<string, unknown> = {}): BaseRow => ({

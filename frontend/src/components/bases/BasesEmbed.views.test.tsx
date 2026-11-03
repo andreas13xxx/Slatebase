@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
-import { BasesEmbed, embedViewKind, type IBasesEmbedApiClient } from './BasesEmbed'
+import { BasesEmbed, type IBasesEmbedApiClient } from './BasesEmbed'
+import { embedViewKind } from './pickEmbedView'
 import { dispatchRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 
 function client(rows: Array<{ path: string; fileName: string; values: Record<string, string[]> }> = []): IBasesEmbedApiClient {

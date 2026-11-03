@@ -18,6 +18,8 @@ import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contract
 import { formatFormulaValue, evaluateFormula, rowContext } from '@slatebase/shared-contracts'
 import { AppContext } from '../../state'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { parseCardImage } from './cardImage'
+import type { CardImage } from './cardImage'
 
 export interface BasesCardsViewProps {
   doc: BaseDocument
@@ -28,33 +30,6 @@ export interface BasesCardsViewProps {
 }
 
 const DEFAULT_CARD_SIZE = 200
-const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
-
-/** What the cover area shows for one card. */
-export type CardImage =
-  | { kind: 'color'; color: string }
-  | { kind: 'url'; src: string }
-  | { kind: 'file'; target: string }
-
-/** Classifies a raw image property value; null when there is nothing usable. */
-export function parseCardImage(raw: string): CardImage | null {
-  const value = raw.trim()
-  if (!value) return null
-  if (HEX_COLOR.test(value)) return { kind: 'color', color: value }
-  const wiki = /^!?\[\[([^\]|#]+)/.exec(value)
-  if (wiki) return { kind: 'file', target: wiki[1]!.trim() }
-  if (/^https?:\/\//i.test(value)) {
-    try {
-      const url = new URL(value)
-      if (url.protocol === 'http:' || url.protocol === 'https:') return { kind: 'url', src: url.href }
-    } catch {
-      return null
-    }
-    return null
-  }
-  return { kind: 'file', target: value }
-}
-
 /** Vault file URL for an image path (same raw endpoint the note viewer uses). */
 function vaultImageSrc(vaultId: string, path: string): string {
   return `/api/v1/vaults/${encodeURIComponent(vaultId)}/files?path=${encodeURIComponent(path)}&raw=true`

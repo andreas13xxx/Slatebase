@@ -24,6 +24,7 @@ import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { BasesKanbanView } from './BasesKanbanView'
 import { BasesListView } from './BasesListView'
 import { BasesCardsView } from './BasesCardsView'
+import { embedViewKind } from './pickEmbedView'
 import { BasesTableView } from './BasesTableView'
 import { pickEmbedView } from './pickEmbedView'
 
@@ -49,19 +50,6 @@ export interface BasesEmbedProps {
   onOpenNote: (path: string) => void
   /** Explicit client (CM6 widget); falls back to AppContext in reading view. */
   apiClient?: IBasesEmbedApiClient | null
-}
-
-/**
- * Which renderer an embedded view uses. Mirrors `BasesView`: a `kanban` or a
- * grouped `cards` view is the board, an ungrouped `cards` view the card grid,
- * `list` the list. Everything else (`table`, `map` — it needs the operator's
- * tile config —, unknown or plugin types) falls back to the read-only table.
- */
-export function embedViewKind(view: BaseView): 'table' | 'kanban' | 'cards' | 'list' {
-  if (view.type === 'kanban' || (view.type === 'cards' && view.groupBy)) return 'kanban'
-  if (view.type === 'cards') return 'cards'
-  if (view.type === 'list') return 'list'
-  return 'table'
 }
 
 export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, viewName, hostPath, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
