@@ -141,6 +141,10 @@ export const en: TranslationShape = {
     modeReading: 'Reading view',
     unpinTab: 'Unpin',
     unpinTabAriaLabel: 'Unpin tab: {name}',
+    moveLeft: 'Move left',
+    moveRight: 'Move right',
+    moveToOtherPane: 'Move to other pane',
+    moveToPane: 'Move to pane {n}',
   },
 
   userMenu: {
@@ -985,6 +989,8 @@ export const en: TranslationShape = {
   },
 
   bookmarkGroups: {
+    moveUp: 'Move up',
+    moveDown: 'Move down',
     newGroup: 'New group',
     defaultName: 'Group',
     newSubgroup: 'New subgroup',

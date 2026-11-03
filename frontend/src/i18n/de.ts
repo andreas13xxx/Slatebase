@@ -135,6 +135,10 @@ export const de = {
     modeReading: 'Lesemodus',
     unpinTab: 'Lösen',
     unpinTabAriaLabel: 'Tab lösen: {name}',
+    moveLeft: 'Nach links verschieben',
+    moveRight: 'Nach rechts verschieben',
+    moveToOtherPane: 'In anderen Bereich verschieben',
+    moveToPane: 'In Bereich {n} verschieben',
   },
 
   userMenu: {
@@ -979,6 +983,8 @@ export const de = {
   },
 
   bookmarkGroups: {
+    moveUp: 'Nach oben',
+    moveDown: 'Nach unten',
     newGroup: 'Neue Gruppe',
     defaultName: 'Gruppe',
     newSubgroup: 'Neue Untergruppe',

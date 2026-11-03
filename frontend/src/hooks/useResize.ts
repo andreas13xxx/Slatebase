@@ -47,6 +47,9 @@ export function useResize(
   }, [width, persistKey])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
+    // One drag at a time, by the primary pointer's main button (not a second finger, right click or pen barrel).
+    if (dragging.current || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+    const pointerId = e.pointerId
     dragging.current = true
     startX.current = e.clientX
     startWidth.current = width
@@ -54,13 +57,14 @@ export function useResize(
     document.body.style.userSelect = 'none'
 
     function onPointerMove(ev: PointerEvent) {
-      if (!dragging.current) return
+      if (!dragging.current || ev.pointerId !== pointerId) return
       const delta = side === 'left' ? ev.clientX - startX.current : startX.current - ev.clientX
       const newWidth = Math.min(max, Math.max(min, startWidth.current + delta))
       setWidth(newWidth)
     }
 
-    function onPointerUp() {
+    function onPointerUp(ev: PointerEvent) {
+      if (ev.pointerId !== pointerId) return
       dragging.current = false
       document.body.style.cursor = ''
       document.body.style.userSelect = ''

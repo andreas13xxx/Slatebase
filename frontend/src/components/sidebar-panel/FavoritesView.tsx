@@ -138,6 +138,13 @@ function entryIconClass(entry: FavoriteEntry): string {
 }
 
 /** The visible lines, depth first; the content of a folded group is left out. */
+/** The level an entry sits on (null = top level), its entries in order, and its position among them. */
+function locateAmongSiblings(byParent: Map<string | null, FavoriteEntry[]>, entry: FavoriteEntry) {
+  const parent = entry.parentId !== undefined && byParent.has(entry.parentId) ? entry.parentId : null
+  const siblings = byParent.get(parent) ?? []
+  return { parent, siblings, index: siblings.findIndex((s) => s.id === entry.id) }
+}
+
 function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set<string>): Row[] {
   const rows: Row[] = []
   const walk = (parent: string | null, depth: number): void => {
@@ -316,9 +323,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   /** One step up (-1) or down (+1) among the entries of the same level: the menu counterpart of dragging. */
   const handleNudge = useCallback((entry: FavoriteEntry, step: -1 | 1) => {
     if (!vaultId) return
-    const parent = entry.parentId !== undefined && byParent.has(entry.parentId) ? entry.parentId : null
-    const siblings = byParent.get(parent) ?? []
-    const index = siblings.findIndex((s) => s.id === entry.id)
+    const { parent, siblings, index } = locateAmongSiblings(byParent, entry)
     if (index === -1 || index + step < 0 || index + step >= siblings.length) return
     favoritesStore.moveEntry(vaultId, entry.id, parent, index + step)
     refresh()
@@ -434,12 +439,10 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     favorites.filter((g) => isGroup(g) && g.id !== entry.parentId && !withDescendants(byParent, entry.id).has(g.id))
 
   const nudgeItems = (entry: FavoriteEntry): ContextMenuItem[] => {
-    const parent = entry.parentId !== undefined && byParent.has(entry.parentId) ? entry.parentId : null
-    const siblings = byParent.get(parent) ?? []
-    const index = siblings.findIndex((s) => s.id === entry.id)
+    const { siblings, index } = locateAmongSiblings(byParent, entry)
     return [
-      { id: 'move-up', label: 'Nach oben', icon: <ArrowUp size={14} />, disabled: index <= 0 },
-      { id: 'move-down', label: 'Nach unten', icon: <ArrowDown size={14} />, disabled: index === -1 || index >= siblings.length - 1 },
+      { id: 'move-up', label: t('bookmarkGroups.moveUp'), icon: <ArrowUp size={14} />, disabled: index <= 0 },
+      { id: 'move-down', label: t('bookmarkGroups.moveDown'), icon: <ArrowDown size={14} />, disabled: index === -1 || index >= siblings.length - 1 },
     ]
   }
 

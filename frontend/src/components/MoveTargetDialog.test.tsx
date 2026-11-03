@@ -21,7 +21,7 @@ function setup() {
 describe('MoveTargetDialog', () => {
   it('selects a folder with one tap', () => {
     const { onSelect } = setup()
-    fireEvent.click(screen.getByRole('button', { name: 'archive' }))
+    fireEvent.click(screen.getByRole('button', { name: /^archive/ }))
     expect(onSelect).toHaveBeenCalledWith('work/archive')
   })
 
@@ -36,10 +36,17 @@ describe('MoveTargetDialog', () => {
     expect((screen.getByRole('button', { name: /work.*(aktueller Ort|current location)/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('shows the parent path of nested folders and finds the root by its label or vault name', () => {
+    setup()
+    expect(screen.getByRole('button', { name: /^archive\s*work$/ })).toBeTruthy() // parent hint
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'vault' } })
+    expect(screen.getByRole('button', { name: /Vault-Stammordner|Vault root/ })).toBeTruthy()
+  })
+
   it('filters by the search text and closes on overlay click', () => {
     const { onClose } = setup()
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'priv' } })
-    expect(screen.queryByRole('button', { name: 'archive' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^archive/ })).toBeNull()
     expect(screen.getByRole('button', { name: 'private' })).toBeTruthy()
     fireEvent.click(document.querySelector('.move-target-overlay') as HTMLElement)
     expect(onClose).toHaveBeenCalled()

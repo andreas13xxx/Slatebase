@@ -6862,7 +6862,7 @@
   .resize-handle::before {
     content: '';
     position: absolute;
-    inset: 0 -12px;
+    inset: 0 -8px;
   }
 }
 

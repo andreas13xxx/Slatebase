@@ -35,14 +35,21 @@ function scrollParent(el: Element | null): HTMLElement | null {
   return null
 }
 
-/** Scrolls the text caret above the keyboard if it ended up behind it. */
+/**
+ * Scrolls the text caret above the keyboard if it ended up behind it. Only for the editor
+ * (contenteditable): native inputs and textareas are scrolled into view by the browser itself.
+ */
 function revealCaret(visibleBottom: number): void {
   const active = document.activeElement
-  if (!(active instanceof HTMLElement) || !(active.isContentEditable || active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement)) return
-  const range = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0) : null
-  const rect = range?.getBoundingClientRect()
-  const caretBottom = rect && (rect.height > 0 || rect.top > 0) ? rect.bottom : active.getBoundingClientRect().bottom
-  const overflow = caretBottom + CARET_MARGIN_PX - visibleBottom
+  if (!(active instanceof HTMLElement) || !active.isContentEditable) return
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
+  const range = selection.getRangeAt(0)
+  if (!active.contains(range.commonAncestorContainer)) return
+  const rect = range.getBoundingClientRect()
+  // A caret on an empty line can report a zero rect: nothing reliable to scroll to.
+  if (rect.width === 0 && rect.height === 0 && rect.top === 0) return
+  const overflow = rect.bottom + CARET_MARGIN_PX - visibleBottom
   if (overflow <= 0) return
   const parent = scrollParent(active)
   if (parent) parent.scrollTop += overflow
@@ -60,28 +67,38 @@ export function useKeyboardViewport(): void {
     const vv = window.visualViewport
     if (!vv) return
     const root = document.documentElement
-    let lastInset = -1
+    let inset = 0
+
+    const reveal = () => {
+      // Wait for the resized layout before measuring the caret.
+      requestAnimationFrame(() => revealCaret(window.innerHeight - inset))
+    }
 
     const update = () => {
-      const inset = computeKeyboardInset(window)
-      if (inset === lastInset) return
-      lastInset = inset
-      root.style.setProperty('--keyboard-inset', `${inset}px`)
-      root.classList.toggle('keyboard-open', inset > 0)
+      const next = computeKeyboardInset(window)
+      if (next !== inset || root.style.getPropertyValue('--keyboard-inset') === '') {
+        inset = next
+        root.style.setProperty('--keyboard-inset', `${inset}px`)
+        root.classList.toggle('keyboard-open', inset > 0)
+      }
       if (inset > 0) {
         // iOS pans the page up to the focused field; the layout is resized instead, so pan back.
-        window.scrollTo(0, 0)
-        // Wait for the resized layout before measuring the caret.
-        requestAnimationFrame(() => revealCaret(window.innerHeight - inset))
+        if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0)
+        reveal()
       }
     }
 
+    // Moving to another field while the keyboard stays open changes no viewport size.
+    const onFocusIn = () => { if (inset > 0) reveal() }
+
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
+    document.addEventListener('focusin', onFocusIn)
     update()
     return () => {
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      document.removeEventListener('focusin', onFocusIn)
       root.style.removeProperty('--keyboard-inset')
       root.classList.remove('keyboard-open')
     }

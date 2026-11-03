@@ -22,8 +22,12 @@ const ICON_SIZE = 14
 /** Where the tab sits in its bar and which panes it could move to: the menu counterpart of dragging it. */
 export interface TabMoveOptions {
   index: number
+  /** Neighbouring tabs: a tab does not jump across the pinned/unpinned boundary. */
+  prev?: TabEntry
+  next?: TabEntry
+  labels: { left: string; right: string; otherPane: string; pane: (n: number) => string }
   /** Other panes the tab can be moved into; empty without a split. */
-  otherPanes: Array<{ id: string; label: string }>
+  otherPanes: Array<{ id: string; number: number }>
   moveToPane: (toPaneId: string) => void
 }
 
@@ -53,26 +57,26 @@ export function buildTabContextMenuItems(
   ]
 
   if (move) {
-    const { index, otherPanes, moveToPane } = move
+    const { index, prev, next, labels, otherPanes, moveToPane } = move
     items.push(
       { id: 'sep-move', label: '', separator: true },
       {
         id: 'move-left',
-        label: 'Nach links verschieben',
+        label: labels.left,
         icon: createElement(ArrowLeft, { size: ICON_SIZE }),
-        disabled: index === 0,
+        disabled: index === 0 || (!tab.pinned && prev?.pinned === true),
         run: () => tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex: index, toIndex: index - 1 } }),
       },
       {
         id: 'move-right',
-        label: 'Nach rechts verschieben',
+        label: labels.right,
         icon: createElement(ArrowRight, { size: ICON_SIZE }),
-        disabled: isLastTab,
+        disabled: isLastTab || (tab.pinned && next?.pinned !== true),
         run: () => tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex: index, toIndex: index + 1 } }),
       },
       ...otherPanes.map((pane) => ({
         id: `move-to-pane-${pane.id}`,
-        label: otherPanes.length === 1 ? 'In anderes Pane verschieben' : `In ${pane.label} verschieben`,
+        label: otherPanes.length === 1 ? labels.otherPane : labels.pane(pane.number),
         icon: createElement(PanelRight, { size: ICON_SIZE }),
         run: () => moveToPane(pane.id),
       })),

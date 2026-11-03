@@ -36,6 +36,9 @@ export function PaneSplitHandle({ direction, ratio, getAxisLengthPx, onResize, l
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // One drag at a time, by the primary pointer's main button (not a second finger or right click).
+      if (dragging.current || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+      const pointerId = e.pointerId
       dragging.current = true
       startPos.current = isHorizontal ? e.clientX : e.clientY
       startRatio.current = ratio
@@ -44,12 +47,13 @@ export function PaneSplitHandle({ direction, ratio, getAxisLengthPx, onResize, l
       document.body.style.userSelect = 'none'
 
       const onPointerMove = (ev: PointerEvent) => {
-        if (!dragging.current || axisLen.current <= 0) return
+        if (!dragging.current || ev.pointerId !== pointerId || axisLen.current <= 0) return
         const pos = isHorizontal ? ev.clientX : ev.clientY
         const deltaRatio = (pos - startPos.current) / axisLen.current
         onResize(clamp(startRatio.current + deltaRatio))
       }
-      const onPointerUp = () => {
+      const onPointerUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
         dragging.current = false
         document.body.style.cursor = ''
         document.body.style.userSelect = ''

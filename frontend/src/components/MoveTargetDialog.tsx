@@ -29,10 +29,10 @@ export function MoveTargetDialog({ itemName, vaultName, folders, currentFolder, 
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return [...folders]
-      .sort((a, b) => a.localeCompare(b))
-      .filter((path) => (path === '' ? vaultName : path).toLowerCase().includes(q))
-  }, [folders, query, vaultName])
+    // Match what the row shows: the root by its label and the vault name, others by their full path.
+    const matches = (path: string) => (path === '' ? `${t('moveDialog.vaultRoot')} ${vaultName}` : path).toLowerCase().includes(q)
+    return [...folders].sort((a, b) => a.localeCompare(b)).filter(matches)
+  }, [folders, query, vaultName, t])
 
   return (
     <div
@@ -68,6 +68,7 @@ export function MoveTargetDialog({ itemName, vaultName, folders, currentFolder, 
                 >
                   <Folder size={14} aria-hidden="true" />
                   <span className="move-target-item-name">{path === '' ? t('moveDialog.vaultRoot') : path.split('/').pop()}</span>
+                  {depth > 1 && <span className="move-target-item-note">{path.slice(0, path.lastIndexOf('/'))}</span>}
                   {isCurrent && <span className="move-target-item-note">{t('moveDialog.currentLocation')}</span>}
                 </button>
               </li>

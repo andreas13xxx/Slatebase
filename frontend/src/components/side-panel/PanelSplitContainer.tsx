@@ -69,6 +69,8 @@ export function PanelSplitContainer({
 }: PanelSplitContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [resizingIndex, setResizingIndex] = useState<number | null>(null)
+  /** The pointer that owns the running resize drag; other pointers are ignored meanwhile. */
+  const resizingPointerRef = useRef<number | null>(null)
   const [showDropIndicator, setShowDropIndicator] = useState(false)
   const startYRef = useRef(0)
   const startFractionsRef = useRef<number[]>([])
@@ -80,7 +82,10 @@ export function PanelSplitContainer({
 
   /** Handle pointerdown (mouse, pen or touch) on a resize handle between sections. */
   const handleResizeStart = useCallback((e: React.PointerEvent, handleIndex: number) => {
+    // One drag at a time, by the primary pointer's main button (not a second finger or right click).
+    if (resizingPointerRef.current !== null || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
     e.preventDefault()
+    resizingPointerRef.current = e.pointerId
     setResizingIndex(handleIndex)
     startYRef.current = e.clientY
     startFractionsRef.current = sections.map((s) => s.heightFraction)
@@ -122,6 +127,7 @@ export function PanelSplitContainer({
     if (resizingIndex === null) return
 
     const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerId !== resizingPointerRef.current) return
       const containerHeight = panelHeight
       if (containerHeight <= 0) return
 
@@ -156,7 +162,9 @@ export function PanelSplitContainer({
       onResize(fractions)
     }
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== resizingPointerRef.current) return
+      resizingPointerRef.current = null
       setResizingIndex(null)
     }
 

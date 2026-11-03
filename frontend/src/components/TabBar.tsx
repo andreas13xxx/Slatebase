@@ -176,9 +176,17 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
       y: e.clientY,
       items: buildTabContextMenuItems(tab, index === tabs.length - 1, tabDispatch, {
         index,
+        prev: tabs[index - 1],
+        next: tabs[index + 1],
+        labels: {
+          left: t('tabs.moveLeft'),
+          right: t('tabs.moveRight'),
+          otherPane: t('tabs.moveToOtherPane'),
+          pane: (n) => t('tabs.moveToPane', { n }),
+        },
         otherPanes: paneId && onMoveTabToPane && paneTree
           ? listPanes(paneTree)
-              .map((p, n) => ({ id: p.id, label: `Pane ${n + 1}` }))
+              .map((p, n) => ({ id: p.id, number: n + 1 }))
               .filter((p) => p.id !== paneId)
           : [],
         moveToPane: (toPaneId) => { if (paneId) onMoveTabToPane?.(paneId, toPaneId, tab.id) },

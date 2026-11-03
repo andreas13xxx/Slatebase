@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { useAppContext, exportVault } from '../state'
 import { useTabContext } from '../state/tabContext'
 import { useTranslation } from '../i18n'
@@ -91,6 +91,13 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   const [expandedVaults, setExpandedVaults] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedVaults))
   const [showCreateVaultForm, setShowCreateVaultForm] = useState(false)
   const [moveDialog, setMoveDialog] = useState<{ node: DirectoryTree; vaultId: string } | null>(null)
+  // Folders the item of the open "Move to…" dialog may go into; empty (not a stuck dialog) if the tree was unloaded meanwhile.
+  const moveTree = moveDialog ? state.vaultTrees[moveDialog.vaultId] : undefined
+  const moveNodePath = moveDialog?.node.path
+  const moveFolders = useMemo(
+    () => (moveTree && moveNodePath !== undefined ? [...getValidDropTargets(moveTree, moveNodePath)] : []),
+    [moveTree, moveNodePath],
+  )
   const [newVaultName, setNewVaultName] = useState('')
   const [vaultValidationError, setVaultValidationError] = useState<string | null>(null)
   const [dragState, setDragState] = useState<DragState>({
@@ -1572,25 +1579,20 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       />
 
       {/* Move-to folder picker */}
-      {moveDialog && (() => {
-        const tree = state.vaultTrees[moveDialog.vaultId]
-        if (!tree) return null
-        const parent = moveDialog.node.path.includes('/') ? moveDialog.node.path.slice(0, moveDialog.node.path.lastIndexOf('/')) : ''
-        return (
-          <MoveTargetDialog
-            itemName={moveDialog.node.name}
-            vaultName={state.vaults.find((v) => v.id === moveDialog.vaultId)?.name ?? ''}
-            folders={[...getValidDropTargets(tree, moveDialog.node.path)]}
-            currentFolder={parent}
-            onSelect={(folder) => {
-              const { vaultId, node } = moveDialog
-              setMoveDialog(null)
-              void moveNodeToFolder(vaultId, node, folder)
-            }}
-            onClose={() => setMoveDialog(null)}
-          />
-        )
-      })()}
+      {moveDialog && (
+        <MoveTargetDialog
+          itemName={moveDialog.node.name}
+          vaultName={state.vaults.find((v) => v.id === moveDialog.vaultId)?.name ?? ''}
+          folders={moveFolders}
+          currentFolder={moveDialog.node.path.includes('/') ? moveDialog.node.path.slice(0, moveDialog.node.path.lastIndexOf('/')) : ''}
+          onSelect={(folder) => {
+            const { vaultId, node } = moveDialog
+            setMoveDialog(null)
+            void moveNodeToFolder(vaultId, node, folder)
+          }}
+          onClose={() => setMoveDialog(null)}
+        />
+      )}
 
       {/* Template Selector Modal */}
       {templateSelectorVaultId && apiClient && (
