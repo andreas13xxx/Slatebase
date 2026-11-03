@@ -83,6 +83,9 @@ export interface BaseGroupBy {
   direction?: string
 }
 
+/** One `groupOrder` entry: a group value, or `null` for entries without a value. */
+export type BaseGroupValue = string | number | boolean | null
+
 /** Per-view summary assignment: column id → named summary (e.g. `Average`). */
 export type BaseSummaries = Record<string, string>
 
@@ -109,6 +112,20 @@ export interface BaseView {
   filters?: BaseFilterNode
   /** Maximum rows this view shows. */
   limit?: number
+  /**
+   * Ordered list of `groupBy` values to show. When set, only these groups appear,
+   * in this order; an empty list hides all groups; `null` is the group of entries
+   * with no value (Obsidian 1.14.3).
+   */
+  groupOrder?: BaseGroupValue[]
+  /** Cards: property (column id) holding the card image (attachment link, URL or `#hex` colour). */
+  image?: string
+  /** Cards: `cover` (crops, default) or `contain` (no crop). */
+  imageFit?: string
+  /** Cards: image aspect ratio as width / height (default 1). */
+  imageAspectRatio?: number
+  /** Cards: card width in px (default 200). */
+  cardSize?: number
   /** Column id → named summary aggregation. */
   summaries?: BaseSummaries
   /** Unknown fields preserved for round-trip compatibility. */
@@ -209,6 +226,8 @@ export interface BaseQueryRowWire {
   tags?: string[] | undefined
   /** Internal link targets in the file (`file.links`), vault-relative. */
   links?: string[] | undefined
+  /** Embed targets in the file (`file.embeds`), vault-relative. */
+  embeds?: string[] | undefined
   /** File size in bytes (`file.size`), when the base referenced it. */
   size?: number | undefined
   /** Vault-relative paths of files linking to this one (`file.backlinks`). */

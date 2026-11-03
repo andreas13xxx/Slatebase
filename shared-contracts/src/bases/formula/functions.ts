@@ -21,8 +21,15 @@ export interface LinkValue {
   display?: string
 }
 
+/** A regular-expression value (`/abc/g` literal). */
+export interface RegexValue {
+  readonly kind: 'regex'
+  source: string
+  flags: string
+}
+
 /** A formula/expression value. */
-export type FormulaValue = string | number | boolean | Date | FormulaValue[] | LinkValue | null
+export type FormulaValue = string | number | boolean | Date | FormulaValue[] | LinkValue | RegexValue | null
 
 /** Signature shared by every built-in global function. */
 export type FormulaFn = (args: FormulaValue[]) => FormulaValue
@@ -31,7 +38,27 @@ const MS_PER_DAY = 86_400_000
 
 /** True when a value is a link object. */
 export function isLink(value: FormulaValue): value is LinkValue {
-  return typeof value === 'object' && value !== null && !(value instanceof Date) && !Array.isArray(value)
+  return typeof value === 'object' && value !== null && !(value instanceof Date) && !Array.isArray(value) && value.kind === 'link'
+}
+
+/** True when a value is a regular expression. */
+export function isRegex(value: FormulaValue): value is RegexValue {
+  return typeof value === 'object' && value !== null && !(value instanceof Date) && !Array.isArray(value) && value.kind === 'regex'
+}
+
+/** Longest regex source a formula may use. */
+const MAX_REGEX_SOURCE = 200
+
+/** Builds a JS RegExp from a regex value; null for an invalid pattern. */
+export function toRegExp(value: RegexValue, extraFlags = ''): RegExp | null {
+  // A base is evaluated server-side too (MCP `query_base`): keep patterns short so a
+  // pasted pathological one cannot be arbitrarily large. Backtracking cost is not bounded.
+  if (value.source.length > MAX_REGEX_SOURCE) return null
+  try {
+    return new RegExp(value.source, [...new Set(value.flags + extraFlags)].join(''))
+  } catch {
+    return null
+  }
 }
 
 /** Coerces a value to a Date, or null when it cannot be parsed. */
@@ -63,6 +90,7 @@ export function stringify(v: FormulaValue): string {
   if (v instanceof Date) return v.toISOString()
   if (Array.isArray(v)) return v.map(stringify).join(', ')
   if (isLink(v)) return v.display ?? v.path
+  if (isRegex(v)) return `/${v.source}/${v.flags}`
   return String(v)
 }
 
@@ -75,6 +103,7 @@ export function isTruthy(value: FormulaValue): boolean {
   if (value instanceof Date) return !Number.isNaN(value.getTime())
   if (Array.isArray(value)) return value.length > 0
   if (isLink(value)) return value.path.length > 0
+  if (isRegex(value)) return true
   return false
 }
 
@@ -141,6 +170,31 @@ export const FORMULA_FUNCTIONS: Record<string, FormulaFn> = {
     if (display) l.display = display
     return l
   },
+
+  /** file(path) / image(path) — a link value to a vault file (an image is rendered as a link). */
+  file: (args) => FORMULA_FUNCTIONS['link']!(args.slice(0, 1)),
+  image: (args) => FORMULA_FUNCTIONS['link']!(args.slice(0, 1)),
+
+  /** icon(name) — a Lucide icon name; rendered as its name (no icon model in the value set). */
+  icon: (args) => stringify(args[0] ?? null),
+
+  /** html(string) — passed through as text (cells never inject raw HTML). */
+  html: (args) => stringify(args[0] ?? null),
+
+  /** escapeHTML(string) — escapes &, <, >, " and '. */
+  escapeHTML: (args) => stringify(args[0] ?? null)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
+
+  /** duration(string) — a duration in milliseconds (so `duration('5h') * 2` and date arithmetic work). */
+  duration: (args) => {
+    const v = args[0] ?? null
+    if (typeof v === 'number') return v
+    return parseDurationMs(stringify(v))
+  },
+
+  /** random() — a number in [0, 1). */
+  random: () => Math.random(),
 
   /** min(...numbers) — smallest numeric argument, null when none numeric. */
   min: (args) => {

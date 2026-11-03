@@ -22,6 +22,8 @@ export type ExprNode =
   | { kind: 'number'; value: number }
   | { kind: 'string'; value: string }
   | { kind: 'boolean'; value: boolean }
+  /** Regex literal, e.g. `/abc/g`. */
+  | { kind: 'regex'; source: string; flags: string }
   /** A bare or dotted property reference, e.g. `status`, `note.price`, `file.name`. */
   | { kind: 'property'; name: string }
   /** Unary minus or logical not. */

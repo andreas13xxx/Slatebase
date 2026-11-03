@@ -32,7 +32,7 @@ Specs gebündelt statt einzeln spezifiziert.
 
 > **Zurückgestellte Reste ausgelieferter Features** (nicht in der Summe oben, siehe eigenen
 > Abschnitt unten): Split-Panes — gespeicherte, benannte Workspace-Layouts + Workspace-Switcher;
-> Bases — nur noch die erweiterte Ausdruckssprache (Lambdas/`map`/`filter`, custom `summaries`-Formeln, `file.embeds`); R1–R7 der Spec `bases-feature-completion` sind umgesetzt.
+> Bases — nur noch kleine Reste (Tabellen-Zeilenhöhe und Listen-Optionen, deren YAML-Schlüssel nicht belegt sind; Objekt-Typ); Lambdas, Regexp, custom `summaries`, `file.embeds`, Cards-Optionen, `groupOrder` und Einbettung mit eigenem Ansichtstyp + Live-Update sind in `bases-obsidian-parity` umgesetzt.
 
 ## Abhängigkeiten
 
@@ -194,8 +194,8 @@ mit konservativem Prädikat-Pushdown (Property-Gleichheit/`file.hasTag`/`file.in
 Kappung) + sichtbarem `truncated`-Hinweis; Property-Typ Liste/Skalar (beobachtet + Registry);
 `summaries`-Aggregation (Tabelle, Kanban-Header, MCP); `file.size`/`file.backlinks`; `![[file.base]]`-Embed + `bases:add-item`; sortierbare Formelspalten (clientseitig); Welcome-Vault-
 Guides + Beispiele DE/EN erweitert. Danach: Inline-```` ```base ````-Codeblock in Notizen (Live Preview + Reading View), `bases:insert` fügt ihn ein. Spec `bases-embed-this-and-views`: `![[x.base#Ansicht]]` (benannte Ansicht, unbekannter Name = sichtbarer Fehler) und `this` (einbettende Notiz) in Filtern/Formeln. Bewusst offen: echte `cards`/`list`/`map`-Ansichten in der Einbettung (nur Tabelle), Aktualisierung der Einbettung bei `vault:change`, `this` in Plugin-Ansichten und im MCP-Werkzeug.
-**Noch zurückgestellt:** Lambdas/`map`/`filter` in der Ausdruckssprache, custom `summaries`-Formeln
-über `values`, `file.embeds` (bräuchte getrennte Embed-Markierung im Index).
+**Umgesetzt (Spec `bases-obsidian-parity`):** Lambdas (`map`/`filter`/`reduce`), Regexp-Literale, ~50 weitere Funktionen/Methoden, custom `summaries`-Formeln über `values`, `file.embeds` (getrennte Embed-Markierung im Link-Index), `groupOrder`, `type: kanban`, Cards-Raster mit `image`/`imageFit`/`imageAspectRatio`/`cardSize`, Einbettung mit echtem Ansichtstyp (außer `map`) und Live-Update bei `vault:change`.
+**Noch zurückgestellt:** Tabellen-Zeilenhöhe und Listen-Optionen (YAML-Schlüssel nicht belegt), Objekt-Typ, Copy/CSV-Export, `this` im MCP-Tool.
 Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).
 
 ---

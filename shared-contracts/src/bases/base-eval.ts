@@ -129,7 +129,7 @@ export function buildHostQuerySpec(doc: BaseDocument, view: BaseView, hostPath: 
  * these keys are therefore never unwrapped (`tags.contains(..)` must behave the
  * same for one tag and for two).
  */
-const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links', 'file.backlinks'])
+const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links', 'file.embeds', 'file.backlinks'])
 
 /**
  * Converts an index value to an expression value. A one-element list reads as a
@@ -218,6 +218,11 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
         // Match the folder itself or any descendant path.
         return own === target || own.startsWith(target + '/') || row.path.toLowerCase().startsWith(target + '/')
       },
+      hasProperty: (name: string) => {
+        const v = values[name.startsWith('note.') ? name.slice('note.'.length) : name]
+        return v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0)
+      },
+      asLink: (display?: string) => (display ? { kind: 'link', path: row.path, display } : { kind: 'link', path: row.path }),
       hasLink: (target: string) => {
         const needle = linkKey(target)
         // An empty target names no file — match nothing (e.g. `this.file` without a host).
@@ -257,6 +262,7 @@ export function wireRowToBaseRow(r: BaseQueryRowWire, listKeys?: ReadonlySet<str
   if (r.folder !== undefined) values['file.folder'] = r.folder
   if (r.tags !== undefined) values['file.tags'] = r.tags
   if (r.links !== undefined) values['file.links'] = r.links
+  if (r.embeds !== undefined) values['file.embeds'] = r.embeds
   if (r.size !== undefined) values['file.size'] = r.size
   if (r.backlinks !== undefined) values['file.backlinks'] = r.backlinks
   return listKeys

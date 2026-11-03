@@ -8,7 +8,7 @@
  */
 
 import moment from 'moment'
-import { toDate, toNumber, stringify, isLink, type FormulaValue } from './functions.js'
+import { toDate, toNumber, stringify, isLink, isRegex, isTruthy, toRegExp, type FormulaValue } from './functions.js'
 
 /** A method implementation: receiver + evaluated args → value. */
 export type MethodFn = (receiver: FormulaValue, args: FormulaValue[]) => FormulaValue
@@ -23,9 +23,40 @@ const stringMethods: Record<string, MethodFn> = {
   lower: (r) => stringify(r).toLowerCase(),
   upper: (r) => stringify(r).toUpperCase(),
   trim: (r) => stringify(r).trim(),
-  replace: (r, a) => stringify(r).split(stringify(a[0] ?? null)).join(stringify(a[1] ?? null)),
-  split: (r, a) => stringify(r).split(stringify(a[0] ?? null)),
+  replace: (r, a) => {
+    const pattern = a[0] ?? null
+    const replacement = stringify(a[1] ?? null)
+    if (isRegex(pattern)) {
+      // Like JS: without the `g` flag only the first match is replaced.
+      const re = toRegExp(pattern)
+      return re ? stringify(r).replace(re, replacement) : stringify(r)
+    }
+    // Plain string pattern: every occurrence (the historic Slatebase behaviour).
+    return stringify(r).split(stringify(pattern)).join(replacement)
+  },
+  split: (r, a) => {
+    const sep = a[0] ?? null
+    const limit = toNumber(a[1] ?? null)
+    const re = isRegex(sep) ? toRegExp(sep) : null
+    const parts = re ? stringify(r).split(re) : stringify(r).split(stringify(sep))
+    return limit !== null && limit >= 0 ? parts.slice(0, Math.trunc(limit)) : parts
+  },
   length: (r) => stringify(r).length,
+  containsAll: (r, a) => a.every((x) => stringify(r).includes(stringify(x))),
+  containsAny: (r, a) => a.some((x) => stringify(r).includes(stringify(x))),
+  repeat: (r, a) => stringify(r).repeat(Math.max(0, Math.min(10_000, Math.trunc(toNumber(a[0] ?? null) ?? 0)))),
+  reverse: (r) => [...stringify(r)].reverse().join(''),
+  slice: (r, a) => stringify(r).slice(toNumber(a[0] ?? null) ?? 0, toNumber(a[1] ?? null) ?? undefined),
+  title: (r) => stringify(r).replace(/\b\p{L}[\p{L}\p{N}']*/gu, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()),
+}
+
+/** Regexp receiver: `/abc/.matches("abcd")`. */
+const regexMethods: Record<string, MethodFn> = {
+  matches: (r, a) => {
+    if (!isRegex(r)) return false
+    const re = toRegExp(r)
+    return re ? re.test(stringify(a[0] ?? null)) : false
+  },
 }
 
 const numberMethods: Record<string, MethodFn> = {
@@ -46,6 +77,14 @@ const numberMethods: Record<string, MethodFn> = {
     const n = toNumber(r)
     return n === null ? null : Math.abs(n)
   },
+  ceil: (r) => {
+    const n = toNumber(r)
+    return n === null ? null : Math.ceil(n)
+  },
+  floor: (r) => {
+    const n = toNumber(r)
+    return n === null ? null : Math.floor(n)
+  },
 }
 
 const dateMethods: Record<string, MethodFn> = {
@@ -64,6 +103,10 @@ const dateMethods: Record<string, MethodFn> = {
     const d = toDate(r)
     return d ? moment(d).format('HH:mm:ss') : ''
   },
+  relative: (r) => {
+    const d = toDate(r)
+    return d ? moment(d).fromNow() : ''
+  },
 }
 
 const listMethods: Record<string, MethodFn> = {
@@ -76,11 +119,86 @@ const listMethods: Record<string, MethodFn> = {
   join: (r, a) => (Array.isArray(r) ? r.map(stringify).join(stringify(a[0] ?? null)) : stringify(r)),
   first: (r) => (Array.isArray(r) && r.length > 0 ? r[0]! : null),
   last: (r) => (Array.isArray(r) && r.length > 0 ? r[r.length - 1]! : null),
+  containsAll: (r, a) => Array.isArray(r) && a.every((x) => listHas(r, x)),
+  containsAny: (r, a) => Array.isArray(r) && a.some((x) => listHas(r, x)),
+  flat: (r) => (Array.isArray(r) ? r.flatMap((x) => (Array.isArray(x) ? x : [x])) : []),
+  reverse: (r) => (Array.isArray(r) ? [...r].reverse() : []),
+  slice: (r, a) => (Array.isArray(r) ? r.slice(toNumber(a[0] ?? null) ?? 0, toNumber(a[1] ?? null) ?? undefined) : []),
+  sort: (r) => (Array.isArray(r) ? [...r].sort(compareValues) : []),
+  unique: (r) => {
+    if (!Array.isArray(r)) return []
+    const seen = new Set<string>()
+    return r.filter((x) => {
+      const k = `${typeof x}:${stringify(x)}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+  },
+  // Aggregates: not in Obsidian's documented list methods, but its custom-summary
+  // example uses `values.mean()`, so the usual ones are accepted on lists.
+  sum: (r) => numbersOf(r).reduce((x, y) => x + y, 0),
+  mean: (r) => {
+    const nums = numbersOf(r)
+    return nums.length ? nums.reduce((x, y) => x + y, 0) / nums.length : null
+  },
+  min: (r) => {
+    const nums = numbersOf(r)
+    return nums.length ? Math.min(...nums) : null
+  },
+  max: (r) => {
+    const nums = numbersOf(r)
+    return nums.length ? Math.max(...nums) : null
+  },
+}
+
+function listHas(list: FormulaValue[], needle: FormulaValue): boolean {
+  const n = stringify(needle).toLowerCase()
+  return list.some((item) => stringify(item).toLowerCase() === n)
+}
+
+function numbersOf(list: FormulaValue): number[] {
+  if (!Array.isArray(list)) return []
+  return list.map(toNumber).filter((n): n is number => n !== null)
+}
+
+/** Default list ordering: numbers numerically, dates by time, everything else as text. */
+function compareValues(a: FormulaValue, b: FormulaValue): number {
+  if (a === null) return b === null ? 0 : 1
+  if (b === null) return -1
+  if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime()
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return stringify(a).localeCompare(stringify(b))
+}
+
+/** Methods every value has (`isEmpty`, `isTruthy`, `isType`). */
+function typeName(v: FormulaValue): string {
+  if (v === null) return 'null'
+  if (Array.isArray(v)) return 'list'
+  if (v instanceof Date) return 'date'
+  if (isLink(v)) return 'link'
+  if (isRegex(v)) return 'regexp'
+  return typeof v
+}
+
+const universalMethods: Record<string, MethodFn> = {
+  isEmpty: (r) => r === null || r === '' || (Array.isArray(r) && r.length === 0),
+  isTruthy: (r) => isTruthy(r),
+  isType: (r, a) => typeName(r) === stringify(a[0] ?? null).toLowerCase(),
 }
 
 const linkMethods: Record<string, MethodFn> = {
   // asLink/toString-ish helpers plugins occasionally call on links.
   toString: (r: FormulaValue) => stringify(r),
+  // A link doubles as its file reference in this value model.
+  asFile: (r) => r,
+  linksTo: (r, a) => {
+    if (!isLink(r)) return false
+    const target = a[0] ?? null
+    const t = (isLink(target) ? target.path : stringify(target)).replace(/\.md$/i, '').toLowerCase()
+    const own = r.path.replace(/\.md$/i, '').toLowerCase()
+    return t !== '' && (own === t || own.endsWith('/' + t) || t.endsWith('/' + own))
+  },
 }
 
 /** Date member fields (`now().hour`), returned as numbers. */
@@ -98,7 +216,11 @@ export const DATE_MEMBERS: Record<string, (d: Date) => number> = {
  * unknown method on the receiver's type.
  */
 export function callMethod(receiver: FormulaValue, method: string, args: FormulaValue[]): FormulaValue {
-  // Length is universal-ish; try the type-specific tables first.
+  if (isRegex(receiver)) {
+    const fn = regexMethods[method]
+    if (fn) return fn(receiver, args)
+  }
+  // Type-specific tables first, then the methods every value has.
   if (Array.isArray(receiver)) {
     const fn = listMethods[method]
     if (fn) return fn(receiver, args)
@@ -122,6 +244,8 @@ export function callMethod(receiver: FormulaValue, method: string, args: Formula
     const dateFn = typeof receiver === 'string' && toDate(receiver) ? dateMethods[method] : undefined
     if (dateFn) return dateFn(receiver, args)
   }
+  const universal = universalMethods[method]
+  if (universal) return universal(receiver, args)
   throw new MethodError(`Unknown method '${method}' on ${describeType(receiver)}`)
 }
 

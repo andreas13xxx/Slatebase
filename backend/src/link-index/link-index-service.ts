@@ -11,7 +11,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { ILogger } from '../logger/index.js'
-import type { ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, BaseQuerySpec, BaseQueryNode, BaseQueryCondition, BaseQueryRow, BaseQueryResult, BaseQueryOperator } from './types.js'
+import type { ParsedWikilink, ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, BaseQuerySpec, BaseQueryNode, BaseQueryCondition, BaseQueryRow, BaseQueryResult, BaseQueryOperator } from './types.js'
 import { extractWikilinks } from './wikilink-parser.js'
 import { extractTags } from './tag-extractor.js'
 import { extractProperties } from './property-extractor.js'
@@ -32,6 +32,8 @@ interface LinkIndexJsonV2 {
   forwardLinks: Record<string, string[]>
   tags: Record<string, string[]>
   properties: Record<string, Record<string, string[]>>
+  /** Embed targets per file (`file.embeds`). Absent in indexes written before it existed → rebuild on load. */
+  embeds?: Record<string, string[]>
 }
 
 /** Union type for all supported persisted schemas. */
@@ -102,6 +104,8 @@ export function extractFrontmatterTags(properties: Record<string, string[]>): st
 
 export class LinkIndexService implements ILinkIndex {
   private readonly forwardLinks: Map<string, Set<string>> = new Map()
+  /** Embed targets (`![[x]]`) per file — a subset of what `forwardLinks` holds. */
+  private readonly fileEmbeds: Map<string, Set<string>> = new Map()
   private readonly backlinks: Map<string, Set<string>> = new Map()
   private readonly fileTags: Map<string, Set<string>> = new Map()
   private readonly fileProperties: Map<string, Map<string, string[]>> = new Map()
@@ -136,6 +140,7 @@ export class LinkIndexService implements ILinkIndex {
   async rebuild(): Promise<void> {
     this.invalidateObservedListKeys()
     this.forwardLinks.clear()
+    this.fileEmbeds.clear()
     this.backlinks.clear()
     this.fileTags.clear()
     this.fileProperties.clear()
@@ -191,6 +196,7 @@ export class LinkIndexService implements ILinkIndex {
         targets.add(normalizedTarget)
       }
       this.forwardLinks.set(normalizedPath, targets)
+      this.fileEmbeds.delete(normalizedPath)
 
       // Add new entries to reverse map
       for (const target of targets) {
@@ -216,6 +222,7 @@ export class LinkIndexService implements ILinkIndex {
         targets.add(normalizedTarget)
       }
       this.forwardLinks.set(normalizedPath, targets)
+      this.setEmbeds(normalizedPath, links)
 
       // Add new entries to reverse map
       for (const target of targets) {
@@ -322,6 +329,7 @@ export class LinkIndexService implements ILinkIndex {
 
     // Remove old entries
     this.forwardLinks.delete(normalizedOld)
+    this.fileEmbeds.delete(normalizedOld)
     const oldTags = this.fileTags.get(normalizedOld)
     const oldProps = this.fileProperties.get(normalizedOld)
     this.fileTags.delete(normalizedOld)
@@ -337,6 +345,7 @@ export class LinkIndexService implements ILinkIndex {
       targets.add(normalizedTarget)
     }
     this.forwardLinks.set(normalizedNew, targets)
+    this.setEmbeds(normalizedNew, links)
 
     // Add new entries to reverse map
     for (const target of targets) {
@@ -872,6 +881,8 @@ export class LinkIndexService implements ILinkIndex {
     if (tags && tags.size > 0) row.tags = Array.from(tags)
     const links = this.forwardLinks.get(filePath)
     if (links && links.size > 0) row.links = Array.from(links)
+    const embeds = this.fileEmbeds.get(filePath)
+    if (embeds && embeds.size > 0) row.embeds = Array.from(embeds)
     // Backlinks are cheap (reverse map already built) — always included.
     const backlinks = this.getBacklinks(filePath)
     if (backlinks.length > 0) row.backlinks = backlinks
@@ -1032,6 +1043,8 @@ export class LinkIndexService implements ILinkIndex {
 
       // Clear all maps
       this.forwardLinks.clear()
+      this.fileEmbeds.clear()
+    this.fileEmbeds.clear()
       this.backlinks.clear()
       this.fileTags.clear()
       this.fileProperties.clear()
@@ -1046,6 +1059,19 @@ export class LinkIndexService implements ILinkIndex {
         })
         await this.rebuild()
         return
+      }
+
+      if (data.embeds === undefined) {
+        // Written before `file.embeds` existed: one rebuild fills it.
+        this.logger.info('Link index without embeds detected, triggering rebuild', {
+          vaultId: this.vaultId,
+          vaultName: this.vaultName,
+        })
+        await this.rebuild()
+        return
+      }
+      for (const [filePath, targets] of Object.entries(data.embeds)) {
+        if (targets.length > 0) this.fileEmbeds.set(filePath, new Set(targets))
       }
 
       // v2: Load forward links, tags, and properties
@@ -1152,12 +1178,23 @@ export class LinkIndexService implements ILinkIndex {
       // Reverse map first — it reads the forward links that follow it.
       this.removeFromReverseMap(target)
       this.forwardLinks.delete(target)
+      this.fileEmbeds.delete(target)
       this.fileTags.delete(target)
       this.removeFromPropertyValueIndex(target)
       this.fileProperties.delete(target)
     }
 
     return targets
+  }
+
+  /** Records the `![[...]]` targets of one file (clears the entry when it has none). */
+  private setEmbeds(normalizedPath: string, links: ParsedWikilink[]): void {
+    const embeds = new Set<string>()
+    for (const link of links) {
+      if (link.embed && link.target !== '') embeds.add(normalizeLinkPath(link.target))
+    }
+    if (embeds.size > 0) this.fileEmbeds.set(normalizedPath, embeds)
+    else this.fileEmbeds.delete(normalizedPath)
   }
 
   /**
@@ -1174,17 +1211,20 @@ export class LinkIndexService implements ILinkIndex {
         targets.add(normalizeLinkPath(ref))
       }
       this.forwardLinks.set(normalizedPath, targets)
+      this.fileEmbeds.delete(normalizedPath)
       this.fileTags.delete(normalizedPath)
       this.fileProperties.delete(normalizedPath)
       return
     }
 
     const targets = new Set<string>()
-    for (const link of extractWikilinks(content)) {
+    const parsedLinks = extractWikilinks(content)
+    for (const link of parsedLinks) {
       if (link.target === '') continue
       targets.add(normalizeLinkPath(link.target))
     }
     this.forwardLinks.set(normalizedPath, targets)
+    this.setEmbeds(normalizedPath, parsedLinks)
 
     const properties = extractProperties(content)
     if (Object.keys(properties).length > 0) {
@@ -1236,6 +1276,7 @@ export class LinkIndexService implements ILinkIndex {
 
     for (const indexedPath of stale) {
       this.forwardLinks.delete(indexedPath)
+      this.fileEmbeds.delete(indexedPath)
       this.fileTags.delete(indexedPath)
       this.fileProperties.delete(indexedPath)
     }
@@ -1415,6 +1456,7 @@ export class LinkIndexService implements ILinkIndex {
         forwardLinks: this.serializeForwardLinks(),
         tags: this.serializeTags(),
         properties: this.serializeProperties(),
+        embeds: Object.fromEntries(Array.from(this.fileEmbeds, ([k, v]) => [k, Array.from(v)])),
       }
 
       const json = JSON.stringify(data, null, 2)

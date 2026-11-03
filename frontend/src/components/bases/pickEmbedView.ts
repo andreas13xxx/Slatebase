@@ -14,3 +14,16 @@ export function pickEmbedView(doc: BaseDocument, viewName: string | undefined): 
   const first = doc.views[0]
   return first ? { view: first } : { error: 'Base hat keine Ansicht' }
 }
+
+/**
+ * Which renderer an embedded view uses. Mirrors `BasesView`: a `kanban` or a
+ * grouped `cards` view is the board, an ungrouped `cards` view the card grid,
+ * `list` the list. Everything else (`table`, `map` — it needs the operator's
+ * tile config —, unknown or plugin types) falls back to the read-only table.
+ */
+export function embedViewKind(view: BaseView): 'table' | 'kanban' | 'cards' | 'list' {
+  if (view.type === 'kanban' || (view.type === 'cards' && view.groupBy)) return 'kanban'
+  if (view.type === 'cards') return 'cards'
+  if (view.type === 'list') return 'list'
+  return 'table'
+}

@@ -18,6 +18,7 @@
 export type TokenType =
   | 'number'
   | 'string'
+  | 'regex'
   | 'boolean'
   | 'identifier'
   | 'operator'
@@ -34,6 +35,8 @@ export interface Token {
   type: TokenType
   value: string
   pos: number
+  /** Regex literal flags (`regex` tokens only). */
+  flags?: string
 }
 
 /** Raised when the source contains a character the tokenizer cannot read. */
@@ -144,12 +147,48 @@ export function tokenize(source: string): Token[] {
     // a dotted identifier (handled in the identifier branch below).
     if (ch === '.') {
       const prev = lastSignificant()
-      if (prev && (prev.type === 'rparen' || prev.type === 'rbracket' || prev.type === 'string' || prev.type === 'number')) {
+      if (prev && (prev.type === 'rparen' || prev.type === 'rbracket' || prev.type === 'string' || prev.type === 'number' || prev.type === 'regex')) {
         tokens.push({ type: 'dot', value: '.', pos: i })
         i++
         continue
       }
       throw new FormulaTokenizeError(`Unexpected '.'`, i)
+    }
+
+    // Regex literal `/abc/g`: a `/` where a value is expected (start, after an
+    // operator, `(`, `[` or `,`); after a value it is division.
+    if (ch === '/') {
+      const prev = lastSignificant()
+      const afterValue = prev && ['number', 'string', 'boolean', 'identifier', 'rparen', 'rbracket', 'regex'].includes(prev.type)
+      if (!afterValue) {
+        const start = i
+        i++
+        let body = ''
+        let inClass = false
+        // Scan to the closing `/`; a `/` inside `[...]` or after a `\` does not end the literal.
+        while (i < n) {
+          const c = source[i]!
+          if (c === '\\' && i + 1 < n) {
+            body += c + source[i + 1]!
+            i += 2
+            continue
+          }
+          if (c === '[') inClass = true
+          else if (c === ']') inClass = false
+          else if (c === '/' && !inClass) break
+          body += c
+          i++
+        }
+        if (i >= n) throw new FormulaTokenizeError('Unterminated regex literal', start)
+        i++ // closing slash
+        let flags = ''
+        while (i < n && source[i]! >= 'a' && source[i]! <= 'z') {
+          flags += source[i]
+          i++
+        }
+        tokens.push({ type: 'regex', value: body, pos: start, flags })
+        continue
+      }
     }
 
     // Two-char then one-char operators

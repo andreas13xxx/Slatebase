@@ -16,6 +16,7 @@ export type {
   BaseSortClause,
   BaseGroupBy,
   BaseSummaries,
+  BaseGroupValue,
   BaseView,
   BaseDocument,
   BaseRow,

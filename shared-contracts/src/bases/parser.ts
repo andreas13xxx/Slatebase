@@ -22,6 +22,7 @@ import type {
   BaseProperties,
   BaseSortClause,
   BaseSummaries,
+  BaseGroupValue,
   BaseValidationError,
   BaseView,
 } from './types.js'
@@ -145,7 +146,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'filters', 'limit', 'summaries']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -216,6 +217,20 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   } else if (raw['limit'] !== undefined) {
     errors.push({ message: 'view "limit" must be a number', path: `views[${index}].limit` })
   }
+  if (Array.isArray(raw['groupOrder'])) {
+    const items = raw['groupOrder']
+    if (items.every((v) => v === null || ['string', 'number', 'boolean'].includes(typeof v))) {
+      view.groupOrder = items as BaseGroupValue[]
+    } else {
+      errors.push({ message: 'view "groupOrder" must be a list of values', path: `views[${index}].groupOrder` })
+    }
+  } else if (raw['groupOrder'] !== undefined) {
+    errors.push({ message: 'view "groupOrder" must be a list', path: `views[${index}].groupOrder` })
+  }
+  if (isString(raw['image'])) view.image = raw['image']
+  if (isString(raw['imageFit'])) view.imageFit = raw['imageFit']
+  if (typeof raw['imageAspectRatio'] === 'number') view.imageAspectRatio = raw['imageAspectRatio']
+  if (typeof raw['cardSize'] === 'number') view.cardSize = raw['cardSize']
   const summaries = parseSummaries(raw['summaries'], errors, `views[${index}].summaries`)
   if (summaries) view.summaries = summaries
 

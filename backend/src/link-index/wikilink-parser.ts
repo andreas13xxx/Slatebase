@@ -222,6 +222,8 @@ function extractFromLine(line: string, lineNumber: number, results: ParsedWikili
           heading: wikilink.heading,
           blockRef: wikilink.blockRef,
           position: { line: lineNumber, column: startColumn },
+          // Only set for `![[...]]` so plain links keep their exact shape.
+          ...(startColumn >= 2 && line[startColumn - 2] === '!' ? { embed: true } : {}),
         })
         i = wikilink.endIndex
       }
