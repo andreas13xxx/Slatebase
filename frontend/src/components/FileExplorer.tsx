@@ -73,7 +73,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   // Empty-area menu: a press that starts on a row belongs to that row's own menu, so don't arm a second timer for it.
   const emptyAreaLongPress = useLongPress()
   const emptyAreaPointerDown = (e: React.PointerEvent<Element>): void => {
-    if (e.target instanceof Element && e.target.closest('.tree-node-row')) return
+    // Text fields keep the native selection/paste menu.
+    if (e.target instanceof Element && e.target.closest('.tree-node-row, input, textarea, [contenteditable="true"]')) return
     emptyAreaLongPress.onPointerDown(e)
   }
   const { state, dispatch, apiClient } = useAppContext()

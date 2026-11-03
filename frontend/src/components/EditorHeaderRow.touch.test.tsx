@@ -4,6 +4,8 @@ import { useEffect } from 'react'
 import { PaneTreeProvider, usePaneTree } from '../state/paneTreeContext'
 import { getActivePaneTabState } from '../state/paneTreeState'
 import { EditorHeaderRow } from './EditorHeaderRow'
+import { AppContext, initialState } from '../state'
+import type { IApiClient } from '../api'
 
 vi.mock('../state/navigationHistoryContext', () => ({
   useNavigationHistory: () => ({ goBack: vi.fn(), goForward: vi.fn(), canGoBack: false, canGoForward: false }),
@@ -54,5 +56,35 @@ describe('EditorHeaderRow text-actions button', () => {
   it('stays disabled for tabs that are not markdown', () => {
     renderWithTab('board.canvas')
     expect((screen.getByRole('button', { name: /textaktionen|text actions/i }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('stays disabled for a read-only vault', () => {
+    const state = { ...initialState, vaults: [{ id: 'v', name: 'V', permission: 'read' }] } as unknown as typeof initialState
+    render(
+      <AppContext.Provider value={{ state, dispatch: vi.fn(), apiClient: {} as IApiClient }}>
+        <PaneTreeProvider>
+          <Seed filePath="note.md" />
+          <EditorHeaderRow />
+        </PaneTreeProvider>
+      </AppContext.Provider>,
+    )
+    expect((screen.getByRole('button', { name: /textaktionen|text actions/i }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('targets the pane named by the paneId prop', () => {
+    const handler = vi.fn()
+    window.addEventListener('slatebase:editor-command', handler)
+    render(
+      <PaneTreeProvider>
+        <Seed filePath="note.md" />
+        <EditorHeaderRow paneId="other-pane" />
+      </PaneTreeProvider>,
+    )
+    // "other-pane" has no tab, so the button is disabled and must not fire.
+    const button = screen.getByRole('button', { name: /textaktionen|text actions/i }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.click(button)
+    window.removeEventListener('slatebase:editor-command', handler)
+    expect(handler).not.toHaveBeenCalled()
   })
 })

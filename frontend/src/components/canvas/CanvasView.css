@@ -1367,9 +1367,7 @@
     -webkit-touch-callout: none;
     user-select: none;
   }
-}
 
-@media (pointer: coarse) {
   .canvas-view textarea,
   .canvas-view input,
   .canvas-view [contenteditable="true"] {
