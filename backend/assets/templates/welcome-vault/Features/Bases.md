@@ -146,6 +146,20 @@ Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Date
 
 ---
 
+## Werkzeugleiste: Ansichten, Filter, Sortierung, Gruppen, Eigenschaften
+
+Über der Tabelle sitzt eine Werkzeugleiste — du musst das YAML nicht von Hand schreiben. Jede Änderung wird sofort in die `.base`-Datei geschrieben (mit Schreibrecht auf den Vault; ohne lassen sich die Einstellungen nur ansehen).
+
+- **Ansichtenmenü** (Name der Ansicht ▾): zwischen Ansichten wechseln, eine **neue Ansicht** mit Name und Typ anlegen, die aktuelle **umbenennen**, ihren **Typ ändern**, **duplizieren** oder **löschen** (die letzte Ansicht bleibt immer erhalten).
+- **Sortieren:** mehrere Sortierungen mit Eigenschaft und Richtung, in der Reihenfolge verschiebbar.
+- **Gruppieren:** eine Eigenschaft, nach der Karten- und Kanban-Ansichten ihre Spalten bilden.
+- **Filtern:** Bedingungen aus Eigenschaft, Operator und Wert (ist, enthält, beginnt mit, ist leer, größer/kleiner, hat Tag, liegt in Ordner …), beliebig zu **und / oder / nicht**-Gruppen verschachtelt. Der Reiter **Diese Ansicht** wirkt nur auf die aktuelle Ansicht, **Alle Ansichten** auf die ganze Base. Was sich nicht als Baukasten-Bedingung darstellen lässt, bleibt als Ausdruck editierbar (`</>`).
+- **Eigenschaften:** festlegen, welche Spalten angezeigt werden und in welcher Reihenfolge — auch Datei-Felder (`file.ctime` …) und Formeln; eigene Eigenschaften trägst du per Namen ein.
+
+Die Schalter **Ansicht / Quelltext** rechts wechseln zum rohen YAML, das jetzt den ganzen verfügbaren Platz nutzt.
+
+---
+
 ## Ansichten: Tabelle, Karten, Liste und Karte
 
 Eine Base kann mehrere Ansichten enthalten; oben erscheint dann ein Umschalter.

@@ -10,8 +10,8 @@
 
 import { memo, useCallback, useMemo } from 'react'
 import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
-import { evaluateFormula, formatFormulaValue, computeSummaries } from '@slatebase/shared-contracts'
-import type { FormulaContext, ComputedSummaries } from '@slatebase/shared-contracts'
+import { evaluateFormula, formatFormulaValue, computeSummaries, rowContext } from '@slatebase/shared-contracts'
+import type { ComputedSummaries } from '@slatebase/shared-contracts'
 import { BaseCell } from './BaseCell'
 import { inferCellType } from './base-cell-type'
 
@@ -25,19 +25,6 @@ export interface BasesTableViewProps {
   onCommitCell: (path: string, property: string, values: string[]) => void
   /** Toggle sort on a column; the container persists it. */
   onSortChange: (sort: BaseSortClause[]) => void
-}
-
-/** Builds a formula evaluation context from one row's values. */
-function rowContext(row: BaseRow): FormulaContext {
-  return {
-    resolve: (name) => {
-      if (name === 'file.name') return row.fileName
-      const v = row.values[name]
-      if (Array.isArray(v)) return v.length > 0 ? (v[0] ?? null) : null
-      if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v
-      return null
-    },
-  }
 }
 
 export const BasesTableView = memo(function BasesTableView({
@@ -118,7 +105,7 @@ export const BasesTableView = memo(function BasesTableView({
 
                 if (formulaKeys.has(col)) {
                   const src = doc.formulas?.[col] ?? ''
-                  const result = evaluateFormula(src, rowContext(row))
+                  const result = evaluateFormula(src, rowContext(row, doc))
                   return (
                     <td key={col} className="bases-table__cell bases-table__cell--formula">
                       {result.ok

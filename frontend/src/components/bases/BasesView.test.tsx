@@ -6,7 +6,7 @@
  * - a throwing factory falls back to the table.
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { installObsidianGlobals } from '../../plugins/compat/install-globals'
 import { registerBasesView, resetForVault } from '../../plugins/compat/bases-view-registry'
@@ -92,8 +92,11 @@ describe('BasesView plugin views', () => {
     render(
       <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
-    expect(screen.getByRole('tab', { name: 'Karten' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Tabelle' })).toBeTruthy()
+    // The toolbar's view menu names the active view and lists all of them.
+    fireEvent.click(screen.getByRole('button', { name: /Karten/ }))
+    const list = screen.getByRole('list', { name: 'Ansichten' })
+    expect(within(list).getByRole('button', { name: /Karten/ })).toBeTruthy()
+    expect(within(list).getByRole('button', { name: /Tabelle/ })).toBeTruthy()
   })
 
   it('falls back to the table when the plugin factory throws', async () => {
@@ -111,7 +114,8 @@ describe('BasesView plugin views', () => {
     render(
       <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
-    fireEvent.click(screen.getByRole('tab', { name: 'Tabelle' }))
+    fireEvent.click(screen.getByRole('button', { name: /Karten/ }))
+    fireEvent.click(within(screen.getByRole('list', { name: 'Ansichten' })).getByRole('button', { name: /Tabelle/ }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Alpha' })).toBeTruthy())
   })
 })
