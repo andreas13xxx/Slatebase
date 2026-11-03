@@ -158,6 +158,9 @@ class Parser {
       case 'boolean':
         this.next()
         return { kind: 'boolean', value: tok.value === 'true' }
+      case 'regex':
+        this.next()
+        return { kind: 'regex', source: tok.value, flags: tok.flags ?? '' }
       case 'lparen': {
         this.next()
         const expr = this.parseExpression(0)

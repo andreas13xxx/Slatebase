@@ -195,6 +195,11 @@ describe('this — the host note (embedded base)', () => {
     expect(keep('file.hasLink(this.file)', rows)).toEqual(['a.md', 'b.md', 'c.md'])
   })
 
+  it('file.hasProperty checks the row frontmatter', () => {
+    const rows = [wire('a.md', { status: ['open'] }), wire('b.md', {})]
+    expect(keep('file.hasProperty("status")', rows)).toEqual(['a.md'])
+  })
+
   it('resolves everything to null without a host, excluding the row instead of keeping it', () => {
     const rows = [wire('a.md', { status: ['open'] }, { links: ['Plan'] })]
 

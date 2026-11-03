@@ -29,6 +29,10 @@ export interface FormulaContext {
     hasTag(tag: string): boolean
     inFolder(folder: string): boolean
     hasLink(target: string): boolean
+    /** `file.hasProperty(name)` — the note has that frontmatter property. */
+    hasProperty?(name: string): boolean
+    /** `file.asLink(display?)` — a link to the file. */
+    asLink?(display?: string): FormulaValue
   }
 }
 
@@ -80,6 +84,8 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
     case 'string':
     case 'boolean':
       return node.value
+    case 'regex':
+      return { kind: 'regex', source: node.source, flags: node.flags }
     case 'property':
       return evalProperty(node.name, ctx)
     case 'unary': {
@@ -115,10 +121,17 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
         if (node.method === 'hasTag') return api.hasTag(arg)
         if (node.method === 'inFolder') return api.inFolder(arg)
         if (node.method === 'hasLink') return api.hasLink(arg)
+        if (node.method === 'hasProperty' && api.hasProperty) return api.hasProperty(arg)
+        if (node.method === 'asLink' && api.asLink) return api.asLink(node.args.length > 0 ? arg : undefined)
         // Fall through for other file.* methods (none supported yet).
         throw new EvalError(`Unknown file method '${node.method}'`)
       }
       const receiver = evalNode(node.object, ctx)
+      // List lambdas: the argument is an expression evaluated per element with
+      // implicit `value` / `index` (/ `acc`), so it must NOT be evaluated up front.
+      if (Array.isArray(receiver) && (node.method === 'map' || node.method === 'filter' || node.method === 'reduce')) {
+        return evalLambda(node.method, receiver, node.args, ctx)
+      }
       const args = node.args.map((a) => evalNode(a, ctx))
       return callMethod(receiver, node.method, args)
     }
@@ -143,6 +156,37 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
     default:
       throw new EvalError('Unknown expression')
   }
+}
+
+/** Scope variables a lambda body can read besides the row's properties. */
+function withScope(ctx: FormulaContext, scope: Record<string, FormulaValue>): FormulaContext {
+  return {
+    ...ctx,
+    resolve(name: string): FormulaValue {
+      if (name in scope) return scope[name]!
+      return ctx.resolve(name)
+    },
+  }
+}
+
+/** `list.map(expr)`, `list.filter(expr)`, `list.reduce(expr, initial)`. */
+function evalLambda(method: string, list: FormulaValue[], args: ExprNode[], ctx: FormulaContext): FormulaValue {
+  const body = args[0]
+  if (!body) throw new EvalError(`${method}() needs an expression`)
+  if (method === 'reduce') {
+    let acc: FormulaValue = args[1] ? evalNode(args[1], ctx) : null
+    list.forEach((value, index) => {
+      acc = evalNode(body, withScope(ctx, { value, index, acc }))
+    })
+    return acc
+  }
+  const out: FormulaValue[] = []
+  list.forEach((value, index) => {
+    const r = evalNode(body, withScope(ctx, { value, index }))
+    if (method === 'map') out.push(r)
+    else if (isTruthy(r)) out.push(value)
+  })
+  return out
 }
 
 function evalBinary(op: BinaryOp, leftNode: ExprNode, rightNode: ExprNode, ctx: FormulaContext): FormulaValue {

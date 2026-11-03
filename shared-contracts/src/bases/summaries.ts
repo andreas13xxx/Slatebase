@@ -9,16 +9,17 @@
  *   - Dates:     Earliest, Latest, Range
  *   - Checkbox:  Checked, Unchecked
  *
- * NOT covered (deliberately out of this spec, same reason as list `map`/`filter`):
- * custom summaries written as a formula over `values` (`values.reduce(...)`) —
- * those need the lambda support that is a separate later theme. An unknown
- * summary name yields `null` (no value, no error), never a thrown exception.
+ * Custom summaries: a name defined in the base's top-level `summaries:` map is a
+ * formula over the column's `values` list (`values.mean().round(3)`,
+ * `values.reduce(acc + value, 0)`). An unknown summary name yields `null`
+ * (no value, no error), never a thrown exception.
  */
 
 import type { BaseDocument, BaseRow, BaseView } from './types.js'
 import { rowContext } from './base-eval.js'
 import type { FormulaValue } from './formula/functions.js'
 import { toDate } from './formula/functions.js'
+import { evaluateFormula } from './formula/evaluator.js'
 
 /** One computed summary: the function that was applied and its resulting value. */
 export interface ColumnSummary {
@@ -63,9 +64,17 @@ export function computeSummaries(rows: BaseRow[], view: BaseView, doc: BaseDocum
   const out: ComputedSummaries = {}
   for (const [column, summaryName] of Object.entries(assignments)) {
     const values = resolveColumnValues(rows, column, doc)
-    out[column] = { summary: summaryName, value: computeOne(summaryName, values) }
+    // A name defined in the top-level `summaries:` map is a custom formula over `values`.
+    const custom = doc.summaries?.[summaryName]
+    out[column] = { summary: summaryName, value: custom !== undefined ? computeCustom(custom, values) : computeOne(summaryName, values) }
   }
   return out
+}
+
+/** Custom summary: the formula sees the column's values as the list `values`. A failing formula yields null. */
+function computeCustom(source: string, values: FormulaValue[]): FormulaValue {
+  const r = evaluateFormula(source, { resolve: (name) => (name === 'values' ? values : null) })
+  return r.ok ? r.value : null
 }
 
 /** Resolves one column's value for every row; a failing formula contributes null. */
