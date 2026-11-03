@@ -32,7 +32,8 @@
   /* iOS: 100vh ignores the dynamic browser toolbar; dvh follows it. */
   height: 100dvh;
   /* viewport-fit=cover: keep content clear of the notch / home indicator (0 where there is none). */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* The on-screen keyboard covers the home-indicator area, so its height replaces (not adds to) the bottom inset. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) max(env(safe-area-inset-bottom), var(--keyboard-inset, 0px)) env(safe-area-inset-left);
   box-sizing: border-box;
   overflow: hidden;
   font-family: var(--font-sans);

@@ -12,8 +12,8 @@ Ziel: Slatebase ist auf dem iPad (Safari und als Home-Screen-App, mit Finger, Pe
 - R5 Hardware-Tastatur: Auch wenn iPadOS `navigator.platform` als `iPad` meldet, gilt Cmd als Mod-Taste.
 - R6 Viewport: `viewport-fit=cover` plus `safe-area-inset-*` für Header, Sidebars und untere Leisten.
 - R7 Installierbar: Web-App-Manifest und `apple-mobile-web-app-*`-Meta-Tags für den Home-Screen-Start im Vollbild.
-- R8 Mausverhalten bleibt überall unverändert.
+- R8 Bildschirmtastatur: Öffnet die iPad-Tastatur, schrumpft das Layout über sie (`visualViewport` → `--keyboard-inset`), und der Cursor wird über die Tastatur gescrollt.
+- R9 Mausverhalten bleibt überall unverändert.
 
 ## Bewusst ausgespart
-- Bildschirmtastatur-Handling (`visualViewport`) — eigener Punkt.
 - Pencil-Sonderverhalten in Canvas/Graph.
