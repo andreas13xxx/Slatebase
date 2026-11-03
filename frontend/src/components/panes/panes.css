@@ -77,11 +77,13 @@
 }
 
 .pane-split-handle--horizontal {
+  touch-action: none;
   width: 4px;
   cursor: col-resize;
 }
 
 .pane-split-handle--vertical {
+  touch-action: none;
   height: 4px;
   cursor: row-resize;
 }
@@ -134,5 +136,24 @@
 @media (prefers-reduced-motion: reduce) {
   .pane-drop-edge {
     transition: none;
+  }
+}
+
+/* Touch: widen the hit area of the 4px split handles without changing the layout. */
+@media (pointer: coarse) {
+  .pane-split-handle {
+    position: relative;
+  }
+
+  .pane-split-handle--horizontal::before {
+    content: '';
+    position: absolute;
+    inset: 0 -12px;
+  }
+
+  .pane-split-handle--vertical::before {
+    content: '';
+    position: absolute;
+    inset: -12px 0;
   }
 }

@@ -283,6 +283,7 @@
 
 /* ===== Resize Handle ===== */
 .resize-handle {
+  touch-action: none;
   width: 4px;
   background: transparent;
   cursor: col-resize;
@@ -6847,5 +6848,14 @@
 @media (pointer: coarse) {
   .editor-header-row__editor-menu {
     display: inline-flex;
+  }
+}
+
+/* Touch: a 4px handle is impossible to hit with a finger; widen the hit area without changing the layout. */
+@media (pointer: coarse) {
+  .resize-handle::before {
+    content: '';
+    position: absolute;
+    inset: 0 -12px;
   }
 }

@@ -1289,7 +1289,7 @@ function AppContent() {
           {showSidebar && (
             <div
               className="resize-handle"
-              onMouseDown={sidebar.onMouseDown}
+              onPointerDown={sidebar.onPointerDown}
               onKeyDown={sidebar.onKeyDown}
               title={t('resize.adjustWidth')}
               role="separator"
@@ -1400,7 +1400,7 @@ function AppContent() {
             <>
               <div
                 className="resize-handle"
-                onMouseDown={rightPanel.onMouseDown}
+                onPointerDown={rightPanel.onPointerDown}
                 onKeyDown={rightPanel.onKeyDown}
                 title={t('resize.adjustWidth')}
                 role="separator"

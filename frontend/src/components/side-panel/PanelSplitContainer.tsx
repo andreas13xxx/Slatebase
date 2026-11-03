@@ -78,8 +78,8 @@ export function PanelSplitContainer({
 
   // ─── Resize Logic ────────────────────────────────────────────────────────
 
-  /** Handle mousedown on a resize handle between sections. */
-  const handleResizeStart = useCallback((e: React.MouseEvent, handleIndex: number) => {
+  /** Handle pointerdown (mouse, pen or touch) on a resize handle between sections. */
+  const handleResizeStart = useCallback((e: React.PointerEvent, handleIndex: number) => {
     e.preventDefault()
     setResizingIndex(handleIndex)
     startYRef.current = e.clientY
@@ -117,11 +117,11 @@ export function PanelSplitContainer({
     onResize(fractions)
   }, [sections, panelHeight, onResize, KEYBOARD_STEP])
 
-  /** Handle mouse movement during resize. Enforces 80px minimum height. */
+  /** Handle pointer movement during resize. Enforces 80px minimum height. */
   useEffect(() => {
     if (resizingIndex === null) return
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       const containerHeight = panelHeight
       if (containerHeight <= 0) return
 
@@ -156,16 +156,18 @@ export function PanelSplitContainer({
       onResize(fractions)
     }
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setResizingIndex(null)
     }
 
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('pointermove', handlePointerMove)
+    document.addEventListener('pointerup', handlePointerUp)
+    document.addEventListener('pointercancel', handlePointerUp)
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerup', handlePointerUp)
+      document.removeEventListener('pointercancel', handlePointerUp)
     }
   }, [resizingIndex, onResize, panelHeight])
 
@@ -220,7 +222,7 @@ export function PanelSplitContainer({
             {index > 0 && (
               <div
                 className={`side-panel-split-resize-handle${resizingIndex === index - 1 ? ' side-panel-split-resize-handle--active' : ''}`}
-                onMouseDown={(e) => handleResizeStart(e, index - 1)}
+                onPointerDown={(e) => handleResizeStart(e, index - 1)}
                 onKeyDown={(e) => handleResizeKeyDown(e, index - 1)}
                 role="separator"
                 aria-orientation="horizontal"
