@@ -16,10 +16,14 @@
  * `AppContext` client.
  */
 
-import { memo, useContext, useEffect, useMemo, useState } from 'react'
+import { memo, useContext, useEffect, useRef, useState } from 'react'
 import type { BaseDocument, BaseQueryResultWire, BaseQuerySpecWire, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import { parseBase, runBaseQuery } from '../../bases'
 import { AppContext } from '../../state'
+import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { BasesKanbanView } from './BasesKanbanView'
+import { BasesListView } from './BasesListView'
+import { BasesCardsView } from './BasesCardsView'
 import { BasesTableView } from './BasesTableView'
 import { pickEmbedView } from './pickEmbedView'
 
@@ -47,6 +51,19 @@ export interface BasesEmbedProps {
   apiClient?: IBasesEmbedApiClient | null
 }
 
+/**
+ * Which renderer an embedded view uses. Mirrors `BasesView`: a `kanban` or a
+ * grouped `cards` view is the board, an ungrouped `cards` view the card grid,
+ * `list` the list. Everything else (`table`, `map` — it needs the operator's
+ * tile config —, unknown or plugin types) falls back to the read-only table.
+ */
+export function embedViewKind(view: BaseView): 'table' | 'kanban' | 'cards' | 'list' {
+  if (view.type === 'kanban' || (view.type === 'cards' && view.groupBy)) return 'kanban'
+  if (view.type === 'cards') return 'cards'
+  if (view.type === 'list') return 'list'
+  return 'table'
+}
+
 export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, viewName, hostPath, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
   const appContext = useContext(AppContext)
   const apiClient: IBasesEmbedApiClient | null = explicitClient ?? appContext?.apiClient ?? null
@@ -57,6 +74,11 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Bumped on a vault change: the effect below then re-queries WITHOUT the
+  // loading flash (the old rows stay visible until the new ones arrive).
+  const [refreshTick, setRefreshTick] = useState(0)
+  const lastTickRef = useRef(0)
+
   useEffect(() => {
     if (!apiClient) {
       setError('Kein API-Client verfügbar')
@@ -64,8 +86,12 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
       return
     }
     let cancelled = false
-    setLoading(true)
-    setError(null)
+    const silent = refreshTick !== lastTickRef.current
+    lastTickRef.current = refreshTick
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
 
     void (async () => {
       try {
@@ -80,6 +106,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
           if (cancelled) return
         }
         const parsed = parseBase(content)
+        if (cancelled) return
         if (!parsed.success) {
           setError(`Ungültige Base: ${parsed.errors.map((e) => e.message).join('; ')}`)
           setLoading(false)
@@ -96,30 +123,39 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
         setDoc(parsed.document)
         setView(picked.view)
         setRows(result.rows)
+        setError(null)
         setLoading(false)
       } catch {
         if (cancelled) return
+        if (silent) return // a failed background refresh keeps the last good rows
         setError(`Fehler beim Laden: ${target ?? 'Base'}`)
         setLoading(false)
       }
     })()
 
     return () => { cancelled = true }
-  }, [apiClient, vaultId, filePath, source, target, viewName, hostPath])
+  }, [apiClient, vaultId, filePath, source, target, viewName, hostPath, refreshTick])
 
-  // The embedded view, forced to a read-only table.
-  const tableView = useMemo<BaseView | null>(() => (view ? { ...view, type: 'table' } : null), [view])
+  // Live refresh: any change in this vault (the host note's `this.*`, a target
+  // note, or the .base file itself) re-runs the query.
+  useEffect(() => {
+    return onRealtimeVaultChange((event) => {
+      if (event.vaultId === vaultId) setRefreshTick((n) => n + 1)
+    })
+  }, [vaultId])
 
   if (error) {
     return <div className="view-mode-embed view-mode-embed--missing bases-embed">{error}</div>
   }
-  if (loading || !doc || !tableView) {
+  if (loading || !doc || !view) {
     return (
       <div className="view-mode-embed bases-embed bases-embed--loading">
         <span className="view-mode-embed-loading">Laden…</span>
       </div>
     )
   }
+
+  const kind = embedViewKind(view)
 
   return (
     <div className="view-mode-embed bases-embed">
@@ -128,14 +164,25 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
           <span className="view-mode-embed-title">{viewName ? `${target} › ${view?.name ?? viewName}` : target}</span>
         </span>
       )}
-      <BasesTableView
-        doc={doc}
-        view={tableView}
-        rows={rows}
-        onOpenNote={onOpenNote}
-        onCommitCell={() => { /* read-only in an embed */ }}
-        onSortChange={() => { /* read-only in an embed */ }}
-      />
+      {kind === 'kanban' && (
+        <BasesKanbanView doc={doc} view={view} rows={rows} onOpenNote={onOpenNote} />
+      )}
+      {kind === 'cards' && (
+        <BasesCardsView doc={doc} view={view} rows={rows} vaultId={vaultId} onOpenNote={onOpenNote} />
+      )}
+      {kind === 'list' && (
+        <BasesListView doc={doc} view={view} rows={rows} onOpenNote={onOpenNote} />
+      )}
+      {kind === 'table' && (
+        <BasesTableView
+          doc={doc}
+          view={{ ...view, type: 'table' }}
+          rows={rows}
+          onOpenNote={onOpenNote}
+          onCommitCell={() => { /* read-only in an embed */ }}
+          onSortChange={() => { /* read-only in an embed */ }}
+        />
+      )}
     </div>
   )
 })

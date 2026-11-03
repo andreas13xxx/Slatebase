@@ -72,9 +72,14 @@ function serializeView(view: BaseView): Record<string, unknown> {
   if (view.order !== undefined) out['order'] = view.order
   if (view.sort !== undefined) out['sort'] = serializeSort(view.sort)
   if (view.groupBy !== undefined) out['groupBy'] = serializeGroupBy(view.groupBy)
+  if (view.groupOrder !== undefined) out['groupOrder'] = [...view.groupOrder]
   if (view.filters !== undefined) out['filters'] = serializeFilterNode(view.filters)
   if (view.limit !== undefined) out['limit'] = view.limit
   if (view.summaries !== undefined) out['summaries'] = { ...view.summaries }
+  if (view.image !== undefined) out['image'] = view.image
+  if (view.imageFit !== undefined) out['imageFit'] = view.imageFit
+  if (view.imageAspectRatio !== undefined) out['imageAspectRatio'] = view.imageAspectRatio
+  if (view.cardSize !== undefined) out['cardSize'] = view.cardSize
   mergeUnknown(out, view._unknown)
   return out
 }

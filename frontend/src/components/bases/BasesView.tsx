@@ -28,6 +28,7 @@ import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
 import { BasesListView } from './BasesListView'
+import { BasesCardsView } from './BasesCardsView'
 import { BasesSourceView } from './BasesSourceView'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
@@ -76,12 +77,17 @@ export const BasesView = memo(function BasesView({
   // A view whose `type` a plugin registered renders via the plugin host; the
   // built-in types (`table`, `cards`) and any other unregistered type render
   // in-app. An errored plugin view falls back to the built-in table.
-  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'list', 'map']), [])
+  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'kanban', 'list', 'map']), [])
   const isPluginView = useMemo(
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
-  const isKanbanView = !!activeView && activeView.type === 'cards' && !isPluginView
+  // Obsidian 1.14 has a dedicated `kanban` layout; a grouped `cards` view keeps
+  // rendering as the board (historic behaviour). An ungrouped `cards` view is
+  // the Obsidian image-card grid.
+  const isKanbanView = !!activeView && !isPluginView
+    && (activeView.type === 'kanban' || (activeView.type === 'cards' && !!activeView.groupBy))
+  const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
   const isMapView = !!activeView && activeView.type === 'map' && !isPluginView
 
@@ -350,6 +356,16 @@ export const BasesView = memo(function BasesView({
         />
       )}
 
+      {mode === 'view' && !isPluginView && isCardsView && activeView && (
+        <BasesCardsView
+          doc={doc}
+          view={activeView}
+          rows={displayRows}
+          vaultId={vaultId}
+          onOpenNote={onOpenNote}
+        />
+      )}
+
       {mode === 'view' && !isPluginView && isListView && activeView && (
         <BasesListView
           doc={doc}
@@ -372,7 +388,7 @@ export const BasesView = memo(function BasesView({
         </Suspense>
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && !isListView && !isMapView && activeView && (
+      {mode === 'view' && !isPluginView && !isKanbanView && !isCardsView && !isListView && !isMapView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

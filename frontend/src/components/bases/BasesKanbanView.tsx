@@ -100,12 +100,23 @@ export const BasesKanbanView = memo(function BasesKanbanView({
       if (b === UNGROUPED) return -1
       return a.localeCompare(b)
     })
+    // `groupOrder` (Obsidian 1.14.3): only the listed groups, in that order;
+    // `null` is the group of notes without a value; an empty list hides all.
+    if (view.groupOrder) {
+      const wanted = view.groupOrder.map((g) => (g === null ? UNGROUPED : String(g)))
+      const listed = wanted.filter((key, i) => wanted.indexOf(key) === i)
+      return listed.map((key) => ({
+        key,
+        label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
+        rows: byValue.get(key) ?? [],
+      }))
+    }
     return order.map((key) => ({
       key,
       label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
       rows: byValue.get(key)!,
     }))
-  }, [groupBy, rows, columnLabel])
+  }, [groupBy, rows, columnLabel, view.groupOrder])
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggle = useCallback((key: string) => {

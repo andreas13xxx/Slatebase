@@ -564,3 +564,52 @@
 .bases-list__chip-val {
   color: var(--text-primary);
 }
+
+/* ─── Cards grid (type: cards without groupBy) ─────────────────────────── */
+.bases-cards {
+  --bases-card-size: 200px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--bases-card-size), 1fr));
+  gap: var(--space-3, 0.75rem);
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3, 0.75rem);
+  overflow-y: auto;
+}
+
+.bases-cards__item {
+  display: flex;
+  min-width: 0;
+}
+
+.bases-cards__card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  color: inherit;
+  background: var(--bg-secondary, transparent);
+  border: 1px solid var(--border-color, currentColor);
+  border-radius: var(--radius-md, 6px);
+}
+
+.bases-cards__cover {
+  width: 100%;
+  overflow: hidden;
+}
+
+.bases-cards__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bases-cards__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+}
