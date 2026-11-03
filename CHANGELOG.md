@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.75.0](https://github.com/andreas13xxx/Slatebase/compare/v0.74.0...v0.75.0) (2026-11-03)
+
+
+### Features
+
+* **touch:** iPad usability — touch resize, targets, drag alternatives, home-screen app, keyboard ([#325](https://github.com/andreas13xxx/Slatebase/issues/325)) ([018ccc4](https://github.com/andreas13xxx/Slatebase/commit/018ccc498adb2c25c4e3c0b759ce0663c006d3f1))
+* **touch:** pan and pinch-zoom for the graph view ([#323](https://github.com/andreas13xxx/Slatebase/issues/323)) ([fc2af5a](https://github.com/andreas13xxx/Slatebase/commit/fc2af5af141243d6663f53f1f9692a742cfc84a7))
+
 ## [0.74.0](https://github.com/andreas13xxx/Slatebase/compare/v0.73.0...v0.74.0) (2026-11-02)
 
 
