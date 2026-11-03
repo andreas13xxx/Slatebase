@@ -1361,10 +1361,11 @@
   box-shadow: 0 0 0 2px var(--accent-light);
 }
 
-/* Touch long-press opens the context menu: suppress the native iOS callout (not the text selection, so rendered text stays copyable). */
+/* Touch long-press opens the context menu: suppress the native iOS callout / text selection. */
 @media (pointer: coarse) {
   .canvas-view {
     -webkit-touch-callout: none;
+    user-select: none;
   }
 
   .canvas-view textarea,
