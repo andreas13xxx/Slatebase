@@ -116,10 +116,20 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   const [panX, setPanX] = useState(0)
   const [panY, setPanY] = useState(0)
 
+  /** Sets the view and mirrors it into viewRef so pointer handlers firing before the next render see it. */
+  const applyView = useCallback((patch: Partial<{ zoom: number; panX: number; panY: number }>) => {
+    viewRef.current = { ...viewRef.current, ...patch }
+    if (patch.zoom !== undefined) setZoom(patch.zoom)
+    if (patch.panX !== undefined) setPanX(patch.panX)
+    if (patch.panY !== undefined) setPanY(patch.panY)
+  }, [])
+
   // Interaction state refs (avoid re-renders during drag/pan)
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ x: 0, y: 0 })
   const panOffsetRef = useRef({ x: 0, y: 0 })
+  // Latest view, readable from pointer handlers that fire before React re-renders.
+  const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 })
 
   const isDraggingRef = useRef(false)
   const dragNodeRef = useRef<SimNode | null>(null)
@@ -127,7 +137,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   /** Tracks whether a drag actually moved (to suppress click after drag). */
   const didDragRef = useRef(false)
   const touchPointersRef = useRef(new Map<number, { x: number; y: number }>())
-  const pinchRef = useRef<{ dist: number; zoom: number; anchor: { x: number; y: number } } | null>(null)
+  const pinchRef = useRef<{ ids: [number, number]; dist: number; zoom: number; anchor: { x: number; y: number } } | null>(null)
 
   // Hovered node for highlighting
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
@@ -357,14 +367,14 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
       const delta = e.deltaY > 0 ? -0.1 : 0.1
-      setZoom((prev) => clampZoom(prev, delta))
+      applyView({ zoom: clampZoom(viewRef.current.zoom, delta) })
     }
 
     svg.addEventListener('wheel', handleWheel, { passive: false })
     return () => {
       svg.removeEventListener('wheel', handleWheel)
     }
-  }, [loading])
+  }, [loading, applyView])
 
   /**
    * Handles mouse down on SVG background to start panning.
@@ -395,13 +405,13 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
         // Start panning on background
         isPanningRef.current = true
         panStartRef.current = { x: e.clientX, y: e.clientY }
-        panOffsetRef.current = { x: panX, y: panY }
+        panOffsetRef.current = { x: viewRef.current.panX, y: viewRef.current.panY }
         // Clear click highlight when clicking background
         setClickedHighlightId(null)
         e.preventDefault()
       }
     },
-    [nodes, panX, panY, screenToSvg],
+    [nodes, screenToSvg],
   )
 
   /**
@@ -412,8 +422,9 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       if (isPanningRef.current) {
         const dx = e.clientX - panStartRef.current.x
         const dy = e.clientY - panStartRef.current.y
-        setPanX(panOffsetRef.current.x + dx)
-        setPanY(panOffsetRef.current.y + dy)
+        const nextPanX = panOffsetRef.current.x + dx
+        const nextPanY = panOffsetRef.current.y + dy
+        applyView({ panX: nextPanX, panY: nextPanY })
       } else if (isDraggingRef.current && dragNodeRef.current) {
         didDragRef.current = true
         const pos = screenToSvg(e.clientX, e.clientY)
@@ -454,6 +465,32 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   }, [])
 
   /**
+   * Starts a pinch with the first two active touch pointers, anchored on the graph point between them.
+   * Reads the view from viewRef so a pointer event that lands before React re-rendered sees the latest values.
+   */
+  const beginPinch = useCallback(() => {
+    const svg = svgRef.current
+    const entries = [...touchPointersRef.current.entries()].slice(0, 2)
+    if (!svg || entries.length < 2) return
+    const [[idA, a], [idB, b]] = entries
+    const rect = svg.getBoundingClientRect()
+    const view = viewRef.current
+    isPanningRef.current = false
+    isDraggingRef.current = false
+    dragNodeRef.current = null
+    didDragRef.current = true
+    pinchRef.current = {
+      ids: [idA, idB],
+      dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      zoom: view.zoom,
+      anchor: {
+        x: ((a.x + b.x) / 2 - rect.left - view.panX) / view.zoom,
+        y: ((a.y + b.y) / 2 - rect.top - view.panY) / view.zoom,
+      },
+    }
+  }, [])
+
+  /**
    * Touch input: one finger pans the background or drags a node (same path as the mouse),
    * two fingers pinch-zoom around their midpoint and pan along with it.
    * Mouse and pen keep using the mouse handlers.
@@ -462,25 +499,10 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (e.pointerType !== 'touch') return
       touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      if (touchPointersRef.current.size === 1) {
-        handleMouseDown(e)
-        return
-      }
-      if (touchPointersRef.current.size === 2) {
-        isPanningRef.current = false
-        isDraggingRef.current = false
-        dragNodeRef.current = null
-        const [a, b] = [...touchPointersRef.current.values()]
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-        pinchRef.current = {
-          dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
-          zoom,
-          anchor: screenToSvg(mid.x, mid.y),
-        }
-        didDragRef.current = true
-      }
+      if (touchPointersRef.current.size === 1) handleMouseDown(e)
+      else if (!pinchRef.current) beginPinch()
     },
-    [handleMouseDown, screenToSvg, zoom],
+    [handleMouseDown, beginPinch],
   )
 
   const handlePointerMove = useCallback(
@@ -489,21 +511,22 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       const pointers = touchPointersRef.current
       if (!pointers.has(e.pointerId)) return
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      if (pointers.size >= 2 && pinchRef.current) {
+      const pinch = pinchRef.current
+      if (pinch) {
         const svg = svgRef.current
-        if (!svg) return
-        const [a, b] = [...pointers.values()]
-        const pinch = pinchRef.current
+        const a = pointers.get(pinch.ids[0])
+        const b = pointers.get(pinch.ids[1])
+        if (!svg || !a || !b) return
         const nextZoom = clampZoom(pinch.zoom, (pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.dist - pinch.zoom)
         const rect = svg.getBoundingClientRect()
-        setZoom(nextZoom)
-        setPanX((a.x + b.x) / 2 - rect.left - pinch.anchor.x * nextZoom)
-        setPanY((a.y + b.y) / 2 - rect.top - pinch.anchor.y * nextZoom)
+        const nextPanX = (a.x + b.x) / 2 - rect.left - pinch.anchor.x * nextZoom
+        const nextPanY = (a.y + b.y) / 2 - rect.top - pinch.anchor.y * nextZoom
+        applyView({ zoom: nextZoom, panX: nextPanX, panY: nextPanY })
       } else if (pointers.size === 1) {
         handleMouseMove(e)
       }
     },
-    [handleMouseMove],
+    [handleMouseMove, applyView],
   )
 
   const handlePointerEnd = useCallback(
@@ -511,21 +534,26 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       if (e.pointerType !== 'touch') return
       const pointers = touchPointersRef.current
       if (!pointers.delete(e.pointerId)) return
-      if (pointers.size === 1 && pinchRef.current) {
-        // One finger lifted after a pinch: keep panning with the remaining one.
-        const [rest] = [...pointers.values()]
+      const pinch = pinchRef.current
+      if (pinch && pinch.ids.includes(e.pointerId)) {
         pinchRef.current = null
-        isPanningRef.current = true
-        panStartRef.current = { x: rest.x, y: rest.y }
-        panOffsetRef.current = { x: panX, y: panY }
-        return
+        if (pointers.size >= 2) {
+          // A third finger takes over the lifted one: re-anchor on the new pair.
+          beginPinch()
+        } else if (pointers.size === 1) {
+          // Keep panning with the remaining finger from the latest view.
+          const [rest] = [...pointers.values()]
+          isPanningRef.current = true
+          panStartRef.current = { x: rest.x, y: rest.y }
+          panOffsetRef.current = { x: viewRef.current.panX, y: viewRef.current.panY }
+        }
       }
       if (pointers.size === 0) {
         pinchRef.current = null
         handleMouseUp()
       }
     },
-    [handleMouseUp, panX, panY],
+    [handleMouseUp, beginPinch],
   )
 
   /**
@@ -705,8 +733,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       // the node-click-opens-file behavior (Requirement 1.7), which stays unchanged.
       if (isLocalGraph) {
         setCenterPath(selectedNode.path ?? selectedNode.id)
-        setPanX(0)
-        setPanY(0)
+        applyView({ panX: 0, panY: 0 })
         setShowDropdown(false)
         setSearchQuery('')
         setSearchResults([])
@@ -720,8 +747,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       // Center the graph on the selected node
       const newPanX = dimensions.width / 2 - simNode.x * zoom
       const newPanY = dimensions.height / 2 - simNode.y * zoom
-      setPanX(newPanX)
-      setPanY(newPanY)
+      applyView({ panX: newPanX, panY: newPanY })
 
       // Highlight the node
       setHighlightedSearchNodeId(selectedNode.id)
@@ -731,7 +757,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       setSearchQuery('')
       setSearchResults([])
     },
-    [isLocalGraph, nodes, dimensions.width, dimensions.height, zoom],
+    [isLocalGraph, nodes, dimensions.width, dimensions.height, zoom, applyView],
   )
 
   /**

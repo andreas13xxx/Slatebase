@@ -104,4 +104,20 @@ describe('useLongPress dispatchOnTarget', () => {
     vi.advanceTimersByTime(LONG_PRESS_MS)
     expect(seen).toHaveBeenCalledWith(getByTestId('link'))
   })
+
+  it('falls back to the handler element when the pressed node was replaced during the hold', () => {
+    function Container() {
+      const longPress = useLongPress({ dispatchOnTarget: true })
+      return <div data-testid="c" {...longPress}><span data-testid="child">x</span></div>
+    }
+    const { getByTestId } = render(<Container />)
+    const container = getByTestId('c')
+    const child = getByTestId('child')
+    const onContextMenu = vi.fn()
+    container.addEventListener('contextmenu', onContextMenu)
+    fireEvent.pointerDown(child, { pointerType: 'touch', isPrimary: true })
+    child.remove()
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    expect(onContextMenu).toHaveBeenCalledTimes(1)
+  })
 })

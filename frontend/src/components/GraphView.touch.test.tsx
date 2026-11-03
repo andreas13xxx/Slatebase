@@ -63,4 +63,32 @@ describe('GraphView — touch', () => {
     fireEvent.pointerUp(svg, touch(2, 300, 100))
     fireEvent.pointerUp(svg, touch(1, 100, 100))
   })
+
+  it('does not jump when a third finger joins and one pinch finger lifts', async () => {
+    renderGraph()
+    const svg = await screen.findByRole('img')
+    await waitFor(() => expect(svg.querySelectorAll('[data-node-id]').length).toBe(2))
+    fireEvent.pointerDown(svg, touch(1, 100, 100))
+    fireEvent.pointerDown(svg, touch(2, 200, 100))
+    fireEvent.pointerDown(svg, touch(3, 500, 400))
+    fireEvent.pointerUp(svg, touch(1, 100, 100))
+    const before = transform(svg)
+    // Pointers 2 and 3 form the new pair; moving without changing their distance keeps the view still.
+    fireEvent.pointerMove(svg, touch(2, 200, 100))
+    expect(transform(svg)).toBe(before)
+  })
+
+  it('continues panning from the latest offset after a pinch ends with one finger', async () => {
+    renderGraph()
+    const svg = await screen.findByRole('img')
+    await waitFor(() => expect(svg.querySelectorAll('[data-node-id]').length).toBe(2))
+    fireEvent.pointerDown(svg, touch(1, 100, 100))
+    fireEvent.pointerDown(svg, touch(2, 200, 100))
+    fireEvent.pointerMove(svg, touch(2, 300, 100))
+    const afterPinch = transform(svg)
+    fireEvent.pointerUp(svg, touch(1, 100, 100))
+    fireEvent.pointerMove(svg, touch(2, 310, 100))
+    const match = (str: string) => /translate\(([-\d.]+), ([-\d.]+)\)/.exec(str)
+    expect(Number(match(transform(svg))?.[1]) - Number(match(afterPinch)?.[1])).toBeCloseTo(10)
+  })
 })

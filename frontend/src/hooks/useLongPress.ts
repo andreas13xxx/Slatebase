@@ -65,14 +65,17 @@ export function useLongPress(options: { dispatchOnTarget?: boolean } = {}): Long
     if (releaseTimerRef.current !== null) clearTimeout(releaseTimerRef.current)
     releaseTimerRef.current = null
     firedRef.current = false
-    const target = dispatchOnTarget && e.target instanceof Element ? e.target : e.currentTarget
+    const currentTarget = e.currentTarget
+    const target = dispatchOnTarget && e.target instanceof Element ? e.target : currentTarget
     const x = e.clientX
     const y = e.clientY
     startRef.current = { x, y }
     timerRef.current = setTimeout(() => {
       timerRef.current = null
       firedRef.current = true
-      target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y }))
+      // The pressed node may have been re-rendered away during the hold: fall back to the handler's element.
+      const dispatchTarget = target.isConnected ? target : currentTarget
+      dispatchTarget.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y }))
     }, LONG_PRESS_MS)
   }, [cancel, dispatchOnTarget])
 

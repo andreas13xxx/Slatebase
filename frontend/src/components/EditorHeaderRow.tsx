@@ -1,7 +1,8 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useContext, useRef, useState, type ReactNode } from 'react'
 import { TextCursor, MoreHorizontal, Columns2, Rows2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, X, PanelTopClose } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import { usePaneTree } from '../state/paneTreeContext'
+import { AppContext } from '../state'
 import { findPane, getActivePaneTabState, listPanes, type PaneNode } from '../state/paneTreeState'
 import { splitActivePane, focusPaneInDirection } from './panes/pane-commands'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
@@ -14,6 +15,8 @@ export interface EditorHeaderRowProps {
   children?: ReactNode
   /** Hides the pane menu, e.g. while a settings page covers the panes. Default true. */
   showPaneMenu?: boolean
+  /** Pane this row belongs to; the editor-menu button targets it. Defaults to the active pane. */
+  paneId?: string
 }
 
 /** True if any tab of the pane holds edits that closing the pane would discard. */
@@ -25,9 +28,11 @@ function hasUnsavedTabs(pane: PaneNode): boolean {
  * Row below the tab bar: back/forward on the left, the breadcrumb in the
  * middle and a "…" menu with pane commands on the right.
  */
-export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderRowProps) {
+export function EditorHeaderRow({ children, showPaneMenu = true, paneId }: EditorHeaderRowProps) {
   const { t } = useTranslation()
   const { paneTree, paneTreeDispatch } = usePaneTree()
+  // Optional context: the row also renders without an AppProvider (vault permissions then unknown).
+  const vaults = useContext(AppContext)?.state.vaults
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   // ContextMenu closes on an outside mousedown, which includes this very button;
   // remember that it was open at press time so the click toggles instead of reopening.
@@ -36,10 +41,13 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
   const paneCount = listPanes(paneTree).length
   const activeTabState = getActivePaneTabState(paneTree)
   const activeTabId = activeTabState?.activeTabId ?? null
-  // The editor menu only exists for a markdown tab in an editable mode.
-  const activeTab = activeTabState?.tabs.find((tab) => tab.id === activeTabId)
-  const canOpenEditorMenu = activeTab !== undefined && activeTab.mode !== 'reading'
-    && /\.(md|markdown)$/i.test(activeTab.filePath)
+  // The editor menu only exists for a markdown tab in an editable mode, in a vault the user can write to.
+  const editorPaneId = paneId ?? paneTree.activePaneId
+  const editorTabState = findPane(paneTree, editorPaneId)?.tabState
+  const editorTab = editorTabState?.tabs.find((tab) => tab.id === editorTabState.activeTabId)
+  const vaultReadOnly = editorTab !== undefined && vaults?.find((v) => v.id === editorTab.vaultId)?.permission === 'read'
+  const canOpenEditorMenu = editorTab !== undefined && editorTab.mode !== 'reading' && !vaultReadOnly
+    && /\.(md|markdown)$/i.test(editorTab.filePath)
 
   /** The menu items are rebuilt on every render, so this sees the latest tree and unsaved edits. */
   function closeOthers() {
@@ -81,18 +89,17 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
       <NavigationControls />
       <div className="editor-header-row__center">{children}</div>
       {showPaneMenu && (
+      <>
       <button
         type="button"
         className="nav-controls-button editor-header-row__editor-menu"
         aria-label={t('splitPanes.editorMenuLabel')}
         title={t('splitPanes.editorMenuLabel')}
         disabled={!canOpenEditorMenu}
-        onClick={() => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'showContextMenu', paneId: paneTree.activePaneId } }))}
+        onClick={() => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'showContextMenu', paneId: editorPaneId } }))}
       >
         <TextCursor size={16} />
       </button>
-      )}
-      {showPaneMenu && (
       <button
         type="button"
         className="nav-controls-button editor-header-row__menu"
@@ -111,6 +118,7 @@ export function EditorHeaderRow({ children, showPaneMenu = true }: EditorHeaderR
       >
         <MoreHorizontal size={16} />
       </button>
+      </>
       )}
       {showPaneMenu && menuPos && (
         <ContextMenu

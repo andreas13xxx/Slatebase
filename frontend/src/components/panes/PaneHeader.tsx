@@ -25,7 +25,7 @@ export function PaneHeader({ pane, vaults, onSegmentClick, onModeChange }: PaneH
     && !tab.filePath.startsWith('__')
     && !tab.fileName.endsWith('.canvas') && !tab.fileName.endsWith('.base')
   return (
-    <EditorHeaderRow>
+    <EditorHeaderRow paneId={pane.id}>
       {tab && vault && isBreadcrumbPath(tab.filePath) && (
         <Breadcrumb
           vaultName={vault.name}
