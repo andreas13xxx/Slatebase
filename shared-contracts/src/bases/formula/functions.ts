@@ -46,8 +46,14 @@ export function isRegex(value: FormulaValue): value is RegexValue {
   return typeof value === 'object' && value !== null && !(value instanceof Date) && !Array.isArray(value) && value.kind === 'regex'
 }
 
+/** Longest regex source a formula may use. */
+const MAX_REGEX_SOURCE = 200
+
 /** Builds a JS RegExp from a regex value; null for an invalid pattern. */
 export function toRegExp(value: RegexValue, extraFlags = ''): RegExp | null {
+  // A base is evaluated server-side too (MCP `query_base`): keep patterns short so a
+  // pasted pathological one cannot be arbitrarily large. Backtracking cost is not bounded.
+  if (value.source.length > MAX_REGEX_SOURCE) return null
   try {
     return new RegExp(value.source, [...new Set(value.flags + extraFlags)].join(''))
   } catch {

@@ -44,6 +44,16 @@ describe('regex literals', () => {
   })
 })
 
+describe('regex limits', () => {
+  it('an oversized pattern never matches and never throws', () => {
+    const big = 'a'.repeat(300)
+    expect(ev(`/${big}/.matches("${big}")`)).toBe(false)
+  })
+  it('an invalid pattern is treated as no match', () => {
+    expect(ev('/(/.matches("x")')).toBe(false)
+  })
+})
+
 describe('string / number / date methods', () => {
   it('string helpers', () => {
     expect(ev('"ab".repeat(3)')).toBe('ababab')
