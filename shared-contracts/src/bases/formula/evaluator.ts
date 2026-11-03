@@ -13,7 +13,7 @@ import { parseFormula } from './parser.js'
 import type { ExprNode, BinaryOp } from './ast.js'
 import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, parseDurationMs } from './functions.js'
 import type { FormulaValue } from './functions.js'
-import { callMethod, DATE_MEMBERS } from './methods.js'
+import { callMethod, DATE_MEMBERS, DURATION_MEMBERS } from './methods.js'
 
 /** The context one expression is evaluated against: a row's property values. */
 export interface FormulaContext {
@@ -44,13 +44,18 @@ export type FormulaResult =
 class EvalError extends Error {}
 
 /** Member names the evaluator understands on a value (`x.length`, `d.year`, `link.path`). */
-const MEMBER_NAMES: ReadonlySet<string> = new Set(['length', 'path', ...Object.keys(DATE_MEMBERS)])
+const MEMBER_NAMES: ReadonlySet<string> = new Set(['length', 'path', ...Object.keys(DATE_MEMBERS), ...Object.keys(DURATION_MEMBERS)])
 
 /** Member access on an evaluated value. Throws on an unknown member. */
 function memberOf(obj: FormulaValue, property: string): FormulaValue {
   if (property === 'length') {
     if (Array.isArray(obj)) return obj.length
     if (typeof obj === 'string') return obj.length
+  }
+  // A number is a duration (a date difference in ms): `.days`, `.hours`, …
+  if (typeof obj === 'number') {
+    const unit = DURATION_MEMBERS[property]
+    if (unit) return unit(obj)
   }
   // Dates also arrive as epoch numbers (`file.ctime`) or ISO strings.
   const asDate = obj instanceof Date ? obj : typeof obj === 'number' || typeof obj === 'string' ? toDate(obj) : null

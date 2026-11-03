@@ -3,7 +3,7 @@ filters:
     - file.inFolder("Features/Beispiel-Aufgaben")
     - 'type == "task"'
 formulas:
-  days_left: 'days(date(deadline), today())'
+  days_left: '(date(deadline) - today()).days'
 properties:
   file.name:
     displayName: "Aufgabe"
@@ -28,9 +28,9 @@ views:
       - estimate
       - formula.days_left
     sort:
-      - column: priority
-        direction: desc
+      - property: priority
+        direction: DESC
     summaries:
-      file.name: Count
+      file.name: Filled
       estimate: Sum
-      days_left: Average
+      formula.days_left: Average

@@ -67,7 +67,7 @@ Formulas live under `formulas:` and are read-only columns computed per row. They
 
 ```yaml
 formulas:
-  days_left: 'days(date(deadline), today())'
+  days_left: '(date(deadline) - today()).days'
 ```
 
 **Built-in functions:** `if`, `concat`, `now`, `today`, `date`, `duration`, `number`, `list`, `link`, `file`, `image`, `icon`, `html`, `escapeHTML`, `random`, `min`, `max`, `days`, `length`.
@@ -95,7 +95,7 @@ formulas:
 ```
 
 > [!note] Date difference
-> `date1 - date2` returns **milliseconds** (as in Obsidian). Use `days(a, b)` when you want days.
+> `date1 - date2` returns **milliseconds** (as in Obsidian). For days use `(a - b).days` as in Obsidian (also `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` exists as an extra.
 
 ---
 
@@ -109,7 +109,7 @@ views:
     name: Tasks
     order: [file.name, status, estimate]
     summaries:
-      file.name: Count
+      file.name: Filled
       estimate: Sum
 ```
 
@@ -117,7 +117,7 @@ Built-in functions (as in Obsidian):
 
 | Applies to | Functions |
 |------------|-----------|
-| All types | `Count`, `Empty`, `Filled`, `Unique` |
+| All types | `Empty`, `Filled`, `Unique` (and `Count` as a Slatebase extra — unknown in Obsidian) |
 | Numbers | `Sum`, `Average`, `Min`, `Max`, `Median`, `Range`, `Stddev` |
 | Dates | `Earliest`, `Latest`, `Range` |
 | Checkbox | `Checked`, `Unchecked` |

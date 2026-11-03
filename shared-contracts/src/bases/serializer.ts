@@ -54,8 +54,9 @@ function serializeColumnMeta(meta: BaseColumnMeta): Record<string, unknown> {
 
 function serializeSort(clauses: BaseSortClause[]): Record<string, unknown>[] {
   return clauses.map((c) => {
-    const out: Record<string, unknown> = { column: c.column }
-    if (c.direction !== undefined) out['direction'] = c.direction
+    // Obsidian's spelling: `property` + upper-case direction.
+    const out: Record<string, unknown> = { property: c.column }
+    if (c.direction !== undefined) out['direction'] = c.direction.toUpperCase()
     return out
   })
 }
