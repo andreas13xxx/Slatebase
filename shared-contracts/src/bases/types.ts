@@ -209,6 +209,8 @@ export interface BaseQueryRowWire {
   tags?: string[] | undefined
   /** Internal link targets in the file (`file.links`), vault-relative. */
   links?: string[] | undefined
+  /** Embed targets in the file (`file.embeds`), vault-relative. */
+  embeds?: string[] | undefined
   /** File size in bytes (`file.size`), when the base referenced it. */
   size?: number | undefined
   /** Vault-relative paths of files linking to this one (`file.backlinks`). */

@@ -129,7 +129,7 @@ export function buildHostQuerySpec(doc: BaseDocument, view: BaseView, hostPath: 
  * these keys are therefore never unwrapped (`tags.contains(..)` must behave the
  * same for one tag and for two).
  */
-const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links', 'file.backlinks'])
+const LIST_KEYS: ReadonlySet<string> = new Set(['tags', 'aliases', 'cssclasses', 'file.tags', 'file.links', 'file.embeds', 'file.backlinks'])
 
 /**
  * Converts an index value to an expression value. A one-element list reads as a
@@ -262,6 +262,7 @@ export function wireRowToBaseRow(r: BaseQueryRowWire, listKeys?: ReadonlySet<str
   if (r.folder !== undefined) values['file.folder'] = r.folder
   if (r.tags !== undefined) values['file.tags'] = r.tags
   if (r.links !== undefined) values['file.links'] = r.links
+  if (r.embeds !== undefined) values['file.embeds'] = r.embeds
   if (r.size !== undefined) values['file.size'] = r.size
   if (r.backlinks !== undefined) values['file.backlinks'] = r.backlinks
   return listKeys

@@ -97,6 +97,8 @@ export interface ParsedWikilink {
     /** 1-based column number. */
     column: number
   }
+  /** True for an embed (`![[...]]`); absent for a plain link. */
+  embed?: boolean
 }
 
 // ─── Link Index Interface ────────────────────────────────────────────────────
@@ -334,6 +336,8 @@ export interface BaseQueryRow {
   tags?: string[] | undefined
   /** Internal link targets in the file (the `file.links` field), vault-relative. */
   links?: string[] | undefined
+  /** Embed targets in the file (the `file.embeds` field), vault-relative. */
+  embeds?: string[] | undefined
   /** File size in bytes (the `file.size` field), when the base referenced it. */
   size?: number | undefined
   /** Vault-relative paths of files linking to this one (`file.backlinks`). */
