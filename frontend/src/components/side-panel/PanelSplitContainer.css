@@ -39,6 +39,7 @@
 /* ─── Resize Handle ───────────────────────────────────────────────────────── */
 
 .side-panel-split-resize-handle {
+  touch-action: none;
   height: 4px;
   width: 100%;
   cursor: row-resize;
@@ -92,4 +93,13 @@
   height: 2px;
   background: var(--accent);
   border-radius: 1px;
+}
+
+/* Touch: widen the hit area of the 4px handle without changing the layout. */
+@media (pointer: coarse) {
+  .side-panel-split-resize-handle::before {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+  }
 }

@@ -34,8 +34,11 @@ export function PaneSplitHandle({ direction, ratio, getAxisLengthPx, onResize, l
 
   const clamp = (r: number): number => Math.min(Math.max(r, MIN_PANE_RATIO), 1 - MIN_PANE_RATIO)
 
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      // One drag at a time, by the primary pointer's main button (not a second finger or right click).
+      if (dragging.current || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+      const pointerId = e.pointerId
       dragging.current = true
       startPos.current = isHorizontal ? e.clientX : e.clientY
       startRatio.current = ratio
@@ -43,21 +46,24 @@ export function PaneSplitHandle({ direction, ratio, getAxisLengthPx, onResize, l
       document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize'
       document.body.style.userSelect = 'none'
 
-      const onMouseMove = (ev: MouseEvent) => {
-        if (!dragging.current || axisLen.current <= 0) return
+      const onPointerMove = (ev: PointerEvent) => {
+        if (!dragging.current || ev.pointerId !== pointerId || axisLen.current <= 0) return
         const pos = isHorizontal ? ev.clientX : ev.clientY
         const deltaRatio = (pos - startPos.current) / axisLen.current
         onResize(clamp(startRatio.current + deltaRatio))
       }
-      const onMouseUp = () => {
+      const onPointerUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
         dragging.current = false
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
-        document.removeEventListener('mousemove', onMouseMove)
-        document.removeEventListener('mouseup', onMouseUp)
+        document.removeEventListener('pointermove', onPointerMove)
+        document.removeEventListener('pointerup', onPointerUp)
+        document.removeEventListener('pointercancel', onPointerUp)
       }
-      document.addEventListener('mousemove', onMouseMove)
-      document.addEventListener('mouseup', onMouseUp)
+      document.addEventListener('pointermove', onPointerMove)
+      document.addEventListener('pointerup', onPointerUp)
+      document.addEventListener('pointercancel', onPointerUp)
     },
     [isHorizontal, ratio, getAxisLengthPx, onResize],
   )
@@ -83,7 +89,7 @@ export function PaneSplitHandle({ direction, ratio, getAxisLengthPx, onResize, l
       aria-valuemin={Math.round(MIN_PANE_RATIO * 100)}
       aria-valuemax={Math.round((1 - MIN_PANE_RATIO) * 100)}
       tabIndex={0}
-      onMouseDown={onMouseDown}
+      onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
     />
   )

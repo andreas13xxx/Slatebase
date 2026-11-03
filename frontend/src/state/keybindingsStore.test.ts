@@ -12,6 +12,7 @@ import {
   resetAll,
   findConflict,
   matchesShortcut,
+  isMacPlatform,
   isOverridden,
   onKeybindingsChange,
   disconnect,
@@ -325,5 +326,20 @@ describe('keybindingsStore — safety', () => {
     disconnect()
     expect(localStorage.getItem('slatebase:hotkeys:v1')).toBeNull()
     expect(localStorage.getItem('slatebase:hotkeys-taken-over:v1')).toBeNull()
+  })
+})
+
+describe('isMacPlatform', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it.each([
+    ['MacIntel', true],
+    ['iPad', true],
+    ['iPhone', true],
+    ['Linux x86_64', false],
+    ['Win32', false],
+  ])('platform %s → %s', (platform, expected) => {
+    vi.stubGlobal('navigator', { platform })
+    expect(isMacPlatform()).toBe(expected)
   })
 })

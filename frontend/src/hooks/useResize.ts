@@ -8,8 +8,8 @@ type LayoutWidthKey = 'sidebarWidth' | 'rightPanelWidth'
 const KEYBOARD_STEP = 10
 
 /**
- * Hook for mouse- and keyboard-driven panel resize.
- * Returns the current width, an onMouseDown handler, and an onKeyDown handler
+ * Hook for pointer- (mouse, pen, touch) and keyboard-driven panel resize.
+ * Returns the current width, an onPointerDown handler, and an onKeyDown handler
  * to attach to the resize handle.
  *
  * @param initialWidth - Starting width in pixels (used as fallback if no persisted value)
@@ -46,30 +46,36 @@ export function useResize(
     }
   }, [width, persistKey])
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    // One drag at a time, by the primary pointer's main button (not a second finger, right click or pen barrel).
+    if (dragging.current || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+    const pointerId = e.pointerId
     dragging.current = true
     startX.current = e.clientX
     startWidth.current = width
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
 
-    function onMouseMove(ev: MouseEvent) {
-      if (!dragging.current) return
+    function onPointerMove(ev: PointerEvent) {
+      if (!dragging.current || ev.pointerId !== pointerId) return
       const delta = side === 'left' ? ev.clientX - startX.current : startX.current - ev.clientX
       const newWidth = Math.min(max, Math.max(min, startWidth.current + delta))
       setWidth(newWidth)
     }
 
-    function onMouseUp() {
+    function onPointerUp(ev: PointerEvent) {
+      if (ev.pointerId !== pointerId) return
       dragging.current = false
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
+      document.removeEventListener('pointermove', onPointerMove)
+      document.removeEventListener('pointerup', onPointerUp)
+      document.removeEventListener('pointercancel', onPointerUp)
     }
 
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
+    document.addEventListener('pointermove', onPointerMove)
+    document.addEventListener('pointerup', onPointerUp)
+    document.addEventListener('pointercancel', onPointerUp)
   }, [width, min, max, side])
 
   /** Keyboard handler: ArrowLeft/ArrowRight adjust width by KEYBOARD_STEP. */
@@ -82,5 +88,5 @@ export function useResize(
     setWidth((current) => Math.min(max, Math.max(min, current + delta)))
   }, [min, max, side])
 
-  return { width, min, max, onMouseDown, onKeyDown }
+  return { width, min, max, onPointerDown, onKeyDown }
 }

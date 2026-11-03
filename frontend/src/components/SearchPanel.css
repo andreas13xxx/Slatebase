@@ -841,3 +841,10 @@
   border-radius: 3px;
   font-size: 11px;
 }
+
+/* No hover on touch devices: keep the per-hit replace button visible. */
+@media (hover: none) {
+  .search-panel__replace-hit-btn {
+    opacity: 1;
+  }
+}

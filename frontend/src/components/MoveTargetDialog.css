@@ -1,0 +1,112 @@
+/* MoveTargetDialog — folder picker for "Move to…" */
+
+.move-target-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+  background: var(--bg-overlay);
+}
+
+.move-target-dialog {
+  width: min(480px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.3));
+  overflow: hidden;
+}
+
+.move-target-title {
+  padding: 12px 14px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.move-target-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-subtle);
+}
+
+.move-target-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 16px; /* >= 16px keeps iOS from zooming the page on focus */
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.move-target-list {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.move-target-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.move-target-item:hover:not(:disabled),
+.move-target-item:focus-visible {
+  background: var(--accent-light);
+}
+
+.move-target-item:disabled {
+  color: var(--text-subtle);
+  cursor: default;
+}
+
+.move-target-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.move-target-item-note {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.move-target-empty {
+  padding: 12px 14px;
+  color: var(--text-subtle);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (pointer: coarse) {
+  .move-target-item {
+    min-height: 44px;
+  }
+}

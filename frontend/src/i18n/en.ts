@@ -141,6 +141,10 @@ export const en: TranslationShape = {
     modeReading: 'Reading view',
     unpinTab: 'Unpin',
     unpinTabAriaLabel: 'Unpin tab: {name}',
+    moveLeft: 'Move left',
+    moveRight: 'Move right',
+    moveToOtherPane: 'Move to other pane',
+    moveToPane: 'Move to pane {n}',
   },
 
   userMenu: {
@@ -196,6 +200,15 @@ export const en: TranslationShape = {
     focusDown: 'Focus pane below',
     closePane: 'Close pane',
     closeOtherPanes: 'Close other panes',
+  },
+
+  moveDialog: {
+    title: 'Move “{name}”',
+    searchPlaceholder: 'Search folders…',
+    vaultRoot: 'Vault root',
+    currentLocation: 'current location',
+    noFolders: 'No folders found',
+    listLabel: 'Target folders',
   },
 
   binaryViewer: {
@@ -515,7 +528,6 @@ export const en: TranslationShape = {
     nameTooLong: 'Filename is too long',
     copyError: 'Error copying file',
     copyPrompt: 'Target folder for the copy:',
-    movePrompt: 'Target folder for moving:',
   },
 
   mcpTokens: {
@@ -977,6 +989,8 @@ export const en: TranslationShape = {
   },
 
   bookmarkGroups: {
+    moveUp: 'Move up',
+    moveDown: 'Move down',
     newGroup: 'New group',
     defaultName: 'Group',
     newSubgroup: 'New subgroup',

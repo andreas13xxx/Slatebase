@@ -12,7 +12,7 @@
 import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react'
 import {
   Star, StarOff, Heading, Hash, Search as SearchIcon, FolderOpen, Folder, FolderPlus, FolderInput,
-  ChevronRight, ChevronDown, CornerLeftUp, Pencil, Trash2,
+  ChevronRight, ChevronDown, CornerLeftUp, Pencil, Trash2, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { favoritesStore, groupByParent, onFavoritesChange, withDescendants } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
@@ -138,6 +138,13 @@ function entryIconClass(entry: FavoriteEntry): string {
 }
 
 /** The visible lines, depth first; the content of a folded group is left out. */
+/** The level an entry sits on (null = top level), its entries in order, and its position among them. */
+function locateAmongSiblings(byParent: Map<string | null, FavoriteEntry[]>, entry: FavoriteEntry) {
+  const parent = entry.parentId !== undefined && byParent.has(entry.parentId) ? entry.parentId : null
+  const siblings = byParent.get(parent) ?? []
+  return { parent, siblings, index: siblings.findIndex((s) => s.id === entry.id) }
+}
+
 function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set<string>): Row[] {
   const rows: Row[] = []
   const walk = (parent: string | null, depth: number): void => {
@@ -313,16 +320,27 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
     refresh()
   }, [vaultId, refresh, groupName])
 
+  /** One step up (-1) or down (+1) among the entries of the same level: the menu counterpart of dragging. */
+  const handleNudge = useCallback((entry: FavoriteEntry, step: -1 | 1) => {
+    if (!vaultId) return
+    const { parent, siblings, index } = locateAmongSiblings(byParent, entry)
+    if (index === -1 || index + step < 0 || index + step >= siblings.length) return
+    favoritesStore.moveEntry(vaultId, entry.id, parent, index + step)
+    refresh()
+  }, [vaultId, byParent, refresh])
+
   const handleContextMenuSelect = useCallback((action: string) => {
     if (!contextMenu) return
     const { entry } = contextMenu
-    if (action === 'remove') handleRemove(entry)
+    if (action === 'move-up') handleNudge(entry, -1)
+    else if (action === 'move-down') handleNudge(entry, 1)
+    else if (action === 'remove') handleRemove(entry)
     else if (action === 'reveal') handleReveal(entry)
     else if (action === 'rename') handleRenameStart(entry)
     else if (action === 'new-group') handleAddGroup(entry.id)
     else if (action === 'ungroup') handleMove(entry, null)
     else if (action.startsWith('move:')) handleMove(entry, action.slice('move:'.length))
-  }, [contextMenu, handleRemove, handleReveal, handleRenameStart, handleAddGroup, handleMove])
+  }, [contextMenu, handleNudge, handleRemove, handleReveal, handleRenameStart, handleAddGroup, handleMove])
 
   // ─── Drag and drop: reorder and move into groups (Requirement 1) ─────────
 
@@ -420,9 +438,18 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   const moveTargets = (entry: FavoriteEntry): FavoriteEntry[] =>
     favorites.filter((g) => isGroup(g) && g.id !== entry.parentId && !withDescendants(byParent, entry.id).has(g.id))
 
+  const nudgeItems = (entry: FavoriteEntry): ContextMenuItem[] => {
+    const { siblings, index } = locateAmongSiblings(byParent, entry)
+    return [
+      { id: 'move-up', label: t('bookmarkGroups.moveUp'), icon: <ArrowUp size={14} />, disabled: index <= 0 },
+      { id: 'move-down', label: t('bookmarkGroups.moveDown'), icon: <ArrowDown size={14} />, disabled: index === -1 || index >= siblings.length - 1 },
+    ]
+  }
+
   const menuItems: ContextMenuItem[] = contextMenu ? [
     ...(contextMenu.entry.type !== 'search' && !isGroup(contextMenu.entry) ? [{ id: 'reveal', label: 'Im Datei-Explorer anzeigen', icon: <FolderOpen size={14} /> }] : []),
     { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} /> },
+    ...nudgeItems(contextMenu.entry),
     ...(isGroup(contextMenu.entry) ? [{ id: 'new-group', label: t('bookmarkGroups.newSubgroup'), icon: <FolderPlus size={14} /> }] : []),
     ...moveTargets(contextMenu.entry).map((g) => ({ id: `move:${g.id}`, label: t('bookmarkGroups.moveTo', { name: getEntryDisplayText(g, groupName) }), icon: <FolderInput size={14} /> })),
     ...(contextMenu.entry.parentId !== undefined && favorites.some((g) => g.id === contextMenu.entry.parentId)

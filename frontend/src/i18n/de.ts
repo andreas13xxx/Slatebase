@@ -135,6 +135,10 @@ export const de = {
     modeReading: 'Lesemodus',
     unpinTab: 'Lösen',
     unpinTabAriaLabel: 'Tab lösen: {name}',
+    moveLeft: 'Nach links verschieben',
+    moveRight: 'Nach rechts verschieben',
+    moveToOtherPane: 'In anderen Bereich verschieben',
+    moveToPane: 'In Bereich {n} verschieben',
   },
 
   userMenu: {
@@ -190,6 +194,15 @@ export const de = {
     focusDown: 'Fokus nach unten',
     closePane: 'Bereich schließen',
     closeOtherPanes: 'Andere Bereiche schließen',
+  },
+
+  moveDialog: {
+    title: '„{name}“ verschieben',
+    searchPlaceholder: 'Ordner suchen…',
+    vaultRoot: 'Vault-Stammordner',
+    currentLocation: 'aktueller Ort',
+    noFolders: 'Keine Ordner gefunden',
+    listLabel: 'Zielordner',
   },
 
   binaryViewer: {
@@ -509,7 +522,6 @@ export const de = {
     nameTooLong: 'Dateiname ist zu lang',
     copyError: 'Fehler beim Kopieren',
     copyPrompt: 'Zielordner für die Kopie:',
-    movePrompt: 'Zielordner zum Verschieben:',
   },
 
   mcpTokens: {
@@ -971,6 +983,8 @@ export const de = {
   },
 
   bookmarkGroups: {
+    moveUp: 'Nach oben',
+    moveDown: 'Nach unten',
     newGroup: 'Neue Gruppe',
     defaultName: 'Gruppe',
     newSubgroup: 'Neue Untergruppe',

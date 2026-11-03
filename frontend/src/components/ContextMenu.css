@@ -109,3 +109,10 @@
   border-radius: 50%;
   border: 1px solid rgba(127, 127, 127, 0.45);
 }
+
+/* Touch: menu rows are finger-sized. */
+@media (pointer: coarse) {
+  .context-menu-btn {
+    min-height: 44px;
+  }
+}

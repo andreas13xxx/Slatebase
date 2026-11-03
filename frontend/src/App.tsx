@@ -114,6 +114,7 @@ import { Breadcrumb } from './components/Breadcrumb'
 import { PaneHeader } from './components/panes/PaneHeader'
 import { isBreadcrumbPath } from './components/panes/breadcrumbPath'
 import { useResize } from './hooks/useResize'
+import { useKeyboardViewport } from './hooks/useKeyboardViewport'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useWorkspaceRestore, LAST_VAULT_KEY, getInitialPaneTree } from './hooks/useWorkspaceRestore'
@@ -263,6 +264,7 @@ function AppContent() {
   // follows the user across devices.
   const explorerFollowActiveFile = useUiSettings().explorerFollowActiveFile
 
+  useKeyboardViewport()
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
   const versionInfo = useVersionInfo()
@@ -1289,7 +1291,7 @@ function AppContent() {
           {showSidebar && (
             <div
               className="resize-handle"
-              onMouseDown={sidebar.onMouseDown}
+              onPointerDown={sidebar.onPointerDown}
               onKeyDown={sidebar.onKeyDown}
               title={t('resize.adjustWidth')}
               role="separator"
@@ -1400,7 +1402,7 @@ function AppContent() {
             <>
               <div
                 className="resize-handle"
-                onMouseDown={rightPanel.onMouseDown}
+                onPointerDown={rightPanel.onPointerDown}
                 onKeyDown={rightPanel.onKeyDown}
                 title={t('resize.adjustWidth')}
                 role="separator"
