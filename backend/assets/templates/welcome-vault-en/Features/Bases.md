@@ -70,16 +70,29 @@ formulas:
   days_left: 'days(date(deadline), today())'
 ```
 
-**Built-in functions:** `if`, `concat`, `now`, `today`, `date`, `number`, `list`, `link`, `min`, `max`, `days`, `length`.
+**Built-in functions:** `if`, `concat`, `now`, `today`, `date`, `duration`, `number`, `list`, `link`, `file`, `image`, `icon`, `html`, `escapeHTML`, `random`, `min`, `max`, `days`, `length`.
 
 **Methods:**
 
 | Type | Methods |
 |------|---------|
-| Text | `contains`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `replace`, `split`, `length` |
-| Number | `toFixed`, `round`, `abs` |
-| Date | `format`, `date`, `time`, plus `year`, `month`, `day`, `hour`, `minute`, `second` |
-| List | `contains`, `length`, `join`, `first`, `last` |
+| Text | `contains`, `containsAll`, `containsAny`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `title`, `repeat`, `reverse`, `slice`, `replace`, `split`, `length`, `isEmpty` |
+| Number | `toFixed`, `round`, `abs`, `ceil`, `floor`, `isEmpty` |
+| Date | `format`, `date`, `time`, `relative`, plus `year`, `month`, `day`, `hour`, `minute`, `second` |
+| List | `contains`, `containsAll`, `containsAny`, `length`, `join`, `first`, `last`, `flat`, `reverse`, `slice`, `sort`, `unique`, `isEmpty`, `map`, `filter`, `reduce` |
+| Regexp | `matches` — literals like `/abc/gi`; `replace` and `split` accept them too (`g` replaces every match, otherwise only the first) |
+| Link | `asFile`, `linksTo` |
+| File | `file.hasTag`, `file.inFolder`, `file.hasLink`, `file.hasProperty`, `file.asLink` |
+| Any value | `isTruthy`, `isType`, `toString` |
+
+**List lambdas** use no arrow syntax, as in Obsidian, but an expression with the implicit variables `value`, `index` and (for `reduce`) `acc`:
+
+```yaml
+formulas:
+  doubled: 'numbers.map(value * 2)'
+  big: 'numbers.filter(value > 10).length'
+  total: 'numbers.reduce(acc + value, 0)'
+```
 
 > [!note] Date difference
 > `date1 - date2` returns **milliseconds** (as in Obsidian). Use `days(a, b)` when you want days.
@@ -109,7 +122,19 @@ Built-in functions (as in Obsidian):
 | Dates | `Earliest`, `Latest`, `Range` |
 | Checkbox | `Checked`, `Unchecked` |
 
-A numeric function on a non-numeric column yields an empty value, not an error. Custom summaries written as a formula over `values` (lambdas) are not implemented.
+A numeric function on a non-numeric column yields an empty value, not an error. Define custom summaries in the top-level `summaries:` block as a formula over the list `values`, and assign them by name in the view:
+
+```yaml
+summaries:
+  middle: 'values.mean().round(1)'
+  big: 'values.filter(value > 10).length'
+views:
+  - type: table
+    summaries:
+      effort: middle
+```
+
+If the formula fails, the summary stays empty.
 
 ---
 
@@ -126,7 +151,8 @@ Click a column header to sort; the sort is written back into the `.base` file. T
 A base can hold several views; a view switcher appears at the top.
 
 - **Table** — one row per note, editable cells.
-- **Cards (Kanban)** — notes grouped into columns by a property. Each value becomes a column; notes without a value land in a "No …" column. Columns collapse, and clicking a card opens the note.
+- **Cards** (`type: cards` without `groupBy`) — a grid of cards, one per note, as in Obsidian. Options: `image` (the property holding the cover image: an `[[attachment]]` link, an http(s) URL or a colour like `#ff8800`), `imageFit` (`cover` crops, `contain` does not), `imageAspectRatio` (width / height, default 1) and `cardSize` (card width in pixels, default 200).
+- **Cards (Kanban)** (`type: kanban`, or `type: cards` **with** `groupBy`) — notes grouped into columns by a property. With `groupOrder` (a list of values; `null` stands for "No …") only the listed columns show, in that order; an empty list hides them all. Each value becomes a column; notes without a value land in a "No …" column. Columns collapse, and clicking a card opens the note.
   **Drag a card to another column** to change the grouping property's value in the note; dropping on "No …" removes the property. (Requires write access to the vault.)
 - **List** (`type: list`) — a simple read-only list with one entry per note, no grouping. Formula columns are evaluated, and summaries appear as a bar above the list.
 - **Map** (`type: map`) — notes with geo coordinates as pins on a map; clicking a pin opens the note. Slatebase reads the coordinate from the view option `coordinates` (or `location`) as a property holding `"lat,lng"`, or from two numeric properties `latProperty` and `lngProperty` (also `lat`/`lng`/`longitude`). Notes without a readable coordinate are not plotted; a counter shows how many were skipped. The map tiles come from a server the operator sets (`SLATEBASE_MAP_TILE_URL`); without one the view only shows a notice that it is inactive.
@@ -201,16 +227,17 @@ So nothing surprises you:
 
 **Expression language**
 - This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
-- **No lambdas** and no `map`/`filter` operations on lists (this also means custom `summaries` written as a formula).
-- Unsupported: `file.embeds`. `file.size` and `file.backlinks` ARE supported.
+- There is no object type: `keys()`/`values()` on objects are missing. `html()`, `icon()` and `image()` return text or a link; raw HTML is never inserted.
+- `file.embeds`, `file.size` and `file.backlinks` ARE supported. `file.embeds` holds `![[…]]` embeds only; on the first start after the update Slatebase rebuilds the link index once.
+- Not implemented: table row height and the list options (markers, indent, separator) — their YAML keys are not documented.
 
 **Lists vs. single values**
 - The index hands over every property as a list. A property that has **more than one value somewhere** in your vault — or is declared as a list/tags in the property-type registry — is treated as a list even with a single value. Only for a property that never appears as a list and is not declared one is a one-element list read like a single value.
 
 **Views and embedding**
 - **Table**, **cards**, **list** and **map** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
-- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (a read-only table each). Embedded, it shows **one** view — the first, or the one chosen with `#View name` — and always as a **table**, even if the view is of type cards, list or map.
-- An embedded base is queried once when shown and is **not** refreshed on vault changes; an opened `.base` file is. That includes `this`: if the embedding note changes, the embed keeps the old state until the note is reopened.
+- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (read-only each). Embedded, it shows **one** view — the first, or the one chosen with `#View name` — in its own type: table, cards, Kanban or list. Only a **map** and plugin views appear as a table when embedded.
+- An embedded base refreshes itself on vault changes (including a change to the embedding note, and so to `this`); the old display stays until the new query is done.
 - `this` works in the built-in table, not in views a plugin provides, and not in the MCP `query_base` tool (there `this.…` is empty).
 
 **AI access via MCP**

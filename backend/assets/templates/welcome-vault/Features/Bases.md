@@ -70,16 +70,29 @@ formulas:
   days_left: 'days(date(deadline), today())'
 ```
 
-**Eingebaute Funktionen:** `if`, `concat`, `now`, `today`, `date`, `number`, `list`, `link`, `min`, `max`, `days`, `length`.
+**Eingebaute Funktionen:** `if`, `concat`, `now`, `today`, `date`, `duration`, `number`, `list`, `link`, `file`, `image`, `icon`, `html`, `escapeHTML`, `random`, `min`, `max`, `days`, `length`.
 
 **Methoden:**
 
 | Typ | Methoden |
 |-----|----------|
-| Text | `contains`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `replace`, `split`, `length` |
-| Zahl | `toFixed`, `round`, `abs` |
-| Datum | `format`, `date`, `time` sowie `year`, `month`, `day`, `hour`, `minute`, `second` |
-| Liste | `contains`, `length`, `join`, `first`, `last` |
+| Text | `contains`, `containsAll`, `containsAny`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `title`, `repeat`, `reverse`, `slice`, `replace`, `split`, `length`, `isEmpty` |
+| Zahl | `toFixed`, `round`, `abs`, `ceil`, `floor`, `isEmpty` |
+| Datum | `format`, `date`, `time`, `relative` sowie `year`, `month`, `day`, `hour`, `minute`, `second` |
+| Liste | `contains`, `containsAll`, `containsAny`, `length`, `join`, `first`, `last`, `flat`, `reverse`, `slice`, `sort`, `unique`, `isEmpty`, `map`, `filter`, `reduce` |
+| Regexp | `matches` — Literale wie `/abc/gi`; `replace` und `split` akzeptieren sie ebenfalls (`g` ersetzt alle Treffer, sonst nur den ersten) |
+| Link | `asFile`, `linksTo` |
+| Datei | `file.hasTag`, `file.inFolder`, `file.hasLink`, `file.hasProperty`, `file.asLink` |
+| Jeder Wert | `isTruthy`, `isType`, `toString` |
+
+**Lambdas auf Listen** nutzen wie in Obsidian keine Pfeilsyntax, sondern einen Ausdruck mit den impliziten Variablen `value`, `index` und (bei `reduce`) `acc`:
+
+```yaml
+formulas:
+  doppelt: 'zahlen.map(value * 2)'
+  grosse: 'zahlen.filter(value > 10).length'
+  summe: 'zahlen.reduce(acc + value, 0)'
+```
 
 > [!note] Datumsdifferenz
 > `date1 - date2` liefert **Millisekunden** (wie in Obsidian). Willst du Tage, nimm `days(a, b)`.
@@ -109,7 +122,19 @@ Eingebaute Funktionen (wie in Obsidian):
 | Daten | `Earliest`, `Latest`, `Range` |
 | Checkbox | `Checked`, `Unchecked` |
 
-Eine numerische Funktion auf einer nicht-numerischen Spalte ergibt einen leeren Wert, keinen Fehler. Eigene Zusammenfassungen per Formel über `values` (Lambdas) sind nicht umgesetzt.
+Eine numerische Funktion auf einer nicht-numerischen Spalte ergibt einen leeren Wert, keinen Fehler. Eigene Zusammenfassungen definierst du im Top-Level-Block `summaries:` als Formel über die Liste `values` und weist sie in der Ansicht per Namen zu:
+
+```yaml
+summaries:
+  mittel: 'values.mean().round(1)'
+  gross: 'values.filter(value > 10).length'
+views:
+  - type: table
+    summaries:
+      aufwand: mittel
+```
+
+Schlägt die Formel fehl, bleibt die Zusammenfassung leer.
 
 ---
 
@@ -126,7 +151,8 @@ Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Date
 Eine Base kann mehrere Ansichten enthalten; oben erscheint dann ein Umschalter.
 
 - **Tabelle** — eine Zeile pro Notiz, editierbare Zellen.
-- **Karten (Kanban)** — Notizen nach einer Property in Spalten gruppiert. Jeder Wert wird eine Spalte, Notizen ohne Wert landen in „Ohne …". Spalten sind einklappbar, ein Klick auf eine Karte öffnet die Notiz.
+- **Karten** (`type: cards` ohne `groupBy`) — ein Raster aus Karten, eine pro Notiz, wie in Obsidian. Optionen: `image` (Property mit dem Titelbild: `[[Anhang]]`-Link, http(s)-URL oder Farbe wie `#ff8800`), `imageFit` (`cover` schneidet zu, `contain` nicht), `imageAspectRatio` (Breite / Höhe, Standard 1) und `cardSize` (Kartenbreite in Pixeln, Standard 200).
+- **Karten (Kanban)** (`type: kanban`, oder `type: cards` **mit** `groupBy`) — Notizen nach einer Property in Spalten gruppiert. Mit `groupOrder` (Liste von Werten, `null` steht für „Ohne …") zeigst du nur die genannten Spalten in dieser Reihenfolge; eine leere Liste blendet alle aus. Jeder Wert wird eine Spalte, Notizen ohne Wert landen in „Ohne …". Spalten sind einklappbar, ein Klick auf eine Karte öffnet die Notiz.
   **Ziehe eine Karte in eine andere Spalte**, um den Wert der Gruppierungs-Property in der Notiz zu ändern; das Ziehen in „Ohne …" entfernt die Property. (Nur mit Schreibrecht auf den Vault.)
 - **Liste** (`type: list`) — eine einfache, schreibgeschützte Liste mit einem Eintrag pro Notiz, ohne Gruppierung. Formelspalten werden ausgewertet, Zusammenfassungen erscheinen als Leiste über der Liste.
 - **Karte** (`type: map`) — Notizen mit Geokoordinaten als Pins auf einer Karte; ein Klick auf einen Pin öffnet die Notiz. Die Koordinate liest Slatebase aus der Ansichts-Option `coordinates` (oder `location`) als Property mit `"Breite,Länge"` oder aus zwei Zahl-Properties `latProperty` und `lngProperty` (auch `lat`/`lng`/`longitude`). Notizen ohne lesbare Koordinate erscheinen nicht, ein Zähler nennt ihre Anzahl. Die Kartenkacheln kommen von einem Server, den der Betreiber festlegt (`SLATEBASE_MAP_TILE_URL`); ohne ihn zeigt die Ansicht nur einen Hinweis, dass sie nicht aktiv ist.
@@ -201,16 +227,17 @@ Damit du nicht überrascht wirst:
 
 **Ausdruckssprache**
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
-- **Keine Lambdas** und keine `map`/`filter`-Operationen auf Listen (das gilt auch für eigene `summaries` per Formel).
-- Nicht unterstützt: `file.embeds`. `file.size` und `file.backlinks` werden dagegen unterstützt.
+- Es gibt keinen Objekt-Typ: `keys()`/`values()` auf Objekten fehlen. `html()`, `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
+- `file.embeds`, `file.size` und `file.backlinks` werden unterstützt. `file.embeds` enthält nur `![[…]]`-Einbettungen; beim ersten Start nach dem Update baut Slatebase den Link-Index einmal neu auf.
+- Nicht umgesetzt: Zeilenhöhe der Tabelle und die Listen-Optionen (Marker, Einrückung, Trennzeichen) — ihre YAML-Schlüssel sind nicht belegt.
 
 **Listen vs. Einzelwerte**
 - Der Index liefert jede Property als Liste. Eine Property, die in deinem Vault **irgendwo mehrere Werte** hat — oder in der Property-Typ-Registry als Liste/Tags deklariert ist — wird auch mit nur einem Wert als Liste behandelt. Nur bei einer Property, die nirgends als Liste auftaucht und nicht so deklariert ist, wird eine Ein-Element-Liste wie ein Einzelwert gelesen.
 
 **Ansichten und Einbettung**
 - Eingebaut sind **Tabelle**, **Karten**, **Liste** und **Karte** (Map); andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
-- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützte Tabelle). Eingebettet zeigt sie **eine** Ansicht — die erste oder die per `#Ansichtsname` gewählte — und zwar immer als **Tabelle**, auch wenn die Ansicht vom Typ Karten, Liste oder Karte ist.
-- Eine eingebettete Base wird beim Anzeigen einmal abgefragt und **nicht** bei Änderungen im Vault aktualisiert; die geöffnete `.base`-Datei dagegen schon. Das gilt auch für `this`: Ändert sich die einbettende Notiz, zeigt die Einbettung den alten Stand, bis die Notiz neu geöffnet wird.
+- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützt). Eingebettet zeigt sie **eine** Ansicht — die erste oder die per `#Ansichtsname` gewählte — in ihrem eigenen Typ: Tabelle, Karten, Kanban oder Liste. Nur eine **Karte** (Map) und Plugin-Ansichten erscheinen eingebettet als Tabelle.
+- Eine eingebettete Base aktualisiert sich bei Änderungen im Vault von selbst (auch wenn sich die einbettende Notiz und damit `this` ändert); die alte Anzeige bleibt stehen, bis die neue Abfrage fertig ist.
 - `this` gilt in der eingebauten Tabelle, nicht in Ansichten, die ein Plugin liefert, und nicht im MCP-Werkzeug `query_base` (dort ergibt `this.…` einen leeren Wert).
 
 **KI-Zugriff über MCP**

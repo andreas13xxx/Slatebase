@@ -3,6 +3,14 @@
 Stand 2026-11-03. Quelle: Abgleich von Code gegen die Obsidian-Hilfe (obsidian.md/help/bases/syntax, /functions,
 /views, /views/table|cards|list|map). Nur Punkte, die im Code verifiziert offen sind.
 
+## Status (2026-11-03)
+P1, P2, P3, P5 umgesetzt. P4 teilweise: `groupOrder`, Cards-Raster und -Optionen, `type: kanban` umgesetzt; Tabellen-`rowHeight` und
+Listen-Optionen **nicht** (YAML-Schlüssel in der Obsidian-Doku nicht belegt; Raten würde das Dateiformat verbiegen); Copy/CSV offen.
+Abweichungen: Objekt-Methoden (`keys`/`values`) entfallen mangels Objekt-Typ; `file()`/`image()` liefern einen Link, `icon()`/`html()` Text;
+`map`-Ansicht bleibt in der Einbettung eine Tabelle (Kacheln sind Operator-Konfiguration). Ein `cards`-View ohne `groupBy` ist jetzt das
+Obsidian-Kartenraster, mit `groupBy` bleibt es das Kanban-Board.
+Cards-Schlüssel (`image`, `imageFit`, `imageAspectRatio`, `cardSize`) stammen aus einem Forenbeispiel, `groupOrder` aus `obsidian.d.ts` (1.14.3).
+
 ## Phasen
 
 ### P1 — Ausdruckssprache: Funktionen und Methoden
