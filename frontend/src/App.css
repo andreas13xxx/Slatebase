@@ -6859,3 +6859,61 @@
     inset: 0 -12px;
   }
 }
+
+/* ===== iPad / touch: finger-sized targets (>= 44px) ===== */
+@media (pointer: coarse) {
+  .tab-bar {
+    min-height: 44px;
+  }
+
+  .tab-bar-close-btn {
+    padding: 8px;
+    margin-right: -6px;
+  }
+
+  .tree-node-toggle {
+    min-height: 44px;
+  }
+
+  .tree-node-star,
+  .tree-node-delete {
+    min-width: 36px;
+    min-height: 36px;
+    justify-content: center;
+  }
+
+  .toolbar-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .nav-controls-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .breadcrumb-segment {
+    padding: 10px 6px;
+  }
+
+  .context-menu-btn {
+    min-height: 44px;
+  }
+}
+
+/* ===== Devices without hover: controls that only appear on hover stay visible ===== */
+@media (hover: none) {
+  .tab-bar-close-btn,
+  .tree-node-delete,
+  .conversation-item-leave {
+    opacity: 1;
+  }
+
+  .tree-node-star {
+    opacity: 0.6;
+  }
+
+  .tree-node-star--active {
+    opacity: 1;
+  }
+}

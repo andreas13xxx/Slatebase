@@ -142,3 +142,10 @@
   color: var(--accent);
   background: var(--bg-hover);
 }
+
+/* No hover on touch devices: keep the delete button visible. */
+@media (hover: none) {
+  .properties-editor__delete-btn {
+    opacity: 1;
+  }
+}

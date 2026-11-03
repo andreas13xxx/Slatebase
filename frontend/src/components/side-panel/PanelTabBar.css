@@ -94,3 +94,10 @@
 .app-right-panel .side-panel-tab-bar--icon-only .side-panel-tab {
   padding: 6px 8px;
 }
+
+/* Touch: panel tabs are finger-sized. */
+@media (pointer: coarse) {
+  .side-panel-tab {
+    min-height: 44px;
+  }
+}
