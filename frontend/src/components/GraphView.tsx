@@ -64,6 +64,7 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
  * - Visual distinction for unresolved links (exists=false)
  * - Zoom via mouse wheel, clamped to [0.1, 5.0]
  * - Pan via mouse drag on background
+ * - Touch: one-finger pan / node drag, two-finger pinch zoom
  * - Node drag with position fixing; double-click to release
  * - Hover: tooltip + highlight direct connections, dim others
  * - Click: open existing file in tab; no action for unresolved
@@ -125,6 +126,8 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   const dragStartRef = useRef({ x: 0, y: 0 })
   /** Tracks whether a drag actually moved (to suppress click after drag). */
   const didDragRef = useRef(false)
+  const touchPointersRef = useRef(new Map<number, { x: number; y: number }>())
+  const pinchRef = useRef<{ dist: number; zoom: number; anchor: { x: number; y: number } } | null>(null)
 
   // Hovered node for highlighting
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
@@ -449,6 +452,81 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
     isDraggingRef.current = false
     dragNodeRef.current = null
   }, [])
+
+  /**
+   * Touch input: one finger pans the background or drags a node (same path as the mouse),
+   * two fingers pinch-zoom around their midpoint and pan along with it.
+   * Mouse and pen keep using the mouse handlers.
+   */
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (e.pointerType !== 'touch') return
+      touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touchPointersRef.current.size === 1) {
+        handleMouseDown(e)
+        return
+      }
+      if (touchPointersRef.current.size === 2) {
+        isPanningRef.current = false
+        isDraggingRef.current = false
+        dragNodeRef.current = null
+        const [a, b] = [...touchPointersRef.current.values()]
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+        pinchRef.current = {
+          dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+          zoom,
+          anchor: screenToSvg(mid.x, mid.y),
+        }
+        didDragRef.current = true
+      }
+    },
+    [handleMouseDown, screenToSvg, zoom],
+  )
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (e.pointerType !== 'touch') return
+      const pointers = touchPointersRef.current
+      if (!pointers.has(e.pointerId)) return
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pointers.size >= 2 && pinchRef.current) {
+        const svg = svgRef.current
+        if (!svg) return
+        const [a, b] = [...pointers.values()]
+        const pinch = pinchRef.current
+        const nextZoom = clampZoom(pinch.zoom, (pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.dist - pinch.zoom)
+        const rect = svg.getBoundingClientRect()
+        setZoom(nextZoom)
+        setPanX((a.x + b.x) / 2 - rect.left - pinch.anchor.x * nextZoom)
+        setPanY((a.y + b.y) / 2 - rect.top - pinch.anchor.y * nextZoom)
+      } else if (pointers.size === 1) {
+        handleMouseMove(e)
+      }
+    },
+    [handleMouseMove],
+  )
+
+  const handlePointerEnd = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (e.pointerType !== 'touch') return
+      const pointers = touchPointersRef.current
+      if (!pointers.delete(e.pointerId)) return
+      if (pointers.size === 1 && pinchRef.current) {
+        // One finger lifted after a pinch: keep panning with the remaining one.
+        const [rest] = [...pointers.values()]
+        pinchRef.current = null
+        isPanningRef.current = true
+        panStartRef.current = { x: rest.x, y: rest.y }
+        panOffsetRef.current = { x: panX, y: panY }
+        return
+      }
+      if (pointers.size === 0) {
+        pinchRef.current = null
+        handleMouseUp()
+      }
+    },
+    [handleMouseUp, panX, panY],
+  )
 
   /**
    * Handles double-click on a node to release it from fixed position.
@@ -904,7 +982,11 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab', width: '100%', height: '100%' }} // eslint-disable-line react-hooks/refs
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab', width: '100%', height: '100%', touchAction: 'none' }} // eslint-disable-line react-hooks/refs
       >
         {/* Transform group for zoom and pan */}
         <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
