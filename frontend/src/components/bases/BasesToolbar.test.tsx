@@ -12,7 +12,11 @@ const makeDoc = (): BaseDocument => ({
   ],
 })
 
+// Toolbar edits are functions of the latest document; tests apply them to the document they rendered with.
+let current: BaseDocument = makeDoc()
+
 function setup(over: Partial<{ doc: BaseDocument; readOnly: boolean; index: number }> = {}) {
+  current = over.doc ?? makeDoc()
   const onChange = vi.fn()
   const onSelectView = vi.fn()
   const onModeChange = vi.fn()
@@ -32,7 +36,8 @@ function setup(over: Partial<{ doc: BaseDocument; readOnly: boolean; index: numb
 }
 
 const open = (name: RegExp | string) => fireEvent.click(screen.getByRole('button', { name }))
-const lastDoc = (fn: ReturnType<typeof vi.fn>): BaseDocument => fn.mock.calls[fn.mock.calls.length - 1]![0] as BaseDocument
+const lastDoc = (fn: ReturnType<typeof vi.fn>): BaseDocument =>
+  (fn.mock.calls[fn.mock.calls.length - 1]![0] as (d: BaseDocument) => BaseDocument)(current)
 
 describe('BasesToolbar — views', () => {
   it('selects another view', () => {
@@ -187,5 +192,27 @@ describe('BasesToolbar — read-only', () => {
     open(/Offen/)
     expect(screen.queryByRole('button', { name: 'Ansicht anlegen' })).toBeNull()
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('BasesToolbar — edits compose', () => {
+  it('passes functions of the latest document, not finished documents', () => {
+    const { onChange } = setup()
+    open(/Sortieren/)
+    fireEvent.click(screen.getByRole('button', { name: '+ Sortierung hinzufügen' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Sortierung hinzufügen' }))
+    // Both clicks saw the same rendered props, yet each update works on whatever document it is handed.
+    const [first, second] = onChange.mock.calls.map((c) => c[0] as (d: BaseDocument) => BaseDocument)
+    expect(second!(first!(current)).views[0]!.sort).toHaveLength(3)
+  })
+
+  it('commits a half-typed field when the click lands outside the panel', () => {
+    const { onChange } = setup()
+    open(/Offen/)
+    const name = screen.getByLabelText('Name der Ansicht') as HTMLInputElement
+    name.focus()
+    fireEvent.change(name, { target: { value: 'Unterwegs' } })
+    fireEvent.mouseDown(document.body)
+    expect(lastDoc(onChange).views[0]!.name).toBe('Unterwegs')
   })
 })

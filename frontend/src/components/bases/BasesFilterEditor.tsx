@@ -129,15 +129,14 @@ const ConditionRow = memo(function ConditionRow({ expression, columns, disabled,
 })
 
 interface GroupEditorProps {
-  root: BaseFilterNode
   node: BaseFilterNode
   path: FilterPath
   columns: ColumnChoice[]
   disabled: boolean
-  onChange: (root: BaseFilterNode) => void
+  onChange: (update: RootUpdate) => void
 }
 
-const GroupEditor = memo(function GroupEditor({ root, node, path, columns, disabled, onChange }: GroupEditorProps) {
+const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, onChange }: GroupEditorProps) {
   const key = groupKeyOf(node)
   if (key === null) return null
   const children = childrenOf(node)
@@ -149,12 +148,12 @@ const GroupEditor = memo(function GroupEditor({ root, node, path, columns, disab
           aria-label="Verknüpfung"
           value={key}
           disabled={disabled}
-          onChange={(e) => onChange(setGroupKey(root, path, e.target.value as FilterGroupKey))}
+          onChange={(e) => { const key = e.target.value as FilterGroupKey; onChange((r) => setGroupKey(r, path, key)) }}
         >
           {(Object.keys(GROUP_LABELS) as FilterGroupKey[]).map((k) => <option key={k} value={k}>{GROUP_LABELS[k]}</option>)}
         </select>
         {path.length > 0 && (
-          <button type="button" className="bases-tb__icon-btn" aria-label="Gruppe entfernen" title="Gruppe entfernen" disabled={disabled} onClick={() => onChange(removeFilterNode(root, path))}>×</button>
+          <button type="button" className="bases-tb__icon-btn" aria-label="Gruppe entfernen" title="Gruppe entfernen" disabled={disabled} onClick={() => onChange((r) => removeFilterNode(r, path))}>×</button>
         )}
       </div>
       {children.map((child, i) => {
@@ -165,19 +164,19 @@ const GroupEditor = memo(function GroupEditor({ root, node, path, columns, disab
             expression={child}
             columns={columns}
             disabled={disabled}
-            onChange={(expr) => onChange(replaceFilterNode(root, childPath, expr))}
-            onRemove={() => onChange(removeFilterNode(root, childPath))}
+            onChange={(expr) => onChange((r) => replaceFilterNode(r, childPath, expr))}
+            onRemove={() => onChange((r) => removeFilterNode(r, childPath))}
           />
         ) : (
-          <GroupEditor key={i} root={root} node={child} path={childPath} columns={columns} disabled={disabled} onChange={onChange} />
+          <GroupEditor key={i} node={child} path={childPath} columns={columns} disabled={disabled} onChange={onChange} />
         )
       })}
       {!disabled && (
         <div className="bases-tb__group-actions">
-          <button type="button" className="bases-tb__link-btn" onClick={() => onChange(addFilterChild(root, path, conditionToExpression(DEFAULT_CONDITION)))}>
+          <button type="button" className="bases-tb__link-btn" onClick={() => onChange((r) => addFilterChild(r, path, conditionToExpression(DEFAULT_CONDITION)))}>
             + Bedingung
           </button>
-          <button type="button" className="bases-tb__link-btn" onClick={() => onChange(addFilterChild(root, path, { and: [] }))}>
+          <button type="button" className="bases-tb__link-btn" onClick={() => onChange((r) => addFilterChild(r, path, { and: [] }))}>
             + Gruppe
           </button>
         </div>
@@ -186,14 +185,17 @@ const GroupEditor = memo(function GroupEditor({ root, node, path, columns, disab
   )
 })
 
+/** An edit of the root filter group, applied to the latest tree. */
+export type RootUpdate = (root: BaseFilterNode) => BaseFilterNode
+
 export interface BasesFilterEditorProps {
   /** Root group being edited (use `rootGroup()` for a missing filter). */
   root: BaseFilterNode
   columns: ColumnChoice[]
   disabled: boolean
-  onChange: (root: BaseFilterNode) => void
+  onChange: (update: RootUpdate) => void
 }
 
 export const BasesFilterEditor = memo(function BasesFilterEditor({ root, columns, disabled, onChange }: BasesFilterEditorProps) {
-  return <GroupEditor root={root} node={root} path={[]} columns={columns} disabled={disabled} onChange={onChange} />
+  return <GroupEditor node={root} path={[]} columns={columns} disabled={disabled} onChange={onChange} />
 })

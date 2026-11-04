@@ -19,6 +19,7 @@ import {
 import { BasesFilterEditor, CommitInput } from './BasesFilterEditor'
 
 export type BasesMode = 'view' | 'source'
+export type DocUpdate = (doc: BaseDocument) => BaseDocument
 
 export interface BasesToolbarProps {
   doc: BaseDocument
@@ -28,8 +29,12 @@ export interface BasesToolbarProps {
   mode: BasesMode
   onModeChange: (mode: BasesMode) => void
   onSelectView: (index: number) => void
-  /** Persist a changed document. */
-  onChange: (doc: BaseDocument) => void
+  /**
+   * Apply an edit to the LATEST document and persist it. Edits are functions, not
+   * finished documents, so two quick changes (e.g. a filter value committed on blur,
+   * then a click on "+ Bedingung") compose instead of the second overwriting the first.
+   */
+  onChange: (update: DocUpdate) => void
 }
 
 // ─── Popover ────────────────────────────────────────────────────────────────
@@ -44,7 +49,12 @@ const Popover = memo(function Popover({
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        // Blur first so a half-typed field commits before its panel unmounts.
+        const active = document.activeElement
+        if (active instanceof HTMLElement && rootRef.current.contains(active)) active.blur()
+        setOpen(false)
+      }
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDown)
@@ -85,7 +95,7 @@ interface PanelProps {
   index: number
   columns: ColumnChoice[]
   disabled: boolean
-  onChange: (doc: BaseDocument) => void
+  onChange: (update: DocUpdate) => void
 }
 
 function ColumnSelect({ columns, value, onChange, label, disabled }: {
@@ -102,14 +112,15 @@ function ColumnSelect({ columns, value, onChange, label, disabled }: {
 
 const SortPanel = memo(function SortPanel({ doc, index, columns, disabled, onChange }: PanelProps) {
   const sort: BaseSortClause[] = doc.views[index]?.sort ?? []
-  const write = (next: BaseSortClause[]) => onChange(setSort(doc, index, next))
-  const update = (i: number, patch: Partial<BaseSortClause>) => write(sort.map((s, k) => (k === i ? { ...s, ...patch } : s)))
-  const move = (i: number, by: -1 | 1) => {
-    const next = [...sort]
+  const edit = (fn: (current: BaseSortClause[]) => BaseSortClause[]) =>
+    onChange((d) => setSort(d, index, fn(d.views[index]?.sort ?? [])))
+  const update = (i: number, patch: Partial<BaseSortClause>) => edit((cur) => cur.map((s, k) => (k === i ? { ...s, ...patch } : s)))
+  const move = (i: number, by: -1 | 1) => edit((cur) => {
+    const next = [...cur]
     const [item] = next.splice(i, 1)
-    next.splice(i + by, 0, item!)
-    write(next)
-  }
+    if (item) next.splice(i + by, 0, item)
+    return next
+  })
   const unused = columns.find((c) => !sort.some((s) => s.column === c.id))
 
   return (
@@ -130,11 +141,11 @@ const SortPanel = memo(function SortPanel({ doc, index, columns, disabled, onCha
           </select>
           <button type="button" className="bases-tb__icon-btn" aria-label="Nach oben" disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
           <button type="button" className="bases-tb__icon-btn" aria-label="Nach unten" disabled={disabled || i === sort.length - 1} onClick={() => move(i, 1)}>↓</button>
-          <button type="button" className="bases-tb__icon-btn" aria-label="Sortierung entfernen" disabled={disabled} onClick={() => write(sort.filter((_, k) => k !== i))}>×</button>
+          <button type="button" className="bases-tb__icon-btn" aria-label="Sortierung entfernen" disabled={disabled} onClick={() => edit((cur) => cur.filter((_, k) => k !== i))}>×</button>
         </div>
       ))}
       {!disabled && unused && (
-        <button type="button" className="bases-tb__link-btn" onClick={() => write([...sort, { column: unused.id, direction: 'asc' }])}>
+        <button type="button" className="bases-tb__link-btn" onClick={() => edit((cur) => [...cur, { column: unused.id, direction: 'asc' }])}>
           + Sortierung hinzufügen
         </button>
       )}
@@ -152,7 +163,7 @@ const GroupPanel = memo(function GroupPanel({ doc, index, columns, disabled, onC
           aria-label="Gruppieren nach"
           value={groupBy?.property ?? ''}
           disabled={disabled}
-          onChange={(e) => onChange(setGroupBy(doc, index, e.target.value ? { property: e.target.value, direction: groupBy?.direction ?? 'ASC' } : undefined))}
+          onChange={(e) => { const property = e.target.value; onChange((d) => setGroupBy(d, index, property ? { property, direction: groupBy?.direction ?? 'ASC' } : undefined)) }}
         >
           <option value="">Keine Gruppierung</option>
           {groupBy && !columns.some((c) => c.id === groupBy.property) && <option value={groupBy.property}>{groupBy.property}</option>}
@@ -164,7 +175,7 @@ const GroupPanel = memo(function GroupPanel({ doc, index, columns, disabled, onC
             aria-label="Gruppenreihenfolge"
             value={groupBy.direction?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC'}
             disabled={disabled}
-            onChange={(e) => onChange(setGroupBy(doc, index, { property: groupBy.property, direction: e.target.value }))}
+            onChange={(e) => { const direction = e.target.value; onChange((d) => setGroupBy(d, index, { property: groupBy.property, direction })) }}
           >
             <option value="ASC">Aufsteigend</option>
             <option value="DESC">Absteigend</option>
@@ -180,13 +191,14 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
   const shown = effectiveColumns(doc, doc.views[index])
   const labelOf = (id: string) => columns.find((c) => c.id === id)?.label ?? id
   const hidden = columns.filter((c) => !shown.includes(c.id))
-  const write = (order: string[]) => onChange(setOrder(doc, index, order))
-  const move = (i: number, by: -1 | 1) => {
-    const next = [...shown]
+  const edit = (fn: (current: string[]) => string[]) =>
+    onChange((d) => setOrder(d, index, fn(effectiveColumns(d, d.views[index]))))
+  const move = (i: number, by: -1 | 1) => edit((cur) => {
+    const next = [...cur]
     const [item] = next.splice(i, 1)
-    next.splice(i + by, 0, item!)
-    write(next)
-  }
+    if (item !== undefined) next.splice(i + by, 0, item)
+    return next
+  })
 
   return (
     <div className="bases-tb__section">
@@ -194,7 +206,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
         {shown.map((id, i) => (
           <li key={id} className="bases-tb__row">
             <label className="bases-tb__check">
-              <input type="checkbox" checked disabled={disabled} onChange={() => write(shown.filter((c) => c !== id))} />
+              <input type="checkbox" checked disabled={disabled} onChange={() => edit((cur) => cur.filter((c) => c !== id))} />
               <span>{labelOf(id)}</span>
             </label>
             <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
@@ -209,7 +221,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
             {hidden.map((c) => (
               <li key={c.id} className="bases-tb__row">
                 <label className="bases-tb__check">
-                  <input type="checkbox" checked={false} disabled={disabled} onChange={() => write([...shown, c.id])} />
+                  <input type="checkbox" checked={false} disabled={disabled} onChange={() => edit((cur) => (cur.includes(c.id) ? cur : [...cur, c.id]))} />
                   <span>{c.label}</span>
                 </label>
               </li>
@@ -222,7 +234,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
           label="Eigene Eigenschaft hinzufügen"
           placeholder="Eigene Eigenschaft hinzufügen…"
           value=""
-          onCommit={(name) => { const n = name.trim(); if (n && !shown.includes(n)) write([...shown, n]) }}
+          onCommit={(name) => { const n = name.trim(); if (n) edit((cur) => (cur.includes(n) ? cur : [...cur, n])) }}
         />
       )}
     </div>
@@ -247,7 +259,9 @@ const FilterPanel = memo(function FilterPanel({ doc, index, columns, disabled, o
         root={rootGroup(node)}
         columns={columns}
         disabled={disabled}
-        onChange={(next) => onChange(scope === 'view' ? setViewFilter(doc, index, next) : setDocFilter(doc, next))}
+        onChange={(update) => onChange((d) => (scope === 'view'
+          ? setViewFilter(d, index, update(rootGroup(d.views[index]?.filters)))
+          : setDocFilter(d, update(rootGroup(d.filters)))))}
       />
     </div>
   )
@@ -267,7 +281,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   activeIndex: number
   disabled: boolean
   onSelectView: (index: number) => void
-  onChange: (doc: BaseDocument) => void
+  onChange: (update: DocUpdate) => void
 }) {
   const active = doc.views[activeIndex]
   const [newName, setNewName] = useState('')
@@ -299,16 +313,16 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
         <div className="bases-tb__section">
           <p className="bases-tb__hint">Diese Ansicht konfigurieren</p>
           <div className="bases-tb__row">
-            <CommitInput label="Name der Ansicht" value={active.name ?? ''} disabled={disabled} onCommit={(name) => onChange(renameView(doc, activeIndex, name))} />
+            <CommitInput label="Name der Ansicht" value={active.name ?? ''} disabled={disabled} onCommit={(name) => onChange((d) => renameView(d, activeIndex, name))} />
           </div>
           <div className="bases-tb__row">
-            <select className="bases-tb__select" aria-label="Typ der Ansicht" value={active.type} disabled={disabled} onChange={(e) => onChange(setViewType(doc, activeIndex, e.target.value))}>
+            <select className="bases-tb__select" aria-label="Typ der Ansicht" value={active.type} disabled={disabled} onChange={(e) => { const type = e.target.value; onChange((d) => setViewType(d, activeIndex, type)) }}>
               {typeOptions.map((t) => <option key={t} value={t}>{VIEW_TYPE_LABELS[t] ?? t}</option>)}
             </select>
           </div>
           {!disabled && (
             <div className="bases-tb__row">
-              <button type="button" className="bases-tb__btn" onClick={() => { onChange(duplicateView(doc, activeIndex)); onSelectView(activeIndex + 1) }}>
+              <button type="button" className="bases-tb__btn" onClick={() => { onChange((d) => duplicateView(d, activeIndex)); onSelectView(activeIndex + 1) }}>
                 Duplizieren
               </button>
               {confirmDelete ? (
@@ -316,7 +330,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
                   type="button"
                   className="bases-tb__btn bases-tb__btn--danger"
                   onClick={() => {
-                    onChange(deleteView(doc, activeIndex))
+                    onChange((d) => deleteView(d, activeIndex))
                     onSelectView(Math.max(0, Math.min(activeIndex, doc.views.length - 2)))
                     setConfirmDelete(false)
                   }}
@@ -346,7 +360,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
             className="bases-tb__btn bases-tb__btn--primary"
             onClick={() => {
               const name = newName.trim() || VIEW_TYPE_LABELS[newType] || newType
-              onChange(addView(doc, newType, name))
+              onChange((d) => addView(d, newType, name))
               onSelectView(doc.views.length)
               setNewName('')
             }}
@@ -366,7 +380,7 @@ export const BasesToolbar = memo(function BasesToolbar({
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
   const columns = availableColumns(doc, rows, view)
-  const handleChange = useCallback((next: BaseDocument) => { if (!readOnly) onChange(next) }, [readOnly, onChange])
+  const handleChange = useCallback((update: DocUpdate) => { if (!readOnly) onChange(update) }, [readOnly, onChange])
   const panelProps: PanelProps = { doc, index: activeIndex, columns, disabled: readOnly, onChange: handleChange }
   const filterCount = countConditions(view?.filters) + countConditions(doc.filters)
 

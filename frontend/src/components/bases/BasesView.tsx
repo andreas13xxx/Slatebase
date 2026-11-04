@@ -210,12 +210,17 @@ export const BasesView = memo(function BasesView({
     onSaveSource(serializeBase({ ...doc, views: nextViews }))
   }, [doc, activeView, readOnly, onSaveSource, safeIndex])
 
-  // Toolbar edits (views, sort, group, filter, properties): write the new
-  // document back into the `.base` file.
-  const handleDocChange = useCallback((next: BaseDocument) => {
-    if (readOnly) return
+  // Toolbar edits (views, sort, group, filter, properties) are functions applied
+  // to the latest document we asked to save, so two quick edits compose instead of
+  // the second overwriting the first while the file round-trip is still in flight.
+  const pendingDocRef = useRef<BaseDocument | null>(null)
+  useEffect(() => { pendingDocRef.current = null }, [source])
+  const handleDocChange = useCallback((update: (d: BaseDocument) => BaseDocument) => {
+    if (readOnly || !doc) return
+    const next = update(pendingDocRef.current ?? doc)
+    pendingDocRef.current = next
     onSaveSource(serializeBase(next))
-  }, [readOnly, onSaveSource])
+  }, [readOnly, doc, onSaveSource])
 
   // Expose this base to the `bases:*` core commands (single-active-instance,
   // same as activeCanvasBridge).
