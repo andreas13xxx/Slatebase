@@ -20,5 +20,5 @@ views:
       - priority
       - estimate
     summaries:
-      file.name: Count
+      file.name: Filled
       estimate: Sum

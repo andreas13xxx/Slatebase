@@ -41,3 +41,21 @@ describe('view settings round trip', () => {
     expect((parseBase('views:\n  - type: cards\n    groupOrder: nope\n').errors ?? []).length).toBeGreaterThan(0)
   })
 })
+
+describe('sort clause spelling', () => {
+  type Parsed = { document: import('./types.js').BaseDocument }
+  const OBSIDIAN = 'views:\n  - type: table\n    sort:\n      - property: file.name\n        direction: DESC\n'
+
+  it('reads Obsidian\'s property/ASC-DESC form and the older column form', () => {
+    expect((parseBase(OBSIDIAN) as Parsed).document.views[0]!.sort).toEqual([{ column: 'file.name', direction: 'desc' }])
+    const old = 'views:\n  - type: table\n    sort:\n      - column: status\n        direction: asc\n'
+    expect((parseBase(old) as Parsed).document.views[0]!.sort).toEqual([{ column: 'status', direction: 'asc' }])
+  })
+
+  it('writes Obsidian\'s form', () => {
+    const out = serializeBase((parseBase(OBSIDIAN) as Parsed).document)
+    expect(out).toContain('property: file.name')
+    expect(out).toContain('direction: DESC')
+    expect(out).not.toContain('column:')
+  })
+})

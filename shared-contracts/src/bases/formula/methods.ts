@@ -212,6 +212,18 @@ export const DATE_MEMBERS: Record<string, (d: Date) => number> = {
 }
 
 /**
+ * Duration members (`(date(a) - today()).days`): Obsidian's duration type exposes its
+ * length in each unit. Here a duration is the millisecond number a date difference yields.
+ */
+export const DURATION_MEMBERS: Record<string, (ms: number) => number> = {
+  days: (ms) => ms / 86_400_000,
+  hours: (ms) => ms / 3_600_000,
+  minutes: (ms) => ms / 60_000,
+  seconds: (ms) => ms / 1000,
+  milliseconds: (ms) => ms,
+}
+
+/**
  * Dispatch a method call on a receiver value. Throws `MethodError` for an
  * unknown method on the receiver's type.
  */

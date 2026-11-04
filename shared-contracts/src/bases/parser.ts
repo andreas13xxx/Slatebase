@@ -156,11 +156,13 @@ function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): B
   }
   const clauses: BaseSortClause[] = []
   raw.forEach((entry, i) => {
-    if (!isObject(entry) || !isString(entry['column'])) {
-      errors.push({ message: 'sort clause must have a "column" string', path: `${path}[${i}]` })
+    // Obsidian writes `{ property, direction: ASC|DESC }`; `column` is the older Slatebase spelling.
+    const column = isObject(entry) ? (isString(entry['property']) ? entry['property'] : entry['column']) : undefined
+    if (!isObject(entry) || !isString(column)) {
+      errors.push({ message: 'sort clause must have a "property" string', path: `${path}[${i}]` })
       return
     }
-    const clause: BaseSortClause = { column: entry['column'] }
+    const clause: BaseSortClause = { column }
     if (entry['direction'] !== undefined) {
       const dir = isString(entry['direction']) ? entry['direction'].toLowerCase() : ''
       if (!VALID_SORT_DIRECTIONS.includes(dir)) {

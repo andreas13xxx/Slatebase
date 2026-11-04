@@ -30,6 +30,7 @@ import { BasesKanbanView } from './BasesKanbanView'
 import { BasesListView } from './BasesListView'
 import { BasesCardsView } from './BasesCardsView'
 import { BasesSourceView } from './BasesSourceView'
+import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 import { sortRowsByFormula } from './base-formula-sort'
@@ -209,6 +210,18 @@ export const BasesView = memo(function BasesView({
     onSaveSource(serializeBase({ ...doc, views: nextViews }))
   }, [doc, activeView, readOnly, onSaveSource, safeIndex])
 
+  // Toolbar edits (views, sort, group, filter, properties) are functions applied
+  // to the latest document we asked to save, so two quick edits compose instead of
+  // the second overwriting the first while the file round-trip is still in flight.
+  const pendingDocRef = useRef<BaseDocument | null>(null)
+  useEffect(() => { pendingDocRef.current = null }, [source])
+  const handleDocChange = useCallback((update: (d: BaseDocument) => BaseDocument) => {
+    if (readOnly || !doc) return
+    const next = update(pendingDocRef.current ?? doc)
+    pendingDocRef.current = next
+    onSaveSource(serializeBase(next))
+  }, [readOnly, doc, onSaveSource])
+
   // Expose this base to the `bases:*` core commands (single-active-instance,
   // same as activeCanvasBridge).
   const rootRef = useRef<HTMLDivElement>(null)
@@ -280,42 +293,16 @@ export const BasesView = memo(function BasesView({
 
   return (
     <div className="bases-view" ref={rootRef}>
-      <div className="bases-view__toolbar">
-        <span className="bases-view__title">{activeView?.name ?? 'Base'}</span>
-        {/* View switcher: one button per declared view (plugin or built-in table). */}
-        {views.length > 1 && (
-          <div className="bases-view__views" role="tablist" aria-label="Ansichten">
-            {views.map((v, i) => (
-              <button
-                key={`${v.type}-${i}`}
-                type="button"
-                role="tab"
-                aria-selected={i === safeIndex}
-                className={i === safeIndex ? 'bases-view__view bases-view__view--active' : 'bases-view__view'}
-                onClick={() => { setSelectedViewIndex(i); setMode('view') }}
-              >
-                {v.name ?? v.type}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="bases-view__modes">
-          <button
-            type="button"
-            className={mode === 'view' ? 'bases-view__mode bases-view__mode--active' : 'bases-view__mode'}
-            onClick={() => setMode('view')}
-          >
-            Ansicht
-          </button>
-          <button
-            type="button"
-            className={mode === 'source' ? 'bases-view__mode bases-view__mode--active' : 'bases-view__mode'}
-            onClick={() => setMode('source')}
-          >
-            Quelltext
-          </button>
-        </div>
-      </div>
+      <BasesToolbar
+        doc={doc}
+        rows={rows}
+        activeIndex={safeIndex}
+        readOnly={readOnly}
+        mode={mode}
+        onModeChange={setMode}
+        onSelectView={(i) => { setSelectedViewIndex(i); setMode('view') }}
+        onChange={handleDocChange}
+      />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
       {truncated && !queryError && (

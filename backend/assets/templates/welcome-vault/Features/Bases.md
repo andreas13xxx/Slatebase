@@ -67,7 +67,7 @@ Formeln stehen unter `formulas:` und sind schreibgeschützte Spalten, pro Zeile 
 
 ```yaml
 formulas:
-  days_left: 'days(date(deadline), today())'
+  days_left: '(date(deadline) - today()).days'
 ```
 
 **Eingebaute Funktionen:** `if`, `concat`, `now`, `today`, `date`, `duration`, `number`, `list`, `link`, `file`, `image`, `icon`, `html`, `escapeHTML`, `random`, `min`, `max`, `days`, `length`.
@@ -95,7 +95,7 @@ formulas:
 ```
 
 > [!note] Datumsdifferenz
-> `date1 - date2` liefert **Millisekunden** (wie in Obsidian). Willst du Tage, nimm `days(a, b)`.
+> `date1 - date2` liefert **Millisekunden** (wie in Obsidian). Willst du Tage, nimm wie in Obsidian `(a - b).days` (auch `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` gibt es zusätzlich.
 
 ---
 
@@ -109,7 +109,7 @@ views:
     name: Aufgaben
     order: [file.name, status, estimate]
     summaries:
-      file.name: Count
+      file.name: Filled
       estimate: Sum
 ```
 
@@ -117,7 +117,7 @@ Eingebaute Funktionen (wie in Obsidian):
 
 | Gilt für | Funktionen |
 |----------|-----------|
-| Alle Typen | `Count`, `Empty`, `Filled`, `Unique` |
+| Alle Typen | `Empty`, `Filled`, `Unique` (und `Count` als Slatebase-Zusatz — in Obsidian unbekannt) |
 | Zahlen | `Sum`, `Average`, `Min`, `Max`, `Median`, `Range`, `Stddev` |
 | Daten | `Earliest`, `Latest`, `Range` |
 | Checkbox | `Checked`, `Unchecked` |
@@ -143,6 +143,20 @@ Schlägt die Formel fehl, bleibt die Zusammenfassung leer.
 Property-Zellen sind inline editierbar, über dieselben typisierten Controls wie der [[Features/Tags und Properties|Properties-Editor]] — Text, Zahl, Datum, Checkbox, Liste/Tags. Eine Änderung landet direkt in der Frontmatter der Notiz. Formel-Spalten sind schreibgeschützt.
 
 Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Datei zurückgeschrieben. Das gilt auch für Formel-Spalten — die werden nach dem Laden anhand ihrer berechneten Werte sortiert.
+
+---
+
+## Werkzeugleiste: Ansichten, Filter, Sortierung, Gruppen, Eigenschaften
+
+Über der Tabelle sitzt eine Werkzeugleiste — du musst das YAML nicht von Hand schreiben. Jede Änderung wird sofort in die `.base`-Datei geschrieben (mit Schreibrecht auf den Vault; ohne lassen sich die Einstellungen nur ansehen).
+
+- **Ansichtenmenü** (Name der Ansicht ▾): zwischen Ansichten wechseln, eine **neue Ansicht** mit Name und Typ anlegen, die aktuelle **umbenennen**, ihren **Typ ändern**, **duplizieren** oder **löschen** (die letzte Ansicht bleibt immer erhalten).
+- **Sortieren:** mehrere Sortierungen mit Eigenschaft und Richtung, in der Reihenfolge verschiebbar.
+- **Gruppieren:** eine Eigenschaft, nach der Karten- und Kanban-Ansichten ihre Spalten bilden.
+- **Filtern:** Bedingungen aus Eigenschaft, Operator und Wert (ist, enthält, beginnt mit, ist leer, größer/kleiner, hat Tag, liegt in Ordner …), beliebig zu **und / oder / nicht**-Gruppen verschachtelt. Der Reiter **Diese Ansicht** wirkt nur auf die aktuelle Ansicht, **Alle Ansichten** auf die ganze Base. Was sich nicht als Baukasten-Bedingung darstellen lässt, bleibt als Ausdruck editierbar (`</>`).
+- **Eigenschaften:** festlegen, welche Spalten angezeigt werden und in welcher Reihenfolge — auch Datei-Felder (`file.ctime` …) und Formeln; eigene Eigenschaften trägst du per Namen ein.
+
+Die Schalter **Ansicht / Quelltext** rechts wechseln zum rohen YAML, das jetzt den ganzen verfügbaren Platz nutzt.
 
 ---
 

@@ -167,3 +167,14 @@ describe('any-type and link methods', () => {
     expect(run('file.asLink("Hi")')).toMatchObject({ path: 'p.md', display: 'Hi' })
   })
 })
+
+describe('duration members', () => {
+  it('(date - date).days and friends', () => {
+    expect(ev('(date("2026-01-11") - date("2026-01-01")).days')).toBe(10)
+    expect(ev('(date("2026-01-01T12:00:00Z") - date("2026-01-01T00:00:00Z")).hours')).toBe(12)
+    expect(ev('duration("90s").minutes')).toBe(1.5)
+  })
+  it('works on a property holding a duration and chains with number methods', () => {
+    expect(ev('d.days.round()', { d: 86_400_000 * 2.4 })).toBe(2)
+  })
+})

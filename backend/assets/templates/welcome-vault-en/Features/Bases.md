@@ -67,7 +67,7 @@ Formulas live under `formulas:` and are read-only columns computed per row. They
 
 ```yaml
 formulas:
-  days_left: 'days(date(deadline), today())'
+  days_left: '(date(deadline) - today()).days'
 ```
 
 **Built-in functions:** `if`, `concat`, `now`, `today`, `date`, `duration`, `number`, `list`, `link`, `file`, `image`, `icon`, `html`, `escapeHTML`, `random`, `min`, `max`, `days`, `length`.
@@ -95,7 +95,7 @@ formulas:
 ```
 
 > [!note] Date difference
-> `date1 - date2` returns **milliseconds** (as in Obsidian). Use `days(a, b)` when you want days.
+> `date1 - date2` returns **milliseconds** (as in Obsidian). For days use `(a - b).days` as in Obsidian (also `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` exists as an extra.
 
 ---
 
@@ -109,7 +109,7 @@ views:
     name: Tasks
     order: [file.name, status, estimate]
     summaries:
-      file.name: Count
+      file.name: Filled
       estimate: Sum
 ```
 
@@ -117,7 +117,7 @@ Built-in functions (as in Obsidian):
 
 | Applies to | Functions |
 |------------|-----------|
-| All types | `Count`, `Empty`, `Filled`, `Unique` |
+| All types | `Empty`, `Filled`, `Unique` (and `Count` as a Slatebase extra — unknown in Obsidian) |
 | Numbers | `Sum`, `Average`, `Min`, `Max`, `Median`, `Range`, `Stddev` |
 | Dates | `Earliest`, `Latest`, `Range` |
 | Checkbox | `Checked`, `Unchecked` |
@@ -143,6 +143,20 @@ If the formula fails, the summary stays empty.
 Property cells are editable inline, using the same typed controls as the [[Features/Tags and Properties|Properties editor]] — text, number, date, checkbox, list/tags. A change goes straight into the note's frontmatter. Formula columns are read-only.
 
 Click a column header to sort; the sort is written back into the `.base` file. This also works for formula columns — they are sorted after loading by their computed values.
+
+---
+
+## Toolbar: views, filters, sorting, groups, properties
+
+A toolbar sits above the table — you don't have to write the YAML by hand. Every change is written to the `.base` file immediately (with write access to the vault; without it the settings can only be viewed).
+
+- **View menu** (view name ▾): switch between views, create a **new view** with a name and type, **rename** the current one, **change its type**, **duplicate** or **delete** it (the last view always stays).
+- **Sort:** several sorts with property and direction, reorderable.
+- **Group:** the property that cards and Kanban views build their columns from.
+- **Filter:** conditions of property, operator and value (is, contains, starts with, is empty, greater/less than, has tag, in folder …), nested into **and / or / not** groups as you like. The **This view** tab affects only the current view, **All views** the whole base. Anything that can't be shown as a builder condition stays editable as an expression (`</>`).
+- **Properties:** choose which columns show and in which order — including file fields (`file.ctime` …) and formulas; type the name of a custom property to add it.
+
+The **View / Source** switch on the right toggles to the raw YAML, which now uses all the available space.
 
 ---
 
