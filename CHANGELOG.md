@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.76.0](https://github.com/andreas13xxx/Slatebase/compare/v0.75.0...v0.76.0) (2026-11-04)
+
+
+### Features
+
+* **bases:** Obsidian-Parity — Lambdas, Regexp, file.embeds, Cards-Raster, groupOrder, Live-Einbettung ([#326](https://github.com/andreas13xxx/Slatebase/issues/326)) ([577097f](https://github.com/andreas13xxx/Slatebase/commit/577097f210f9c2971cc7ba0d76c8593ab9e16741))
+* **bases:** Werkzeugleiste, Obsidian-Tabellenoptik, days-Fix, größerer Quelltext-Editor ([#328](https://github.com/andreas13xxx/Slatebase/issues/328)) ([b6e0e4b](https://github.com/andreas13xxx/Slatebase/commit/b6e0e4b8db72f7b5effbd73433e8fff27aa8b807))
+
 ## [0.75.0](https://github.com/andreas13xxx/Slatebase/compare/v0.74.0...v0.75.0) (2026-11-03)
 
 
