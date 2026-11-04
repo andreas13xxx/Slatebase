@@ -8,7 +8,7 @@
 
 ## Phase 2: CSP & Security-Header
 
-- [x] Task 4: Klären ob Plugin-Loader (`frontend/src/plugins/compat/plugin-loader.ts`) `eval`/`new Function` zur Bundle-Ausführung braucht (Voraussetzung für Task 5) — **Ergebnis: KEIN `unsafe-eval` nötig.** Bundles werden via Blob URL + dynamic `import()` ausgeführt → CSP braucht `blob:` in `script-src`. Mermaid/d3-force/highlight.js ebenfalls ohne `eval`/`new Function`.
+- [x] Task 4: Klären ob Plugin-Loader (`frontend/src/plugins/compat/plugin-loader.ts`) `eval`/`new Function` zur Bundle-Ausführung braucht (Voraussetzung für Task 5) — **Ergebnis (ursprünglich): KEIN `unsafe-eval` nötig** für Slatebases eigene Ausführung (Blob URL + dynamic `import()` → `blob:` in `script-src`; Mermaid/d3-force/highlight.js ebenfalls ohne `eval`/`new Function`). **Korrektur (2026-09):** Diese Annahme galt nur für den eigenen Code und nicht für echte Community-Plugins. Templater (WASM), Excalidraw und Kanban brechen ohne `'unsafe-eval'`/`'wasm-unsafe-eval'`; beide sind daher bewusst in `script-src` aufgenommen (trust-on-install, siehe SECURITY-AUDIT.md).
 - [x] Task 5: `secureHeaders()`-Konfiguration in `backend/src/index.ts` um `scriptSrc`/`defaultSrc`/`styleSrc`/`imgSrc`/`connectSrc` erweitern
 - [x] Task 6: `Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy` ergänzen falls fehlend
 - [x] Task 7: Regressionsprüfung: Editor, Canvas, Plugin-Install/-Aktivierung, Graph-View mit neuer CSP testen (Browser-Konsole auf Violations prüfen)
