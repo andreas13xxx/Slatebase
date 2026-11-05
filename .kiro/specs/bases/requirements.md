@@ -56,7 +56,7 @@ Dies ist Prio 6 / Track H der Roadmap (`.kiro/specs/implementation-plan.md`), Sc
 2. THE Formula_Evaluator SHALL eine überschaubare, dokumentierte Menge an Hilfsfunktionen bereitstellen (mindestens: `if`, `concat`, `now`/`today`, einfache Datumsdifferenz, `length`); die vollständige Obsidian-Formelsprache ist ausdrücklich NICHT Ziel der ersten Version.
 3. THE Formula_Evaluator SHALL Formeln rein lesend auswerten und das Ergebnis NIE in die Frontmatter einer Notiz zurückschreiben.
 4. WHEN eine Formel einen Fehler wirft, auf eine fehlende Property verweist oder durch Null teilt, THE Formula_Evaluator SHALL einen klar erkennbaren Fehler-/Leerwert in der Zelle anzeigen, nie den Tab abstürzen lassen.
-5. THE Formula_Evaluator SHALL einen Ausdruck ohne `eval()`/`new Function()` auswerten (eigener kleiner Parser + Interpreter), passend zur CSP des Projekts (kein `unsafe-eval`).
+5. THE Formula_Evaluator SHALL einen Ausdruck ohne `eval()`/`new Function()` auswerten (eigener kleiner Parser + Interpreter). Hinweis: Das ist eine bewusste Design-Entscheidung für Robustheit und einen kleinen Vertrauensbereich, nicht eine CSP-Zwangslage — die Projekt-CSP enthält inzwischen `'unsafe-eval'`/`'wasm-unsafe-eval'` (bewusst gesetzt für Drittanbieter-Obsidian-Plugins, siehe SECURITY-AUDIT.md), der Evaluator nutzt es aber dennoch nicht.
 
 ### Requirement 4: Editierbare Tabellen-View
 
