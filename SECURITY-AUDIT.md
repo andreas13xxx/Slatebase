@@ -224,7 +224,7 @@ untrusted content is covered by the XSS rules in `.kiro/steering/quality.md`.
 | `style-src` | `'self' 'unsafe-inline'` | Plugin CSS injection via `<style>` tags, inline styles in rendered content |
 | `img-src` | `'self' data: https:` | `data:` for base64 images in Markdown, `https:` for external images in notes |
 | `font-src` | `'self' data: https:` | Plugins load webfonts from their own CDN of choice (e.g. Excalidraw pulls from unpkg.com) or embed one inline as a base64 `data:` URI (e.g. Excalidraw's bundled "Excalifont") |
-| `connect-src` | `'self' https://api.github.com` | API and SSE are same-origin in production; `api.github.com` for the built-in update checker (`useVersionInfo.ts`, `useReleaseNotes.ts`), which calls it directly from the browser |
+| `connect-src` | `'self' https://api.github.com` | API and SSE are same-origin in production. The built-in update checker (`useVersionInfo.ts`, `useReleaseNotes.ts`) does *not* call GitHub from the browser: `releaseApi.ts` fetches the same-origin `/api/v1/releases`, and GitHub is reached only server-side in `release-info-service.ts` / `plugin-store/github-client.ts`. The `https://api.github.com` entry is therefore redundant (`'self'` already covers the update checker) |
 | `frame-src` | `'self' https:` | Canvas link-node iframes load external URLs |
 | `object-src` | `'none'` | No plugin/embed/object elements needed |
 | `frame-ancestors` | `'none'` | Clickjacking protection |
