@@ -27,10 +27,10 @@
     "@slatebase/shared-contracts": "file:../shared-contracts",
     "adm-zip": "0.6.1",
     "argon2": "0.45.1",
-    "hono": "^4.13.14",
-    "imapflow": "^2.9.1",
+    "hono": "^4.13.16",
+    "imapflow": "^2.10.0",
     "pino": "^10.4.0",
-    "postal-mime": "^4.1.4",
+    "postal-mime": "^4.2.0",
     "turndown": "^7.2.1",
     "undici": "^8.12.3",
     "zod": "^4.5.4"
@@ -38,15 +38,15 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/adm-zip": "0.6.0",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/turndown": "^5.0.5",
     "@vitest/coverage-v8": "^5.0.5",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "fast-check": "4.10.2",
-    "globals": "^17.13.0",
+    "globals": "^17.14.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "vitest": "^5.0.0"
   }
 }
