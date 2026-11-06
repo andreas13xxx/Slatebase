@@ -106,6 +106,21 @@ Then you link with:
 
 ---
 
+## Link Suggestions While Typing
+
+Type `[[` in the editor and a list of suggestions appears. Move with the arrow keys, accept with Enter or Tab, close with Esc.
+
+| You type | Suggestions |
+|----------|-------------|
+| `[[ide` | Notes and aliases whose name contains "ide" |
+| `[[Ideas#` | Headings of the note "Ideas" (`[[#` for this note) |
+| `[[Ideas#^` | Blocks of "Ideas" that already have a `^id` (`[[^` for this note) |
+| `[[##plan` | Headings from the whole vault that contain "plan" |
+
+Accepting a suggestion closes the link with `]]`. Two notes with the same name are offered with their folder.
+
+---
+
 ## Auto-Resolve
 
 Slatebase resolves wikilinks intelligently:

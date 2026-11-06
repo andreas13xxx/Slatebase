@@ -118,6 +118,12 @@ When you have write access, the Properties tab shows an **interactive editor** i
 
 A field you still have open is not lost along the way: if the editor is rebuilt because you changed another property, switched tabs, or left Live Preview, whatever you had typed is committed — even without pressing Enter or clicking away first. The same holds for a key rename you started.
 
+### Suggestions While Typing
+
+- Typing `#` followed by a letter in the text suggests the tags of your vault.
+- In the frontmatter, the start of a line suggests property names that exist in the vault; accepting one writes `name: `.
+- After `tags:` (or on a `- ` list line below it) the tags of the vault are suggested; for a checkbox property `true` and `false`.
+
 ### Command Palette Shortcuts
 
 - **"Add alias"** — adds an `aliases` list to the frontmatter (creating the frontmatter block first if the file doesn't have one yet)

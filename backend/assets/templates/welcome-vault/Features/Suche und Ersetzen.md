@@ -87,6 +87,30 @@ Neben einfachem Text kannst du strukturierte **Operatoren** verwenden, um die Su
 | `-path:<muster>` | `-path:Archiv/**` | Pfad ausschließen |
 | `-tag:<tag>` | `-tag:erledigt` | Tag ausschließen |
 | `-property:<key>` | `-property:draft` | Eigenschaft ausschließen |
+| `[<key>:<wert>]` | `[status:aktiv]` | Kurzform für `property:<key>=<wert>` |
+| `line:(<a> <b>)` | `line:(mehl eier)` | Alle Begriffe in derselben Zeile |
+| `section:(<a> <b>)` | `section:(mehl eier)` | Alle Begriffe unter derselben Überschrift |
+| `block:(<a> <b>)` | `block:(mehl eier)` | Alle Begriffe im selben Absatz |
+| `content:(<a> <b>)` | `content:(mehl eier)` | Alle Begriffe irgendwo in der Datei |
+| `task:<text>` | `task:einkaufen` | Text in einer Aufgabe (`- [ ]` oder `- [x]`) |
+| `task-todo:<text>` | `task-todo:einkaufen` | Text in einer offenen Aufgabe |
+| `task-done:<text>` | `task-done:einkaufen` | Text in einer erledigten Aufgabe |
+| `match-case:<text>` | `match-case:API` | Begriff mit Groß-/Kleinschreibung suchen |
+| `ignore-case:<text>` | `ignore-case:api` | Begriff ohne Beachtung der Groß-/Kleinschreibung suchen |
+
+Ein vorangestelltes `-` schließt Dateien auch bei den Textoperatoren aus, zum Beispiel `-content:entwurf`. Mehrere Begriffe stehen in Klammern, Begriffe mit Leerzeichen in Anführungszeichen: `line:("Vollkorn mehl" eier)`.
+
+### Suchergebnisse in eine Notiz einbetten
+
+Ein Codeblock mit der Sprache `query` zeigt die Treffer einer Suche live in der Notiz an. Der Inhalt ist eine normale Suchanfrage, auch mit Operatoren:
+
+````
+```query
+task-todo:einkaufen path:Haushalt/**
+```
+````
+
+Die Ergebnisse aktualisieren sich, wenn sich der Vault ändert. Ein Klick auf einen Dateinamen öffnet die Notiz.
 
 ### Kombination
 
