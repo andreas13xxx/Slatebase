@@ -8,12 +8,17 @@ import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, locateFrontmatter, toggleCalloutFoldEffect } from './widget-decorations'
-import { hasSearch, type ISearchEmbedApiClient } from '../../components/SearchEmbed'
+import type { ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { MetadataSuggestApiClient } from '../suggest/metadata-complete'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../../state/aliasStore'
 import { editorInfoField } from '../editor-state-fields'
+
+/** Narrows the host client, which may lack `searchVault`, for ```` ```query ```` blocks. */
+function hasSearch<T extends object>(client: T | null | undefined): client is T & ISearchEmbedApiClient {
+  return !!client && typeof (client as Partial<ISearchEmbedApiClient>).searchVault === 'function'
+}
 
 /**
  * Options for creating the Live Preview extension.

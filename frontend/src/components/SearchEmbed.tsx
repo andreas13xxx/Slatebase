@@ -29,11 +29,6 @@ export interface SearchEmbedProps {
   apiClient?: ISearchEmbedApiClient | null
 }
 
-/** Narrows a host client that may lack `searchVault` (the editor's client type is a union of capabilities). */
-export function hasSearch<T extends object>(client: T | null | undefined): client is T & ISearchEmbedApiClient {
-  return !!client && typeof (client as Partial<ISearchEmbedApiClient>).searchVault === 'function'
-}
-
 /** Most files and hits per file shown; the embed is a preview, the search panel shows the rest. */
 const MAX_RESULTS = 100
 const MAX_HITS_PER_FILE = 5
