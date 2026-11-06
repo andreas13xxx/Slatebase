@@ -12,15 +12,41 @@
  *   -tag:<tagname>     — exclude files with the tag
  *   -property:<key>    — exclude files with the property key
  *   -property:<key>=<value> — exclude files with key=value
+ *   [key:value]        — shorthand for property:key=value (also negatable: -[key:value])
+ *   line:(a b)         — all terms on the same line
+ *   section:(a b)      — all terms in the same section (heading to next heading)
+ *   block:(a b)        — all terms in the same block (paragraph)
+ *   content:(a b)      — all terms anywhere in the file's content
+ *   task:(a b)         — all terms in one task line; task-todo: open, task-done: completed tasks
+ *   match-case:<term>  — term matched case-sensitively
+ *   ignore-case:<term> — term matched case-insensitively
+ *   (text operators can be negated with a leading -)
  *
  * Values can be quoted: `path:"My Folder/**"` or `property:status="in progress"`
  * Unknown `foo:bar` patterns are kept as free-text (not treated as operators).
+ *
+ * shortcut: a query of only negated text operators lists no files (hits come from positive terms).
+ * shortcut: `[key]` (existence only) and `[key:a OR b]` are not parsed; use
+ * `property:key` and separate `[key:a]` terms. Upgrade if users ask for them.
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** Operators that match inside the file's text (they need the content, not just the file list). */
+export type TextOperatorType =
+  | 'line' | 'section' | 'block' | 'content' | 'task' | 'task-todo' | 'task-done' | 'match-case' | 'ignore-case'
+
 /** A recognized operator type. */
-export type OperatorType = 'path' | 'file' | 'tag' | 'property'
+export type OperatorType = 'path' | 'file' | 'tag' | 'property' | TextOperatorType
+
+const TEXT_OPERATORS: ReadonlySet<string> = new Set([
+  'line', 'section', 'block', 'content', 'task', 'task-todo', 'task-done', 'match-case', 'ignore-case',
+])
+
+/** Whether `type` is an operator that matches inside the file's text. */
+export function isTextOperator(type: OperatorType): type is TextOperatorType {
+  return TEXT_OPERATORS.has(type)
+}
 
 /** A single parsed operator from the query. */
 export interface ParsedOperator {
@@ -34,6 +60,8 @@ export interface ParsedOperator {
   propertyKey?: string | undefined
   /** For property operators: the parsed property value (after =). */
   propertyValue?: string | undefined
+  /** For text operators: the terms that must all match within the operator's scope. */
+  terms?: string[] | undefined
 }
 
 /** Result of parsing a search query. */
@@ -47,16 +75,22 @@ export interface ParsedQuery {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** Known operator keywords. Anything else is treated as free-text. */
-const KNOWN_OPERATORS = new Set<string>(['path', 'file', 'tag', 'property'])
+const KNOWN_OPERATORS = new Set<string>(['path', 'file', 'tag', 'property', ...TEXT_OPERATORS])
 
 /**
  * Regex that matches operator tokens in the query string.
- * Groups: (1) negation prefix, (2) keyword, (3) value (quoted or unquoted).
+ * Groups: (1) negation prefix, (2) keyword, (3) value (quoted, parenthesized or unquoted).
  *
+ * An operator must start a word (`inline:x` or `profile:x` are free text).
  * Quoted values: "..." with escaped quotes inside.
+ * Parenthesized values: (a b) — several terms for the text operators.
  * Unquoted values: everything up to the next whitespace.
  */
-const OPERATOR_REGEX = /(-?)(path|file|tag|property):("(?:[^"\\]|\\.)*"|[^\s]+)/g
+const OPERATOR_REGEX =
+  /(?<![^\s])(-?)(path|file|tag|property|line|section|block|content|task-todo|task-done|task|match-case|ignore-case):("(?:[^"\\]|\\.)*"|\([^)]*\)|[^\s]+)/g
+
+/** `[key:value]` property shorthand. Not `[[wikilinks]]` and not `[text](url)` links. */
+const BRACKET_PROPERTY_REGEX = /(?<![^\s])(-?)(?<!\[)\[([^[\]:\s][^[\]:]*):([^[\]]*)\](?![([])/g
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
 
@@ -90,6 +124,18 @@ export function parseSearchQuery(raw: string): ParsedQuery {
     })
   }
 
+  BRACKET_PROPERTY_REGEX.lastIndex = 0
+  while ((match = BRACKET_PROPERTY_REGEX.exec(raw)) !== null) {
+    const key = match[2]!.trim()
+    const value = match[3]!.trim()
+    matches.push({
+      fullMatch: match[0],
+      negated: match[1] === '-',
+      keyword: 'property',
+      rawValue: value === '' ? key : `${key}=${value}`,
+    })
+  }
+
   // Remove matched operators from the free-text
   for (const m of matches) {
     freeText = freeText.replace(m.fullMatch, ' ')
@@ -118,6 +164,8 @@ export function parseSearchQuery(raw: string): ParsedQuery {
       }
     }
 
+    if (TEXT_OPERATORS.has(m.keyword)) operator.terms = splitTerms(m.rawValue)
+
     operators.push(operator)
   }
 
@@ -125,6 +173,20 @@ export function parseSearchQuery(raw: string): ParsedQuery {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Splits a raw operator value into terms: `(a "b c")` gives `a`, `b c`;
+ * a bare or quoted value is one term.
+ */
+function splitTerms(rawValue: string): string[] {
+  if (!(rawValue.startsWith('(') && rawValue.endsWith(')'))) {
+    const single = stripQuotes(rawValue)
+    return single === '' ? [] : [single]
+  }
+  return [...rawValue.slice(1, -1).matchAll(/"((?:[^"\\]|\\.)*)"|(\S+)/g)]
+    .map((t) => (t[1] ?? t[2] ?? '').replace(/\\"/g, '"'))
+    .filter((t) => t !== '')
+}
 
 /**
  * Strips surrounding double-quotes and unescapes inner escaped quotes.

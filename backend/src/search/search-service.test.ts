@@ -219,4 +219,36 @@ describe('SearchService', () => {
       ).rejects.toThrow(RegexValidationError)
     })
   })
+
+  describe('search() — text operators', () => {
+    it('finds hits for line: without free text and skips non-matching files', async () => {
+      const vaultService = createMockVaultService({
+        files: {
+          'a.md': { content: 'mix flour\nother' },
+          'b.md': { content: 'flour\nmix' },
+        },
+      })
+      const service = new SearchService(vaultService, accessControl, logger)
+
+      const result = await service.search('vault1', defaultOptions({ query: 'line:(mix flour)' }))
+
+      expect(result.results.map((r) => r.filePath)).toEqual(['a.md'])
+      expect(result.results[0]?.hits[0]?.line).toBe(1)
+    })
+
+    it('combines a text operator with free text and a file operator', async () => {
+      const vaultService = createMockVaultService({
+        files: {
+          'a.md': { content: '- [ ] buy milk\nmilk' },
+          'b.md': { content: '- [x] buy milk' },
+        },
+      })
+      const service = new SearchService(vaultService, accessControl, logger)
+
+      const result = await service.search('vault1', defaultOptions({ query: 'task-todo:buy milk file:a' }))
+
+      expect(result.results.map((r) => r.filePath)).toEqual(['a.md'])
+      expect(result.results[0]?.hits.map((h) => h.line)).toEqual([1, 2])
+    })
+  })
 })
