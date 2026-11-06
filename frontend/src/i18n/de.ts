@@ -107,6 +107,14 @@ export const de = {
     newFileNameEmpty: 'Dateiname darf nicht leer sein.',
   },
 
+  searchEmbed: {
+    label: 'Suche',
+    empty: 'Leere Suchanfrage',
+    noResults: 'Keine Treffer',
+    error: 'Suche fehlgeschlagen',
+    count: '{files} Dateien',
+  },
+
   editor: {
     suggest: { tag: 'Tag', property: 'Eigenschaft', value: 'Wert' },
     textareaAriaLabel: 'Dateiinhalt bearbeiten',

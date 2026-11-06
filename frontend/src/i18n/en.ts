@@ -113,6 +113,14 @@ export const en: TranslationShape = {
     newFileNameEmpty: 'File name must not be empty.',
   },
 
+  searchEmbed: {
+    label: 'Search',
+    empty: 'Empty search query',
+    noResults: 'No results',
+    error: 'Search failed',
+    count: '{files} files',
+  },
+
   editor: {
     suggest: { tag: 'Tag', property: 'Property', value: 'Value' },
     textareaAriaLabel: 'Edit file content',

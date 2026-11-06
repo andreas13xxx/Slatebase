@@ -8,6 +8,7 @@ import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, locateFrontmatter, toggleCalloutFoldEffect } from './widget-decorations'
+import type { ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { MetadataSuggestApiClient } from '../suggest/metadata-complete'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
@@ -35,7 +36,7 @@ export interface LivePreviewOptions {
   /** How the frontmatter shows (app.json `propertiesInDocument`); default `visible`. */
   propertiesInDocument?: 'visible' | 'hidden' | 'source'
   /** API client, for an embedded Bases view (`![[file.base]]`) to query the vault. */
-  apiClient?: (IBasesEmbedApiClient & MetadataSuggestApiClient) | null
+  apiClient?: (IBasesEmbedApiClient & MetadataSuggestApiClient & Partial<ISearchEmbedApiClient>) | null
   /** Whether the `bases` feature is on; gates rendering of inline ```` ```base ```` blocks. */
   basesEnabled?: boolean
   /**

@@ -30,6 +30,7 @@ import { PdfViewer } from './BinaryViewer'
 import { MermaidRenderer } from './MermaidRenderer'
 import { MathRenderer } from './MathRenderer'
 import { BasesEmbed } from './bases/BasesEmbed'
+import { SearchEmbed } from './SearchEmbed'
 import { usePublicEmbeds } from '../public-share/PublicEmbedContext'
 import { embedRef, parsePublicVaultId, publicAssetUrl } from '../public-share/publicVault'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedCreator, type EmbedContext } from '../plugins/compat/embed-registry'
@@ -942,6 +943,10 @@ function renderBlockNode(
           source: node.value,
           onOpenNote: (path: string) => onInternalLinkClick?.(path),
         })
+      }
+      // A query block: live search results. Not on a public share (the search endpoint needs a login).
+      if (node.lang?.toLowerCase() === 'query' && parsePublicVaultId(vaultId) === null) {
+        return createElement(SearchEmbed, { key, vaultId, query: node.value, onOpenNote: (path: string) => onInternalLinkClick?.(path) })
       }
       return renderCodeBlock(node.value, node.lang, key)
 
