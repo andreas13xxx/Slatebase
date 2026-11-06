@@ -114,6 +114,7 @@ export const en: TranslationShape = {
   },
 
   editor: {
+    suggest: { tag: 'Tag', property: 'Property', value: 'Value' },
     textareaAriaLabel: 'Edit file content',
     readOnlyBanner: 'Read only — this vault was shared with you as read-only.',
     statusUnsaved: '● Unsaved changes',
