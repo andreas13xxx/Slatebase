@@ -87,6 +87,29 @@ describe('createLinkSource', () => {
     await s.vaultHeadings()
     expect(searchVault).toHaveBeenCalledTimes(1)
   })
+  it('caches files briefly, shares concurrent requests and does not cache failures', async () => {
+    const fetchFileContent = vi.fn()
+      .mockRejectedValueOnce(new Error('down'))
+      .mockResolvedValue({ content: 'text', isBinary: false })
+    const s = createLinkSource(() => ({
+      vaultId: 'v', directoryTree: null, sourcePath: '', aliasMap: new Map(), aliasEntries: [], apiClient: { fetchFileContent },
+    }))
+    expect(await s.readFile('a.md')).toBeNull()
+    const [x, y] = await Promise.all([s.readFile('a.md'), s.readFile('a.md')])
+    expect([x, y]).toEqual(['text', 'text'])
+    await s.readFile('a.md')
+    expect(fetchFileContent).toHaveBeenCalledTimes(2)
+  })
+  it('does not keep a failed heading search for the cache window', async () => {
+    const searchVault = vi.fn()
+      .mockRejectedValueOnce(new Error('x'))
+      .mockResolvedValue({ results: [{ filePath: 'A.md', hits: [{ matchLine: '# T' }] }] })
+    const s = createLinkSource(() => ({
+      vaultId: 'v', directoryTree: null, sourcePath: '', aliasMap: new Map(), aliasEntries: [], apiClient: { searchVault },
+    }))
+    expect(await s.vaultHeadings()).toEqual([])
+    expect(await s.vaultHeadings()).toEqual([{ path: 'A.md', heading: 'T' }])
+  })
   it('gives an empty list when the search fails', async () => {
     const s = createLinkSource(() => ({
       vaultId: 'v', directoryTree: null, sourcePath: '', aliasMap: new Map(), aliasEntries: [],

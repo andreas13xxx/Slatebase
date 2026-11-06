@@ -19,6 +19,7 @@
 import type { Completion, CompletionContext, CompletionResult, CompletionSource } from '@codemirror/autocomplete'
 import type { EditorView } from '@codemirror/view'
 import type { DirectoryTree } from '../../types'
+import { getAliasMapSnapshot, getAliasEntriesSnapshot } from '../../state/aliasStore'
 import { collectFilesSorted, resolveWikilinkTarget } from '../../plugins/link-resolver'
 
 /** Where the completion source gets its candidates from. */
@@ -210,16 +211,23 @@ export interface LinkSourceDeps {
   } | null | undefined
 }
 
+/** How long a fetched file or heading list is reused while the user keeps typing. */
+const CACHE_TTL_MS = 10_000
+
 /** Regex (for the search API) matching every markdown heading line. */
 const HEADING_SEARCH = '^#{1,6}\\s+\\S'
 
 /**
  * Builds the source from the vault's directory tree, alias store and API client.
- * `getDeps` is read lazily so the tree/aliases are always the current ones.
- * Vault-wide headings are cached for a short time; failed requests give an empty list.
+ * `getDeps` is read lazily so the tree/aliases are always the current ones; keep the
+ * returned source alive across editor rebuilds so its caches survive.
+ * Files and the vault-wide heading list are cached briefly and concurrent requests
+ * share one promise, so typing does not refetch on every key. A failed request is
+ * not cached.
  */
 export function createLinkSource(getDeps: () => LinkSourceDeps): LinkSuggestSource {
-  let headingsCache: { at: number; value: Promise<Array<{ path: string; heading: string }>> } | null = null
+  const files = new Map<string, { at: number; value: Promise<string | null> }>()
+  let headingsCache: { at: number; vaultId: string; value: Promise<Array<{ path: string; heading: string }>> } | null = null
   return {
     notes: () => {
       const { directoryTree } = getDeps()
@@ -230,18 +238,27 @@ export function createLinkSource(getDeps: () => LinkSourceDeps): LinkSuggestSour
       const d = getDeps()
       return resolveWikilinkTarget(target, d.directoryTree, d.sourcePath, d.aliasMap)
     },
-    readFile: async (path) => {
+    readFile: (path) => {
       const d = getDeps()
-      try {
-        const file = await d.apiClient?.fetchFileContent?.(d.vaultId, path)
-        return file && !file.isBinary ? file.content : null
-      } catch {
+      const key = `${d.vaultId}\0${path}`
+      const hit = files.get(key)
+      if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value
+      const value = (async () => {
+        try {
+          const file = await d.apiClient?.fetchFileContent?.(d.vaultId, path)
+          if (file && !file.isBinary) return file.content
+        } catch { /* not cached, see below */ }
+        files.delete(key)
         return null
-      }
+      })()
+      files.set(key, { at: Date.now(), value })
+      return value
     },
     vaultHeadings: () => {
-      if (headingsCache && Date.now() - headingsCache.at < 30_000) return headingsCache.value
       const d = getDeps()
+      if (headingsCache && headingsCache.vaultId === d.vaultId && Date.now() - headingsCache.at < CACHE_TTL_MS) {
+        return headingsCache.value
+      }
       const value = (async () => {
         try {
           const raw = await d.apiClient?.searchVault?.(d.vaultId, {
@@ -252,11 +269,32 @@ export function createLinkSource(getDeps: () => LinkSourceDeps): LinkSuggestSour
             return heading ? [{ path: f.filePath, heading }] : []
           }))
         } catch {
+          headingsCache = null // a failure must not stick for the whole TTL
           return []
         }
       })()
-      headingsCache = { at: Date.now(), value }
+      headingsCache = { at: Date.now(), vaultId: d.vaultId, value }
       return value
     },
+  }
+}
+
+export type EditorLinkDeps = Pick<LinkSourceDeps, 'vaultId' | 'directoryTree' | 'sourcePath' | 'apiClient'>
+
+/**
+ * The editor's source plus a setter for the current tree, path and client. The host calls
+ * `setDeps` whenever they change; the source (and with it its caches) stays the same.
+ * The alias store is read on every request.
+ */
+export function createEditorLinkSource(): {
+  source: LinkSuggestSource
+  setDeps: (deps: EditorLinkDeps) => void
+  hasVault: () => boolean
+} {
+  let deps: EditorLinkDeps = { vaultId: '', directoryTree: null, sourcePath: '' }
+  return {
+    source: createLinkSource(() => ({ ...deps, aliasMap: getAliasMapSnapshot(), aliasEntries: getAliasEntriesSnapshot() })),
+    setDeps: (next) => { deps = next },
+    hasVault: () => deps.vaultId !== '',
   }
 }
