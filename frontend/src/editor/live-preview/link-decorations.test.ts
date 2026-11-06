@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { createWikilinkRegex, resolveWikilinkMatchTarget, buildLinkDecorations } from './link-decorations'
+import { createWikilinkRegex, resolveWikilinkMatchTarget, buildLinkDecorations, createLinkClickHandler } from './link-decorations'
 
 /** Builds an EditorState with the same markdown/GFM setup used by CodeMirrorEditor.tsx. */
 function makeState(doc: string): EditorState {
@@ -75,4 +76,45 @@ describe('buildLinkDecorations code-block guard', () => {
     expect(result.decorations).toHaveLength(3)
     expect(JSON.stringify(result.decorations)).toContain('"data-target":"RealLink"')
   })
+})
+
+describe('createLinkClickHandler Ctrl/Cmd+Click scheme handling', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** Mounts a view with a fake `.cm-lp-link` element and Ctrl+clicks it. */
+  function ctrlClickLink(url: string) {
+    const onInternalLinkClick = vi.fn()
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    const view = new EditorView({
+      state: EditorState.create({ doc: '', extensions: [createLinkClickHandler({ onInternalLinkClick })] }),
+      parent,
+    })
+    const link = document.createElement('span')
+    link.className = 'cm-lp-link'
+    link.setAttribute('data-url', url)
+    view.contentDOM.appendChild(link)
+    link.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, ctrlKey: true }))
+    view.destroy()
+    parent.remove()
+    return { openSpy, onInternalLinkClick }
+  }
+
+  it.each(['https://example.com/a', 'http://example.com/a'])('opens %s via window.open', (url) => {
+    const { openSpy, onInternalLinkClick } = ctrlClickLink(url)
+    expect(openSpy).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
+    expect(onInternalLinkClick).not.toHaveBeenCalled()
+  })
+
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)'])(
+    'does not call window.open for %s',
+    (url) => {
+      const { openSpy, onInternalLinkClick } = ctrlClickLink(url)
+      expect(openSpy).not.toHaveBeenCalled()
+      expect(onInternalLinkClick).toHaveBeenCalledWith(url)
+    },
+  )
 })

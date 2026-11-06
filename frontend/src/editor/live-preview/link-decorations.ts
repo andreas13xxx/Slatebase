@@ -275,7 +275,14 @@ export function createLinkClickHandler(options: LinkDecorationOptions): Extensio
             const url = linkElement.getAttribute('data-url')
             if (url) {
               event.preventDefault()
-              window.open(url, '_blank', 'noopener,noreferrer')
+              // Only http(s) may reach window.open; anything else (javascript:,
+              // data:, vbscript:, vault paths) is treated as an internal link,
+              // matching createLivePreviewClickHandler.
+              if (url.startsWith('http://') || url.startsWith('https://')) {
+                window.open(url, '_blank', 'noopener,noreferrer')
+              } else if (options.onInternalLinkClick) {
+                options.onInternalLinkClick(url)
+              }
               return true
             }
           }
