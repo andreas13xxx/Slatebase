@@ -30,6 +30,13 @@ describe('createMetadataCompletions', () => {
     expect(await run('---\ntags: pr')).not.toBeNull()
     expect(await run('---\ntags:\n  - pr')).not.toBeNull()
   })
+  it('suggests values in an open list and resolves linearly on a malicious value (no ReDoS)', async () => {
+    expect(await run('---\ntags: [project, al')).not.toBeNull()
+    const evil = '---\ntags:!:\t,' + '\t,'.repeat(50000)
+    const start = Date.now()
+    await run(evil)
+    expect(Date.now() - start).toBeLessThan(1000)
+  })
   it('stays silent outside frontmatter keys and for unknown values', async () => {
     expect(await run('---\ntitle: x\n---\nstatus')).toBeNull()
     expect(await run('---\ntitle: x')).toBeNull()

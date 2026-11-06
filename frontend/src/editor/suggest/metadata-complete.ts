@@ -130,10 +130,18 @@ export function createMetadataCompletions(
         }
       }
       // Property value: `key: va`, `key: [a, b` or a `- item` list line.
+      // Split on the first colon (linear, no nested quantifier) and check the rest
+      // is a plain value or a `[`-list of them — never a regex that can backtrack.
       let key: string | null = null
-      const inline = /^([^\s:#][^:]*):\s+\[?(?:[^\],]*,\s*)*[^\s,\][]*$/.exec(before)
-      if (inline) key = inline[1]?.trim() ?? null
-      else if (/^\s*-\s+[^\s,]*$/.test(before)) key = listOwnerKey(state, line.number)
+      const colon = before.indexOf(':')
+      const name = colon > 0 ? before.slice(0, colon) : ''
+      const rest = colon > 0 ? before.slice(colon + 1) : ''
+      const nameOk = name !== '' && !name.startsWith(' ') && !name.startsWith('#') && !name.includes('#')
+      if (nameOk && /^\s/.test(rest) && !/[:\]]/.test(rest)) {
+        key = name.trim()
+      } else if (/^\s*-\s+[^\s,]*$/.test(before)) {
+        key = listOwnerKey(state, line.number)
+      }
       if (!key) return null
       const values = await source.getPropertyValues(key)
       if (values.length === 0) return null
