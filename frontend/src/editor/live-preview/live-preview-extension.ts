@@ -12,6 +12,7 @@ import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../../state/aliasStore'
 import { editorInfoField } from '../editor-state-fields'
+import { openExternalUrl } from '../../utils/externalUrl'
 
 /**
  * Options for creating the Live Preview extension.
@@ -411,9 +412,7 @@ export function createLivePreviewClickHandler(options: LivePreviewOptions): Exte
         if (url) {
           event.preventDefault()
           event.stopPropagation()
-          if (url.startsWith('http://') || url.startsWith('https://')) {
-            window.open(url, '_blank', 'noopener,noreferrer')
-          } else if (options.onInternalLinkClick) {
+          if (!openExternalUrl(url) && options.onInternalLinkClick) {
             options.onInternalLinkClick(url)
           }
           return

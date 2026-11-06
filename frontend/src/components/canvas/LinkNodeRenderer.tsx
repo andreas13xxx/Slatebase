@@ -9,6 +9,7 @@ import { memo, useCallback, useState, useRef, useEffect } from 'react'
 import { ExternalLink, Globe } from 'lucide-react'
 import type { LinkNode } from '../../canvas/types'
 import { getCanvasColorClass } from './canvas-utils'
+import { openExternalUrl } from '../../utils/externalUrl'
 import { useNodeDrag } from './useNodeDrag'
 import { useNodeResize } from './useNodeResize'
 import { ResizeHandles } from './ResizeHandles'
@@ -98,7 +99,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'TEXTAREA' || tag === 'INPUT') return
       e.preventDefault()
-      window.open(node.url, '_blank', 'noopener,noreferrer')
+      openExternalUrl(node.url)
     }
   }, [node.url])
 
@@ -139,7 +140,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
       data-node-id={node.id}
       onMouseDown={handleMouseDown}
       onDoubleClick={() => {
-        window.open(node.url, '_blank', 'noopener,noreferrer')
+        openExternalUrl(node.url)
       }}
       onKeyDown={handleNodeKeyDown}
       role="button"

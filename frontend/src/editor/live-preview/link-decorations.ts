@@ -2,6 +2,7 @@ import { Decoration, type EditorView, ViewPlugin, type ViewUpdate } from '@codem
 import type { EditorState, Range, Extension } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import type { HideableRange } from './inline-decorations'
+import { openExternalUrl } from '../../utils/externalUrl'
 
 /**
  * Options for link decoration behavior.
@@ -278,9 +279,7 @@ export function createLinkClickHandler(options: LinkDecorationOptions): Extensio
               // Only http(s) may reach window.open; anything else (javascript:,
               // data:, vbscript:, vault paths) is treated as an internal link,
               // matching createLivePreviewClickHandler.
-              if (url.startsWith('http://') || url.startsWith('https://')) {
-                window.open(url, '_blank', 'noopener,noreferrer')
-              } else if (options.onInternalLinkClick) {
+              if (!openExternalUrl(url) && options.onInternalLinkClick) {
                 options.onInternalLinkClick(url)
               }
               return true

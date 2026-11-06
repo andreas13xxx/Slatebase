@@ -103,13 +103,13 @@ describe('createLinkClickHandler Ctrl/Cmd+Click scheme handling', () => {
     return { openSpy, onInternalLinkClick }
   }
 
-  it.each(['https://example.com/a', 'http://example.com/a'])('opens %s via window.open', (url) => {
+  it.each(['https://example.com/a', 'http://example.com/a', 'HTTPS://example.com/a'])('opens %s via window.open', (url) => {
     const { openSpy, onInternalLinkClick } = ctrlClickLink(url)
     expect(openSpy).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
     expect(onInternalLinkClick).not.toHaveBeenCalled()
   })
 
-  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)'])(
+  it.each(['javascript:alert(1)', 'JavaScript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)'])(
     'does not call window.open for %s',
     (url) => {
       const { openSpy, onInternalLinkClick } = ctrlClickLink(url)
