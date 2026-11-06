@@ -45,7 +45,8 @@ bound, unbound and reset, and are written to the vault's `hotkeys.json` under th
 
 ## Commands that differ from what you may expect
 
-- `app:increase-font-size` / `app:decrease-font-size` (new in Obsidian 1.14) change `baseFontSize` in the vault's
+- `app:increase-font-size` / `app:decrease-font-size` (Obsidian's "Increase/Decrease font size" commands; the IDs are
+  unverified guesses, see below) change `baseFontSize` in the vault's
   `.obsidian/appearance.json` by 1 px within 10 to 30 px; at the default of 16 the key is removed, like the
   settings form does. In a read-only vault they show an error instead. The two IDs are an assumption: Obsidian's
   changelog names the commands, not their IDs, and they were not checked against a running Obsidian.

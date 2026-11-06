@@ -804,6 +804,7 @@ export const en: TranslationShape = {
       columnExample: 'Example',
       columnDescription: 'Description',
       note: 'Quote values that contain spaces:',
+      textNote: 'A single term with spaces or ")" goes in quotes, e.g. line:"a )". Inside a parenthesized group a term cannot contain ")". A search made only of excluded text operators (e.g. -content:x) returns no results.',
       operators: {
         path: 'Include files in path',
         file: 'Files with matching name',

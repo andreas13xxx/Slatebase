@@ -67,6 +67,7 @@ export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
         <p className="search-operator-help__note">
           {t('search.operatorHelp.note')} <code>path:&quot;Mein Ordner/**&quot;</code>
         </p>
+        <p className="search-operator-help__note">{t('search.operatorHelp.textNote')}</p>
       </div>
     </div>
   )

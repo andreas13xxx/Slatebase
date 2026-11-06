@@ -798,6 +798,7 @@ export const de = {
       columnExample: 'Beispiel',
       columnDescription: 'Beschreibung',
       note: 'Werte mit Leerzeichen in Anführungszeichen setzen:',
+      textNote: 'Ein einzelner Begriff mit Leerzeichen oder ")" steht in Anführungszeichen, z. B. line:"a )". In einer Klammergruppe ist ")" im Begriff nicht möglich. Eine Suche nur aus ausgeschlossenen Textoperatoren (z. B. -content:x) liefert keine Treffer.',
       operators: {
         path: 'Dateien im Pfad einschließen',
         file: 'Dateien mit passendem Namen',
