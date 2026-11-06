@@ -19,6 +19,7 @@
     "test:e2e": "playwright test"
   },
   "overrides": {
+    "minimatch": "^11.0.1",
     "obsidian": {
       "@codemirror/state": "$@codemirror/state",
       "@codemirror/view": "$@codemirror/view",

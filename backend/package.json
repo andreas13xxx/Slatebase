@@ -21,6 +21,9 @@
     "pretest:coverage": "npm run build:contracts",
     "test:coverage": "vitest --run --coverage"
   },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@modelcontextprotocol/sdk": "1.32.2",
