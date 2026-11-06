@@ -16,11 +16,17 @@ import type { TabEntry } from '../../state/tabState'
 import type { PublicUserInfo } from '../../state/authState'
 import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
 import { setActiveBasesController } from '../../state/activeBasesBridge'
+import { increaseFontSize, decreaseFontSize } from '../../state/fontSizeCommands'
 
 vi.mock('../../state/zoomStore', () => ({
   zoomIn: vi.fn(),
   zoomOut: vi.fn(),
   resetZoom: vi.fn(),
+}))
+
+vi.mock('../../state/fontSizeCommands', () => ({
+  increaseFontSize: vi.fn(() => Promise.resolve()),
+  decreaseFontSize: vi.fn(() => Promise.resolve()),
 }))
 
 /** Minimal mock covering every IApiClient member (mirrors FileExplorer.test.tsx's helper). */
@@ -135,6 +141,7 @@ describe('registerCoreAppCommands', () => {
       onDailyNote: vi.fn(),
       onDailyNoteOffset: vi.fn(),
       onCreateWelcomeVault: vi.fn(),
+      onOpenHelp: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onOpenReleaseNotes: vi.fn(),
       onOpenDebugInfo: vi.fn(),
@@ -342,6 +349,27 @@ describe('registerCoreAppCommands', () => {
     expect(handlers.onCreateWelcomeVault).toHaveBeenCalled()
   })
 
+  it('app:open-help delegates to onOpenHelp', () => {
+    registry.executeCommand('app:open-help')
+    expect(handlers.onOpenHelp).toHaveBeenCalled()
+  })
+
+  it('app:increase/decrease-font-size delegate to the font-size commands', () => {
+    registry.executeCommand('app:increase-font-size')
+    expect(increaseFontSize).toHaveBeenCalled()
+
+    registry.executeCommand('app:decrease-font-size')
+    expect(decreaseFontSize).toHaveBeenCalled()
+  })
+
+  it('a failed font-size change shows an error toast', async () => {
+    vi.mocked(increaseFontSize).mockRejectedValueOnce(new Error('read only'))
+    const toast = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
+    registry.executeCommand('app:increase-font-size')
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('error', expect.stringContaining('read only')))
+    toast.mockRestore()
+  })
+
   it('window:zoom-in/out/reset-zoom delegate to the zoom store', () => {
     registry.executeCommand('window:zoom-in')
     expect(zoomIn).toHaveBeenCalled()
@@ -489,6 +517,7 @@ describe('registerCoreAppCommands — editor:* commands needing app context', ()
       onDailyNote: vi.fn(),
       onDailyNoteOffset: vi.fn(),
       onCreateWelcomeVault: vi.fn(),
+      onOpenHelp: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onOpenReleaseNotes: vi.fn(),
       onOpenDebugInfo: vi.fn(),
@@ -600,6 +629,7 @@ describe('registerCoreAppCommands — bookmark types (Requirements 11-14)', () =
       onDailyNote: vi.fn(),
       onDailyNoteOffset: vi.fn(),
       onCreateWelcomeVault: vi.fn(),
+      onOpenHelp: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onOpenReleaseNotes: vi.fn(),
       onOpenDebugInfo: vi.fn(),
@@ -819,6 +849,7 @@ describe('registerCoreAppCommands — frontmatter properties (markdown:*)', () =
       onDailyNote: vi.fn(),
       onDailyNoteOffset: vi.fn(),
       onCreateWelcomeVault: vi.fn(),
+      onOpenHelp: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onOpenReleaseNotes: vi.fn(),
       onOpenDebugInfo: vi.fn(),
@@ -969,6 +1000,7 @@ describe('registerCoreAppCommands — canvas:jump-to-group', () => {
       onDailyNote: vi.fn(),
       onDailyNoteOffset: vi.fn(),
       onCreateWelcomeVault: vi.fn(),
+      onOpenHelp: vi.fn(),
       onOpenTemplateSelector: vi.fn(),
       onOpenReleaseNotes: vi.fn(),
       onOpenDebugInfo: vi.fn(),
@@ -1412,6 +1444,7 @@ function makeMinimalHandlers(overrides: { apiClient?: IApiClient; tabDispatch?: 
     onDailyNote: vi.fn(),
     onDailyNoteOffset: vi.fn(),
     onCreateWelcomeVault: vi.fn(),
+    onOpenHelp: vi.fn(),
     onOpenTemplateSelector: vi.fn(),
     onOpenReleaseNotes: vi.fn(),
     onOpenDebugInfo: vi.fn(),

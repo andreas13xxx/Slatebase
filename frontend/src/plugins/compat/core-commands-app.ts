@@ -48,6 +48,8 @@ import { getActiveBasesController } from '../../state/activeBasesBridge'
 import { parseCanvas } from '../../canvas'
 import { canvasToMarkdown } from '../../canvas/canvasToMarkdown'
 import { zoomIn, zoomOut, resetZoom } from '../../state/zoomStore'
+import { increaseFontSize, decreaseFontSize } from '../../state/fontSizeCommands'
+import { extractErrorMessage } from '../../utils/error'
 import { defaultHotkeysFor } from './core-default-hotkeys'
 import { findHeadingSectionAtCursor, sanitizeFileNameFromHeading, extractRangeToNewFile } from '../../state/noteComposer'
 
@@ -90,6 +92,8 @@ export interface CoreAppCommandHandlers {
   onDailyNote: () => void
   onDailyNoteOffset: (offsetDays: number) => void
   onCreateWelcomeVault: () => void
+  /** Opens the welcome (tutorial) vault's start note, creating the vault first if the user has none. */
+  onOpenHelp: () => void
   onOpenTemplateSelector: () => void
   /** Inserts a template into the note that is already open (Templates: Insert template). */
   onInsertTemplate: () => void
@@ -673,6 +677,15 @@ function showFootnotes(h: CoreAppCommandHandlers): void {
     : 'Keine Notiz geöffnet.')
 }
 
+/** Runs a font-size change; a read-only vault or a failed write ends in a toast, not a silent no-op. */
+async function changeFontSizeOrToast(change: () => Promise<void>): Promise<void> {
+  try {
+    await change()
+  } catch (error: unknown) {
+    showToast('error', `Schriftgröße konnte nicht geändert werden: ${extractErrorMessage(error)}`)
+  }
+}
+
 /**
  * A command Slatebase implements, or one it only registers so plugin lookups
  * find something: `unsupported` names the gap, and `registerCoreAppCommands`
@@ -758,13 +771,13 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'app:switch-vault', name: 'Change vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     { id: 'app:open-another-vault', name: 'Open vault...', run: (h) => h.onOpenSettings({ category: 'account', section: 'my-vaults' }) },
     // Obsidian's "ribbon" is Slatebase's toolbar (SidebarToolbar) — same idea,
-    // same command. The sandbox vault maps to the welcome vault; the help page
-    // and the split-pane default-mode setting have nothing to map to.
+    // same command. The sandbox vault and the help page both map to the welcome
+    // vault; the split-pane default-mode setting has nothing to map to.
     { id: 'app:toggle-ribbon', name: 'Toggle ribbon', run: (h) => h.onToggleToolbar() },
     { id: 'app:go-back', name: 'Navigate back', run: (h) => h.onNavigateBack() },
     { id: 'app:go-forward', name: 'Navigate forward', run: (h) => h.onNavigateForward() },
     { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: (h) => h.onCreateWelcomeVault() },
-    { id: 'app:open-help', name: 'Open help', unsupported: 'in-app-help' },
+    { id: 'app:open-help', name: 'Open help', run: (h) => h.onOpenHelp() },
     { id: 'app:show-debug-info', name: 'Show debug info', run: (h) => h.onOpenDebugInfo() },
     { id: 'app:show-release-notes', name: 'Show release notes', run: (h) => h.onOpenReleaseNotes() },
     { id: 'app:toggle-default-new-pane-mode', name: 'Toggle default mode for new tabs', unsupported: 'new-tab-defaults' },
@@ -777,6 +790,9 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'window:zoom-in', name: 'Zoom in', run: () => zoomIn() },
     { id: 'window:zoom-out', name: 'Zoom out', run: () => zoomOut() },
     { id: 'window:reset-zoom', name: 'Reset zoom', run: () => resetZoom() },
+    // Obsidian 1.14: unlike zoom, these change the vault's base font size (appearance.json).
+    { id: 'app:increase-font-size', name: 'Increase font size', run: () => changeFontSizeOrToast(increaseFontSize) },
+    { id: 'app:decrease-font-size', name: 'Decrease font size', run: () => changeFontSizeOrToast(decreaseFontSize) },
     { id: 'window:toggle-always-on-top', name: 'Toggle window always on top', unsupported: 'native-windows' },
 
     // ── Graph / Canvas / Daily Notes ──
