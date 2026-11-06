@@ -74,6 +74,10 @@ export interface WidgetDecorationOptions {
   apiClient?: IBasesEmbedApiClient | null
   /** Whether the `bases` feature is on; an inline ```` ```base ```` block only renders as a table then, else it stays code. */
   basesEnabled?: boolean
+  /** Client for ```` ```query ```` blocks (live search results); null when the host provides no search. */
+  searchApiClient?: ISearchEmbedApiClient | null
+  /** Opens a note by vault path (a result link in a ```` ```query ```` block). */
+  onInternalLinkClick?: (target: string) => void
 }
 
 /**
@@ -1085,13 +1089,15 @@ class QueryBlockWidget extends WidgetType {
   private readonly query: string
   private readonly vaultId: string
   private readonly apiClient: ISearchEmbedApiClient | null
+  private readonly onOpenNote: (path: string) => void
   private reactRoot: Root | null = null
 
-  constructor(query: string, vaultId: string, apiClient: ISearchEmbedApiClient | null) {
+  constructor(query: string, vaultId: string, apiClient: ISearchEmbedApiClient | null, onOpenNote: (path: string) => void) {
     super()
     this.query = query
     this.vaultId = vaultId
     this.apiClient = apiClient
+    this.onOpenNote = onOpenNote
   }
 
   toDOM(): HTMLElement {
@@ -1102,7 +1108,7 @@ class QueryBlockWidget extends WidgetType {
       createElement(SearchEmbed, {
         vaultId: this.vaultId,
         query: this.query,
-        onOpenNote: () => { /* navigation is handled by the editor host */ },
+        onOpenNote: this.onOpenNote,
         apiClient: this.apiClient,
       })
     )
@@ -2140,7 +2146,7 @@ export function buildWidgetDecorations(
         // `query` processor, if any, wins so existing setups keep working.
         if (language.toLowerCase() === 'query' && !hasCodeBlockProcessor(language) && options.vaultId) {
           const source = fencedCodeSource(doc, node, fenceOpenFrom, fenceCloseFrom)
-          const widget = new QueryBlockWidget(source, options.vaultId, options.apiClient && "searchVault" in options.apiClient ? options.apiClient as ISearchEmbedApiClient : null)
+          const widget = new QueryBlockWidget(source, options.vaultId, options.searchApiClient ?? null, (path) => options.onInternalLinkClick?.(path))
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)
           )

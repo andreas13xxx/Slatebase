@@ -8,7 +8,7 @@ import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, locateFrontmatter, toggleCalloutFoldEffect } from './widget-decorations'
-import type { ISearchEmbedApiClient } from '../../components/SearchEmbed'
+import { hasSearch, type ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { MetadataSuggestApiClient } from '../suggest/metadata-complete'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
@@ -139,6 +139,8 @@ function buildDecorations(
     propertiesInDocument: options.propertiesInDocument,
     apiClient: options.apiClient,
     basesEnabled: options.basesEnabled,
+    searchApiClient: hasSearch(options.apiClient) ? options.apiClient : null,
+    onInternalLinkClick: options.onInternalLinkClick,
   })
 
   // Frontmatter that is not shown as properties (hidden, or raw YAML) is left alone by the other passes:

@@ -29,10 +29,17 @@ export interface SearchEmbedProps {
   apiClient?: ISearchEmbedApiClient | null
 }
 
+/** Narrows a host client that may lack `searchVault` (the editor's client type is a union of capabilities). */
+export function hasSearch<T extends object>(client: T | null | undefined): client is T & ISearchEmbedApiClient {
+  return !!client && typeof (client as Partial<ISearchEmbedApiClient>).searchVault === 'function'
+}
+
 /** Most files and hits per file shown; the embed is a preview, the search panel shows the rest. */
 const MAX_RESULTS = 100
 const MAX_HITS_PER_FILE = 5
 const MAX_LINE_LENGTH = 200
+/** Quiet time after the last vault change before the query re-runs. */
+const REFRESH_DEBOUNCE_MS = 1000
 
 interface SearchResponse {
   results: SearchFileResult[]
@@ -69,9 +76,16 @@ export const SearchEmbed = memo(function SearchEmbed({ vaultId, query, onOpenNot
     return () => { cancelled = true }
   }, [apiClient, vaultId, trimmed, refreshTick])
 
-  useEffect(() => onRealtimeVaultChange((event) => {
-    if (event.vaultId === vaultId) setRefreshTick((n) => n + 1)
-  }), [vaultId])
+  // A burst of vault changes (typing in an open note saves repeatedly) triggers one re-query.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const off = onRealtimeVaultChange((event) => {
+      if (event.vaultId !== vaultId) return
+      clearTimeout(timer)
+      timer = setTimeout(() => setRefreshTick((n) => n + 1), REFRESH_DEBOUNCE_MS)
+    })
+    return () => { off(); clearTimeout(timer) }
+  }, [vaultId])
 
   let body
   if (trimmed === '') body = <p className="search-embed__status">{t('searchEmbed.empty')}</p>
