@@ -27,6 +27,8 @@ import { search, selectNextOccurrence } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { createMetadataCompletions, createApiMetadataSource } from './suggest/metadata-complete'
+import { createLinkCompletions, createLinkSource } from './suggest/link-complete'
+import { getAliasMapSnapshot, getAliasEntriesSnapshot } from '../state/aliasStore'
 import { highlightColorCompletions } from './live-preview/highlight-color-complete'
 import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
@@ -477,10 +479,22 @@ export function CodeMirrorEditor({
     const metadataCompletions = createMetadataCompletions(() => metadataSource, {
       tag: t('editor.suggest.tag'), property: t('editor.suggest.property'), value: t('editor.suggest.value'),
     })
-    extensions.push(autocompletion({ override: [highlightColorCompletions, metadataCompletions, ...pluginCompletionSources] }))
+    // `[[` suggests notes, aliases, headings and blocks.
+    const linkSource = createLinkSource(() => ({
+      vaultId: livePreviewOptions?.vaultId ?? '',
+      directoryTree: livePreviewOptions?.directoryTree ?? null,
+      sourcePath: filePath ?? '',
+      aliasMap: getAliasMapSnapshot(),
+      aliasEntries: getAliasEntriesSnapshot(),
+      apiClient: livePreviewOptions?.apiClient,
+    }))
+    const linkCompletions = createLinkCompletions(() => (livePreviewOptions?.vaultId ? linkSource : null), {
+      alias: t('editor.suggest.alias'), heading: t('editor.suggest.heading'), block: t('editor.suggest.block'),
+    })
+    extensions.push(autocompletion({ override: [highlightColorCompletions, linkCompletions, metadataCompletions, ...pluginCompletionSources] }))
 
     return extensions
-  }, [readOnly, showLineNumbers, spellcheck, editorPrefs, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu, t])
+  }, [readOnly, showLineNumbers, spellcheck, editorPrefs, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu, t, filePath])
 
   /**
    * Save the current editor state to the store.

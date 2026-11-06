@@ -116,7 +116,7 @@ export const de = {
   },
 
   editor: {
-    suggest: { tag: 'Tag', property: 'Eigenschaft', value: 'Wert' },
+    suggest: { tag: 'Tag', property: 'Eigenschaft', value: 'Wert', alias: 'Alias', heading: 'Überschrift', block: 'Block' },
     textareaAriaLabel: 'Dateiinhalt bearbeiten',
     readOnlyBanner: 'Nur Lesen — dieser Vault wurde schreibgeschützt mit dir geteilt.',
     statusUnsaved: '● Ungespeicherte Änderungen',
