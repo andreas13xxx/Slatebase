@@ -1,8 +1,8 @@
 /**
  * BasesListView — renders a base's rows as a flat list, one entry per note.
  *
- * The `list` view type (Obsidian) is the simplest built-in view: no grouping,
- * no columns grid — each note is one clickable row showing its file name as the
+ * The `list` view type (Obsidian) is the simplest built-in view: optional
+ * collapsible groups (`groupBy`/`groupOrder`), no columns grid — each note is one clickable row showing its file name as the
  * title and the view's configured properties as a compact labelled line beneath.
  * Formula columns are evaluated read-only (the table view owns formula sorting);
  * property editing stays in the table view and the note, exactly as the Kanban
@@ -15,6 +15,7 @@
 
 import { memo, useCallback, useMemo } from 'react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
+import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
 import { computeSummaries, formatFormulaValue, evaluateFormula, rowContext } from '@slatebase/shared-contracts'
 
 export interface BasesListViewProps {
@@ -75,25 +76,11 @@ export const BasesListView = memo(function BasesListView({
     [summaries],
   )
 
-  if (rows.length === 0) {
-    return <p className="bases-list__empty">Keine Einträge</p>
-  }
+  const groups = useMemo(() => groupRows(rows, view), [rows, view])
+  const [collapsed, toggleGroup] = useCollapsedGroups()
+  const groupPropertyLabel = columnLabel(view.groupBy?.property ?? '')
 
-  return (
-    <div className="bases-list-view">
-      {summaryEntries.length > 0 && (
-        <div className="bases-list__summary-bar" role="status">
-          {summaryEntries.map((s) => (
-            <span key={s.col} className="bases-list__summary">
-              <span className="bases-list__summary-col">{columnLabel(s.col)}</span>
-              <span className="bases-list__summary-label">{s.summary}</span>
-              <span className="bases-list__summary-value">{formatFormulaValue(s.value)}</span>
-            </span>
-          ))}
-        </div>
-      )}
-      <ul className="bases-list" role="list" aria-label="Listen-Ansicht">
-        {rows.map((row) => (
+  const renderItem = (row: BaseRow) => (
           <li key={row.path} className="bases-list__item">
             <button
               type="button"
@@ -117,8 +104,48 @@ export const BasesListView = memo(function BasesListView({
               )}
             </button>
           </li>
-        ))}
-      </ul>
+  )
+
+  if (rows.length === 0) {
+    return <p className="bases-list__empty">Keine Einträge</p>
+  }
+
+  return (
+    <div className="bases-list-view">
+      {summaryEntries.length > 0 && (
+        <div className="bases-list__summary-bar" role="status">
+          {summaryEntries.map((s) => (
+            <span key={s.col} className="bases-list__summary">
+              <span className="bases-list__summary-col">{columnLabel(s.col)}</span>
+              <span className="bases-list__summary-label">{s.summary}</span>
+              <span className="bases-list__summary-value">{formatFormulaValue(s.value)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {groups ? (
+        <div className="bases-list-groups" role="list" aria-label="Listen-Ansicht">
+          {groups.map((g) => (
+            <section key={g.key} className="bases-list__group" role="listitem">
+              <button
+                type="button"
+                className="bases-list__group-btn"
+                aria-expanded={!collapsed[g.key]}
+                onClick={() => toggleGroup(g.key)}
+              >
+                <span aria-hidden="true">{collapsed[g.key] ? '▶' : '▼'} </span>
+                {groupLabel(g.key, groupPropertyLabel)}
+                <span className="bases-list__group-count"> ({g.rows.length})</span>
+              </button>
+              {!collapsed[g.key] && <ul className="bases-list">{g.rows.map(renderItem)}</ul>}
+            </section>
+          ))}
+        </div>
+      ) : (
+        <ul className="bases-list" role="list" aria-label="Listen-Ansicht">
+          {rows.map(renderItem)}
+        </ul>
+      )}
     </div>
   )
 })

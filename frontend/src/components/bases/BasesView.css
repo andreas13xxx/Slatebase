@@ -888,3 +888,30 @@
   display: flex;
   gap: var(--spacing-md);
 }
+
+/* Collapsible groups in the table and list views */
+.bases-table__group-cell,
+.bases-list__group-btn {
+  background: var(--bg-surface);
+}
+
+.bases-table__group-btn,
+.bases-list__group-btn {
+  appearance: none;
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bases-table__group-count,
+.bases-list__group-count {
+  color: var(--text-subtle);
+  font-weight: 400;
+}
