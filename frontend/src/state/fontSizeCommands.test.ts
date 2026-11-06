@@ -53,4 +53,11 @@ describe('fontSizeCommands', () => {
     await decreaseFontSize()
     expect(low.patchAppearanceConfig).not.toHaveBeenCalled()
   })
+
+  it('rejects instead of writing when the store has no active vault', async () => {
+    // _reset() in beforeEach left the store uninitialized: no client, no vault.
+    // The default size (16) is below the bound, so a write is attempted and refused.
+    await expect(increaseFontSize()).rejects.toThrow('Kein Vault aktiv')
+    await expect(decreaseFontSize()).rejects.toThrow('Kein Vault aktiv')
+  })
 })
