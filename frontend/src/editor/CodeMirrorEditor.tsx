@@ -53,6 +53,7 @@ import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
 import { codeFolding } from '@codemirror/language'
 import { markdownFoldService } from './folding'
 import { isEmbeddableFile } from '../utils/internalLink'
+import { openExternalUrl } from '../utils/externalUrl'
 import { showToast } from '../components/ToastNotification'
 import { useTranslation } from '../i18n'
 import './live-preview/live-preview.css'
@@ -233,7 +234,7 @@ export function CodeMirrorEditor({
       setContextMenu({
         x, y,
         items: [
-          { id: 'open', label: 'Link öffnen', icon: <ExternalLink size={14} />, run: () => window.open(link.url, '_blank', 'noopener,noreferrer') },
+          { id: 'open', label: 'Link öffnen', icon: <ExternalLink size={14} />, run: () => { openExternalUrl(link.url) } },
           { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(link.url).catch(() => {}) } },
           ...buildPluginMenuItems('url-menu', [link.url], 'editor-link-url-menu'),
         ],
