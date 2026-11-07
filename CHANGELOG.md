@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.78.0](https://github.com/andreas13xxx/Slatebase/compare/v0.77.0...v0.78.0) (2026-11-07)
+
+
+### Features
+
+* **editor,bases:** Modus-Rotation, Titel im Editor, Bases-Toolbar einzeilig, Tabellen-Fixes ([#341](https://github.com/andreas13xxx/Slatebase/issues/341)) ([e5b2c0f](https://github.com/andreas13xxx/Slatebase/commit/e5b2c0f5e8d63485e6a912fbaf601951e04cfa3a))
+
+
+### Bugfixes
+
+* **plugins:** harden isSafeUrl and rendered-HTML sanitizing ([#339](https://github.com/andreas13xxx/Slatebase/issues/339)) ([b66708f](https://github.com/andreas13xxx/Slatebase/commit/b66708f42544e47ecdb4ed9ae806298c14b2c472))
+* **plugins:** sanitize MarkdownRenderer shim output ([#337](https://github.com/andreas13xxx/Slatebase/issues/337)) ([560bedb](https://github.com/andreas13xxx/Slatebase/commit/560bedb5ab9a5ed6e58ede8714691737c9b7fa4f))
+* **plugins:** sanitize plugin icon SVGs ([#340](https://github.com/andreas13xxx/Slatebase/issues/340)) ([1afce02](https://github.com/andreas13xxx/Slatebase/commit/1afce029f845c53fb802e45c5ca541cf3139d7ad))
+
 ## [0.77.0](https://github.com/andreas13xxx/Slatebase/compare/v0.76.0...v0.77.0) (2026-11-07)
 
 
