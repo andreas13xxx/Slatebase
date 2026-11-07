@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.77.1](https://github.com/andreas13xxx/Slatebase/compare/v0.77.0...v0.77.1) (2026-11-07)
+
+
+### Bugfixes
+
+* **plugins:** sanitize MarkdownRenderer shim output ([#337](https://github.com/andreas13xxx/Slatebase/issues/337)) ([560bedb](https://github.com/andreas13xxx/Slatebase/commit/560bedb5ab9a5ed6e58ede8714691737c9b7fa4f))
+
 ## [0.77.0](https://github.com/andreas13xxx/Slatebase/compare/v0.76.0...v0.77.0) (2026-11-07)
 
 
