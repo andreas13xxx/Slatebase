@@ -26,7 +26,8 @@ import { registerBasesView as registerBasesViewInRegistry, type BasesViewRegistr
 import { BASES_VALUE_CLASSES } from './bases-values'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
-import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
+import { clearSizedIconCache, getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
+import { sanitizeSvg } from './sanitize-rendered-html'
 import moment from 'moment/min/moment-with-locales'
 
 // Real CM6 modules — used to provide functional extensions to plugins
@@ -720,12 +721,14 @@ export function installObsidianGlobals(): void {
 
   if (!window.obsidian.addIcon) {
     window.obsidian.addIcon = (iconId: string, svgContent: string): void => {
-      customIconsRef.set(iconId, svgContent)
+      customIconsRef.set(iconId, sanitizeSvg(svgContent))
+      clearSizedIconCache()
     }
   }
   if (!window.obsidian.removeIcon) {
     window.obsidian.removeIcon = (iconId: string): void => {
       customIconsRef.delete(iconId)
+      clearSizedIconCache()
     }
   }
   if (!window.obsidian.getIcon) {
@@ -733,7 +736,8 @@ export function installObsidianGlobals(): void {
       const svg = customIconsRef.get(iconId)
       if (svg) {
         const container = document.createElement('div')
-        container.innerHTML = svg
+        // Re-sanitized on read: plugins can write __obsidianCustomIcons directly.
+        container.innerHTML = sanitizeSvg(svg)
         const svgEl = container.querySelector('svg')
         // A registered custom icon whose content isn't a full <svg>...</svg>
         // string (e.g. bare path data) has no element to return here. Obsidian
