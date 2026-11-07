@@ -2491,7 +2491,12 @@ export function installObsidianGlobals(): void {
           // Show the error inside the modal so developers can see what API is missing
           const errMsg = err instanceof Error ? err.message : String(err)
           console.error('[Modal.open] onOpen() threw:', err)
-          this.contentEl.innerHTML = `<div style="color:var(--text-error,#e53935);padding:12px;font-size:13px;"><strong>Modal-Fehler:</strong> ${errMsg}</div>`
+          const errBox = document.createElement('div')
+          errBox.style.cssText = 'color:var(--text-error,#e53935);padding:12px;font-size:13px;'
+          const errLabel = document.createElement('strong')
+          errLabel.textContent = 'Modal-Fehler:'
+          errBox.append(errLabel, ` ${errMsg}`)
+          this.contentEl.replaceChildren(errBox)
         }
         // Focus the first focusable element so Escape/Tab work without a click first.
         const focusable = this.modalEl.querySelector('input, button, [tabindex]') as HTMLElement | null
