@@ -19,6 +19,7 @@
  */
 import { useEffect, useReducer } from 'react'
 import { subscribeToIconResolution } from '../plugins/compat/lucide-icons'
+import { sanitizeSvg } from '../plugins/compat/sanitize-rendered-html'
 
 /**
  * Forces the calling component to re-render whenever any icon finishes
@@ -57,6 +58,12 @@ export function getCustomIconSvg(iconId: string): string | undefined {
  * silently breaks rendering instead of just looking slightly off.
  */
 export function sizeCustomIconSvg(svgContent: string, sizePx: number): string {
+  // Single choke point for every innerHTML/dangerouslySetInnerHTML sink: the
+  // plugin's markup is untrusted, so the final string is sanitized.
+  return sanitizeSvg(sizeUnsanitized(svgContent, sizePx))
+}
+
+function sizeUnsanitized(svgContent: string, sizePx: number): string {
   if (svgContent.trim().startsWith('<svg')) {
     return svgContent.replace(/<svg([^>]*)>/, (_match, attrs: string) => {
       const cleaned = attrs.replace(/\s*width="[^"]*"/g, '').replace(/\s*height="[^"]*"/g, '')

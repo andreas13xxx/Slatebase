@@ -27,6 +27,7 @@ import { BASES_VALUE_CLASSES } from './bases-values'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
 import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
+import { sanitizeSvg } from './sanitize-rendered-html'
 import moment from 'moment/min/moment-with-locales'
 
 // Real CM6 modules — used to provide functional extensions to plugins
@@ -720,7 +721,7 @@ export function installObsidianGlobals(): void {
 
   if (!window.obsidian.addIcon) {
     window.obsidian.addIcon = (iconId: string, svgContent: string): void => {
-      customIconsRef.set(iconId, svgContent)
+      customIconsRef.set(iconId, sanitizeSvg(svgContent))
     }
   }
   if (!window.obsidian.removeIcon) {
