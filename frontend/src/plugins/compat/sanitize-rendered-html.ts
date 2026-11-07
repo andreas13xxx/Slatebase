@@ -3,7 +3,7 @@
  * vault content, which any user with write access controls.
  *
  * DOMPurify's default allow-list keeps what the shims emit (`class`,
- * `data-href`, `href`, tables, `style="text-align"`) and drops scripts, event
+ * `data-href`, `href`, tables, `align`) and drops scripts, event
  * handlers and `javascript:` URLs.
  *
  * @module sanitize-rendered-html
@@ -14,7 +14,12 @@ import { isSafeUrl } from './bases-values'
 
 /** Sanitize an HTML string before it is assigned to `innerHTML`. */
 export function sanitizeRenderedHtml(html: string): string {
-  return DOMPurify.sanitize(html)
+  return DOMPurify.sanitize(html, {
+    // No inline CSS (UI redress / exfiltration via url()) and no forms; table
+    // alignment is emitted as the `align` attribute by the shim instead.
+    FORBID_TAGS: ['style', 'form'],
+    FORBID_ATTR: ['style'],
+  })
 }
 
 /** `url` if it passes the scheme allowlist (http/https/mailto/relative), else `fallback`. */
