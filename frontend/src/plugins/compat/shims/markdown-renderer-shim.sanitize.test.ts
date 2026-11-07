@@ -75,6 +75,7 @@ describe('MarkdownRenderer shims — sanitizing', () => {
     expect(link?.getAttribute('data-href')).toBe('Note')
     expect(link?.textContent).toBe('Shown')
     expect(el.querySelectorAll('td')).toHaveLength(2)
-    expect(el.querySelector('th')?.getAttribute('style')).toContain('text-align')
+    expect(el.querySelector('th')?.getAttribute('align')).toBe('left')
+    expect(el.querySelectorAll('th')[1]?.getAttribute('align')).toBe('right')
   })
 })

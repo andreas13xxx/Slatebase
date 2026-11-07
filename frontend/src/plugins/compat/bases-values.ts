@@ -253,6 +253,9 @@ export function isSafeUrl(url: string): boolean {
   // eslint-disable-next-line no-control-regex
   const cleaned = url.replace(/[\u0000-\u001f\u007f-\u009f\s]/g, '').toLowerCase()
   if (cleaned === '') return false
+  // Protocol-relative (`//host`, `/\host` — browsers treat `\` as `/`) and
+  // entity-encoded (`&#106;avascript:`) forms are not plain relative URLs.
+  if (/^[/\\]{2}/.test(cleaned) || cleaned.startsWith('&')) return false
   if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('mailto:')) return true
   // Relative URLs (no scheme) are allowed; anything with a scheme is not.
   return !/^[a-z][a-z0-9+.-]*:/.test(cleaned)

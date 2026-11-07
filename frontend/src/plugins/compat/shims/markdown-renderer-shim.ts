@@ -161,7 +161,7 @@ function serializeBlock(node: RootContent): string {
         html += '<thead><tr>'
         headerRow.children.forEach((cell, i) => {
           const align = alignments[i]
-          const alignAttr = align ? ` style="text-align: ${align}"` : ''
+          const alignAttr = align ? ` align="${align}"` : ''
           html += `<th${alignAttr}>${serializeInline(cell.children)}</th>`
         })
         html += '</tr></thead>'
@@ -173,7 +173,7 @@ function serializeBlock(node: RootContent): string {
             html += '<tr>'
             row.children.forEach((cell, i) => {
               const align = alignments[i]
-              const alignAttr = align ? ` style="text-align: ${align}"` : ''
+              const alignAttr = align ? ` align="${align}"` : ''
               html += `<td${alignAttr}>${serializeInline(cell.children)}</td>`
             })
             html += '</tr>'
