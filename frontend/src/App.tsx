@@ -1343,7 +1343,7 @@ function AppContent() {
                         mode: activeTab.mode,
                         onModeChange: (mode) => tabDispatch({ type: 'SET_MODE', payload: { tabId: activeTab.id, mode } }),
                         // A base toggles between its rendered view and its YAML source.
-                        ...(activeTab.fileName.endsWith('.base') ? { modes: BASE_BREADCRUMB_MODES } : {}),
+                        ...(activeTab.fileName.endsWith('.base') && isEnabled('bases') ? { modes: BASE_BREADCRUMB_MODES } : {}),
                       }
                     : {})}
                 />
@@ -1384,6 +1384,7 @@ function AppContent() {
                           <PaneHeader
                             pane={pane}
                             vaults={state.vaults}
+                            basesEnabled={isEnabled('bases')}
                             onSegmentClick={handleBreadcrumbSegmentClick}
                             onModeChange={(tabId, mode) => paneTreeDispatch({ type: 'PANE_TAB_ACTION', payload: { paneId: pane.id, action: { type: 'SET_MODE', payload: { tabId, mode } } } })}
                           />

@@ -63,6 +63,13 @@ export interface BasesViewProps {
 export const BasesView = memo(function BasesView({
   apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, mode = 'view', onShowView,
 }: BasesViewProps) {
+  // Leaving source mode goes through a ref: the host passes a fresh callback every render, and the
+  // `bases:*` controller effect below must not re-register on each of them.
+  const showViewRef = useRef(onShowView)
+  useEffect(() => { showViewRef.current = onShowView }, [onShowView])
+  const modeRef = useRef(mode)
+  useEffect(() => { modeRef.current = mode }, [mode])
+  const showView = useCallback(() => { if (modeRef.current === 'source') showViewRef.current?.() }, [])
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
@@ -234,7 +241,7 @@ export const BasesView = memo(function BasesView({
       nextView: () => {
         if (views.length < 2) return false
         setSelectedViewIndex((safeIndex + 1) % views.length)
-        onShowView?.()
+        showView()
         return true
       },
       addView: () => {
@@ -242,7 +249,7 @@ export const BasesView = memo(function BasesView({
         const name = `Tabelle ${doc.views.length + 1}`
         onSaveSource(serializeBase({ ...doc, views: [...doc.views, { type: 'table', name }] }))
         setSelectedViewIndex(doc.views.length)
-        onShowView?.()
+        showView()
         return true
       },
       copyTable: async () => {
@@ -277,7 +284,7 @@ export const BasesView = memo(function BasesView({
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote, onShowView])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote, showView])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -303,7 +310,7 @@ export const BasesView = memo(function BasesView({
         activeIndex={safeIndex}
         readOnly={readOnly}
         mode={mode}
-        onSelectView={(i) => { setSelectedViewIndex(i); onShowView?.() }}
+        onSelectView={(i) => { setSelectedViewIndex(i); showView() }}
         onChange={handleDocChange}
       />
 
