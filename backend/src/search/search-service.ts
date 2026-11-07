@@ -12,7 +12,8 @@ import type {
   FailedVault,
 } from './types.js'
 import { validateRegexPattern } from './regex-safety.js'
-import { parseSearchQuery } from './query-parser.js'
+import { parseSearchQuery, isTextOperator } from './query-parser.js'
+import { matchTextOperators } from './scoped-match.js'
 import type { ParsedOperator } from './query-parser.js'
 import { globMatch } from './glob-match.js'
 import type { ILinkIndex } from '../link-index/types.js'
@@ -66,6 +67,10 @@ export class SearchService implements ISearchService {
       validateRegexPattern(options.query)
     }
 
+    // File-level operators narrow the candidate list; text operators are checked on the content.
+    const fileOperators = parsed.operators.filter((op) => !isTextOperator(op.type))
+    const textOperators = parsed.operators.filter((op) => isTextOperator(op.type))
+
     const results: SearchFileResult[] = []
     const skippedFiles: SkippedFile[] = []
     let totalHits = 0
@@ -83,8 +88,8 @@ export class SearchService implements ISearchService {
 
     // Apply operator pre-filtering if operators are present
     let filesToSearch: string[]
-    if (parsed.operators.length > 0) {
-      const filtered = await this.resolveOperatorFilters(vaultId, parsed.operators, allFiles)
+    if (fileOperators.length > 0) {
+      const filtered = await this.resolveOperatorFilters(vaultId, fileOperators, allFiles)
       filesToSearch = filtered.length > MAX_FILES ? filtered.slice(0, MAX_FILES) : filtered
       if (filtered.length > MAX_FILES) {
         truncated = true
@@ -101,7 +106,7 @@ export class SearchService implements ISearchService {
     }
 
     // File-listing mode: operators present but no free-text query
-    if (parsed.operators.length > 0 && parsed.freeText.trim() === '') {
+    if (parsed.operators.length > 0 && parsed.freeText.trim() === '' && textOperators.length === 0) {
       return this.buildFileListingResponse(filesToSearch, startTime)
     }
 
@@ -109,7 +114,9 @@ export class SearchService implements ISearchService {
     const matcherOptions = parsed.operators.length > 0
       ? { ...options, query: parsed.freeText }
       : options
-    const matcher = this.buildMatcher(matcherOptions)
+    const matcher = parsed.freeText.trim() === '' && textOperators.length > 0
+      ? null
+      : this.buildMatcher(matcherOptions)
 
     // Iterate over files
     for (const filePath of filesToSearch) {
@@ -161,6 +168,7 @@ export class SearchService implements ISearchService {
         options,
         startTime,
         filePath,
+        textOperators,
       )
 
       if (fileHits === null) {
@@ -599,16 +607,25 @@ export class SearchService implements ISearchService {
    */
   private searchInFile(
     content: string,
-    matcher: (line: string) => Array<{ start: number; end: number; text: string }> | null,
+    matcher: ((line: string) => Array<{ start: number; end: number; text: string }> | null) | null,
     options: ISearchOptions,
     globalStartTime: number,
     filePath: string,
+    textOperators: ParsedOperator[] = [],
   ): SearchHit[] | null {
     const lines = content.split('\n')
-    const rawHits: Array<{ lineIndex: number; matchText: string; matchLine: string }> = []
+    let rawHits: Array<{ lineIndex: number; matchText: string; matchLine: string }> = []
     const fileStartTime = Date.now()
 
-    for (let i = 0; i < lines.length; i++) {
+    // Text operators (line:, section:, ...) must all be satisfied, else the file has no hits.
+    let scopedHits: typeof rawHits = []
+    if (textOperators.length > 0) {
+      const scoped = matchTextOperators(content, textOperators, options.caseSensitive)
+      if (scoped === null) return []
+      scopedHits = scoped
+    }
+
+    for (let i = 0; matcher !== null && i < lines.length; i++) {
       const line = lines[i]!
 
       // Check per-file regex timeout (only for regex mode)
@@ -635,6 +652,14 @@ export class SearchService implements ISearchService {
           matchLine: line,
         })
       }
+    }
+
+    // Free text AND text operators: the file needs both; hits are merged by line.
+    if (matcher !== null && scopedHits.length > 0 && rawHits.length === 0) return []
+    if (scopedHits.length > 0) {
+      const seen = new Set(rawHits.map((h) => h.lineIndex))
+      rawHits = [...rawHits, ...scopedHits.filter((h) => !seen.has(h.lineIndex))]
+        .sort((a, b) => a.lineIndex - b.lineIndex)
     }
 
     if (rawHits.length === 0) return []

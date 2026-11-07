@@ -26,6 +26,8 @@ const markdownLanguageWithProps: typeof markdownLanguage = Object.create(markdow
 import { search, selectNextOccurrence } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
+import { createMetadataCompletions, createApiMetadataSource } from './suggest/metadata-complete'
+import { createLinkCompletions, createEditorLinkSource } from './suggest/link-complete'
 import { highlightColorCompletions } from './live-preview/highlight-color-complete'
 import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
@@ -148,6 +150,19 @@ export function CodeMirrorEditor({
   const onContentChangeRef = useRef(onContentChange)
   // The context menu's label for the properties entry, in the current language
   const { t } = useTranslation()
+
+  // The `[[` suggestion source lives as long as the component, so its caches survive extension
+  // rebuilds. The effect below keeps its tree, path and client current.
+  const [editorLinkSource] = useState(createEditorLinkSource)
+  useEffect(() => {
+    editorLinkSource.setDeps({
+      vaultId: livePreviewOptions?.vaultId ?? '',
+      directoryTree: livePreviewOptions?.directoryTree ?? null,
+      sourcePath: filePath ?? '',
+      apiClient: livePreviewOptions?.apiClient,
+    })
+  }, [editorLinkSource, livePreviewOptions, filePath])
+
   const propertiesLabelRef = useRef(t('propertiesInDocument.menuItem'))
   useEffect(() => {
     propertiesLabelRef.current = t('propertiesInDocument.menuItem')
@@ -470,10 +485,21 @@ export function CodeMirrorEditor({
 
     // Autocompletion: the built-in `==` highlight-color source is always
     // available; plugin-registered completion sources are added when present.
-    extensions.push(autocompletion({ override: [highlightColorCompletions, ...pluginCompletionSources] }))
+    // `#tag` and frontmatter property names/values come from the vault's metadata index.
+    const metadataSource = livePreviewOptions?.vaultId
+      ? createApiMetadataSource(livePreviewOptions.apiClient, livePreviewOptions.vaultId, () => livePreviewOptions.typeRegistry)
+      : null
+    const metadataCompletions = createMetadataCompletions(() => metadataSource, {
+      tag: t('editor.suggest.tag'), property: t('editor.suggest.property'), value: t('editor.suggest.value'),
+    })
+    // `[[` suggests notes, aliases, headings and blocks.
+    const linkCompletions = createLinkCompletions(() => (editorLinkSource.hasVault() ? editorLinkSource.source : null), {
+      alias: t('editor.suggest.alias'), heading: t('editor.suggest.heading'), block: t('editor.suggest.block'),
+    })
+    extensions.push(autocompletion({ override: [highlightColorCompletions, linkCompletions, metadataCompletions, ...pluginCompletionSources] }))
 
     return extensions
-  }, [readOnly, showLineNumbers, spellcheck, editorPrefs, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
+  }, [readOnly, showLineNumbers, spellcheck, editorPrefs, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu, t, editorLinkSource])
 
   /**
    * Save the current editor state to the store.

@@ -20,6 +20,16 @@ const OPERATORS: { syntax: string; example: string; descriptionKey: TranslationK
   { syntax: '-path:<glob>', example: '-path:Archiv/**', descriptionKey: 'search.operatorHelp.operators.excludePath' },
   { syntax: '-tag:<tag>', example: '-tag:erledigt', descriptionKey: 'search.operatorHelp.operators.excludeTag' },
   { syntax: '-property:<key>', example: '-property:draft', descriptionKey: 'search.operatorHelp.operators.excludeProperty' },
+  { syntax: '[<key>:<wert>]', example: '[status:aktiv]', descriptionKey: 'search.operatorHelp.operators.bracketProperty' },
+  { syntax: 'line:(<a> <b>)', example: 'line:(mehl eier)', descriptionKey: 'search.operatorHelp.operators.line' },
+  { syntax: 'section:(<a> <b>)', example: 'section:(mehl eier)', descriptionKey: 'search.operatorHelp.operators.section' },
+  { syntax: 'block:(<a> <b>)', example: 'block:(mehl eier)', descriptionKey: 'search.operatorHelp.operators.block' },
+  { syntax: 'content:(<a> <b>)', example: 'content:(mehl eier)', descriptionKey: 'search.operatorHelp.operators.content' },
+  { syntax: 'task:<text>', example: 'task:einkaufen', descriptionKey: 'search.operatorHelp.operators.task' },
+  { syntax: 'task-todo:<text>', example: 'task-todo:einkaufen', descriptionKey: 'search.operatorHelp.operators.taskTodo' },
+  { syntax: 'task-done:<text>', example: 'task-done:einkaufen', descriptionKey: 'search.operatorHelp.operators.taskDone' },
+  { syntax: 'match-case:<text>', example: 'match-case:API', descriptionKey: 'search.operatorHelp.operators.matchCase' },
+  { syntax: 'ignore-case:<text>', example: 'ignore-case:api', descriptionKey: 'search.operatorHelp.operators.ignoreCase' },
 ]
 
 export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
@@ -57,6 +67,7 @@ export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
         <p className="search-operator-help__note">
           {t('search.operatorHelp.note')} <code>path:&quot;Mein Ordner/**&quot;</code>
         </p>
+        <p className="search-operator-help__note">{t('search.operatorHelp.textNote')}</p>
       </div>
     </div>
   )

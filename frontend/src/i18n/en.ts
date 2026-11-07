@@ -113,7 +113,16 @@ export const en: TranslationShape = {
     newFileNameEmpty: 'File name must not be empty.',
   },
 
+  searchEmbed: {
+    label: 'Search',
+    empty: 'Empty search query',
+    noResults: 'No results',
+    error: 'Search failed',
+    count: '{files} files',
+  },
+
   editor: {
+    suggest: { tag: 'Tag', property: 'Property', value: 'Value', alias: 'Alias', heading: 'Heading', block: 'Block' },
     textareaAriaLabel: 'Edit file content',
     readOnlyBanner: 'Read only — this vault was shared with you as read-only.',
     statusUnsaved: '● Unsaved changes',
@@ -795,6 +804,7 @@ export const en: TranslationShape = {
       columnExample: 'Example',
       columnDescription: 'Description',
       note: 'Quote values that contain spaces:',
+      textNote: 'A single term with spaces or ")" goes in quotes, e.g. line:"a )". Inside a parenthesized group a term cannot contain ")". A search made only of excluded text operators (e.g. -content:x) returns no results.',
       operators: {
         path: 'Include files in path',
         file: 'Files with matching name',
@@ -804,6 +814,16 @@ export const en: TranslationShape = {
         excludePath: 'Exclude path',
         excludeTag: 'Exclude tag',
         excludeProperty: 'Exclude property',
+        bracketProperty: 'Property with value (short form)',
+        line: 'All terms on the same line',
+        section: 'All terms in the same section',
+        block: 'All terms in the same block',
+        content: 'All terms anywhere in the file',
+        task: 'Terms in a task',
+        taskTodo: 'Terms in an open task',
+        taskDone: 'Terms in a completed task',
+        matchCase: 'Match case',
+        ignoreCase: 'Ignore case',
       },
     },
   },

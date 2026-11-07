@@ -65,6 +65,8 @@ Slatebase comes with 40+ built-in commands covering:
 - **Vault management** — Create, delete, import/export vaults
 - **View controls** — Toggle panels, switch modes
 - **Tools** — Open graph, search, settings, trash
+- **Font size** — "Increase font size" and "Decrease font size" change the base font size by 1 px (10 to 30 px) in the vault's appearance settings
+- **Help** — "Open help" opens the "Start here" note of this welcome vault
 
 ---
 

@@ -107,7 +107,16 @@ export const de = {
     newFileNameEmpty: 'Dateiname darf nicht leer sein.',
   },
 
+  searchEmbed: {
+    label: 'Suche',
+    empty: 'Leere Suchanfrage',
+    noResults: 'Keine Treffer',
+    error: 'Suche fehlgeschlagen',
+    count: '{files} Dateien',
+  },
+
   editor: {
+    suggest: { tag: 'Tag', property: 'Eigenschaft', value: 'Wert', alias: 'Alias', heading: 'Überschrift', block: 'Block' },
     textareaAriaLabel: 'Dateiinhalt bearbeiten',
     readOnlyBanner: 'Nur Lesen — dieser Vault wurde schreibgeschützt mit dir geteilt.',
     statusUnsaved: '● Ungespeicherte Änderungen',
@@ -789,6 +798,7 @@ export const de = {
       columnExample: 'Beispiel',
       columnDescription: 'Beschreibung',
       note: 'Werte mit Leerzeichen in Anführungszeichen setzen:',
+      textNote: 'Ein einzelner Begriff mit Leerzeichen oder ")" steht in Anführungszeichen, z. B. line:"a )". In einer Klammergruppe ist ")" im Begriff nicht möglich. Eine Suche nur aus ausgeschlossenen Textoperatoren (z. B. -content:x) liefert keine Treffer.',
       operators: {
         path: 'Dateien im Pfad einschließen',
         file: 'Dateien mit passendem Namen',
@@ -798,6 +808,16 @@ export const de = {
         excludePath: 'Pfad ausschließen',
         excludeTag: 'Tag ausschließen',
         excludeProperty: 'Eigenschaft ausschließen',
+        bracketProperty: 'Eigenschaft mit Wert (Kurzform)',
+        line: 'Alle Begriffe in derselben Zeile',
+        section: 'Alle Begriffe im selben Abschnitt',
+        block: 'Alle Begriffe im selben Block',
+        content: 'Alle Begriffe irgendwo in der Datei',
+        task: 'Begriffe in einer Aufgabe',
+        taskTodo: 'Begriffe in einer offenen Aufgabe',
+        taskDone: 'Begriffe in einer erledigten Aufgabe',
+        matchCase: 'Groß-/Kleinschreibung beachten',
+        ignoreCase: 'Groß-/Kleinschreibung ignorieren',
       },
     },
   },

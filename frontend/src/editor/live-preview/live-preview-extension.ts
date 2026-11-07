@@ -8,11 +8,18 @@ import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 import { buildInlineDecorations, type HideableRange } from './inline-decorations'
 import { buildLinkDecorations } from './link-decorations'
 import { buildWidgetDecorations, locateFrontmatter, toggleCalloutFoldEffect } from './widget-decorations'
+import type { ISearchEmbedApiClient } from '../../components/SearchEmbed'
+import type { MetadataSuggestApiClient } from '../suggest/metadata-complete'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../../state/aliasStore'
 import { editorInfoField } from '../editor-state-fields'
 import { openExternalUrl } from '../../utils/externalUrl'
+
+/** Narrows the host client, which may lack `searchVault`, for ```` ```query ```` blocks. */
+function hasSearch<T extends object>(client: T | null | undefined): client is T & ISearchEmbedApiClient {
+  return !!client && typeof (client as Partial<ISearchEmbedApiClient>).searchVault === 'function'
+}
 
 /**
  * Options for creating the Live Preview extension.
@@ -35,7 +42,7 @@ export interface LivePreviewOptions {
   /** How the frontmatter shows (app.json `propertiesInDocument`); default `visible`. */
   propertiesInDocument?: 'visible' | 'hidden' | 'source'
   /** API client, for an embedded Bases view (`![[file.base]]`) to query the vault. */
-  apiClient?: IBasesEmbedApiClient | null
+  apiClient?: (IBasesEmbedApiClient & MetadataSuggestApiClient & Partial<ISearchEmbedApiClient>) | null
   /** Whether the `bases` feature is on; gates rendering of inline ```` ```base ```` blocks. */
   basesEnabled?: boolean
   /**
@@ -138,6 +145,8 @@ function buildDecorations(
     propertiesInDocument: options.propertiesInDocument,
     apiClient: options.apiClient,
     basesEnabled: options.basesEnabled,
+    searchApiClient: hasSearch(options.apiClient) ? options.apiClient : null,
+    onInternalLinkClick: options.onInternalLinkClick,
   })
 
   // Frontmatter that is not shown as properties (hidden, or raw YAML) is left alone by the other passes:

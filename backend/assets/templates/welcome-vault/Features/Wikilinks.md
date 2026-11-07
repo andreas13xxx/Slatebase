@@ -106,6 +106,21 @@ Dann verlinkst du mit:
 
 ---
 
+## Link-Vorschläge beim Tippen
+
+Tippe `[[` im Editor, und eine Liste mit Vorschlägen erscheint. Mit den Pfeiltasten bewegen, mit Enter oder Tab übernehmen, mit Esc schließen.
+
+| Du tippst | Vorschläge |
+|-----------|------------|
+| `[[ide` | Notizen und Aliase, deren Name „ide" enthält |
+| `[[Ideen#` | Überschriften der Notiz „Ideen" (`[[#` für diese Notiz) |
+| `[[Ideen#^` | Blöcke von „Ideen", die schon eine `^id` haben (`[[^` für diese Notiz) |
+| `[[##plan` | Überschriften aus dem ganzen Vault, die „plan" enthalten |
+
+Mit der Übernahme wird der Link mit `]]` geschlossen. Zwei Notizen mit gleichem Namen erscheinen mit ihrem Ordner.
+
+---
+
 ## Auto-Resolve
 
 Slatebase löst Wikilinks intelligent auf:

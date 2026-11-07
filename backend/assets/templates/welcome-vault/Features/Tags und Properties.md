@@ -148,6 +148,12 @@ Bei Dateien mit Schreibzugriff wird statt der einfachen Tabelle ein **interaktiv
 
 Ein Feld, das du noch offen hast, geht dabei nicht verloren: Wird der Editor neu aufgebaut, weil du parallel eine andere Eigenschaft änderst, den Tab wechselst oder Live Preview verlässt, wird der bereits getippte Wert übernommen — auch ohne dass du vorher Enter gedrückt oder ins Leere geklickt hast. Das gilt auch für eine begonnene Umbenennung eines Schlüssels.
 
+### Vorschläge beim Tippen
+
+- `#` mit einem Buchstaben im Text schlägt die Tags deines Vaults vor.
+- Im Frontmatter schlägt der Zeilenanfang vorhandene Property-Namen vor; die Übernahme schreibt `name: `.
+- Nach `tags:` (oder in einer `- `-Listenzeile darunter) werden die Tags des Vaults vorgeschlagen; bei einer Checkbox-Property `true` und `false`.
+
 ### Command-Palette-Kürzel
 
 - **"Alias hinzufügen"** — fügt eine `aliases`-Liste ins Frontmatter ein (legt den Frontmatter-Block bei Bedarf neu an)

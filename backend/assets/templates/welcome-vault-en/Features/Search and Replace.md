@@ -74,6 +74,30 @@ Beyond plain text, you can use structured **operators** to narrow your search. O
 | `-path:<pattern>` | `-path:Archive/**` | Exclude path |
 | `-tag:<tag>` | `-tag:done` | Exclude tag |
 | `-property:<key>` | `-property:draft` | Exclude property |
+| `[<key>:<value>]` | `[status:active]` | Short form of `property:<key>=<value>` |
+| `line:(<a> <b>)` | `line:(flour eggs)` | All terms on the same line |
+| `section:(<a> <b>)` | `section:(flour eggs)` | All terms below the same heading |
+| `block:(<a> <b>)` | `block:(flour eggs)` | All terms in the same paragraph |
+| `content:(<a> <b>)` | `content:(flour eggs)` | All terms anywhere in the file |
+| `task:<text>` | `task:shopping` | Text in a task (`- [ ]` or `- [x]`) |
+| `task-todo:<text>` | `task-todo:shopping` | Text in an open task |
+| `task-done:<text>` | `task-done:shopping` | Text in a completed task |
+| `match-case:<text>` | `match-case:API` | Match this term case-sensitively |
+| `ignore-case:<text>` | `ignore-case:api` | Match this term case-insensitively |
+
+A leading `-` excludes files for the text operators too, for example `-content:draft`. Put several terms in parentheses; quote a term with spaces: `line:("whole wheat" flour)`.
+
+### Embedding Search Results in a Note
+
+A code block with the language `query` shows the results of a search live inside the note. Its content is a normal search query, operators included:
+
+````
+```query
+task-todo:shopping path:Household/**
+```
+````
+
+The results update when the vault changes. Click a file name to open the note.
 
 ### Combining Operators
 

@@ -43,6 +43,15 @@ bound, unbound and reset, and are written to the vault's `hotkeys.json` under th
 - **Editor commands** bound through the file run only while an editor is open (`editorCallback`).
 - Commands bound through the file replace the editor's own key only if the editor does not handle that key first.
 
+## Commands that differ from what you may expect
+
+- `app:increase-font-size` / `app:decrease-font-size` (Obsidian's "Increase/Decrease font size" commands; the IDs are
+  unverified guesses, see below) change `baseFontSize` in the vault's
+  `.obsidian/appearance.json` by 1 px within 10 to 30 px; at the default of 16 the key is removed, like the
+  settings form does. In a read-only vault they show an error instead. The two IDs are an assumption: Obsidian's
+  changelog names the commands, not their IDs, and they were not checked against a running Obsidian.
+- `app:open-help` opens the "Start here" note of the vault's welcome vault (it is created for the user if missing).
+
 ## Not supported
 
 These Obsidian commands are registered, so plugins can call them and the palette finds them, but running one only
@@ -54,7 +63,6 @@ explains why it does nothing:
 | `workspace:new-window`, `workspace:close-window`, `workspace:move-to-new-window`, `workspace:open-in-new-window`, `window:toggle-always-on-top` | runs in a browser tab, no windows of its own |
 | `workspace:toggle-stacked-tabs` | tabs are side by side, not stacked |
 | `workspace:copy-url` | no `obsidian://` URL scheme |
-| `app:open-help` | no in-app help |
 | `app:toggle-default-new-pane-mode` | no new-tab defaults |
 | `graph:animate` | no time-lapse of the graph |
 | `open-with-default-app:open`, `open-with-default-app:show` | no desktop shell |

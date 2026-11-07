@@ -110,6 +110,8 @@ Korrekturvorschläge selbst stehen nicht in der Palette, sondern im Rechtsklick-
 
 - **Debug-Informationen anzeigen** — Version, Browser und aktiver Vault zum Kopieren, z.B. für einen Bug-Report
 - **Versionshinweise anzeigen** — die letzten Releases samt Änderungsprotokoll
+- **Hilfe öffnen** — öffnet die Notiz „Start hier" dieses Welcome-Vaults
+- **Schriftgröße erhöhen / verringern** — ändert die Basis-Schriftgröße um 1 px (10 bis 30 px) in den Darstellungseinstellungen des Vaults
 
 ---
 

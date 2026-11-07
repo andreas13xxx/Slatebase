@@ -5,15 +5,17 @@
  * column linking to the note. Property cells are editable (BaseCell); formula
  * columns are evaluated client-side and read-only. Clicking a header toggles
  * the sort and reports it upward (the container writes it back into the
- * `.base` file).
+ * `.base` file). With `view.groupBy` the rows are split into collapsible groups
+ * (ordered/hidden by `view.groupOrder`).
  */
 
-import { memo, useCallback, useMemo } from 'react'
+import { Fragment, memo, useCallback, useMemo } from 'react'
 import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
 import { evaluateFormula, formatFormulaValue, computeSummaries, rowContext } from '@slatebase/shared-contracts'
 import type { ComputedSummaries } from '@slatebase/shared-contracts'
 import { BaseCell } from './BaseCell'
 import { inferCellType } from './base-cell-type'
+import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
 
 export interface BasesTableViewProps {
   doc: BaseDocument
@@ -55,7 +57,68 @@ export const BasesTableView = memo(function BasesTableView({
     () => computeSummaries(rows, view, doc),
     [rows, view, doc],
   )
+  const groups = useMemo(() => groupRows(rows, view), [rows, view])
+  const [collapsed, toggleGroup] = useCollapsedGroups()
+  const groupPropertyLabel = headerLabel(view.groupBy?.property ?? '')
   const hasSummaries = Object.keys(summaries).length > 0
+
+  const renderRow = (row: BaseRow) => (
+      <tr key={row.path} className="bases-table__row">
+        {columns.map((col, colIndex) => {
+          // First column links to the note.
+          if (colIndex === 0) {
+            const firstVal = row.values[col]
+            const linkText = col === 'file.name'
+              ? row.fileName
+              : (Array.isArray(firstVal) ? (firstVal[0] as string | undefined) : undefined) ?? row.fileName
+            return (
+              <td key={col} className="bases-table__cell bases-table__cell--link">
+                <button type="button" className="bases-table__link" onClick={() => onOpenNote(row.path)}>
+                  {linkText}
+                </button>
+              </td>
+            )
+          }
+
+          if (formulaKeys.has(col)) {
+            const src = doc.formulas?.[col] ?? ''
+            const result = evaluateFormula(src, rowContext(row, doc))
+            return (
+              <td key={col} className="bases-table__cell bases-table__cell--formula">
+                {result.ok
+                  ? formatFormulaValue(result.value)
+                  : <span className="bases-table__formula-error" title={result.error}>#ERR</span>}
+              </td>
+            )
+          }
+
+          if (col.startsWith('file.')) {
+            const raw = row.values[col]
+            const text = col === 'file.name'
+              ? row.fileName
+              : String((Array.isArray(raw) ? raw[0] : raw) ?? '')
+            return <td key={col} className="bases-table__cell"><span className="base-cell base-cell--readonly">{text}</span></td>
+          }
+
+          const raw = row.values[col]
+          const strValues = Array.isArray(raw)
+            ? raw.map((v) => String(v))
+            : raw === undefined || raw === null
+              ? []
+              : [String(raw)]
+          return (
+            <td key={col} className="bases-table__cell">
+              <BaseCell
+                values={strValues}
+                type={inferCellType(strValues)}
+                readOnly={false}
+                onCommit={(newValues) => onCommitCell(row.path, col, newValues)}
+              />
+            </td>
+          )
+        })}
+      </tr>
+  )
 
   return (
     <div className="bases-table-view">
@@ -85,63 +148,27 @@ export const BasesTableView = memo(function BasesTableView({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.path} className="bases-table__row">
-              {columns.map((col, colIndex) => {
-                // First column links to the note.
-                if (colIndex === 0) {
-                  const firstVal = row.values[col]
-                  const linkText = col === 'file.name'
-                    ? row.fileName
-                    : (Array.isArray(firstVal) ? (firstVal[0] as string | undefined) : undefined) ?? row.fileName
-                  return (
-                    <td key={col} className="bases-table__cell bases-table__cell--link">
-                      <button type="button" className="bases-table__link" onClick={() => onOpenNote(row.path)}>
-                        {linkText}
-                      </button>
-                    </td>
-                  )
-                }
-
-                if (formulaKeys.has(col)) {
-                  const src = doc.formulas?.[col] ?? ''
-                  const result = evaluateFormula(src, rowContext(row, doc))
-                  return (
-                    <td key={col} className="bases-table__cell bases-table__cell--formula">
-                      {result.ok
-                        ? formatFormulaValue(result.value)
-                        : <span className="bases-table__formula-error" title={result.error}>#ERR</span>}
-                    </td>
-                  )
-                }
-
-                if (col.startsWith('file.')) {
-                  const raw = row.values[col]
-                  const text = col === 'file.name'
-                    ? row.fileName
-                    : String((Array.isArray(raw) ? raw[0] : raw) ?? '')
-                  return <td key={col} className="bases-table__cell"><span className="base-cell base-cell--readonly">{text}</span></td>
-                }
-
-                const raw = row.values[col]
-                const strValues = Array.isArray(raw)
-                  ? raw.map((v) => String(v))
-                  : raw === undefined || raw === null
-                    ? []
-                    : [String(raw)]
-                return (
-                  <td key={col} className="bases-table__cell">
-                    <BaseCell
-                      values={strValues}
-                      type={inferCellType(strValues)}
-                      readOnly={false}
-                      onCommit={(newValues) => onCommitCell(row.path, col, newValues)}
-                    />
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
+          {groups
+            ? groups.map((g) => (
+              <Fragment key={g.key}>
+                <tr className="bases-table__group-row">
+                  <th scope="rowgroup" colSpan={Math.max(columns.length, 1)} className="bases-table__group-cell">
+                    <button
+                      type="button"
+                      className="bases-table__group-btn"
+                      aria-expanded={!collapsed[g.key]}
+                      onClick={() => toggleGroup(g.key)}
+                    >
+                      <span aria-hidden="true">{collapsed[g.key] ? '▶' : '▼'} </span>
+                      {groupLabel(g.key, groupPropertyLabel)}
+                      <span className="bases-table__group-count"> ({g.rows.length})</span>
+                    </button>
+                  </th>
+                </tr>
+                {!collapsed[g.key] && g.rows.map(renderRow)}
+              </Fragment>
+            ))
+            : rows.map(renderRow)}
         </tbody>
         {hasSummaries && (
           <tfoot>

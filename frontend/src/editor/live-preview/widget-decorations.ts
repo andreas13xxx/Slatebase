@@ -11,6 +11,7 @@ import { DEFAULT_KEYBINDINGS, matchesShortcut } from '../../state/keybindingsSto
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
 import { BasesEmbed, type IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
+import { SearchEmbed, type ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { DirectoryTree } from '../../types'
 import { errorOnce } from '../../plugins/compat/log'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedComponent, type EmbedContext } from '../../plugins/compat/embed-registry'
@@ -73,6 +74,10 @@ export interface WidgetDecorationOptions {
   apiClient?: IBasesEmbedApiClient | null
   /** Whether the `bases` feature is on; an inline ```` ```base ```` block only renders as a table then, else it stays code. */
   basesEnabled?: boolean
+  /** Client for ```` ```query ```` blocks (live search results); null when the host provides no search. */
+  searchApiClient?: ISearchEmbedApiClient | null
+  /** Opens a note by vault path (a result link in a ```` ```query ```` block). */
+  onInternalLinkClick?: (target: string) => void
 }
 
 /**
@@ -1067,6 +1072,55 @@ class InlineBaseWidget extends WidgetType {
 
   get estimatedHeight(): number {
     return 100
+  }
+
+  destroy(): void {
+    if (this.reactRoot) {
+      unmountRootDeferred(this.reactRoot)
+      this.reactRoot = null
+    }
+  }
+}
+
+/**
+ * Widget for a query code block: live search results, mounted as a nested React root.
+ */
+class QueryBlockWidget extends WidgetType {
+  private readonly query: string
+  private readonly vaultId: string
+  private readonly apiClient: ISearchEmbedApiClient | null
+  private readonly onOpenNote: (path: string) => void
+  private reactRoot: Root | null = null
+
+  constructor(query: string, vaultId: string, apiClient: ISearchEmbedApiClient | null, onOpenNote: (path: string) => void) {
+    super()
+    this.query = query
+    this.vaultId = vaultId
+    this.apiClient = apiClient
+    this.onOpenNote = onOpenNote
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-embed-query'
+    this.reactRoot = createRoot(container)
+    this.reactRoot.render(
+      createElement(SearchEmbed, {
+        vaultId: this.vaultId,
+        query: this.query,
+        onOpenNote: this.onOpenNote,
+        apiClient: this.apiClient,
+      })
+    )
+    return container
+  }
+
+  eq(other: QueryBlockWidget): boolean {
+    return this.query === other.query && this.vaultId === other.vaultId
+  }
+
+  get estimatedHeight(): number {
+    return 80
   }
 
   destroy(): void {
@@ -2081,6 +2135,18 @@ export function buildWidgetDecorations(
           const source = fencedCodeSource(doc, node, fenceOpenFrom, fenceCloseFrom)
 
           const widget = new InlineBaseWidget(source, options.vaultId, options.apiClient ?? null, options.sourcePath || null)
+          decorations.push(
+            Decoration.replace({ widget }).range(node.from, node.to)
+          )
+          hideableRanges.push({ from: node.from, to: node.to, groupFrom: node.from, groupTo: node.to })
+          return
+        }
+
+        // query block: live search results (an Obsidian core feature). A plugin-registered
+        // `query` processor, if any, wins so existing setups keep working.
+        if (language.toLowerCase() === 'query' && !hasCodeBlockProcessor(language) && options.vaultId) {
+          const source = fencedCodeSource(doc, node, fenceOpenFrom, fenceCloseFrom)
+          const widget = new QueryBlockWidget(source, options.vaultId, options.searchApiClient ?? null, (path) => options.onInternalLinkClick?.(path))
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)
           )

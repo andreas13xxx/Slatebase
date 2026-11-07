@@ -8,7 +8,8 @@ import { usePaneTree } from '../state/paneTreeContext'
 import { generatePaneId, serializePaneTree, rehydratePaneTree } from '../state/paneTreeState'
 import { splitActivePane, focusPaneInDirection } from './panes/pane-commands'
 import type { FocusDirection } from './panes/pane-focus-direction'
-import { useAppContext, loadVaults } from '../state/index'
+import { useAppContext, loadVaults, selectVault } from '../state/index'
+import { findHelpVault, helpVaultLanguage, HELP_START_NOTES } from '../state/helpVault'
 import { useAuthContext } from '../state/authContext'
 import { useNavigationHistory } from '../state/navigationHistoryContext'
 import { openTab } from '../state/tabActions'
@@ -456,6 +457,7 @@ export function CommandPaletteContainer({
     onDailyNote,
     onDailyNoteOffset,
     onCreateWelcomeVault: () => { void handleCreateWelcomeVault() },
+    onOpenHelp: () => { void handleOpenHelp() },
     onOpenTemplateSelector: openTemplateSelector,
     onInsertTemplate: openTemplateInserter,
     onOpenRandomNote: openRandomNote,
@@ -618,6 +620,27 @@ export function CommandPaletteContainer({
     } catch (err: unknown) {
       showToast('error', extractErrorMessage(err, t('profile.welcomeVaultError')))
     }
+  }
+
+  /** `app:open-help`: open the welcome vault's start note, creating the vault when there is none. */
+  async function handleOpenHelp(): Promise<void> {
+    if (!apiClient) return
+    let target = findHelpVault(state.vaults, locale === 'de' ? 'de' : 'en')
+    if (!target) {
+      try {
+        const result = await apiClient.createWelcomeVault()
+        showToast('success', t('profile.welcomeVaultCreated', { name: result.vaultName }))
+        await loadVaults(appDispatch, apiClient)
+        target = { vault: { id: result.vaultId, name: result.vaultName }, language: helpVaultLanguage(result.vaultName) ?? (locale === 'de' ? 'de' : 'en') }
+      } catch (err: unknown) {
+        showToast('error', extractErrorMessage(err, t('profile.welcomeVaultError')))
+        return
+      }
+    }
+    const vaultId = target.vault.id
+    const startNote = HELP_START_NOTES[target.language]
+    if (vaultId !== state.selectedVaultId) await selectVault(appDispatch, apiClient, vaultId)
+    await openTab(tabDispatch, appDispatch, apiClient, vaultId, startNote, startNote)
   }
 
   const handleExecute = useCallback((commandId: string) => {

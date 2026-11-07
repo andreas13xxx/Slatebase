@@ -161,6 +161,8 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'window:zoom-in': { de: 'Vergrößern', en: 'Zoom in' },
   'window:zoom-out': { de: 'Verkleinern', en: 'Zoom out' },
   'window:reset-zoom': { de: 'Zoom zurücksetzen', en: 'Reset zoom' },
+  'app:increase-font-size': { de: 'Schrift vergrößern', en: 'Increase font size' },
+  'app:decrease-font-size': { de: 'Schrift verkleinern', en: 'Decrease font size' },
   'window:toggle-always-on-top': { de: 'Fenster immer im Vordergrund umschalten', en: 'Toggle window always on top' },
 
   // ── Graph / Canvas / Daily Notes / Templates ──
@@ -250,7 +252,6 @@ export type UnsupportedReason =
   | 'url-scheme'
   | 'attachments'
   | 'desktop-shell'
-  | 'in-app-help'
   | 'new-tab-defaults'
   | 'graph-animation'
 
@@ -278,10 +279,6 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
   'desktop-shell': {
     de: 'die Datei liegt auf dem Server, nicht auf diesem Rechner',
     en: 'the file lives on the server, not on this machine',
-  },
-  'in-app-help': {
-    de: 'die Anleitung steht im Welcome-Vault statt in einer eigenen Hilfe-Ansicht',
-    en: 'the guide lives in the welcome vault instead of a help view of its own',
   },
   'new-tab-defaults': {
     de: 'neue Tabs öffnen immer im zuletzt genutzten Modus',

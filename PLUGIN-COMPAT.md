@@ -125,7 +125,6 @@ Diese Command-IDs sind registriert (damit `executeCommandById()` sie findet), f�
 | `workspace:new-tab` | `blank-tab` | Ein leerer Tab ohne Datei ist nicht vorgesehen: Tabs entstehen beim Öffnen einer Datei. |
 | `open-with-default-app:open`, `open-with-default-app:show` | `desktop-shell` | Desktop-only-Konzepte („in nativer App öffnen", „im System-Explorer anzeigen") — Dateien liegen serverseitig, es gibt kein lokales Dateisystem. |
 | `download-attachments` | `attachments` | Es gibt keinen automatischen Download externer Bild-Links in den Vault — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen" hinein. |
-| `app:open-help` | `in-app-help` | Die Anleitung steht im Welcome-Vault statt in einer eigenen Hilfe-Ansicht. |
 | `app:toggle-default-new-pane-mode` | `new-tab-defaults` | Neue Tabs öffnen immer im zuletzt genutzten Modus; es gibt keine Split-Pane-Voreinstellung zum Umschalten. |
 
 **Geplant, aber noch nicht umgesetzt** (im Unterschied zur Liste oben *nicht* dauerhaft ausgeschlossen, sondern bewusst auf später verschoben):
