@@ -64,7 +64,12 @@ export function sizeCustomIconSvg(svgContent: string, sizePx: number): string {
   // Single choke point for every innerHTML/dangerouslySetInnerHTML sink: the
   // plugin's markup is untrusted. Sanitize first, size afterwards, so the
   // style attribute we add is the only one (sanitizing strips all others).
-  const root = sanitizeSvgElement(svgContent, BARE_ICON_WRAPPER)
+  let root: Element | null
+  try {
+    root = sanitizeSvgElement(svgContent, BARE_ICON_WRAPPER)
+  } catch {
+    root = null // pathological input: '' gets cached so the failure is not re-thrown every render
+  }
   let out = ''
   if (root) {
     root.setAttribute('width', String(sizePx))

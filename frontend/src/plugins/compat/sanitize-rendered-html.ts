@@ -27,6 +27,15 @@ export function safeUrlOr(url: string, fallback: string): string {
   return isSafeUrl(url) ? url : fallback
 }
 
+/** Presentation attributes in which CSS `url(...)` (and CSS escapes) are meaningful. */
+const URL_PAINT_ATTRS = new Set(['fill', 'stroke', 'filter', 'mask', 'clip-path', 'marker-start', 'marker-mid', 'marker-end', 'cursor'])
+
+/** `url(#id)` (optionally quoted) with an optional plain fallback colour/keyword. */
+const LOCAL_URL_RE = /^url\(\s*(['"]?)#[\w.:-]+\1\s*\)(?:\s+[#\w.%-]+)?$/
+
+/** Icons are small; larger input is refused rather than parsed. shortcut: 64 KB cap, raise if real icons need it. */
+export const MAX_ICON_SVG_LENGTH = 64 * 1024
+
 const isSvgRoot = (s: string): boolean => /^<svg[\s>/]/i.test(s)
 
 /** Strip leading whitespace, XML prolog, DOCTYPE and comments (linear scan, no backtracking regex). */
@@ -65,6 +74,7 @@ const SVG_WRAPPER_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">'
  * colours; upgrade by scoping and filtering CSS properly if that matters.
  */
 export function sanitizeSvgElement(markup: string, wrapperOpen = SVG_WRAPPER_OPEN): Element | null {
+  if (markup.length > MAX_ICON_SVG_LENGTH) return null
   // Drop XML prolog, DOCTYPE and comments in front of the root.
   const body = stripSvgProlog(markup)
   const isFull = isSvgRoot(body)
@@ -80,17 +90,29 @@ export function sanitizeSvgElement(markup: string, wrapperOpen = SVG_WRAPPER_OPE
       const v = el.getAttribute(attr)
       if (v !== null && !v.trim().startsWith('#')) el.removeAttribute(attr)
     }
-    // Presentation attributes (fill, filter, mask, ...) may reference only `url(#id)`.
     for (const attr of Array.from(el.attributes)) {
-      if (/url\s*\(\s*(?!['"]?\s*#)/i.test(attr.value)) el.removeAttribute(attr.name)
+      const v = attr.value
+      if (URL_PAINT_ATTRS.has(attr.name.toLowerCase())) {
+        // Allowlist: CSS escapes (`u\72l(`) and comments defeat any denylist.
+        if (v.includes('\\') || v.includes('/*') || (/url\s*\(/i.test(v) && !LOCAL_URL_RE.test(v.trim()))) {
+          el.removeAttribute(attr.name)
+        }
+      } else if (/url\s*\(\s*(?!['"]?\s*#)/i.test(v)) {
+        el.removeAttribute(attr.name)
+      }
     }
   }
   return clean.querySelector('svg')
 }
 
-/** String form of {@link sanitizeSvgElement}; bare inner markup stays bare. */
+/** String form of {@link sanitizeSvgElement}; bare inner markup stays bare. Never throws. */
 export function sanitizeSvg(markup: string): string {
-  const root = sanitizeSvgElement(markup)
-  if (!root) return ''
-  return isSvgRoot(stripSvgProlog(markup)) ? root.outerHTML : root.innerHTML
+  try {
+    const root = sanitizeSvgElement(markup)
+    if (!root) return ''
+    return isSvgRoot(stripSvgProlog(markup)) ? root.outerHTML : root.innerHTML
+  } catch {
+    // e.g. stack overflow on pathological nesting: no icon rather than a throw into plugin code
+    return ''
+  }
 }
