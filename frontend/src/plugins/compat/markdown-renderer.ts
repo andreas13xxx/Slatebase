@@ -23,6 +23,8 @@
  * @module markdown-renderer
  */
 
+import { sanitizeRenderedHtml, safeUrlOr } from './sanitize-rendered-html'
+
 /**
  * MarkdownRenderer — Static class matching Obsidian's API.
  *
@@ -63,7 +65,7 @@ export class MarkdownRenderer {
     _sourcePath: string,
     _component?: unknown,
   ): Promise<void> {
-    const html = markdownToHtml(markdown)
+    const html = sanitizeRenderedHtml(markdownToHtml(markdown))
     el.innerHTML = html
     el.classList.add('markdown-rendered')
   }
@@ -193,10 +195,10 @@ function renderInline(text: string): string {
   result = result.replace(/`([^`]+)`/g, '<code>$1</code>')
 
   // Images ![alt](url)
-  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
+  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt: string, url: string) => `<img alt="${alt}" src="${safeUrlOr(url, '')}">`)
 
   // Links [text](url)
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text: string, url: string) => `<a href="${safeUrlOr(url, '#')}">${text}</a>`)
 
   // Wikilinks [[target|display]] and [[target]]
   result = result.replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '<a class="internal-link" data-href="$1">$2</a>')

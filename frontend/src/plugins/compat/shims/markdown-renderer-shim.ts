@@ -27,6 +27,7 @@ import type { Root, RootContent, PhrasingContent, AlignType } from 'mdast'
 import { remarkWikilink } from '../../wikilink/plugin'
 import type { WikilinkNode } from '../../types'
 import { getActiveWorkspaceShim } from '../active-workspace-shim'
+import { sanitizeRenderedHtml, safeUrlOr } from '../sanitize-rendered-html'
 import { requestHoverPreview, dismissHoverPreview } from '../hover-link-bus'
 
 // ─── MDAST → HTML Serializer ───────────────────────────────────────────────────
@@ -91,9 +92,9 @@ function serializeInlineNode(node: PhrasingContent): string {
     case 'inlineCode':
       return `<code>${escapeHtml(node.value)}</code>`
     case 'link':
-      return `<a href="${escapeHtml(node.url)}"${node.title ? ` title="${escapeHtml(node.title)}"` : ''}>${serializeInline(node.children)}</a>`
+      return `<a href="${escapeHtml(safeUrlOr(node.url, '#'))}"${node.title ? ` title="${escapeHtml(node.title)}"` : ''}>${serializeInline(node.children)}</a>`
     case 'image':
-      return `<img src="${escapeHtml(node.url)}" alt="${escapeHtml(node.alt ?? '')}"${node.title ? ` title="${escapeHtml(node.title)}"` : ''} />`
+      return `<img src="${escapeHtml(safeUrlOr(node.url, ''))}" alt="${escapeHtml(node.alt ?? '')}"${node.title ? ` title="${escapeHtml(node.title)}"` : ''} />`
     case 'break':
       return '<br />'
     case 'html':
@@ -325,7 +326,7 @@ export class MarkdownRendererShim {
     sourcePath: string,
     _component: unknown,
   ): Promise<void> {
-    const html = markdownToHtml(markdown)
+    const html = sanitizeRenderedHtml(markdownToHtml(markdown))
     el.innerHTML = html
     if (html.includes('class="internal-link"')) {
       attachInternalLinkBehaviour(el, sourcePath ?? '')

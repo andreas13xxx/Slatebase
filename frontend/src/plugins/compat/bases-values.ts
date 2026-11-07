@@ -246,7 +246,7 @@ export class RegExpValue extends NotNullValue {}
  * incl. `javascript:`, is rejected). Whitespace/control chars are stripped
  * before the scheme check to defeat `java\tscript:` bypasses.
  */
-function isSafeUrl(url: string): boolean {
+export function isSafeUrl(url: string): boolean {
   // Strip control chars + whitespace before the scheme check — a `java\tscript:`
   // style bypass is exactly what this defends against, so matching control
   // characters here is intentional (see quality.md "Untrusted Content Rendering").
