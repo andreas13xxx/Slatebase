@@ -4,6 +4,7 @@ import type { VaultInfo } from '../../types'
 import { EditorHeaderRow } from '../EditorHeaderRow'
 import { Breadcrumb } from '../Breadcrumb'
 import { isBreadcrumbPath } from './breadcrumbPath'
+import { BASE_BREADCRUMB_MODES } from '../breadcrumbModes'
 
 export interface PaneHeaderProps {
   pane: PaneNode
@@ -23,7 +24,7 @@ export function PaneHeader({ pane, vaults, onSegmentClick, onModeChange }: PaneH
   const vault = tab ? vaults.find((v) => v.id === tab.vaultId) : undefined
   const showModeSwitcher = tab !== undefined && !tab.isBinary
     && !tab.filePath.startsWith('__')
-    && !tab.fileName.endsWith('.canvas') && !tab.fileName.endsWith('.base')
+    && !tab.fileName.endsWith('.canvas')
   return (
     <EditorHeaderRow paneId={pane.id}>
       {tab && vault && isBreadcrumbPath(tab.filePath) && (
@@ -32,7 +33,11 @@ export function PaneHeader({ pane, vaults, onSegmentClick, onModeChange }: PaneH
           filePath={tab.filePath}
           onSegmentClick={(folderPath) => onSegmentClick(folderPath, vault.id)}
           {...(showModeSwitcher
-            ? { mode: tab.mode, onModeChange: (mode: TabMode) => onModeChange(tab.id, mode) }
+            ? {
+                mode: tab.mode,
+                onModeChange: (mode: TabMode) => onModeChange(tab.id, mode),
+                ...(tab.fileName.endsWith('.base') ? { modes: BASE_BREADCRUMB_MODES } : {}),
+              }
             : {})}
         />
       )}

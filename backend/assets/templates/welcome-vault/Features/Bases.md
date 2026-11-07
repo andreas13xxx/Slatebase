@@ -156,7 +156,7 @@ Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Date
 - **Filtern:** Bedingungen aus Eigenschaft, Operator und Wert (ist, enthält, beginnt mit, ist leer, größer/kleiner, hat Tag, liegt in Ordner …), beliebig zu **und / oder / nicht**-Gruppen verschachtelt. Der Reiter **Diese Ansicht** wirkt nur auf die aktuelle Ansicht, **Alle Ansichten** auf die ganze Base. Was sich nicht als Baukasten-Bedingung darstellen lässt, bleibt als Ausdruck editierbar (`</>`).
 - **Eigenschaften:** festlegen, welche Spalten angezeigt werden und in welcher Reihenfolge — auch Datei-Felder (`file.ctime` …) und Formeln; eigene Eigenschaften trägst du per Namen ein.
 
-Die Schalter **Ansicht / Quelltext** rechts wechseln zum rohen YAML, das jetzt den ganzen verfügbaren Platz nutzt.
+Das Symbol rechts in der Pfadzeile (Breadcrumb) wechselt zwischen Ansicht und Quelltext (rohes YAML, das den ganzen verfügbaren Platz nutzt).
 
 ---
 

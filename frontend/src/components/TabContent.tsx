@@ -475,6 +475,8 @@ export function TabContent() {
               source={activeTab.content ?? ''}
               hostPath={activeTab.filePath}
               readOnly={isReadOnly ?? false}
+              mode={activeTab.mode === 'source' ? 'source' : 'view'}
+              onShowView={() => tabDispatch({ type: 'SET_MODE', payload: { tabId: activeTab.id, mode: 'reading' } })}
               onOpenNote={(path) => {
                 const fileName = path.split('/').pop() ?? path
                 void openTab(tabDispatch, appDispatch, apiClient!, activeTab.vaultId, path, fileName)

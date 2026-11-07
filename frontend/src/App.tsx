@@ -111,6 +111,7 @@ import { CommandPaletteContainer } from './components/CommandPaletteContainer'
 import { TabBar, type SettingsTabDescriptor } from './components/TabBar'
 import { EditorHeaderRow } from './components/EditorHeaderRow'
 import { Breadcrumb } from './components/Breadcrumb'
+import { BASE_BREADCRUMB_MODES } from './components/breadcrumbModes'
 import { PaneHeader } from './components/panes/PaneHeader'
 import { isBreadcrumbPath } from './components/panes/breadcrumbPath'
 import { useResize } from './hooks/useResize'
@@ -1338,10 +1339,11 @@ function AppContent() {
                   {...(activeTab && !activeTab.isBinary
                     && !activeTab.filePath.startsWith('__')
                     && !activeTab.fileName.endsWith('.canvas')
-                    && !activeTab.fileName.endsWith('.base')
                     ? {
                         mode: activeTab.mode,
                         onModeChange: (mode) => tabDispatch({ type: 'SET_MODE', payload: { tabId: activeTab.id, mode } }),
+                        // A base toggles between its rendered view and its YAML source.
+                        ...(activeTab.fileName.endsWith('.base') ? { modes: BASE_BREADCRUMB_MODES } : {}),
                       }
                     : {})}
                 />

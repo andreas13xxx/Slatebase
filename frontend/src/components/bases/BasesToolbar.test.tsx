@@ -19,7 +19,6 @@ function setup(over: Partial<{ doc: BaseDocument; readOnly: boolean; index: numb
   current = over.doc ?? makeDoc()
   const onChange = vi.fn()
   const onSelectView = vi.fn()
-  const onModeChange = vi.fn()
   render(
     <BasesToolbar
       doc={over.doc ?? makeDoc()}
@@ -27,12 +26,11 @@ function setup(over: Partial<{ doc: BaseDocument; readOnly: boolean; index: numb
       activeIndex={over.index ?? 0}
       readOnly={over.readOnly ?? false}
       mode="view"
-      onModeChange={onModeChange}
       onSelectView={onSelectView}
       onChange={onChange}
     />,
   )
-  return { onChange, onSelectView, onModeChange }
+  return { onChange, onSelectView }
 }
 
 const open = (name: RegExp | string) => fireEvent.click(screen.getByRole('button', { name }))
@@ -87,10 +85,9 @@ describe('BasesToolbar — views', () => {
     expect((screen.getByRole('button', { name: 'Löschen' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('switches mode', () => {
-    const { onModeChange } = setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Quelltext' }))
-    expect(onModeChange).toHaveBeenCalledWith('source')
+  it('has no view/source buttons any more (the breadcrumb switches the mode)', () => {
+    setup()
+    expect(screen.queryByRole('button', { name: 'Quelltext' })).toBeNull()
   })
 })
 

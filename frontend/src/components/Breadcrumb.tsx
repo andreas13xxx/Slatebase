@@ -3,6 +3,7 @@ import { ChevronRight, MoreHorizontal, Code2, Eye, BookOpen } from 'lucide-react
 import { useTranslation } from '../i18n'
 import type { TranslationKey } from '../i18n'
 import type { TabMode } from '../state/tabState'
+import { useAppConfigValue } from '../state/vaultAppConfigStore'
 
 export interface BreadcrumbProps {
   vaultName: string
@@ -18,6 +19,8 @@ export interface BreadcrumbProps {
   mode?: TabMode
   /** Switches the active tab's mode. See `mode`. */
   onModeChange?: (mode: TabMode) => void
+  /** Restricts the rotation to these modes, in order (a `.base` only has `reading` and `source`). */
+  modes?: ReadonlyArray<TabMode>
 }
 
 interface Segment {
@@ -35,7 +38,8 @@ const MAX_VISIBLE_MIDDLE_SEGMENTS = 2
  *
  * Validates: Requirements 7.1–7.7 of navigation-link-polish
  */
-export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeChange }: BreadcrumbProps) {
+export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeChange, modes }: BreadcrumbProps) {
+  const showInlineTitle = useAppConfigValue('showInlineTitle')
   const [collapsedOpen, setCollapsedOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -124,17 +128,22 @@ export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeCh
         </div>
       ))}
 
-      <ChevronRight size={12} className="breadcrumb-separator" aria-hidden="true" />
-      <span className="breadcrumb-filename" title={fileName}>{fileName}</span>
+      {/* A note's name is shown as the title at the top of the editor instead (inline title). */}
+      {!(showInlineTitle && /\.md$/i.test(fileName)) && (
+        <>
+          <ChevronRight size={12} className="breadcrumb-separator" aria-hidden="true" />
+          <span className="breadcrumb-filename" title={fileName}>{fileName}</span>
+        </>
+      )}
 
       {mode !== undefined && onModeChange && (
-        <BreadcrumbModeSwitcher mode={mode} onModeChange={onModeChange} />
+        <BreadcrumbModeSwitcher mode={mode} onModeChange={onModeChange} {...(modes ? { modes } : {})} />
       )}
     </div>
   )
 }
 
-/** The three editor modes, in switcher order, with their icon + i18n key. */
+/** Editor modes in rotation order, with their icon + i18n key. */
 const MODE_ORDER: ReadonlyArray<{ mode: TabMode; icon: typeof Code2; labelKey: TranslationKey }> = [
   { mode: 'source', icon: Code2, labelKey: 'tabs.modeSource' },
   { mode: 'live-preview', icon: Eye, labelKey: 'tabs.modeLivePreview' },
@@ -142,31 +151,26 @@ const MODE_ORDER: ReadonlyArray<{ mode: TabMode; icon: typeof Code2; labelKey: T
 ]
 
 /**
- * Three-segment editor-mode switcher shown at the right end of the breadcrumb:
- * Source · Live Preview · Reading. Replaces the old per-tab mode button.
+ * Single editor-mode button at the right end of the breadcrumb. It shows the current mode's icon
+ * and rotates to the next mode on each click (Source → Live Preview → Reading → Source). With
+ * `modes` the rotation is restricted to those modes, in that order (a base: view ⇄ source).
  */
-function BreadcrumbModeSwitcher({ mode, onModeChange }: { mode: TabMode; onModeChange: (mode: TabMode) => void }) {
+function BreadcrumbModeSwitcher({ mode, onModeChange, modes }: { mode: TabMode; onModeChange: (mode: TabMode) => void; modes?: ReadonlyArray<TabMode> }) {
   const { t } = useTranslation()
+  const order = modes
+    ? modes.flatMap((m) => MODE_ORDER.filter((entry) => entry.mode === m))
+    : MODE_ORDER
+  const currentIndex = Math.max(0, order.findIndex((entry) => entry.mode === mode))
+  const current = order[currentIndex]
+  const next = order[(currentIndex + 1) % order.length]
+  if (!current || !next) return null
+  const Icon = current.icon
+  const label = `${t(current.labelKey)} → ${t(next.labelKey)}`
   return (
-    <div className="breadcrumb-mode-switcher" role="radiogroup" aria-label={t('tabs.modeSwitcherLabel')}>
-      {MODE_ORDER.map(({ mode: m, icon: Icon, labelKey }) => {
-        const active = m === mode
-        const label = t(labelKey)
-        return (
-          <button
-            key={m}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={label}
-            title={label}
-            className={`breadcrumb-mode-btn${active ? ' breadcrumb-mode-btn--active' : ''}`}
-            onClick={() => onModeChange(m)}
-          >
-            <Icon size={14} aria-hidden="true" />
-          </button>
-        )
-      })}
+    <div className="breadcrumb-mode-switcher">
+      <button type="button" aria-label={label} title={label} className="breadcrumb-mode-btn" onClick={() => onModeChange(next.mode)}>
+        <Icon size={14} aria-hidden="true" />
+      </button>
     </div>
   )
 }

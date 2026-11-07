@@ -156,7 +156,7 @@ A toolbar sits above the table — you don't have to write the YAML by hand. Eve
 - **Filter:** conditions of property, operator and value (is, contains, starts with, is empty, greater/less than, has tag, in folder …), nested into **and / or / not** groups as you like. The **This view** tab affects only the current view, **All views** the whole base. Anything that can't be shown as a builder condition stays editable as an expression (`</>`).
 - **Properties:** choose which columns show and in which order — including file fields (`file.ctime` …) and formulas; type the name of a custom property to add it.
 
-The **View / Source** switch on the right toggles to the raw YAML, which now uses all the available space.
+The icon on the right of the path bar (breadcrumb) toggles between the view and the source (raw YAML, which now uses all the available space).
 
 ---
 
