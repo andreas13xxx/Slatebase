@@ -27,6 +27,23 @@ export function safeUrlOr(url: string, fallback: string): string {
   return isSafeUrl(url) ? url : fallback
 }
 
+const isSvgRoot = (s: string): boolean => /^<svg[\s>/]/i.test(s)
+
+/** Strip leading whitespace, XML prolog, DOCTYPE and comments (linear scan, no backtracking regex). */
+function stripSvgProlog(markup: string): string {
+  let s = markup.trimStart()
+  for (;;) {
+    let close: string
+    if (s.startsWith('<?')) close = '?>'
+    else if (s.startsWith('<!--')) close = '-->'
+    else if (/^<!doctype/i.test(s)) close = '>'
+    else return s
+    const at = s.indexOf(close)
+    if (at < 0) return s
+    s = s.slice(at + close.length).trimStart()
+  }
+}
+
 /** Own DOMPurify instance for plugin icon SVGs, so its config never leaks into {@link sanitizeRenderedHtml}. */
 const svgPurify = DOMPurify(window)
 
@@ -49,8 +66,8 @@ const SVG_WRAPPER_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">'
  */
 export function sanitizeSvgElement(markup: string, wrapperOpen = SVG_WRAPPER_OPEN): Element | null {
   // Drop XML prolog, DOCTYPE and comments in front of the root.
-  const body = markup.replace(/^(?:\s|<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)+/i, '')
-  const isFull = /^<svg[\s>/]/i.test(body)
+  const body = stripSvgProlog(markup)
+  const isFull = isSvgRoot(body)
   const clean = svgPurify.sanitize(isFull ? body : `${wrapperOpen}${body}</svg>`, {
     USE_PROFILES: { svg: true, svgFilters: true },
     FORBID_TAGS: ['foreignObject', 'script', 'style', 'a', 'image', 'animate', 'set', 'animateTransform', 'animateMotion'],
@@ -75,5 +92,5 @@ export function sanitizeSvgElement(markup: string, wrapperOpen = SVG_WRAPPER_OPE
 export function sanitizeSvg(markup: string): string {
   const root = sanitizeSvgElement(markup)
   if (!root) return ''
-  return /^(?:\s|<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)*<svg[\s>/]/i.test(markup) ? root.outerHTML : root.innerHTML
+  return isSvgRoot(stripSvgProlog(markup)) ? root.outerHTML : root.innerHTML
 }
