@@ -48,7 +48,8 @@ describe('PaneHeader', () => {
     expect(screen.getByLabelText('Zurück')).toBeTruthy()
     expect(screen.getByRole('button', { name: /menü|menu/i })).toBeTruthy()
     expect(screen.getByText('Beta')).toBeTruthy()
-    expect(screen.getByText('a.md')).toBeTruthy()
+    // The note's name is shown as the inline title in the editor, not in the breadcrumb.
+    expect(screen.queryByText('a.md')).toBeNull()
   })
 
   it('reports the pane tab\'s vault with a segment click, not the selected vault', () => {

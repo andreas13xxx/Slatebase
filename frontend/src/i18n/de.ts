@@ -1021,7 +1021,7 @@ export const de = {
     visible: 'Sichtbar',
     hidden: 'Ausgeblendet',
     source: 'Quelltext',
-    menuItem: 'Eigenschaften anzeigen',
+    menuItem: 'Frontmatter ein-/ausblenden',
     command: 'Editor: Eigenschaften im Dokument ein-/ausblenden',
   },
 

@@ -79,7 +79,9 @@
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.9em;
-  /* Grid look: every cell is boxed by hairlines, like Obsidian's Bases table. */
+  /* Grid look: every cell is boxed by visible lines, so it reads as a table. */
+  border-top: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
 }
 
 .bases-table__header {
@@ -87,15 +89,17 @@
   top: 0;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-default);
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-default);
   text-align: left;
   z-index: 1;
   padding: 0;
   white-space: nowrap;
 }
 
-.bases-table__header:last-child {
-  border-right: none;
+.bases-table__header--num,
+.bases-table__header--num .bases-table__header-btn,
+.bases-table__cell--num {
+  text-align: right;
 }
 
 .bases-table__header-btn {
@@ -125,15 +129,74 @@
   height: 34px;
   vertical-align: middle;
   max-width: 320px;
-  border-bottom: 1px solid var(--border-subtle);
-  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.bases-table__cell:last-child {
-  border-right: none;
+/* Numbers: right-aligned, with the editor controls following the column. */
+.bases-table__cell--num .base-cell,
+.bases-table__cell--num .property-control {
+  text-align: right;
+}
+
+.bases-table__cell--num .property-control--editing {
+  text-align: right;
+}
+
+.bases-table__cell--num .property-control--display {
+  margin-left: auto;
+}
+
+/* Plain text instead of the Properties-panel boxes: cell controls render flat. */
+.bases-table .property-control--display {
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.bases-table .property-control--display:hover {
+  background: transparent;
+  text-decoration: underline dotted;
+}
+
+.bases-table .property-control--date,
+.bases-table .property-control--datetime {
+  border-color: transparent;
+  background: transparent;
+  font-size: inherit;
+  padding: 0;
+}
+
+.bases-table .property-control--date:hover,
+.bases-table .property-control--datetime:hover,
+.bases-table .property-control--date:focus,
+.bases-table .property-control--datetime:focus {
+  border-color: var(--border-default);
+}
+
+.bases-table .property-control__chips {
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.bases-table .property-control__chips:focus-within {
+  border-color: var(--border-default);
+}
+
+.bases-table .property-control__chip {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+}
+
+.bases-table .property-control__chip:not(:last-of-type)::after {
+  content: ',';
 }
 
 .bases-table__cell--formula {
@@ -653,9 +716,18 @@
 .bases-tb__group-left {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--spacing-xs);
   min-width: 0;
+}
+
+.bases-tb__group-left .bases-tb__btn {
+  white-space: nowrap;
+}
+
+.bases-tb__caret {
+  font-size: 0.8em;
+  opacity: 0.7;
 }
 
 .bases-tb__pop {

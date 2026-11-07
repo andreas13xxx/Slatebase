@@ -11,11 +11,14 @@
 
 import { Fragment, memo, useCallback, useMemo } from 'react'
 import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
-import { evaluateFormula, formatFormulaValue, computeSummaries, rowContext } from '@slatebase/shared-contracts'
+import { evaluateFormulaColumn, formatFormulaValue, computeSummaries } from '@slatebase/shared-contracts'
 import type { ComputedSummaries } from '@slatebase/shared-contracts'
 import { BaseCell } from './BaseCell'
 import { inferCellType } from './base-cell-type'
 import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
+import { computeNumericColumns, formulaKeyOf } from './base-numeric-columns'
+
+const cellClass = (base: string, numeric: boolean): string => (numeric ? `${base} bases-table__cell--num` : base)
 
 export interface BasesTableViewProps {
   doc: BaseDocument
@@ -34,6 +37,8 @@ export const BasesTableView = memo(function BasesTableView({
 }: BasesTableViewProps) {
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
   const columns = useMemo(() => view.order ?? Object.keys(doc.properties ?? {}), [view.order, doc.properties])
+
+  const numericCols = useMemo(() => computeNumericColumns(doc, columns, rows), [doc, columns, rows])
 
   const sortByColumn = useMemo(() => {
     const map = new Map<string, 'asc' | 'desc'>()
@@ -80,11 +85,11 @@ export const BasesTableView = memo(function BasesTableView({
             )
           }
 
-          if (formulaKeys.has(col)) {
-            const src = doc.formulas?.[col] ?? ''
-            const result = evaluateFormula(src, rowContext(row, doc))
+          const formulaKey = formulaKeyOf(col, formulaKeys)
+          if (formulaKey !== null) {
+            const result = evaluateFormulaColumn(doc, row, formulaKey)
             return (
-              <td key={col} className="bases-table__cell bases-table__cell--formula">
+              <td key={col} className={cellClass('bases-table__cell bases-table__cell--formula', numericCols.has(col))}>
                 {result.ok
                   ? formatFormulaValue(result.value)
                   : <span className="bases-table__formula-error" title={result.error}>#ERR</span>}
@@ -107,7 +112,7 @@ export const BasesTableView = memo(function BasesTableView({
               ? []
               : [String(raw)]
           return (
-            <td key={col} className="bases-table__cell">
+            <td key={col} className={cellClass('bases-table__cell', numericCols.has(col))}>
               <BaseCell
                 values={strValues}
                 type={inferCellType(strValues)}
@@ -130,7 +135,7 @@ export const BasesTableView = memo(function BasesTableView({
               return (
                 <th
                   key={col}
-                  className="bases-table__header"
+                  className={numericCols.has(col) ? 'bases-table__header bases-table__header--num' : 'bases-table__header'}
                   aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}
                 >
                   <button
@@ -176,7 +181,7 @@ export const BasesTableView = memo(function BasesTableView({
               {columns.map((col) => {
                 const s = summaries[col]
                 return (
-                  <td key={col} className="bases-table__cell bases-table__summary-cell">
+                  <td key={col} className={cellClass('bases-table__cell bases-table__summary-cell', numericCols.has(col))}>
                     {s && (
                       <span className="bases-table__summary">
                         <span className="bases-table__summary-label">{s.summary}</span>

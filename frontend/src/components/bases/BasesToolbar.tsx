@@ -1,7 +1,7 @@
 /**
  * BasesToolbar — the control bar above a base: view switcher/manager and the
  * Sort / Group / Filter / Properties popovers (Obsidian's Bases toolbar), plus
- * the view/source mode switch.
+ * all in one row, each a dropdown. The view/source switch lives in the breadcrumb.
  *
  * Every edit is a pure `base-edit` operation producing a new `BaseDocument`,
  * handed to `onChange`, which serializes it back into the `.base` file.
@@ -26,8 +26,8 @@ export interface BasesToolbarProps {
   rows: BaseRow[]
   activeIndex: number
   readOnly: boolean
+  /** Owned by the host (the breadcrumb switches it); the panels only show in `view`. */
   mode: BasesMode
-  onModeChange: (mode: BasesMode) => void
   onSelectView: (index: number) => void
   /**
    * Apply an edit to the LATEST document and persist it. Edits are functions, not
@@ -78,6 +78,7 @@ const Popover = memo(function Popover({
       >
         {label}
         {(badge ?? 0) > 0 && <span className="bases-tb__badge">{badge}</span>}
+        <span aria-hidden="true" className="bases-tb__caret">▾</span>
       </button>
       {open && (
         <div id={panelId} role="dialog" aria-label={title} className="bases-tb__panel">
@@ -291,7 +292,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   if (active && !typeOptions.includes(active.type)) typeOptions.push(active.type)
 
   return (
-    <Popover label={<>{active?.name ?? 'Ansicht'} <span aria-hidden="true">▾</span></>} title="Ansichten">
+    <Popover label={active?.name ?? 'Ansicht'} title="Ansichten">
       <div className="bases-tb__section">
         <ul className="bases-tb__list" aria-label="Ansichten">
           {doc.views.map((v, i) => (
@@ -376,7 +377,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
 // ─── Toolbar ────────────────────────────────────────────────────────────────
 
 export const BasesToolbar = memo(function BasesToolbar({
-  doc, rows, activeIndex, readOnly, mode, onModeChange, onSelectView, onChange,
+  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange,
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
   const columns = availableColumns(doc, rows, view)
@@ -396,14 +397,6 @@ export const BasesToolbar = memo(function BasesToolbar({
             <Popover label="Eigenschaften" title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
           </>
         )}
-      </div>
-      <div className="bases-view__modes">
-        <button type="button" className={mode === 'view' ? 'bases-view__mode bases-view__mode--active' : 'bases-view__mode'} onClick={() => onModeChange('view')}>
-          Ansicht
-        </button>
-        <button type="button" className={mode === 'source' ? 'bases-view__mode bases-view__mode--active' : 'bases-view__mode'} onClick={() => onModeChange('source')}>
-          Quelltext
-        </button>
       </div>
     </div>
   )

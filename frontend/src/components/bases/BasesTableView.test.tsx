@@ -59,6 +59,24 @@ describe('BasesTableView', () => {
     expect(screen.getByText('4')).toBeTruthy()
   })
 
+  it('evaluates a formula column referenced as formula.<id> and right-aligns numbers', () => {
+    const prefixed: BaseDocument = { ...doc }
+    const prefixedView: BaseView = { ...view, order: ['file.name', 'status', 'estimate', 'formula.days_left'] }
+    const numRows: BaseRow[] = [
+      { path: 'Tasks/a.md', fileName: 'a', values: { status: ['open'], deadline: ['2026-01-10'], estimate: ['3'] } },
+      { path: 'Tasks/b.md', fileName: 'b', values: { status: ['done'], deadline: ['2026-01-05'], estimate: ['5'] } },
+    ]
+    render(
+      <BasesTableView doc={prefixed} view={prefixedView} rows={numRows} onOpenNote={() => {}} onCommitCell={() => {}} onSortChange={() => {}} />,
+    )
+    const nine = screen.getByText('9')
+    expect(nine.closest('td')?.className).toContain('bases-table__cell--num')
+    const status = screen.getAllByText('open')[0]
+    expect(status?.closest('td')?.className).not.toContain('bases-table__cell--num')
+    // estimate column (editable number control) is numeric too
+    expect(screen.getByText('3').closest('td')?.className).toContain('bases-table__cell--num')
+  })
+
   it('reports a sort toggle on a header click', () => {
     const onSortChange = vi.fn()
     render(

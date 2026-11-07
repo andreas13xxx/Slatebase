@@ -51,14 +51,25 @@ export interface BasesViewProps {
   onOpenNote: (path: string) => void
   /** Persist new `.base` file content (sort change, raw-source apply). */
   onSaveSource: (yaml: string) => void
+  /**
+   * `view` (default) renders the base; `source` shows its YAML. Owned by the host (the tab's mode,
+   * switched from the breadcrumb), not by the view itself.
+   */
+  mode?: 'view' | 'source'
+  /** Asks the host to leave source mode (after picking a view or running a `bases:*` command). */
+  onShowView?: () => void
 }
 
-type Mode = 'view' | 'source'
-
 export const BasesView = memo(function BasesView({
-  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource,
+  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, mode = 'view', onShowView,
 }: BasesViewProps) {
-  const [mode, setMode] = useState<Mode>('view')
+  // Leaving source mode goes through a ref: the host passes a fresh callback every render, and the
+  // `bases:*` controller effect below must not re-register on each of them.
+  const showViewRef = useRef(onShowView)
+  useEffect(() => { showViewRef.current = onShowView }, [onShowView])
+  const modeRef = useRef(mode)
+  useEffect(() => { modeRef.current = mode }, [mode])
+  const showView = useCallback(() => { if (modeRef.current === 'source') showViewRef.current?.() }, [])
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
@@ -230,7 +241,7 @@ export const BasesView = memo(function BasesView({
       nextView: () => {
         if (views.length < 2) return false
         setSelectedViewIndex((safeIndex + 1) % views.length)
-        setMode('view')
+        showView()
         return true
       },
       addView: () => {
@@ -238,7 +249,7 @@ export const BasesView = memo(function BasesView({
         const name = `Tabelle ${doc.views.length + 1}`
         onSaveSource(serializeBase({ ...doc, views: [...doc.views, { type: 'table', name }] }))
         setSelectedViewIndex(doc.views.length)
-        setMode('view')
+        showView()
         return true
       },
       copyTable: async () => {
@@ -273,7 +284,7 @@ export const BasesView = memo(function BasesView({
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote, showView])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -299,8 +310,7 @@ export const BasesView = memo(function BasesView({
         activeIndex={safeIndex}
         readOnly={readOnly}
         mode={mode}
-        onModeChange={setMode}
-        onSelectView={(i) => { setSelectedViewIndex(i); setMode('view') }}
+        onSelectView={(i) => { setSelectedViewIndex(i); showView() }}
         onChange={handleDocChange}
       />
 

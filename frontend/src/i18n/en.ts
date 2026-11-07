@@ -1027,7 +1027,7 @@ export const en: TranslationShape = {
     visible: 'Visible',
     hidden: 'Hidden',
     source: 'Source',
-    menuItem: 'Show properties',
+    menuItem: 'Show/hide frontmatter',
     command: 'Editor: Toggle properties in document',
   },
 

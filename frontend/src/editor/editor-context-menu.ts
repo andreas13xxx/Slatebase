@@ -255,7 +255,7 @@ export function buildEditorContextMenuItems(
   showLineNumbers: boolean,
   readableLineLength: boolean,
   spellcheck?: SpellcheckMenuContext,
-  propertiesLabel = 'Eigenschaften anzeigen',
+  propertiesLabel = 'Frontmatter ein-/ausblenden',
 ): ContextMenuItem[] {
   const { state } = view
   const sel = state.selection.main
