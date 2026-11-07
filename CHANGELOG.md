@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.77.0](https://github.com/andreas13xxx/Slatebase/compare/v0.76.0...v0.77.0) (2026-11-07)
+
+
+### Features
+
+* seven Obsidian feature-gap closures (editor, search, bases) ([#336](https://github.com/andreas13xxx/Slatebase/issues/336)) ([e2d99a9](https://github.com/andreas13xxx/Slatebase/commit/e2d99a95fd66a6f2f24022632ec533ec84339cc3))
+
+
+### Bugfixes
+
+* **csp:** drop redundant api.github.com from connect-src ([#330](https://github.com/andreas13xxx/Slatebase/issues/330)) ([9ae982f](https://github.com/andreas13xxx/Slatebase/commit/9ae982fa050797440e33a67fb8cb9e5dca0fc2fc))
+* **deps:** bump minimatch to patch globparts DoS advisory ([#334](https://github.com/andreas13xxx/Slatebase/issues/334)) ([cd69136](https://github.com/andreas13xxx/Slatebase/commit/cd69136065b7ef630b10dab18d472689e5b81b21))
+* **editor:** restrict ctrl-click link opening to http(s) URLs ([#335](https://github.com/andreas13xxx/Slatebase/issues/335)) ([b7deec4](https://github.com/andreas13xxx/Slatebase/commit/b7deec4b2a7c871307eb88bfe90d33584217741c))
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group in /backend with 7 updates ([#331](https://github.com/andreas13xxx/Slatebase/issues/331)) ([d9831b9](https://github.com/andreas13xxx/Slatebase/commit/d9831b99755cb150364dcd8a978babf9ba17a706))
+* bump the minor-patch group in /frontend with 7 updates ([#332](https://github.com/andreas13xxx/Slatebase/issues/332)) ([e1c7ed7](https://github.com/andreas13xxx/Slatebase/commit/e1c7ed72fc3a17afcdfbf5e16c644a3e51afbd95))
+* **kiro:** fix stale 'unsafe-eval not needed' CSP claims ([#329](https://github.com/andreas13xxx/Slatebase/issues/329)) ([f09822b](https://github.com/andreas13xxx/Slatebase/commit/f09822b848dd0896d7a110b83cfbfc2428b1ab29))
+
 ## [0.76.0](https://github.com/andreas13xxx/Slatebase/compare/v0.75.0...v0.76.0) (2026-11-04)
 
 
