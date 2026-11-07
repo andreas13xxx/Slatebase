@@ -19,7 +19,7 @@
  */
 import { useEffect, useReducer } from 'react'
 import { subscribeToIconResolution } from '../plugins/compat/lucide-icons'
-import { sanitizeSvg } from '../plugins/compat/sanitize-rendered-html'
+import { sanitizeSvgElement } from '../plugins/compat/sanitize-rendered-html'
 
 /**
  * Forces the calling component to re-render whenever any icon finishes
@@ -58,17 +58,33 @@ export function getCustomIconSvg(iconId: string): string | undefined {
  * silently breaks rendering instead of just looking slightly off.
  */
 export function sizeCustomIconSvg(svgContent: string, sizePx: number): string {
+  const key = `${sizePx}|${svgContent}`
+  const hit = sizedCache.get(key)
+  if (hit !== undefined) return hit
   // Single choke point for every innerHTML/dangerouslySetInnerHTML sink: the
-  // plugin's markup is untrusted, so the final string is sanitized.
-  return sanitizeSvg(sizeUnsanitized(svgContent, sizePx))
+  // plugin's markup is untrusted. Sanitize first, size afterwards, so the
+  // style attribute we add is the only one (sanitizing strips all others).
+  const root = sanitizeSvgElement(svgContent, BARE_ICON_WRAPPER)
+  let out = ''
+  if (root) {
+    root.setAttribute('width', String(sizePx))
+    root.setAttribute('height', String(sizePx))
+    root.setAttribute('style', `width:${sizePx}px;height:${sizePx}px;`)
+    out = root.outerHTML
+  }
+  if (sizedCache.size >= SIZED_CACHE_MAX) sizedCache.clear()
+  sizedCache.set(key, out)
+  return out
 }
 
-function sizeUnsanitized(svgContent: string, sizePx: number): string {
-  if (svgContent.trim().startsWith('<svg')) {
-    return svgContent.replace(/<svg([^>]*)>/, (_match, attrs: string) => {
-      const cleaned = attrs.replace(/\s*width="[^"]*"/g, '').replace(/\s*height="[^"]*"/g, '')
-      return `<svg${cleaned} width="${sizePx}" height="${sizePx}" style="width:${sizePx}px;height:${sizePx}px;">`
-    })
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="width:${sizePx}px;height:${sizePx}px;">${svgContent}</svg>`
+/** Sanitizing is not free and render sites call this on every render. */
+const sizedCache = new Map<string, string>()
+const SIZED_CACHE_MAX = 500
+
+/** Drop cached sized icons, e.g. after `addIcon()`/`removeIcon()` changed the registry. */
+export function clearSizedIconCache(): void {
+  sizedCache.clear()
 }
+
+const BARE_ICON_WRAPPER =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">'
