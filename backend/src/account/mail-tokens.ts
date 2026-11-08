@@ -1,17 +1,21 @@
 // Single-use mailed tokens (email verification, password reset).
 //
 // The raw token has 256 bits of randomness and is only ever sent by mail; the
-// user record keeps SHA-256(token) plus an expiry. Nothing to brute-force, so a
-// fast hash is appropriate (same reasoning as session tokens).
+// user record keeps a digest (HMAC-SHA-256 with a fixed domain label) plus an
+// expiry. Nothing to brute-force, so a fast digest is appropriate (same
+// reasoning as session tokens); it is not a password hash.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { MailTokenRecord } from '../user/index.js'
 
 export const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000
 export const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000
 
+/** Domain-separation key: keeps these digests distinct from other SHA-256 uses of a token. */
+const TOKEN_DIGEST_KEY = 'slatebase:mail-token:v1'
+
 export function hashMailToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex')
+  return createHmac('sha256', TOKEN_DIGEST_KEY).update(token).digest('hex')
 }
 
 export function createMailToken(
