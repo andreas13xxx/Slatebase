@@ -95,11 +95,12 @@ export const BasesView = memo(function BasesView({
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
-  // Obsidian 1.14 has a dedicated `kanban` layout; a grouped `cards` view keeps
-  // rendering as the board (historic behaviour). An ungrouped `cards` view is
-  // the Obsidian image-card grid.
-  const isKanbanView = !!activeView && !isPluginView
-    && (activeView.type === 'kanban' || (activeView.type === 'cards' && !!activeView.groupBy))
+  // Both board layouts share BasesKanbanView, differing only in orientation:
+  // `kanban` groups into horizontal columns, a grouped `cards` view stacks the
+  // groups as vertical rows (each a card grid). An ungrouped `cards` view is
+  // the plain Obsidian image-card grid (BasesCardsView).
+  const isKanbanView = !!activeView && !isPluginView && activeView.type === 'kanban'
+  const isGroupedCardsView = !!activeView && !isPluginView && activeView.type === 'cards' && !!activeView.groupBy
   const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
   const isMapView = !!activeView && activeView.type === 'map' && !isPluginView
@@ -254,6 +255,10 @@ export const BasesView = memo(function BasesView({
       // Resolve a non-colliding file name under the target folder.
       const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
       await apiClient.saveFile(vaultId, path, frontmatter)
+      // The backend's vault:change excludes the user who triggered the write,
+      // so our own SSE live-refresh never fires for a note we just created —
+      // re-query directly so the new row shows up without a manual reload.
+      void runQueryRef.current()
       onOpenNote(path)
       return path
     } catch {
@@ -354,11 +359,12 @@ export const BasesView = memo(function BasesView({
         </ErrorBoundary>
       )}
 
-      {mode === 'view' && !isPluginView && isKanbanView && activeView && (
+      {mode === 'view' && !isPluginView && (isKanbanView || isGroupedCardsView) && activeView && (
         <BasesKanbanView
           doc={doc}
           view={activeView}
           rows={displayRows}
+          layout={isKanbanView ? 'columns' : 'rows'}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
         />
@@ -396,7 +402,7 @@ export const BasesView = memo(function BasesView({
         </Suspense>
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && !isCardsView && !isListView && !isMapView && activeView && (
+      {mode === 'view' && !isPluginView && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && !isMapView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

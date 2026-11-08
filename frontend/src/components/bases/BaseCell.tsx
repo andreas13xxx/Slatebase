@@ -12,7 +12,6 @@
  */
 
 import { memo, useCallback } from 'react'
-import { CalendarDays } from 'lucide-react'
 import {
   TextPropertyControl,
   NumberPropertyControl,
@@ -52,12 +51,7 @@ export const BaseCell = memo(function BaseCell({ values, type, readOnly, onCommi
     case 'checkbox':
       return <div className="base-cell"><CheckboxPropertyControl value={first} onChange={commitBool} /></div>
     case 'date':
-      return (
-        <div className="base-cell base-cell--date">
-          <CalendarDays aria-hidden="true" className="base-cell__date-icon" />
-          <DatePropertyControl value={first} onChange={commitDate} />
-        </div>
-      )
+      return <div className="base-cell"><DatePropertyControl value={first} onChange={commitDate} /></div>
     case 'list':
       return <div className="base-cell"><ListPropertyControl value={values} onChange={commitList} /></div>
     default:

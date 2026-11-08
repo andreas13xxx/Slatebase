@@ -92,6 +92,42 @@ export function setOrder(doc: BaseDocument, index: number, order: string[]): Bas
   return withView(doc, index, (v) => ({ ...v, order }))
 }
 
+// ─── Formulas ───────────────────────────────────────────────────────────────
+
+const FORMULA_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+/** Whether a formula name is a valid identifier not already taken. */
+export function isValidFormulaName(doc: BaseDocument, name: string): boolean {
+  const n = name.trim()
+  return FORMULA_NAME.test(n) && !(doc.formulas && n in doc.formulas)
+}
+
+/**
+ * Adds a formula `name: expression` to the document and appends `formula.name`
+ * as a column of the given view, so it shows up right away. A no-op when the
+ * name is invalid or taken.
+ */
+export function addFormula(doc: BaseDocument, viewIndex: number, name: string, expression: string): BaseDocument {
+  const n = name.trim()
+  if (!isValidFormulaName(doc, n)) return doc
+  const withFormula: BaseDocument = { ...doc, formulas: { ...(doc.formulas ?? {}), [n]: expression.trim() } }
+  const colId = `formula.${n}`
+  return withView(withFormula, viewIndex, (v) => {
+    const order = v.order ?? Object.keys(doc.properties ?? {})
+    return order.includes(colId) ? v : { ...v, order: [...order, colId] }
+  })
+}
+
+/** Removes a formula from the document and drops its column from every view. */
+export function removeFormula(doc: BaseDocument, name: string): BaseDocument {
+  if (!doc.formulas || !(name in doc.formulas)) return doc
+  const { [name]: _drop, ...rest } = doc.formulas
+  const colId = `formula.${name}`
+  const views = doc.views.map((v) => (v.order ? { ...v, order: v.order.filter((c) => c !== colId) } : v))
+  const formulas = Object.keys(rest).length > 0 ? rest : undefined
+  return { ...doc, formulas, views } as BaseDocument
+}
+
 /** The columns a view shows: its `order`, else the declared properties. */
 export function effectiveColumns(doc: BaseDocument, view: BaseView | undefined): string[] {
   return view?.order ?? Object.keys(doc.properties ?? {})

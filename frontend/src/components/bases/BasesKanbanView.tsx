@@ -25,6 +25,12 @@ export interface BasesKanbanViewProps {
   doc: BaseDocument
   view: BaseView
   rows: BaseRow[]
+  /**
+   * `columns` (Kanban) lays the groups out horizontally as columns; `rows`
+   * (grouped cards) stacks them vertically, each group a row of cards.
+   * Default `columns`.
+   */
+  layout?: 'columns' | 'rows'
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /**
@@ -56,7 +62,7 @@ interface KanbanColumn {
 }
 
 export const BasesKanbanView = memo(function BasesKanbanView({
-  doc, view, rows, onOpenNote, onMoveCard,
+  doc, view, rows, layout = 'columns', onOpenNote, onMoveCard,
 }: BasesKanbanViewProps) {
   // The grouping property name (the new `groupBy` is an object `{property, direction}`).
   const groupBy = view.groupBy?.property
@@ -200,7 +206,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
           ))}
         </div>
       )}
-      <div className="bases-kanban" role="list" aria-label="Karten-Ansicht">
+      <div className={layout === 'rows' ? 'bases-kanban bases-kanban--rows' : 'bases-kanban'} role="list" aria-label="Karten-Ansicht">
         {columns.map((column) => {
         const isCollapsed = collapsed[column.key] ?? false
         const isDropTarget = draggable && dragOverKey === column.key && dragFromKey !== column.key

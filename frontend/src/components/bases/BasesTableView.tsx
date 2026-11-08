@@ -18,6 +18,7 @@ import { inferCellType } from './base-cell-type'
 import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
 import { computeNumericColumns, formulaKeyOf } from './base-numeric-columns'
 import { columnLabel } from './base-edit'
+import { ColumnTypeIcon } from './base-column-icon'
 
 const cellClass = (base: string, numeric: boolean): string => (numeric ? `${base} bases-table__cell--num` : base)
 
@@ -144,6 +145,7 @@ export const BasesTableView = memo(function BasesTableView({
                     className="bases-table__header-btn"
                     onClick={() => handleHeaderClick(col)}
                   >
+                    <ColumnTypeIcon doc={doc} col={col} rows={rows} />
                     {headerLabel(col)}
                     {dir === 'asc' && <span aria-hidden="true"> ▲</span>}
                     {dir === 'desc' && <span aria-hidden="true"> ▼</span>}

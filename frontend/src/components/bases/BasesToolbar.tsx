@@ -12,8 +12,10 @@ import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
+import { ColumnTypeIcon } from './base-column-icon'
 import {
-  addView, availableColumns, deleteView, duplicateView, effectiveColumns, renameView, rootGroup,
+  addFormula, addView, availableColumns, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
+  removeFormula, renameView, rootGroup,
   setDocFilter, setGroupBy, setOrder, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
@@ -101,6 +103,8 @@ interface PanelProps {
   doc: BaseDocument
   index: number
   columns: ColumnChoice[]
+  /** Current rows — used only to infer a column's type icon. */
+  rows: BaseRow[]
   disabled: boolean
   onChange: (update: DocUpdate) => void
 }
@@ -194,7 +198,7 @@ const GroupPanel = memo(function GroupPanel({ doc, index, columns, disabled, onC
   )
 })
 
-const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, disabled, onChange }: PanelProps) {
+const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const shown = effectiveColumns(doc, doc.views[index])
   const labelOf = (id: string) => columns.find((c) => c.id === id)?.label ?? id
   const hidden = columns.filter((c) => !shown.includes(c.id))
@@ -214,6 +218,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
           <li key={id} className="bases-tb__row">
             <label className="bases-tb__check">
               <input type="checkbox" checked disabled={disabled} onChange={() => edit((cur) => cur.filter((c) => c !== id))} />
+              <ColumnTypeIcon doc={doc} col={id} rows={rows} />
               <span>{labelOf(id)}</span>
             </label>
             <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
@@ -229,6 +234,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
               <li key={c.id} className="bases-tb__row">
                 <label className="bases-tb__check">
                   <input type="checkbox" checked={false} disabled={disabled} onChange={() => edit((cur) => (cur.includes(c.id) ? cur : [...cur, c.id]))} />
+                  <ColumnTypeIcon doc={doc} col={c.id} rows={rows} />
                   <span>{c.label}</span>
                 </label>
               </li>
@@ -243,6 +249,67 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
           value=""
           onCommit={(name) => { const n = name.trim(); if (n) edit((cur) => (cur.includes(n) ? cur : [...cur, n])) }}
         />
+      )}
+      <FormulaSection doc={doc} index={index} disabled={disabled} onChange={onChange} />
+    </div>
+  )
+})
+
+/** Add / list / remove the document's formula columns (inside the Properties panel). */
+const FormulaSection = memo(function FormulaSection({ doc, index, disabled, onChange }: {
+  doc: BaseDocument; index: number; disabled: boolean; onChange: (update: DocUpdate) => void
+}) {
+  const [name, setName] = useState('')
+  const [expr, setExpr] = useState('')
+  const formulas = Object.entries(doc.formulas ?? {})
+  const nameOk = name.trim() === '' || isValidFormulaName(doc, name)
+  const canAdd = name.trim() !== '' && expr.trim() !== '' && isValidFormulaName(doc, name)
+
+  const add = () => {
+    if (!canAdd) return
+    onChange((d) => addFormula(d, index, name, expr))
+    setName('')
+    setExpr('')
+  }
+
+  return (
+    <div className="bases-tb__section">
+      <p className="bases-tb__hint">Formeln</p>
+      {formulas.length === 0 && <p className="bases-tb__hint">Noch keine Formel.</p>}
+      <ul className="bases-tb__list" aria-label="Formeln">
+        {formulas.map(([key, expression]) => (
+          <li key={key} className="bases-tb__row">
+            <span className="bases-tb__formula-name">{key}</span>
+            <code className="bases-tb__formula-expr" title={expression}>{expression}</code>
+            {!disabled && (
+              <button type="button" className="bases-tb__icon-btn" aria-label={`Formel ${key} entfernen`} onClick={() => onChange((d) => removeFormula(d, key))}>×</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {!disabled && (
+        <div className="bases-tb__formula-add">
+          <input
+            type="text"
+            className={nameOk ? 'bases-tb__input' : 'bases-tb__input bases-tb__input--invalid'}
+            aria-label="Name der Formel"
+            placeholder="Name (z.B. tage_übrig)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            type="text"
+            className="bases-tb__input bases-tb__input--grow"
+            aria-label="Formelausdruck"
+            placeholder='Ausdruck (z.B. (date(deadline) - today()).days)'
+            value={expr}
+            onChange={(e) => setExpr(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+          />
+          <button type="button" className="bases-tb__btn bases-tb__btn--primary" disabled={!canAdd} onClick={add}>
+            Hinzufügen
+          </button>
+        </div>
       )}
     </div>
   )
@@ -388,7 +455,7 @@ export const BasesToolbar = memo(function BasesToolbar({
   const view = doc.views[activeIndex]
   const columns = availableColumns(doc, rows, view)
   const handleChange = useCallback((update: DocUpdate) => { if (!readOnly) onChange(update) }, [readOnly, onChange])
-  const panelProps: PanelProps = { doc, index: activeIndex, columns, disabled: readOnly, onChange: handleChange }
+  const panelProps: PanelProps = { doc, index: activeIndex, columns, rows, disabled: readOnly, onChange: handleChange }
   const filterCount = countConditions(view?.filters) + countConditions(doc.filters)
 
   return (

@@ -264,19 +264,6 @@
   color: var(--text-primary);
 }
 
-.base-cell--date {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.base-cell__date-icon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  color: var(--text-subtle);
-}
-
 /* ── Source view ───────────────────────────────────────────────────────── */
 
 .bases-source-view {
@@ -423,6 +410,30 @@
   min-height: 0;
   overflow-x: auto;
   padding: 12px;
+}
+
+/* Grouped-cards layout: groups stacked as rows, each a horizontal card grid. */
+.bases-kanban--rows {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.bases-kanban--rows .bases-kanban__column {
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+}
+
+.bases-kanban--rows .bases-kanban__cards {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.bases-kanban--rows .bases-kanban__card {
+  flex: 0 0 auto;
+  width: 220px;
 }
 
 .bases-kanban--error,
@@ -762,6 +773,16 @@
   flex: 0 0 auto;
 }
 
+/* Column-type icon in headers and the properties picker. */
+.bases-col-type-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  opacity: 0.65;
+  vertical-align: text-bottom;
+  margin-right: 4px;
+}
+
 .bases-tb__pop {
   position: relative;
 }
@@ -879,6 +900,32 @@
 
 .bases-tb__input--grow {
   flex: 1 1 8em;
+}
+
+.bases-tb__input--invalid {
+  border-color: var(--danger);
+}
+
+.bases-tb__formula-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.bases-tb__formula-name {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.bases-tb__formula-expr {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-subtle);
+  font-size: 0.8em;
 }
 
 .bases-tb__icon-btn {
