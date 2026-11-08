@@ -40,6 +40,7 @@ src/
 │   ├── index.ts          — AuthService, SessionStore, interfaces, error classes. Session reads distinguish "provably gone" (ENOENT / parses but fails schema) from a transient read failure (EPERM/EBUSY from antivirus or a synced folder, torn read mid-write) and only deindex the former, so a locked file never kills a valid session. `startCleanup()`/`stopCleanup()` (composition-root lifecycle, not on ISessionStore) sweep expired session files periodically — otherwise abandoned sessions accumulate and slow every `findByUserId()`
 │   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
 │   ├── ratelimit.ts     — In-memory rate limiter for login attempts (composite key username:ip)
+│   ├── session-write-rate-limit.ts — Central per-user limit for session writes (default + autosave bucket + declarative `EXPENSIVE_ROUTE_RULES` table; modes `log-only`/`enforce`/`off` via `SLATEBASE_WRITE_RATE_LIMIT_MODE`)
 │   ├── validation.ts    — Zod schemas for login request validation (loginRequestSchema)
 │   ├── csrf-secret.ts   — CsrfSecretManager (persistent CSRF secret: env → file → generate)
 │   └── sse-ticket-store.ts — SseTicketStore (short-lived one-time tickets for SSE connections)
