@@ -17,6 +17,7 @@ import { BaseCell } from './BaseCell'
 import { inferCellType } from './base-cell-type'
 import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
 import { computeNumericColumns, formulaKeyOf } from './base-numeric-columns'
+import { columnLabel } from './base-edit'
 
 const cellClass = (base: string, numeric: boolean): string => (numeric ? `${base} bases-table__cell--num` : base)
 
@@ -47,8 +48,8 @@ export const BasesTableView = memo(function BasesTableView({
   }, [view.sort])
 
   const headerLabel = useCallback(
-    (col: string): string => doc.properties?.[col]?.displayName ?? col,
-    [doc.properties],
+    (col: string): string => columnLabel(doc, col),
+    [doc],
   )
 
   const handleHeaderClick = useCallback((col: string) => {

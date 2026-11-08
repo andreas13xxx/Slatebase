@@ -19,6 +19,7 @@ import type { DragEvent } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue } from '@slatebase/shared-contracts'
+import { columnLabel as baseColumnLabel } from './base-edit'
 
 export interface BasesKanbanViewProps {
   doc: BaseDocument
@@ -69,8 +70,8 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   }, [view.order, doc.properties, groupBy, formulaKeys])
 
   const columnLabel = useCallback(
-    (col: string): string => doc.properties?.[col]?.displayName ?? col,
-    [doc.properties],
+    (col: string): string => baseColumnLabel(doc, col),
+    [doc],
   )
 
   // Overall (whole-board) summaries shown as a header bar. Per-group summaries

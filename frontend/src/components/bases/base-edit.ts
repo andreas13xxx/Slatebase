@@ -107,6 +107,38 @@ const FILE_COLUMNS = [
   'file.ctime', 'file.mtime', 'file.tags', 'file.links', 'file.backlinks', 'file.embeds',
 ]
 
+/**
+ * Plain-language labels for the technical `file.*` pseudo-columns, so a header
+ * or picker shows "Ordner" instead of "file.folder". A user-declared
+ * `properties['file.x'].displayName` still wins (handled in `columnLabel`).
+ */
+export const FILE_COLUMN_LABELS: Record<string, string> = {
+  'file.name': 'Name',
+  'file.path': 'Pfad',
+  'file.folder': 'Ordner',
+  'file.ext': 'Dateiendung',
+  'file.size': 'Größe',
+  'file.ctime': 'Erstellt',
+  'file.mtime': 'Geändert',
+  'file.tags': 'Tags',
+  'file.links': 'Links',
+  'file.backlinks': 'Backlinks',
+  'file.embeds': 'Einbettungen',
+}
+
+/**
+ * The display label for a column id: a declared displayName wins, then the
+ * plain-language name of a `file.*` field, then a formula's own key, else the
+ * id verbatim (a user property).
+ */
+export function columnLabel(doc: BaseDocument, id: string): string {
+  const declared = doc.properties?.[id]?.displayName
+  if (declared) return declared
+  if (id in FILE_COLUMN_LABELS) return FILE_COLUMN_LABELS[id]!
+  if (id.startsWith('formula.')) return id.slice('formula.'.length)
+  return id
+}
+
 /** Every column the toolbar offers: file fields, formulas, declared and observed properties. */
 export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseView | undefined): ColumnChoice[] {
   const ids: string[] = [...FILE_COLUMNS]
@@ -121,7 +153,7 @@ export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseV
   for (const id of ids) {
     if (seen.has(id)) continue
     seen.add(id)
-    out.push({ id, label: doc.properties?.[id]?.displayName ?? id })
+    out.push({ id, label: columnLabel(doc, id) })
   }
   return out
 }

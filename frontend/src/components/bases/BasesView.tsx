@@ -237,6 +237,33 @@ export const BasesView = memo(function BasesView({
   // Expose this base to the `bases:*` core commands (single-active-instance,
   // same as activeCanvasBridge).
   const rootRef = useRef<HTMLDivElement>(null)
+
+  // Create a new note scoped to this base and open it. Shared by the
+  // `bases:add-item` core command (via the controller below) and the toolbar's
+  // "Neuer Eintrag" button, so the two cannot drift.
+  const addItem = useCallback(async (): Promise<string | null> => {
+    if (!doc) return null
+    const view = doc.views[safeIndex]
+    const folder = deriveBaseScopeFolder(doc, view)
+    const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
+      (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
+    )
+    const frontmatter = buildBlankFrontmatter(columns, doc, view)
+    const baseName = 'Unbenannt'
+    try {
+      // Resolve a non-colliding file name under the target folder.
+      const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
+      await apiClient.saveFile(vaultId, path, frontmatter)
+      onOpenNote(path)
+      return path
+    } catch {
+      return null
+    }
+  }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
+
+  // Fire-and-forget wrapper for the toolbar button (which wants `() => void`).
+  const handleAddItem = useCallback(() => { void addItem() }, [addItem])
+
   useEffect(() => {
     const controller: ActiveBasesController = {
       nextView: () => {
@@ -263,29 +290,11 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
-      addItem: async () => {
-        if (!doc) return null
-        const view = doc.views[safeIndex]
-        const folder = deriveBaseScopeFolder(doc, view)
-        const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
-          (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
-        )
-        const frontmatter = buildBlankFrontmatter(columns, doc, view)
-        const baseName = 'Unbenannt'
-        try {
-          // Resolve a non-colliding file name under the target folder.
-          const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
-          await apiClient.saveFile(vaultId, path, frontmatter)
-          onOpenNote(path)
-          return path
-        } catch {
-          return null
-        }
-      },
+      addItem,
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote, showView])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -313,6 +322,7 @@ export const BasesView = memo(function BasesView({
         mode={mode}
         onSelectView={(i) => { setSelectedViewIndex(i); showView() }}
         onChange={handleDocChange}
+        onAddItem={handleAddItem}
       />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}

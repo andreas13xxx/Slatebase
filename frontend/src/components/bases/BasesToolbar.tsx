@@ -10,7 +10,7 @@
 
 import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowUpDown, Rows3, Filter, Columns3, Table2 } from 'lucide-react'
+import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
 import {
   addView, availableColumns, deleteView, duplicateView, effectiveColumns, renameView, rootGroup,
@@ -36,6 +36,11 @@ export interface BasesToolbarProps {
    * then a click on "+ Bedingung") compose instead of the second overwriting the first.
    */
   onChange: (update: DocUpdate) => void
+  /**
+   * Create a new note scoped to this base and open it (the `bases:add-item` path).
+   * Absent / disabled when the base is read-only; the button then does not render.
+   */
+  onAddItem?: () => void
 }
 
 // ─── Popover ────────────────────────────────────────────────────────────────
@@ -378,7 +383,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
 // ─── Toolbar ────────────────────────────────────────────────────────────────
 
 export const BasesToolbar = memo(function BasesToolbar({
-  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange,
+  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem,
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
   const columns = availableColumns(doc, rows, view)
@@ -390,6 +395,12 @@ export const BasesToolbar = memo(function BasesToolbar({
     <div className="bases-view__toolbar" role="toolbar" aria-label="Base-Werkzeugleiste">
       <div className="bases-tb__group-left">
         <ViewMenu doc={doc} activeIndex={activeIndex} disabled={readOnly} onSelectView={onSelectView} onChange={handleChange} />
+        {mode === 'view' && !readOnly && onAddItem && (
+          <button type="button" className="bases-tb__btn bases-tb__btn--primary" title="Neuen Eintrag anlegen" onClick={onAddItem}>
+            <Plus aria-hidden="true" className="bases-tb__btn-icon" />
+            Neuer Eintrag
+          </button>
+        )}
       </div>
       {mode === 'view' && view && (
         <div className="bases-tb__group-right">

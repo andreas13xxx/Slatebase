@@ -20,6 +20,7 @@ import { AppContext } from '../../state'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { parseCardImage } from './cardImage'
 import type { CardImage } from './cardImage'
+import { columnLabel as baseColumnLabel } from './base-edit'
 
 export interface BasesCardsViewProps {
   doc: BaseDocument
@@ -52,7 +53,7 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
     return configured.filter((c) => c !== 'file.name' && c !== view.image)
   }, [view.order, view.image, doc.properties])
 
-  const columnLabel = useCallback((col: string) => doc.properties?.[col]?.displayName ?? col, [doc.properties])
+  const columnLabel = useCallback((col: string) => baseColumnLabel(doc, col), [doc])
 
   const cellText = useCallback(
     (row: BaseRow, col: string): string => {
