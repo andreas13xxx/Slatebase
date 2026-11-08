@@ -26,6 +26,7 @@ import type { ILinkIndex } from '../link-index/index.js'
 import type { McpConfig } from './config.js'
 import { mcpToolError, mcpToolSuccess } from './tool-results.js'
 import { registerQueryBase } from './query-base-tool.js'
+import { resolveContainedPath } from './real-path.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
@@ -321,13 +322,8 @@ function registerSearchVault(server: McpServer, deps: ToolHandlerDeps): void {
 
         // Get vault tree and resolve vault path
         let tree: DirectoryTree
-        let vaultPath: string
         try {
           tree = await deps.vaultService.getVaultTree(args.vaultId)
-          // Resolve vault path from the service
-          vaultPath = deps.vaultService.resolveFilePath(args.vaultId, 'dummy')
-          // resolveFilePath returns the resolved absolute path for 'dummy', so get the parent
-          vaultPath = path.dirname(vaultPath)
         } catch (error) {
           if (error instanceof VaultNotFoundError) {
             return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
@@ -341,7 +337,7 @@ function registerSearchVault(server: McpServer, deps: ToolHandlerDeps): void {
         // Perform search with timeout
         const results = await searchFiles(
           filePaths,
-          vaultPath,
+          (relativePath) => resolveContainedPath(deps.vaultService, args.vaultId, relativePath, deps.logger),
           args.query,
           args.maxResults,
           deps.logger,
@@ -371,7 +367,7 @@ function registerSearchVault(server: McpServer, deps: ToolHandlerDeps): void {
  */
 async function searchFiles(
   filePaths: string[],
-  vaultPath: string,
+  resolveFile: (relativePath: string) => Promise<string>,
   query: string,
   maxResults: number,
   logger: ILogger,
@@ -387,9 +383,10 @@ async function searchFiles(
       break
     }
 
-    const absolutePath = path.join(vaultPath, relativePath)
-
     try {
+      // Defense in depth: the cached tree may predate a symlink created later
+      const absolutePath = await resolveFile(relativePath)
+
       // Check file size
       const stat = await fs.stat(absolutePath)
       if (stat.size > MAX_FILE_SIZE_FOR_SEARCH) {
@@ -522,7 +519,7 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
         // Validate file path (path traversal protection)
         let resolvedPath: string
         try {
-          resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
+          resolvedPath = await resolveContainedPath(deps.vaultService, args.vaultId, args.path, deps.logger)
         } catch (error) {
           if (error instanceof PathTraversalError) {
             return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
@@ -711,7 +708,7 @@ function registerCreateDirectory(server: McpServer, deps: ToolHandlerDeps): void
         // Resolve and validate path
         let resolvedPath: string
         try {
-          resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
+          resolvedPath = await resolveContainedPath(deps.vaultService, args.vaultId, args.path, deps.logger)
         } catch (error) {
           if (error instanceof PathTraversalError) {
             return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid directory path')

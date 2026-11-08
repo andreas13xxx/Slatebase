@@ -12,6 +12,7 @@ import { VaultNotFoundError, VaultAccessDeniedError } from '../business/index.js
 import { PathTraversalError, isBinaryContent } from '../vault/index.js'
 import type { IVaultReader, DirectoryTree } from '../vault/index.js'
 import { getMediaTypeFromExtension } from '../vault/mime.js'
+import { resolveContainedPath } from './real-path.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
@@ -222,7 +223,7 @@ export class McpHandlers implements IMcpHandlers {
     // Resolve vault path (validates path traversal)
     let resolvedPath: string
     try {
-      resolvedPath = this.vaultService.resolveFilePath(vaultId, filePath)
+      resolvedPath = await resolveContainedPath(this.vaultService, vaultId, filePath, this.logger)
     } catch (error) {
       if (error instanceof VaultNotFoundError) {
         throw new McpError(MCP_ERROR_NOT_FOUND, `Vault not found: ${vaultId}`)

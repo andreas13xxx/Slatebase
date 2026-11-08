@@ -23,6 +23,7 @@ import { PathTraversalError } from '../vault/index.js'
 import type { ILinkIndex, BaseQuerySpec } from '../link-index/index.js'
 import type { ToolHandlerDeps } from './tool-handlers.js'
 import { mcpToolError, mcpToolSuccess } from './tool-results.js'
+import { resolveContainedPath } from './real-path.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
@@ -130,7 +131,7 @@ export function registerQueryBase(
 
         let resolvedPath: string
         try {
-          resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
+          resolvedPath = await resolveContainedPath(deps.vaultService, args.vaultId, args.path, deps.logger)
         } catch (error) {
           if (error instanceof PathTraversalError) return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
           if (error instanceof VaultNotFoundError) return mcpToolError(MCP_ERROR_ACCESS_DENIED, 'Access denied')
