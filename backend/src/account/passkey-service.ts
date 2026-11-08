@@ -71,7 +71,7 @@ export interface IPasskeyService {
   remove(userId: string, passkeyId: string, ipAddress: string): Promise<void>
   /** Admin action: drop every passkey of an account. */
   removeAll(userId: string, actorId: string, ipAddress: string): Promise<number>
-  beginLogin(rp: RelyingParty): Promise<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }>
+  beginLogin(rp: RelyingParty, ipAddress: string): Promise<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }>
   finishLogin(challengeId: string, response: AuthenticationResponseJSON, rp: RelyingParty, meta: LoginMeta): Promise<LoginResult>
 }
 
@@ -117,12 +117,15 @@ export class PasskeyService implements IPasskeyService {
   private readonly locks = new KeyedMutex()
   private readonly loginFailuresPerIp = new SlidingWindowRateLimiter(10, 15 * 60_000)
   private readonly registerPerUser = new SlidingWindowRateLimiter(10, 15 * 60_000)
+  /** Caps how fast one address can create pending login challenges (the store is bounded, so it must not be floodable). */
+  private readonly loginOptionsPerIp = new SlidingWindowRateLimiter(30, 60_000)
 
   constructor(private readonly deps: PasskeyServiceDeps) {}
 
   destroy(): void {
     this.loginFailuresPerIp.destroy()
     this.registerPerUser.destroy()
+    this.loginOptionsPerIp.destroy()
   }
 
   /** Builds the credential index from all user records. Call once at startup. */
@@ -292,7 +295,10 @@ export class PasskeyService implements IPasskeyService {
     return removed.length
   }
 
-  async beginLogin(rp: RelyingParty) {
+  async beginLogin(rp: RelyingParty, ipAddress: string) {
+    const limit = this.loginOptionsPerIp.checkLimit(ipAddress)
+    if (!limit.allowed) throw new PasskeyError('RATE_LIMITED', 'Too many attempts', limit.retryAfter)
+    this.loginOptionsPerIp.recordRequest(ipAddress)
     const options = await generateAuthenticationOptions({ rpID: rp.rpId, userVerification: 'preferred' })
     const challengeId = this.storeChallenge({ challenge: options.challenge, purpose: 'login', rpId: rp.rpId, origin: rp.origin })
     return { challengeId, options }

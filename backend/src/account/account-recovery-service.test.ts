@@ -11,6 +11,9 @@ import { InMemoryUserRepository, makeUser, silentLogger } from './test-support.j
 
 const PASSWORD = 'correct-horse-battery'
 const ORIGINS = ['https://notes.example.org', 'https://intern.example.org']
+// argon2 hashing is slow on small CI hosts; the default 5 s is too tight when workers compete.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
+
 let passwordHash = ''
 
 beforeAll(async () => {
@@ -87,6 +90,28 @@ describe('email confirmation', () => {
     await expect(ctx.service.requestEmailChange('user-1', 'wrong', 'a@example.org')).rejects.toMatchObject({ code: 'INVALID_PASSWORD' })
     await expect(ctx.service.requestEmailChange('user-1', PASSWORD, 'nope')).rejects.toMatchObject({ code: 'EMAIL_INVALID' })
     expect(ctx.sent).toHaveLength(0)
+  })
+
+  it('refuses addresses a mailer could split into several recipients', async () => {
+    for (const bad of ['victim,attacker@evil.org', 'a@example.org, b@example.org', 'Alice <a@example.org>']) {
+      await expect(ctx.service.requestEmailChange('user-1', PASSWORD, bad)).rejects.toMatchObject({ code: 'EMAIL_INVALID' })
+    }
+    expect(ctx.sent).toHaveLength(0)
+  })
+
+  it('lets only one of two accounts confirm the same address at the same time', async () => {
+    const a = makeUser({ passwordHash })
+    const b = makeUser({ userId: 'user-2', username: 'bob', passwordHash })
+    const both = setup({ users: [a, b] })
+    await both.service.requestEmailChange('user-1', PASSWORD, 'shared@example.org')
+    await both.service.requestEmailChange('user-2', PASSWORD, 'shared@example.org')
+    const results = await Promise.allSettled([
+      both.service.verifyEmail(tokenFrom(both.sent[0]), '10.0.0.1'),
+      both.service.verifyEmail(tokenFrom(both.sent[1]), '10.0.0.2'),
+    ])
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    const confirmed = [...both.repo.users.values()].filter((u) => u.emailVerifiedAt !== undefined)
+    expect(confirmed).toHaveLength(1)
   })
 
   it('refuses when mail delivery is not configured', async () => {

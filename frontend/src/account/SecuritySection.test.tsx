@@ -40,7 +40,7 @@ function setup(sec: SecurityOverview, passkeyCapable = true) {
     'GET /api/v1/users/me/security': () => ({ body: state.security }),
     'GET /api/v1/auth/capabilities': () => ({ body: { passwordReset: true, passkey: passkeyCapable } }),
     'PUT /api/v1/users/me/email': () => ({ status: 202, body: { ok: true } }),
-    'PATCH /api/v1/users/me/passkeys/p1': () => ({ body: { ...passkey, name: 'Phone' } }),
+    'PUT /api/v1/users/me/passkeys/p1': () => ({ body: { ...passkey, name: 'Phone' } }),
     'DELETE /api/v1/users/me/passkeys/p1': () => ({ status: 204 }),
   })
   return { state, ...routes }
@@ -159,8 +159,8 @@ describe('SecuritySection — passkeys', () => {
     await user.type(input, 'Phone')
     await user.click(screen.getByRole('button', { name: 'Speichern' }))
 
-    await waitFor(() => expect(calls.some((c) => c.key === 'PATCH /api/v1/users/me/passkeys/p1')).toBe(true))
-    expect(bodyOf(calls.find((c) => c.key.startsWith('PATCH'))?.init)).toEqual({ name: 'Phone' })
+    await waitFor(() => expect(calls.some((c) => c.key === 'PUT /api/v1/users/me/passkeys/p1')).toBe(true))
+    expect(bodyOf(calls.find((c) => c.key.startsWith('PUT /api/v1/users/me/passkeys'))?.init)).toEqual({ name: 'Phone' })
   })
 
   it('asks for confirmation before deleting a passkey', async () => {

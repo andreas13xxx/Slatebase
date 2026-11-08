@@ -115,7 +115,7 @@ export function createAccountApi(getCsrfToken: () => string | null = () => null)
       call<PasskeyCeremony<T>>('POST', '/api/v1/auth/passkey/register/options', { password }),
     passkeyRegisterVerify: (challengeId: string, name: string, response: unknown) =>
       call<PasskeyInfo>('POST', '/api/v1/auth/passkey/register/verify', { challengeId, name, response }),
-    renamePasskey: (id: string, name: string) => call<PasskeyInfo>('PATCH', `/api/v1/users/me/passkeys/${encodeURIComponent(id)}`, { name }),
+    renamePasskey: (id: string, name: string) => call<PasskeyInfo>('PUT', `/api/v1/users/me/passkeys/${encodeURIComponent(id)}`, { name }),
     deletePasskey: (id: string) => call<void>('DELETE', `/api/v1/users/me/passkeys/${encodeURIComponent(id)}`),
 
     // ─── Admin ───────────────────────────────────────────────────────────

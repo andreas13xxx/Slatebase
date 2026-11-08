@@ -13,6 +13,9 @@ const INTERNAL_RP: RelyingParty = { origin: 'https://intern.example.org', rpId: 
 const META: LoginMeta = { ipAddress: '10.0.0.1', userAgent: 'vitest' }
 const PASSWORD = 'correct-horse-battery'
 
+// argon2 hashing is slow on small CI hosts; the default 5 s is too tight when workers compete.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
+
 let passwordHash = ''
 
 beforeAll(async () => {
@@ -145,7 +148,7 @@ describe('PasskeyService login', () => {
   })
 
   it('logs in with a registered passkey (no username) and updates counter and last use', async () => {
-    const { challengeId, options } = await ctx.service.beginLogin(RP)
+    const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
     const result = await ctx.service.finishLogin(challengeId, authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META)
 
     expect(result.token).toBe('session-token')
@@ -156,35 +159,35 @@ describe('PasskeyService login', () => {
   })
 
   it('rejects a replayed assertion (challenge is single use)', async () => {
-    const { challengeId, options } = await ctx.service.beginLogin(RP)
+    const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
     const response = authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1')
     await ctx.service.finishLogin(challengeId, response, RP, META)
     await expect(ctx.service.finishLogin(challengeId, response, RP, META)).rejects.toMatchObject({ code: 'LOGIN_FAILED' })
   })
 
   it('rejects a counter that does not advance', async () => {
-    const first = await ctx.service.beginLogin(RP)
+    const first = await ctx.service.beginLogin(RP, META.ipAddress)
     await ctx.service.finishLogin(first.challengeId, authenticator.authenticate(first.options, RP.rpId, RP.origin, 'user-1'), RP, META)
-    const second = await ctx.service.beginLogin(RP)
+    const second = await ctx.service.beginLogin(RP, META.ipAddress)
     await expect(
       ctx.service.finishLogin(second.challengeId, authenticator.authenticate(second.options, RP.rpId, RP.origin, 'user-1'), RP, META),
     ).rejects.toMatchObject({ code: 'LOGIN_FAILED' })
   })
 
   it('rejects an assertion whose clientData names another origin', async () => {
-    const { challengeId, options } = await ctx.service.beginLogin(RP)
+    const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
     const response = authenticator.authenticate(options, RP.rpId, 'https://evil.example.com', 'user-1')
     await expect(ctx.service.finishLogin(challengeId, response, RP, META)).rejects.toMatchObject({ code: 'LOGIN_FAILED' })
   })
 
   it('does not accept a passkey on a different relying party', async () => {
-    const { challengeId, options } = await ctx.service.beginLogin(INTERNAL_RP)
+    const { challengeId, options } = await ctx.service.beginLogin(INTERNAL_RP, META.ipAddress)
     const response = authenticator.authenticate(options, INTERNAL_RP.rpId, INTERNAL_RP.origin, 'user-1')
     await expect(ctx.service.finishLogin(challengeId, response, INTERNAL_RP, META)).rejects.toMatchObject({ code: 'LOGIN_FAILED' })
   })
 
   it('rejects a challenge issued for another relying party', async () => {
-    const { challengeId, options } = await ctx.service.beginLogin(INTERNAL_RP)
+    const { challengeId, options } = await ctx.service.beginLogin(INTERNAL_RP, META.ipAddress)
     const response = authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1')
     await expect(ctx.service.finishLogin(challengeId, response, RP, META)).rejects.toMatchObject({ code: 'LOGIN_FAILED' })
   })
@@ -192,7 +195,7 @@ describe('PasskeyService login', () => {
   it('rejects an unknown credential with the same error as any other failure', async () => {
     const stranger = new SoftAuthenticator()
     stranger.counter = 1
-    const { challengeId, options } = await ctx.service.beginLogin(RP)
+    const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
     await expect(
       ctx.service.finishLogin(challengeId, stranger.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META),
     ).rejects.toMatchObject({ code: 'LOGIN_FAILED', message: 'Sign-in failed' })
@@ -203,7 +206,7 @@ describe('PasskeyService login', () => {
     const user = ctx.repo.users.get('user-1')
     if (user === undefined) throw new Error('missing user')
     ctx.repo.users.set('user-1', { ...user, suspended: true })
-    const { challengeId, options } = await ctx.service.beginLogin(RP)
+    const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
     await expect(
       ctx.service.finishLogin(challengeId, authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META),
     ).rejects.toBeInstanceOf(AccountSuspendedError)
@@ -213,15 +216,21 @@ describe('PasskeyService login', () => {
     const stranger = new SoftAuthenticator()
     stranger.counter = 1
     for (let i = 0; i < 10; i++) {
-      const { challengeId, options } = await ctx.service.beginLogin(RP)
+      const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
       await expect(
         ctx.service.finishLogin(challengeId, stranger.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META),
       ).rejects.toMatchObject({ code: 'LOGIN_FAILED' })
     }
-    const { challengeId, options } = await ctx.service.beginLogin(RP)
+    const { challengeId, options } = await ctx.service.beginLogin(RP, META.ipAddress)
     await expect(
       ctx.service.finishLogin(challengeId, authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META),
     ).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+  })
+
+  it('limits how many login challenges one address can open per minute', async () => {
+    for (let i = 0; i < 30; i++) await ctx.service.beginLogin(RP, '10.9.9.9')
+    await expect(ctx.service.beginLogin(RP, '10.9.9.9')).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+    await expect(ctx.service.beginLogin(RP, '10.9.9.10')).resolves.toBeDefined()
   })
 
   it('rebuilds the credential index from stored users', async () => {
@@ -231,7 +240,7 @@ describe('PasskeyService login', () => {
       logger: silentLogger(),
     })
     await fresh.loadIndex()
-    const { challengeId, options } = await fresh.beginLogin(RP)
+    const { challengeId, options } = await fresh.beginLogin(RP, META.ipAddress)
     const result = await fresh.finishLogin(challengeId, authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META)
     expect(result.token).toBe('session-token')
   })
@@ -248,7 +257,7 @@ describe('PasskeyService management', () => {
     expect(repo.users.get('user-1')?.passkeys).toEqual([])
 
     authenticator.counter = 1
-    const { challengeId, options } = await service.beginLogin(RP)
+    const { challengeId, options } = await service.beginLogin(RP, META.ipAddress)
     await expect(
       service.finishLogin(challengeId, authenticator.authenticate(options, RP.rpId, RP.origin, 'user-1'), RP, META),
     ).rejects.toMatchObject({ code: 'LOGIN_FAILED' })

@@ -15,6 +15,7 @@ import { KeyedMutex } from '../shared/async-mutex.js'
 import { SlidingWindowRateLimiter } from '../shared/sliding-window-rate-limiter.js'
 import type { IUserRepository, UserRecord } from '../user/index.js'
 import { ARGON2_OPTIONS, assertValidPassword } from '../user/index.js'
+import { isPlainEmailAddress } from './email-address.js'
 import type { IMailService } from './mail-service.js'
 import {
   PASSWORD_RESET_TTL_MS,
@@ -73,7 +74,7 @@ export interface AccountRecoveryDeps {
   auditService?: IAuditService
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_UNIQUENESS_LOCK = '\0email-uniqueness'
 
 /** Raw tokens travel as `<userId>.<secret>` so the account is found without scanning all users. */
 function composeToken(userId: string, secret: string): string {
@@ -128,7 +129,7 @@ export class AccountRecoveryService implements IAccountRecoveryService {
 
   async requestEmailChange(userId: string, password: string, newEmail: string): Promise<void> {
     const email = newEmail.trim()
-    if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    if (!isPlainEmailAddress(email)) {
       throw new AccountFlowError('EMAIL_INVALID', 'Email must be a valid email address')
     }
     if (!(await this.deps.mailService.isConfigured()) || (await this.linkBase()) === null) {
@@ -165,7 +166,9 @@ export class AccountRecoveryService implements IAccountRecoveryService {
     const parts = splitToken(rawToken)
     if (parts === null) throw new AccountFlowError('INVALID_TOKEN', 'Invalid or expired link')
 
-    await this.locks.runExclusive(parts.userId, async () => {
+    // One address may be confirmed by one account only: the uniqueness check and the save must not
+    // interleave with another account confirming the same address, hence the global lock.
+    await this.locks.runExclusive(EMAIL_UNIQUENESS_LOCK, () => this.locks.runExclusive(parts.userId, async () => {
       const user = await this.deps.userRepository.findById(parts.userId)
       const token = user === null ? null : findMailToken(user.mailTokens, 'verify-email', parts.secret)
       if (user === null || token === null || token.email === undefined) {
@@ -191,7 +194,7 @@ export class AccountRecoveryService implements IAccountRecoveryService {
         ipAddress,
         success: true,
       })
-    })
+    }))
   }
 
   async requestPasswordReset(identifier: string, ipAddress: string): Promise<void> {

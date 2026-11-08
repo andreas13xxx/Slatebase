@@ -8,7 +8,7 @@
  * Authenticated:
  * - POST   /auth/passkey/register/options   (re-auth with password)
  * - POST   /auth/passkey/register/verify
- * - PATCH  /users/me/passkeys/:id
+ * - PUT    /users/me/passkeys/:id
  * - DELETE /users/me/passkeys/:id
  *
  * Admin:
@@ -112,7 +112,7 @@ export function createPasskeyRoutes(deps: PasskeyRoutesDeps): Hono {
     const rp = await relyingParty(c)
     if (rp instanceof Response) return rp
     try {
-      return c.json(await passkeys.beginLogin(rp), 200)
+      return c.json(await passkeys.beginLogin(rp, clientIp(c)), 200)
     } catch (err) {
       return handleError(c, err)
     }
@@ -181,7 +181,7 @@ export function createPasskeyRoutes(deps: PasskeyRoutesDeps): Hono {
     }
   })
 
-  app.patch('/users/me/passkeys/:id', async (c) => {
+  app.put('/users/me/passkeys/:id', async (c) => {
     const session = requireSession(c)
     if (session instanceof Response) return session
     const id = idParamSchema.safeParse(c.req.param('id'))

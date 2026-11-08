@@ -364,7 +364,7 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | POST | `/auth/passkey/register/options` · `/auth/passkey/register/verify` | Register a passkey (password re-entered) |
 | GET | `/users/me/security` | Address state and passkeys |
 | PUT | `/users/me/email` | Start an address change (password required); sends a confirmation mail |
-| PATCH · DELETE | `/users/me/passkeys/:id` | Rename · delete a passkey |
+| PUT · DELETE | `/users/me/passkeys/:id` | Rename · delete a passkey |
 | POST | `/auth/email/verify` | Public: confirm an address with the mailed token |
 | POST | `/auth/password-reset/request` · `/auth/password-reset/confirm` | Public: request a reset mail · set a new password with the token |
 

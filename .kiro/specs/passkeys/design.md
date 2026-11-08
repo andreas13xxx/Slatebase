@@ -61,7 +61,7 @@ Request → Origin-Header → in allowedOrigins? → nein: 403
 | `POST /auth/passkey/login/options` | keine | Challenge (optional mit Benutzername) |
 | `POST /auth/passkey/login/verify` | keine | Signatur prüfen, Sitzung erzeugen |
 | `GET /users/me/passkeys` | Sitzung | Liste |
-| `PATCH` / `DELETE /users/me/passkeys/:id` | Sitzung | Umbenennen, Löschen |
+| `PUT` / `DELETE /users/me/passkeys/:id` | Sitzung | Umbenennen, Löschen |
 | `PUT /users/me/email` | Sitzung + Re-Auth | Adresse setzen, Bestätigungsmail senden |
 | `POST /auth/email/verify` | keine (Token) | Adresse bestätigen |
 | `POST /auth/password-reset/request` | keine | Benutzername oder Adresse, einheitliche Antwort |

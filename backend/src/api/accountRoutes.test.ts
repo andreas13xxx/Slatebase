@@ -171,7 +171,7 @@ describe('passkey routes', () => {
     const passkeys = passkeysMock()
     const res = await build(passkeys, null).request('/api/v1/auth/passkey/login/options', json({}, ORIGIN))
     expect(res.status).toBe(200)
-    expect(passkeys.beginLogin).toHaveBeenCalledWith({ origin: 'https://notes.example.org', rpId: 'notes.example.org' })
+    expect(passkeys.beginLogin).toHaveBeenCalledWith({ origin: 'https://notes.example.org', rpId: 'notes.example.org' }, '10.0.0.1')
   })
 
   it('sets the session cookie on a successful passkey login', async () => {
@@ -201,7 +201,7 @@ describe('passkey routes', () => {
     const app = build(passkeys)
     expect((await app.request('/api/v1/auth/passkey/register/options', json({ password: 'pw' }, ORIGIN))).status).toBe(200)
     expect((await app.request('/api/v1/auth/passkey/register/verify', json({ challengeId: 'c1', name: 'Laptop', response: credential }, ORIGIN))).status).toBe(201)
-    expect((await app.request('/api/v1/users/me/passkeys/p1', { ...json({ name: 'Phone' }), method: 'PATCH' })).status).toBe(200)
+    expect((await app.request('/api/v1/users/me/passkeys/p1', { ...json({ name: 'Phone' }), method: 'PUT' })).status).toBe(200)
     expect((await app.request('/api/v1/users/me/passkeys/p1', { method: 'DELETE' })).status).toBe(204)
     expect(passkeys.remove).toHaveBeenCalledWith('user-1', 'p1', '10.0.0.1')
   })

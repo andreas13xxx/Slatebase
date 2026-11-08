@@ -11,6 +11,7 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { isPlainEmailAddress } from '../account/email-address.js'
 import { normalizeOrigin, resolveMailBaseUrl, validatePasskeyRpId } from '../account/origin.js'
 import type { IMailService } from '../account/mail-service.js'
 import type { IAccountSettingsStore } from '../account/settings-store.js'
@@ -35,7 +36,7 @@ const updateSchema = z.object({
   smtpPassword: z.string().max(1024).optional(),
 })
 
-const testSchema = z.object({ to: z.string().min(3).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) })
+const testSchema = z.object({ to: z.string().min(3).max(254).refine(isPlainEmailAddress) })
 
 export interface AccountSettingsRoutesDeps {
   settings: IAccountSettingsStore
