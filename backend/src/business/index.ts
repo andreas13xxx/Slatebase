@@ -663,8 +663,14 @@ export class VaultService implements IVaultService {
       throw new StorageError('VaultRegistry is not configured')
     }
 
-    // 1. Validate name
-    const existingNames = this.vaultManager.getAllVaults().map((v) => v.info.name)
+    // 1. Validate name. Uniqueness is scoped to the user's OWN vaults only:
+    // vault IDs are path-derived and globally unique, so same-named vaults
+    // never collide technically. A shared vault's name must not block the
+    // user from creating one of their own with that name.
+    const existingNames = this.vaultManager
+      .getAllVaults()
+      .filter((v) => v.info.ownerId === ownerId)
+      .map((v) => v.info.name)
     const validationResult = validateVaultName(name, existingNames)
 
     if (!validationResult.valid) {

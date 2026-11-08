@@ -539,6 +539,41 @@ describe('VaultService', () => {
       expect(created.name).toBe('Mine')
     })
 
+    it('allows a name already used by another user (or a shared vault)', async () => {
+      // Name uniqueness is scoped to the user's own vaults: a stranger's vault
+      // named "Projekte" — or one shared with this user — must not block it.
+      const foreign = createMockVault('vault-foreign', 'Projekte', '/data/vault-foreign')
+      foreign.info.ownerId = 'someone-else'
+      const vaultManager = createMockVaultManager([foreign])
+      const service = new VaultService(
+        vaultManager,
+        createMockVaultReader(),
+        createMockConfigService(),
+        createMockLogger(),
+        createMockRegistry(),
+      )
+
+      const created = await service.createVault('Projekte', 'owner-a')
+
+      expect(created.name).toBe('Projekte')
+    })
+
+    it('rejects a name the requesting user already owns', async () => {
+      const own = createMockVault('vault-own', 'Projekte', '/data/vault-own')
+      own.info.ownerId = 'owner-a'
+      const vaultManager = createMockVaultManager([own])
+      const service = new VaultService(
+        vaultManager,
+        createMockVaultReader(),
+        createMockConfigService(),
+        createMockLogger(),
+        createMockRegistry(),
+      )
+
+      await expect(service.createVault('Projekte', 'owner-a'))
+        .rejects.toThrow(VaultValidationError)
+    })
+
     it('throws VaultValidationError for empty name', async () => {
       const vaultManager = createMockVaultManager()
       const configService = createMockConfigService()
@@ -581,6 +616,7 @@ describe('VaultService', () => {
 
     it('throws VaultValidationError with VAULT_NAME_CONFLICT for duplicate name', async () => {
       const existingVault = createMockVault('abc123def456', 'Existing Vault', '/path/existing')
+      existingVault.info.ownerId = 'test-owner-id'
       const vaultManager = createMockVaultManager([existingVault])
       const configService = createMockConfigService()
       const vaultReader = createMockVaultReader()
