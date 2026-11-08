@@ -47,6 +47,36 @@ export interface UserRecord {
   mustChangePassword: boolean
   createdAt: string
   updatedAt: string
+  /** ISO timestamp at which `email` was confirmed via mailed link; unset = unverified. */
+  emailVerifiedAt?: string
+  /** Address awaiting confirmation. Replaces `email` only once the link is opened. */
+  pendingEmail?: string
+  /** Single-use mailed tokens (stored as SHA-256 hashes), see account/mail-tokens.ts. */
+  mailTokens?: MailTokenRecord[]
+  /** Registered WebAuthn credentials (public keys only). */
+  passkeys?: PasskeyRecord[]
+}
+
+/** A single-use mailed token; only the hash of the raw token is persisted. */
+export interface MailTokenRecord {
+  purpose: 'verify-email' | 'password-reset'
+  hash: string
+  expiresAt: string
+  /** For `verify-email`: the address the token confirms. */
+  email?: string
+}
+
+/** A registered passkey (WebAuthn credential). No private key material. */
+export interface PasskeyRecord {
+  id: string
+  credentialId: string
+  publicKey: string
+  counter: number
+  transports?: string[]
+  rpId: string
+  name: string
+  createdAt: string
+  lastUsedAt?: string
 }
 
 /**
@@ -254,6 +284,16 @@ export class UserValidationError extends Error {
   constructor(public readonly code: string, message: string) {
     super(message)
     this.name = 'UserValidationError'
+  }
+}
+
+/** Password rules shared by registration, password change and mail reset: 8–128 characters. */
+export function assertValidPassword(password: string): void {
+  if (password.length < 8) {
+    throw new UserValidationError('PASSWORD_TOO_SHORT', 'Password must be at least 8 characters')
+  }
+  if (password.length > 128) {
+    throw new UserValidationError('PASSWORD_TOO_LONG', 'Password must be at most 128 characters')
   }
 }
 
@@ -926,6 +966,14 @@ export class UserService implements IUserService {
       updatedAt: new Date().toISOString(),
     }
 
+    // A changed address is no longer the one the user confirmed by mail: drop the
+    // verification so the mail reset never trusts an address nobody has proven.
+    if (updatedUser.email !== user.email) {
+      delete updatedUser.emailVerifiedAt
+      delete updatedUser.pendingEmail
+      delete updatedUser.mailTokens
+    }
+
     await this.userRepository.save(updatedUser)
     this.logger.info('Profile updated', { userId })
 
@@ -1015,6 +1063,8 @@ export class UserService implements IUserService {
     }
 
     await this.userRepository.save(updatedUser)
+    // A reset means the old credential may be compromised: end every session of the account.
+    await this.sessionStore.invalidateAllForUser(userId)
     this.logger.info('Password reset', { userId })
 
     await this.auditService?.log({
@@ -1209,12 +1259,7 @@ export class UserService implements IUserService {
    * Validate password length: 8–128 characters.
    */
   private validatePassword(password: string): void {
-    if (password.length < 8) {
-      throw new UserValidationError('PASSWORD_TOO_SHORT', 'Password must be at least 8 characters')
-    }
-    if (password.length > 128) {
-      throw new UserValidationError('PASSWORD_TOO_LONG', 'Password must be at most 128 characters')
-    }
+    assertValidPassword(password)
   }
 
   /**

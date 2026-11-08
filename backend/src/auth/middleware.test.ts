@@ -22,6 +22,8 @@ function createMockAuthService(overrides: Partial<IAuthService> = {}): IAuthServ
     getSessions: async () => [],
     invalidateSession: async () => {},
     invalidateOtherSessions: async () => {},
+    invalidateAllSessions: async () => {},
+    loginVerifiedUser: async () => ({ token: '', csrfToken: '', user: {} as never, expiresAt: '' }),
     generateCsrfToken: () => 'csrf-token',
     validateCsrfToken: () => true,
     ...overrides,

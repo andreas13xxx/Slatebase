@@ -45,6 +45,25 @@ export function isPublicSharePath(method: string, path: string): boolean {
   return method === 'POST' && path.endsWith('/unlock')
 }
 
+/**
+ * Unauthenticated account endpoints: the login-page capability probe, passkey login,
+ * mailed-link flows (password reset, address confirmation). They carry no session and
+ * therefore no CSRF token; each protects itself (single-use tokens, `Origin` check for
+ * passkeys, per-IP rate limits).
+ */
+const PUBLIC_AUTH_POST_PATHS = new Set([
+  '/api/v1/auth/passkey/login/options',
+  '/api/v1/auth/passkey/login/verify',
+  '/api/v1/auth/password-reset/request',
+  '/api/v1/auth/password-reset/confirm',
+  '/api/v1/auth/email/verify',
+])
+
+export function isPublicAuthPath(method: string, path: string): boolean {
+  if (method === 'GET') return path === '/api/v1/auth/capabilities'
+  return method === 'POST' && PUBLIC_AUTH_POST_PATHS.has(path)
+}
+
 /** HTTP methods that require CSRF validation. */
 const CSRF_METHODS = new Set(['POST', 'PUT', 'DELETE'])
 
@@ -125,6 +144,11 @@ export function createAuthMiddleware(
       return next()
     }
 
+    // Skip auth for the unauthenticated account endpoints (see isPublicAuthPath)
+    if (isPublicAuthPath(c.req.method, c.req.path)) {
+      return next()
+    }
+
     const token = extractBearerToken(c)
     if (token === null) {
       return createErrorResponse(c, 401, 'UNAUTHORIZED', 'Missing or invalid authorization token')
@@ -173,6 +197,11 @@ export function createCsrfMiddleware(
 
     // Skip CSRF for the public share unlock (no session; see isPublicSharePath)
     if (isPublicSharePath(c.req.method, c.req.path)) {
+      return next()
+    }
+
+    // Skip CSRF for the unauthenticated account endpoints (no session; see isPublicAuthPath)
+    if (isPublicAuthPath(c.req.method, c.req.path)) {
       return next()
     }
 
