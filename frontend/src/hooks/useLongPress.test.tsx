@@ -120,4 +120,60 @@ describe('useLongPress dispatchOnTarget', () => {
     vi.advanceTimersByTime(LONG_PRESS_MS)
     expect(onContextMenu).toHaveBeenCalledTimes(1)
   })
+
+  describe('suppressNativeDrag', () => {
+    function Draggable() {
+      const longPress = useLongPress({ suppressNativeDrag: true })
+      return <button data-testid="d" draggable {...longPress}>x</button>
+    }
+
+    it('turns draggable off during a touch and restores it on release', () => {
+      const { getByTestId } = render(<Draggable />)
+      const el = getByTestId('d') as HTMLButtonElement
+      fireEvent.pointerDown(el, { pointerType: 'touch', isPrimary: true })
+      expect(el.draggable).toBe(false)
+      fireEvent.pointerUp(el, { pointerType: 'touch' })
+      expect(el.draggable).toBe(true)
+    })
+
+    it('restores draggable on pointercancel', () => {
+      const { getByTestId } = render(<Draggable />)
+      const el = getByTestId('d') as HTMLButtonElement
+      fireEvent.pointerDown(el, { pointerType: 'touch', isPrimary: true })
+      fireEvent.pointerCancel(el, { pointerType: 'touch' })
+      expect(el.draggable).toBe(true)
+    })
+
+    it('keeps mouse dragging', () => {
+      const { getByTestId } = render(<Draggable />)
+      const el = getByTestId('d') as HTMLButtonElement
+      fireEvent.pointerDown(el, { pointerType: 'mouse', isPrimary: true })
+      expect(el.draggable).toBe(true)
+    })
+
+    it('also handles a draggable ancestor of the pressed element', () => {
+      function Wrapped() {
+        const longPress = useLongPress({ suppressNativeDrag: true })
+        return <li data-testid="li" draggable><button data-testid="b" {...longPress}>x</button></li>
+      }
+      const { getByTestId } = render(<Wrapped />)
+      const li = getByTestId('li') as HTMLLIElement
+      fireEvent.pointerDown(getByTestId('b'), { pointerType: 'touch', isPrimary: true })
+      expect(li.draggable).toBe(false)
+      fireEvent.pointerUp(getByTestId('b'), { pointerType: 'touch' })
+      expect(li.draggable).toBe(true)
+    })
+
+    it('does not turn on draggable for an element that was not draggable', () => {
+      function Plain() {
+        const longPress = useLongPress({ suppressNativeDrag: true })
+        return <button data-testid="p" {...longPress}>x</button>
+      }
+      const { getByTestId } = render(<Plain />)
+      const el = getByTestId('p') as HTMLButtonElement
+      fireEvent.pointerDown(el, { pointerType: 'touch', isPrimary: true })
+      fireEvent.pointerUp(el, { pointerType: 'touch' })
+      expect(el.draggable).toBe(false)
+    })
+  })
 })

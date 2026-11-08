@@ -27,14 +27,25 @@ export interface LongPressHandlers {
  *
  * @param options.dispatchOnTarget Fire on the element that was actually pressed instead of the
  *   handler's element, for containers whose `contextmenu` listener inspects `event.target`.
+ * @param options.suppressNativeDrag Turn off `draggable` on the pressed element (or its closest draggable ancestor) for the duration of a touch.
+ *   Browsers start a native drag on a held `draggable` element at about the same time the long-press fires,
+ *   and that drag swallows the menu. Mouse and pen keep dragging.
  * @returns Handlers to spread onto the element.
  */
-export function useLongPress(options: { dispatchOnTarget?: boolean } = {}): LongPressHandlers {
+export function useLongPress(options: { dispatchOnTarget?: boolean; suppressNativeDrag?: boolean } = {}): LongPressHandlers {
   const dispatchOnTarget = options.dispatchOnTarget === true
+  const suppressNativeDrag = options.suppressNativeDrag === true
+  const undragRef = useRef<HTMLElement | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startRef = useRef<{ x: number; y: number } | null>(null)
   const firedRef = useRef(false)
   const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** Gives the element its `draggable` back once the touch is over. */
+  const restoreDraggable = useCallback(() => {
+    if (undragRef.current) undragRef.current.draggable = true
+    undragRef.current = null
+  }, [])
 
   const cancel = useCallback(() => {
     if (timerRef.current !== null) clearTimeout(timerRef.current)
@@ -45,13 +56,14 @@ export function useLongPress(options: { dispatchOnTarget?: boolean } = {}): Long
   /** Ends a touch: disarms the timer and lets the click suppression expire on its own. */
   const release = useCallback(() => {
     cancel()
+    restoreDraggable()
     if (!firedRef.current) return
     if (releaseTimerRef.current !== null) clearTimeout(releaseTimerRef.current)
     releaseTimerRef.current = setTimeout(() => {
       releaseTimerRef.current = null
       firedRef.current = false
     }, CLICK_SUPPRESS_MS)
-  }, [cancel])
+  }, [cancel, restoreDraggable])
 
   // A row can unmount mid-hold (tab closed, tree refreshed): drop both timers.
   useEffect(() => () => {
@@ -66,6 +78,13 @@ export function useLongPress(options: { dispatchOnTarget?: boolean } = {}): Long
     releaseTimerRef.current = null
     firedRef.current = false
     const currentTarget = e.currentTarget
+    restoreDraggable()
+    // The draggable element may be an ancestor of the one carrying the handlers (favorites: <li> around a button).
+    const draggable = suppressNativeDrag ? currentTarget.closest<HTMLElement>('[draggable="true"]') : null
+    if (draggable) {
+      draggable.draggable = false
+      undragRef.current = draggable
+    }
     const target = dispatchOnTarget && e.target instanceof Element ? e.target : currentTarget
     const x = e.clientX
     const y = e.clientY
@@ -77,7 +96,7 @@ export function useLongPress(options: { dispatchOnTarget?: boolean } = {}): Long
       const dispatchTarget = target.isConnected ? target : currentTarget
       dispatchTarget.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y }))
     }, LONG_PRESS_MS)
-  }, [cancel, dispatchOnTarget])
+  }, [cancel, dispatchOnTarget, suppressNativeDrag, restoreDraggable])
 
   const onPointerMove = useCallback((e: React.PointerEvent<Element>) => {
     const start = startRef.current
