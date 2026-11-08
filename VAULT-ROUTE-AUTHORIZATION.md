@@ -13,7 +13,8 @@ the source-of-truth document for:
 - PR 2 (handler cleanup): for each route, whether the handler-level check becomes
   redundant once the middleware enforces the same level.
 
-Verified against `origin/master` @ `ef82dbc` (v0.78.0, 2026-11-08). The table sections 1–19 were
+Verified against `origin/master` @ `ef82dbc` (v0.78.0, 2026-11-08). The "Level today"/"before the middleware"
+wording and the PR 1/PR 2 notes are historical (2026-09); the current levels are in "Current state". The table sections 1–19 were
 built against `010785d` and their line numbers are **not** re-verified — re-verify rather than trust
 them blindly. The levels, however, were re-checked on 2026-11-08 against
 `VAULT_ROUTE_LEVEL_EXCEPTIONS` and the live route list; where they changed since the original
