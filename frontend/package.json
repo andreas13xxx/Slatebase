@@ -39,6 +39,7 @@
     "@lezer/highlight": "1.2.5",
     "@lezer/lr": "1.4.12",
     "@react-symbols/icons": "1.4.1",
+    "@simplewebauthn/browser": "14.0.0",
     "@slatebase/shared-contracts": "file:../shared-contracts",
     "buffer": "^6.0.3",
     "d3-force": "3.0.0",

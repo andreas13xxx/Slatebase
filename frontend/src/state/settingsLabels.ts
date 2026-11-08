@@ -10,6 +10,7 @@ import type { SettingsCategory, SettingsSection } from './settingsState'
 export const SECTION_LABELS: Record<SettingsSection, string> = {
   'profile': 'Profil',
   'password': 'Passwort ändern',
+  'security': 'Sicherheit',
   'sessions': 'Sitzungen',
   'mcp-tokens': 'MCP-Tokens',
   'public-shares': 'Öffentliche Links',

@@ -16,6 +16,8 @@ import { SETTINGS_SECTIONS } from '../../state/settingsRegistry'
 import { FeatureDisabledHint } from './ui'
 import { ChangePasswordPage } from '../ChangePasswordPage'
 import { AccountDeletionSection } from './AccountDeletionSection'
+import { SecuritySection } from '../../account/SecuritySection'
+import { AdminAccountSettingsSection } from '../../account/AdminAccountSettingsSection'
 import { FeatureTogglesSection } from './FeatureTogglesSection'
 import { ServerRestartSection } from './ServerRestartSection'
 import { VaultConfigSection } from './VaultConfigSection'
@@ -104,6 +106,8 @@ function renderSection(
       return <ProfilePage apiClient={apiClient} mode="profile-only" />
     case 'password':
       return <ChangePasswordPage apiClient={apiClient} embedded />
+    case 'security':
+      return <SecuritySection apiClient={apiClient} />
     case 'sessions':
       return <SessionsPage apiClient={apiClient} />
     case 'mcp-tokens':
@@ -158,7 +162,12 @@ function renderSection(
       }
       return <MailImportSection />
     case 'server-config':
-      return <AdminConfigPage apiClient={apiClient} hideFeatureToggles />
+      return (
+        <>
+          <AdminConfigPage apiClient={apiClient} hideFeatureToggles />
+          <AdminAccountSettingsSection apiClient={apiClient} />
+        </>
+      )
     case 'user-management':
       return <AdminUsersPage apiClient={apiClient} />
     case 'vault-management':
