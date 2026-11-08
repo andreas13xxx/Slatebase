@@ -81,6 +81,12 @@ src/
 │   ├── welcomeVaultRoutes.test.ts — Integration tests for welcome vault route
 │   ├── gitSyncRoutes.ts      — Per-vault git-sync routes (remotes CRUD, branch, generate-ssh-key, status, sync-now); feature-gated on `git-sync`
 │   ├── appConfigRoutes.ts    — `/vaults/:vaultId/app-config`: GET (read) all fields of `.obsidian/app.json`, PATCH (write) known keys; 409 `APP_CONFIG_INVALID` if the file is not a JSON object; publishes `vault:change` for the file
+│   ├── obsidianConfigRoutes.ts — `createObsidianConfigRoutes()`: the shared `GET /` (read) + `PATCH /` (write) factory behind the six `*-config` route files below; Zod schema built from the key table in `shared-contracts` (`obsidian-config/config-schema.ts`), 409 when the file is not valid JSON, every PATCH publishes `vault:change`. No access check of its own — the vault-authorization middleware's method default applies
+│   ├── appearanceConfigRoutes.ts — `/vaults/:vaultId/appearance-config`: `.obsidian/appearance.json` (base theme, accent colour, font size, fonts) via the shared factory; `cssTheme`/`enabledCssSnippets` stay with the theme and snippet routes
+│   ├── graphConfigRoutes.ts  — `/vaults/:vaultId/graph-config`: `.obsidian/graph.json` via the shared factory
+│   ├── bookmarksConfigRoutes.ts — `/vaults/:vaultId/bookmarks-config`: `.obsidian/bookmarks.json` via the shared factory
+│   ├── hotkeysConfigRoutes.ts — `/vaults/:vaultId/hotkeys-config`: `.obsidian/hotkeys.json` via the shared factory
+│   ├── workspacesConfigRoutes.ts — `/vaults/:vaultId/workspaces-config`: `.obsidian/workspaces.json` via the shared factory
 │   ├── keychainRoutes.ts     — Vault keychain routes at `/vaults/:vaultId/keychain` (list IDs = read access; get value, put, delete = write access)
 │   ├── mailImportRoutes.ts   — Per-vault IMAP config routes (CRUD, mailbox-tree, status, import-now); feature-gated on `mail-import`
 │   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
@@ -93,6 +99,13 @@ src/
 │   ├── activityRoutes.ts    — Activity timeline read route (GET /vaults/:vaultId/activity — cursor-paginated, type/time filters; feature-gated `activity-timeline`, vault auth via shared middleware). Recording happens as a side effect of vault mutations (VaultController, trashRoutes, MCP tool-handlers); this route only reads back what ActivityStore wrote
 │   ├── activityRoutes.test.ts — Integration tests for the activity read route
 │   ├── pluginStoreRoutes.ts — Community plugin store routes (browse, install, update; per-vault and global mounts); install/update publish `vault:change`
+│   ├── themeStoreRoutes.ts  — Community theme store: `createThemeStoreRoutes` at `/api/v1/theme-store` (`GET /themes` catalog, `GET /screenshot`; session only, no vault) and `createVaultThemeStoreRoutes` at `/vaults/:vaultId/theme-store` (`GET /updates` read, `POST /install` write); both behind the `obsidian-theme-store` feature guard
+│   ├── spellcheckDictionaryRoutes.ts — Personal spellcheck words: `GET /vaults/:vaultId/spellcheck/words` (read), `POST …/words` and `POST …/words/remove` (write); 409 when `spellcheck-words.json` is unreadable
+│   ├── publicShareRoutes.ts — Public share links, feature `public-shares` (default off): `createPublicShareManagementRoutes` (per-vault create/list/preview/update/regenerate/revoke under `/vaults/:vaultId/public-shares`, plus the creator's own `/public-shares`; listing and preview are a write-level exception in the authorization middleware) and `createPublicShareReaderRoutes` at `/api/v1/public/s` (anonymous `GET /:token`, `POST /:token/unlock`, `GET /:token/asset`; no session/CSRF, bypassed in `auth/middleware.ts` via `isPublicSharePath`, own rate limits, 404 for unknown/expired/revoked links)
+│   ├── releaseRoutes.ts     — `GET /api/v1/releases`: the last published GitHub releases for the Release Notes modal, served from `release-info/` (session only; 502 `RELEASE_INFO_UNAVAILABLE` when GitHub was never reachable)
+│   ├── transcriptionRoutes.ts — `POST /vaults/:vaultId/transcribe` (multipart audio → text via the Whisper backend; write access, per-user rate limit); feature-gated on `voice-transcription`
+│   ├── mapConfigRoutes.ts   — `GET /api/v1/map-config`: operator-set map tile URL and attribution (`SLATEBASE_MAP_TILE_URL`/`_ATTRIBUTION`) for the Bases map view; empty `tileUrl` = map view inactive. Needs a session like all `/api/v1/*` routes
+│   ├── healthRoutes.ts      — `GET /healthz` (liveness) and `GET /readyz` (readiness: session index and vault registry loaded); mounted at the app root, outside `/api/v1/*`, so no auth
 │   ├── vaultChangeEvents.ts — `publishVaultChange()` helper for routes that change vault files outside the file API (plugins; excludes the writer, best-effort) + the `.obsidian` paths plugin events use
 │   └── sseRoutes.ts      — GET /events (SSE stream)
 ├── chat/
@@ -308,6 +321,19 @@ src/
 │   ├── validation.ts         — Zod schemas (transcribeFieldsSchema: language + saveAudio, vaultId param)
 │   ├── whisper-client.ts     — WhisperClient (multipart POST to the backend, AbortSignal timeout, lenient text-field parsing; the ONLY file that knows the backend's request/response shape)
 │   └── transcription-service.ts — TranscriptionService (isConfigured gate, max-audio enforcement, lazy client via factory; never persists audio)
+├── public-share/             — Public share links: let people without an account read a note (with the embeds it pulls in) through an unguessable URL. Feature toggle `public-shares` (cold, default off). The link token is the credential and is shown once; only its hash and a short hint are stored.
+│   ├── index.ts              — Barrel export for public-share module
+│   ├── types.ts              — PublicShare, create/update inputs, PublicNoteView/PublicAsset, IPublicShareVaultAccess
+│   ├── errors.ts             — PublicShareNotFoundError and the other domain errors
+│   ├── public-share-store.ts — IPublicShareStore + its file-backed implementation (links, atomic writes)
+│   ├── public-share-service.ts — PublicShareService (create/update/regenerate/revoke, token hashing, password and expiry checks, resolves what a link includes)
+│   ├── embed-extraction.ts   — Finds the `![[…]]` embeds of a note and extracts heading/block sections; `stripFrontmatter()`
+│   ├── embed-resolver.ts     — Resolves embeds against the vault tree (shared wikilink resolution via `link-index/link-match-resolver.ts`), asset allowlist by extension
+│   ├── vault-access.ts       — Adapter between the module and `VaultService`: every read validates the path, binary assets additionally pass `assertRealPathInsideVault` (a shared note must not embed a file outside the vault via symlink); `MAX_PUBLIC_ASSET_BYTES` 50 MB
+│   └── *.test.ts, test-helpers.ts — Unit tests next to each file
+├── release-info/             — Release list for the Release Notes modal (`api/releaseRoutes.ts`)
+│   ├── index.ts              — Barrel export for release-info module
+│   └── release-info-service.ts — ReleaseInfoService: last 5 releases of the Slatebase repo from the GitHub API via `shared/guarded-fetch.ts`, 2 MB limit, 1 h cache, 5 min backoff after a failure (serves the last known list with `stale: true`)
 ├── welcome-vault/
 │   ├── index.ts              — IWelcomeVaultService, WelcomeVaultService (never-throw, language-aware template copy)
 │   └── types.ts              — WelcomeVaultConfig, WelcomeVaultLanguage, OnUserCreatedFn

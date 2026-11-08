@@ -13,8 +13,13 @@ the source-of-truth document for:
 - PR 2 (handler cleanup): for each route, whether the handler-level check becomes
   redundant once the middleware enforces the same level.
 
-Verified against `origin/master` @ `010785d` (2026-09-09). Line numbers reference that
-commit — if drifted, re-verify rather than trust this file blindly.
+Verified against `origin/master` @ `ef82dbc` (v0.78.0, 2026-11-08). The "Level today"/"before the middleware"
+wording and the PR 1/PR 2 notes are historical (2026-09); the current levels are in "Current state". The table sections 1–19 were
+built against `010785d` and their line numbers are **not** re-verified — re-verify rather than trust
+them blindly. The levels, however, were re-checked on 2026-11-08 against
+`VAULT_ROUTE_LEVEL_EXCEPTIONS` and the live route list; where they changed since the original
+inventory, the sections below are corrected (§3, §16–18) and the "Current state" section at the end
+is the reference.
 
 **PR 2 status (2026-09-12, verified against `8e61aee`): done.** The handler-level checks
 for every row below have been removed except the six structurally-excluded routes (§19's
@@ -77,8 +82,8 @@ codes/messages preserved, see plan Schritt 2).
 
 ## 3. `backend/src/api/graphRoutes.ts` — `createGraphRoutes`
 
-All 4 routes use `checkVaultReadAccess()` (`access-check.ts:22-57`). All GET, all `read` —
-matches the method default, no exceptions.
+All routes are GET and `read` — matches the method default, no exceptions. (Originally 4 routes;
+`GET /vaults/:vaultId/aliases` was added later and is listed last, `graphRoutes.ts:87`.)
 
 | Method | Full path | Registered at | Level today | Check source |
 |---|---|---|---|---|
@@ -86,6 +91,7 @@ matches the method default, no exceptions.
 | GET | `/api/v1/vaults/:vaultId/graph/meta` | `graphRoutes.ts:89` | read | `graphRoutes.ts:151` |
 | GET | `/api/v1/vaults/:vaultId/backlinks` | `graphRoutes.ts:90` | read | `graphRoutes.ts:179` |
 | GET | `/api/v1/vaults/:vaultId/tags` | `graphRoutes.ts:91` | read | `graphRoutes.ts:221` |
+| GET | `/api/v1/vaults/:vaultId/aliases` | `graphRoutes.ts:87` | read | middleware default |
 
 ## 4. `backend/src/api/vaultConfigRoutes.ts` — `createVaultConfigRoutes`
 
@@ -191,54 +197,56 @@ Same `requireVaultAccess` pattern (`mailImportRoutes.ts:59-91`).
 
 ## 16. `backend/src/api/pluginRoutes.ts` (feature-gated: `obsidian-plugin-compat`)
 
-Mounted via `app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)` (`index.ts:651`).
-**Every route in this file — including all 7 mutating ones — uses `checkVaultReadAccess()`
-only.** This is a deliberate design choice per `.kiro/steering/structure.md` and
-`snippetRoutes.ts:84-86`'s doc comment (collaborators are trusted to manage vault-scoped
-customization, not just content), not an oversight. All 7 mutating routes are therefore
-**Exceptions** — verhaltensneutral means preserving `read` for each.
+*Corrected 2026-11-08 (levels re-checked against `ef82dbc`; the original inventory listed 7 mutating
+routes at `read`, since tightened).* Mounted via `app.route('/api/v1/vaults/:vaultId/plugins', pluginRoutes)`.
+Plugin code and activation live in the vault (`.obsidian/plugins/`, `community-plugins.json`) and run in
+every user's browser, so installing, uninstalling and activating need **write** (method default). The one
+remaining **Exception** is a plugin's own settings (`data.json`), which plugins write while they run — a
+read-only collaborator's plugin would otherwise fail on every save. The former `/detected` routes no longer exist.
 
-| Method | Path in sub-app | Full effective path | Registered at | Level today | Check source |
-|---|---|---|---|---|---|
-| GET | `/detected` | `/api/v1/vaults/:vaultId/plugins/detected` | `pluginRoutes.ts:121` | read | `pluginRoutes.ts:127` |
-| POST | `/detected/:pluginId/install` | `.../plugins/detected/:pluginId/install` | `pluginRoutes.ts:146` | **read** — Exception | `pluginRoutes.ts:161` |
-| PUT | `/registry` | `.../plugins/registry` | `pluginRoutes.ts:213` | **read** — Exception | `pluginRoutes.ts:219` |
-| GET | `/registry` | `.../plugins/registry` | `pluginRoutes.ts:247` | read | `pluginRoutes.ts:253` |
-| GET | `/` | `.../plugins` | `pluginRoutes.ts:272` | read | `pluginRoutes.ts:278` |
-| POST | `/` (ZIP upload/install) | `.../plugins` | `pluginRoutes.ts:292` | **read** — Exception | `pluginRoutes.ts:298` |
-| GET | `/:pluginId` | `.../plugins/:pluginId` | `pluginRoutes.ts:363` | read | `pluginRoutes.ts:378` |
-| DELETE | `/:pluginId` (uninstall) | `.../plugins/:pluginId` | `pluginRoutes.ts:395` | **read** — Exception | `pluginRoutes.ts:410` |
-| GET | `/:pluginId/bundle` | `.../plugins/:pluginId/bundle` | `pluginRoutes.ts:430` | read | `pluginRoutes.ts:445` |
-| GET | `/:pluginId/styles` | `.../plugins/:pluginId/styles` | `pluginRoutes.ts:469` | read | `pluginRoutes.ts:484` |
-| GET | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | `pluginRoutes.ts:511` | read | `pluginRoutes.ts:526` |
-| PUT | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | `pluginRoutes.ts:550` | **read** — Exception | `pluginRoutes.ts:565` |
+| Method | Path in sub-app | Full effective path | Level now | Notes |
+|---|---|---|---|---|
+| PUT | `/registry` | `.../plugins/registry` | write | was read |
+| GET | `/registry` | `.../plugins/registry` | read | |
+| GET | `/` | `.../plugins` | read | |
+| POST | `/` (ZIP upload/install) | `.../plugins` | write | was read |
+| GET | `/:pluginId` | `.../plugins/:pluginId` | read | |
+| DELETE | `/:pluginId` (uninstall) | `.../plugins/:pluginId` | write | was read |
+| GET | `/:pluginId/bundle` | `.../plugins/:pluginId/bundle` | read | |
+| GET | `/:pluginId/styles` | `.../plugins/:pluginId/styles` | read | |
+| GET | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | read | |
+| PUT | `/:pluginId/settings` | `.../plugins/:pluginId/settings` | **read** — Exception | only remaining plugin exception |
 
 ## 17. `backend/src/api/snippetRoutes.ts`
 
-Mounted via `app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)` (`index.ts:660`).
-Same model as pluginRoutes.ts (doc comment `snippetRoutes.ts:84-86`): every route uses
-`checkVaultReadAccess()` only, including all 4 mutating ones.
+*Corrected 2026-11-08.* Mounted via `app.route('/api/v1/vaults/:vaultId/snippets', snippetRoutes)`.
+Snippets are vault content (`.obsidian/snippets/`) that applies to every user of the vault: reads need
+`read`, every mutating route needs **write**. No exception in `VAULT_ROUTE_LEVEL_EXCEPTIONS` (the
+originally documented 4 `read` exceptions were removed).
 
-| Method | Path in sub-app | Full effective path | Registered at | Level today | Check source |
-|---|---|---|---|---|---|
-| PUT | `/registry` | `.../snippets/registry` | `snippetRoutes.ts:95` | **read** — Exception | `snippetRoutes.ts:100` |
-| GET | `/registry` | `.../snippets/registry` | `snippetRoutes.ts:126` | read | `snippetRoutes.ts:131` |
-| GET | `/` | `.../snippets` | `snippetRoutes.ts:145` | read | `snippetRoutes.ts:150` |
-| POST | `/` (create) | `.../snippets` | `snippetRoutes.ts:162` | **read** — Exception | `snippetRoutes.ts:167` |
-| GET | `/:snippetId` | `.../snippets/:snippetId` | `snippetRoutes.ts:204` | read | `snippetRoutes.ts:212` |
-| PUT | `/:snippetId` (overwrite) | `.../snippets/:snippetId` | `snippetRoutes.ts:230` | **read** — Exception | `snippetRoutes.ts:238` |
-| DELETE | `/:snippetId` | `.../snippets/:snippetId` | `snippetRoutes.ts:264` | **read** — Exception | `snippetRoutes.ts:272` |
+| Method | Path in sub-app | Full effective path | Level now |
+|---|---|---|---|
+| PUT | `/registry` | `.../snippets/registry` | write |
+| GET | `/registry` | `.../snippets/registry` | read |
+| GET | `/` | `.../snippets` | read |
+| POST | `/` (create) | `.../snippets` | write |
+| GET | `/:snippetId` | `.../snippets/:snippetId` | read |
+| PUT | `/:snippetId` (overwrite) | `.../snippets/:snippetId` | write |
+| DELETE | `/:snippetId` | `.../snippets/:snippetId` | write |
 
 ## 18. `backend/src/api/pluginStoreRoutes.ts` — two factories
 
-### 18a. `createVaultPluginStoreRoutes` — mounted at `/api/v1/vaults/:vaultId/plugins` (`index.ts:666`, same prefix as pluginRoutes, non-overlapping paths)
+### 18a. `createVaultPluginStoreRoutes` — mounted at `/api/v1/vaults/:vaultId/plugins` (same prefix as pluginRoutes, non-overlapping paths)
 
-| Method | Path in sub-app | Full effective path | Registered at | Level today | Check source | Notes |
-|---|---|---|---|---|---|---|
-| POST | `/store-install` | `.../plugins/store-install` | `pluginStoreRoutes.ts:152` | **read** — Exception | `pluginStoreRoutes.ts:155` | Flagged in the original brief as too weak (installs a plugin on read access). **Not changed in this PR** — see finding F2. |
-| POST | `/check-updates` | `.../plugins/check-updates` | `pluginStoreRoutes.ts:185` | **read** — Exception | `pluginStoreRoutes.ts:188` | Same as above. |
-| POST | `/update-all` | `.../plugins/update-all` | `pluginStoreRoutes.ts:202` | **read** — Exception | `pluginStoreRoutes.ts:205` | Same as above; bulk-mutates every plugin in the vault. |
-| POST | `/:pluginId/update` | `.../plugins/:pluginId/update` | `pluginStoreRoutes.ts:219` | **read** — Exception | `pluginStoreRoutes.ts:223` | **Not in the original brief — found during this inventory.** Same anomaly as the three above (single-plugin update on read access). Reported as finding F2 alongside them. |
+*Corrected 2026-11-08.* Installing and updating write plugin code into the vault, so they need **write**
+(method default); finding F2 is resolved. Only the update check, which changes nothing, stays at read.
+
+| Method | Path in sub-app | Full effective path | Level now | Notes |
+|---|---|---|---|---|
+| POST | `/store-install` | `.../plugins/store-install` | write | was read |
+| POST | `/check-updates` | `.../plugins/check-updates` | **read** — Exception | POST verb, read-only |
+| POST | `/update-all` | `.../plugins/update-all` | write | was read |
+| POST | `/:pluginId/update` | `.../plugins/:pluginId/update` | write | was read |
 
 ### 18b. `createPluginStoreRoutes` — mounted at `/api/v1/plugin-store` (`index.ts:665`), **not vault-scoped**
 
@@ -259,6 +267,11 @@ Same model as pluginRoutes.ts (doc comment `snippetRoutes.ts:84-86`): every rout
 ---
 
 ## PR 2 — handler-check removal (2026-09-12)
+
+> **Historical, as of `8e61aee` (2026-09-12).** This section records what PR 2 removed and the levels
+> that were enforced at that time. Levels have changed since (plugin/snippet/plugin-store mutations,
+> `/detected*` routes gone, `store-install`/`update-all`/`:pluginId/update` now `write`): the tables in
+> §1–19 and "Current state" at the end are authoritative, not the level statements below.
 
 For every route below, the handler-level check was **removed** because §-referenced row
 above shows the middleware now enforces the identical level — removal is belegt
@@ -338,7 +351,7 @@ password and opens an outbound connection to the mail server with it. No local w
 but it's a read-level route that spends a write-tier credential. Worth a policy decision
 outside this PR (e.g. whether "connect using stored credentials" deserves its own tier).
 
-**F2 — A fourth plugin-store route shares the anomaly the original brief flagged for three.**
+**F2 — A fourth plugin-store route shares the anomaly the original brief flagged for three.** *(Resolved: `store-install`, `update-all` and `:pluginId/update` now require write; only `check-updates` stays at read — see §18a. Text below is the original 2026-09 finding.)*
 `POST /vaults/:vaultId/plugins/:pluginId/update` (`pluginStoreRoutes.ts:219-223`) was not in
 the original list of "too-weak" plugin-store routes (`store-install`, `check-updates`,
 `update-all`) but has the identical shape: it mutates plugin state behind only a
@@ -374,6 +387,8 @@ eliminates: enforcement no longer depends on every call site remembering to pass
 
 ## Summary counts
 
+*Original counts (2026-09, superseded — the current ones are in "Current state" at the end):*
+
 - **83** routes matched by the `/api/v1/vaults/:vaultId/*` middleware pattern.
 - **23** exceptions where the enforced level differs from the HTTP-method default (16×
   `read` instead of `write`, 7× `owner` instead of `read`/`write`) — see rows marked
@@ -387,7 +402,7 @@ eliminates: enforcement no longer depends on every call site remembering to pass
 
 Added after the inventory above, so the counts above do not include it. Mounted via
 `app.route('/api/v1/vaults/:vaultId/themes', themeRoutes)` (`index.ts`). The routes contain no access
-checks of their own: the middleware default applies, and **no exception was added** — unlike snippets
+checks of their own: the middleware default applies, and **no exception was added** — unlike the snippet and plugin routes as they were originally documented (since tightened to write, see §16–17)
 and plugins, mutating theme routes require **write** access, because a theme is a file in the vault
 (`.obsidian/themes/`) and the selection (`.obsidian/appearance.json`) applies to every user of the vault.
 
@@ -495,3 +510,98 @@ open tabs of one user, is not served and not written.)
 |---|---|---|
 | GET | `.../workspaces-config` | read |
 | PATCH | `.../workspaces-config` | write |
+
+## Addendum — `obsidianConfigRoutes.ts` (shared factory, 2026-11-08)
+
+Not a route set of its own: `createObsidianConfigRoutes()` builds the `GET /` + `PATCH /` pair that
+`appConfigRoutes`, `appearanceConfigRoutes`, `graphConfigRoutes`, `bookmarksConfigRoutes`,
+`hotkeysConfigRoutes` and `workspacesConfigRoutes` mount under `/api/v1/vaults/:vaultId/<name>-config`.
+All six follow the method default (GET `read`, PATCH `write`) and have **no entry** in
+`VAULT_ROUTE_LEVEL_EXCEPTIONS`; the handlers perform no access check of their own. Each PATCH publishes
+`vault:change` for the file. The six sets are listed in the addenda above.
+
+## Addendum — `backend/src/api/activityRoutes.ts` (Activity timeline, 2026-11-08)
+
+Mounted via `app.route('/api/v1', activityRoutes)`, behind the `activity-timeline` feature guard (default **off**,
+`app.use('/api/v1/vaults/:vaultId/activity', …)`). The handler has no access check of its own; the middleware default
+applies and **no exception** exists. The route returns event types, file paths and acting users of the whole vault,
+which every reader of the vault can see anyway in the tree and the file versions.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../activity` | read |
+
+## Addendum — `backend/src/api/basesRoutes.ts` (Bases query, 2026-11-08)
+
+Mounted via `app.route('/api/v1', basesRoutes)`, behind the `bases` feature guard (`.../bases/*`). No access check in
+the handler, and — unlike `POST .../properties/query` — **no exception**: the query is read-only, but the POST verb
+makes the middleware default `write`. Effect: a collaborator with only a read share is answered 403 and cannot open a
+`.base` view (finding F6 below). Not a leak; the restriction is stricter than necessary.
+
+| Method | Path | Level |
+|---|---|---|
+| POST | `.../bases/query` | write (method default; read would suffice, see F6) |
+
+## Addendum — `backend/src/api/spellcheckDictionaryRoutes.ts` (personal spellcheck words, 2026-11-08)
+
+Mounted via `app.route('/api/v1', …)`, no feature guard. The words live in `<vault>/.slatebase/spellcheck-words.json`
+and are shared by everyone who opens the vault (and travel with Git Sync). No access check in the handlers, no
+exception: reading is `read`, adding and removing need `write`. Removal is a POST with the word in the body, so it
+falls under the write default too.
+
+| Method | Path | Level |
+|---|---|---|
+| GET | `.../spellcheck/words` | read |
+| POST | `.../spellcheck/words` | write |
+| POST | `.../spellcheck/words/remove` | write |
+
+## Addendum — `publicShareRoutes.ts`, completion (2026-11-08)
+
+The table in the 2026-10-23 addendum omits one route: `POST .../public-shares/:id/regenerate` (new link token for an
+existing share). Method default, **write**; the handler checks that the link ID belongs to the vault in the URL like
+the PUT/DELETE siblings.
+
+## Routes outside the vault middleware (2026-11-08)
+
+Not under `/api/v1/vaults/:vaultId/*`, listed so the inventory is complete. None of them reads vault content.
+
+| Method | Path | Source | Auth |
+|---|---|---|---|
+| GET | `/healthz`, `/readyz` | `healthRoutes.ts` | none (mounted at the app root, outside `/api/v1/*`; liveness/readiness only) |
+| GET | `/api/v1/version` | `versionRoutes.ts` | none (explicitly skipped in `auth/middleware.ts`) |
+| GET | `/api/v1/map-config` | `mapConfigRoutes.ts` | session. The handler comment says "Public, no authentication", but the route is registered under `/api/v1/*` and only `/api/v1/version` and the public-share reader paths bypass the auth middleware — the comment is wrong (finding F7). Returns only the operator's tile URL and attribution |
+| GET | `/api/v1/releases` | `releaseRoutes.ts` | session (GitHub release list, cached by `release-info/`) |
+| GET | `/api/v1/theme-store/themes`, `/theme-store/screenshot` | `themeStoreRoutes.ts` | session, feature `obsidian-theme-store` |
+| GET | `/api/v1/public-shares`, DELETE `/api/v1/public-shares/:id` | `publicShareRoutes.ts` | session, own links only |
+| GET | `/api/v1/public/s/:token`, POST `…/unlock`, GET `…/asset` | `publicShareRoutes.ts` (reader) | anonymous, link token is the credential |
+
+## New findings (2026-11-08, documentation only — nothing changed)
+
+**F6 — `POST .../bases/query` requires write for a read-only operation.** `basesRoutes.ts:101`, no entry in
+`VAULT_ROUTE_LEVEL_EXCEPTIONS`. Read-only collaborators get 403 on every Bases view. Fix would be one exception row
+(`POST /bases/query` → `read`), the same as `/properties/query`. Left open: it is a policy/behavior change, not a doc fix.
+
+**F7 — `mapConfigRoutes.ts:35` documents the route as public, but it needs a session.** Code behavior is the safer
+one (see the table above); only the comment is misleading.
+
+**F8 — The table-driven test does not cover every vault route.** `vault-authorization-middleware.test.ts` wires
+`app` by hand; it does not mount the theme routes, theme-store vault routes, `hotkeys-config`, `workspaces-config`,
+activity, bases or spellcheck routes (17 routes), so the 403 sweep cannot detect a missing guard on them. The
+default-deny middleware itself is mounted in `index.ts` for all of them, so this is a test-coverage gap, not an
+access gap. The test does **not** parse this document either (it only shares `resolveRequiredLevel` with the
+middleware), so the document cannot be checked against the code mechanically.
+
+## Current state (2026-11-08, `ef82dbc`)
+
+- **111** routes match `/api/v1/vaults/:vaultId/*` (94 mounted in the test harness, 17 not: themes 6, theme-store 2,
+  hotkeys-config 2, workspaces-config 2, activity 1, bases 1, spellcheck 3). Counting method: the harness figure is
+  the number of entries in `app.routes` with a method other than `ALL` whose path matches
+  `^/api/v1/vaults/:vaultId(/|$)` (the same filter as the test, dumped once with a temporary test); the 17 are
+  counted from the route registrations of the unmounted modules. An earlier count of 112/95 wrongly included the
+  one `ALL` entry, the authorization middleware itself (`app.use('/api/v1/vaults/:vaultId/*')`).
+- **13** entries in `VAULT_ROUTE_LEVEL_EXCEPTIONS`: 3× `read` instead of `write` (`POST /properties/query`,
+  `PUT /plugins/:pluginId/settings`, `POST /plugins/check-updates`), 3× `write` instead of `read`
+  (`GET /public-shares`, `GET /public-shares/preview`, `GET /keychain/:secretId`), 7× `owner` (`GET`/`POST /shares`,
+  `PUT`/`DELETE /shares/:userId`, `POST /transfer`, `PUT /config`, `DELETE` of the vault itself).
+- Unchanged: routes outside the middleware pattern (§19 and the "Routes outside the vault middleware" table above).
+- Open findings: F1, F3, F4, F6, F7, F8 (F2 and F5 resolved).
