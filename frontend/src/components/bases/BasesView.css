@@ -713,7 +713,8 @@
 
 /* ── Toolbar (views, sort, group, filter, properties) ─────────────────── */
 
-.bases-tb__group-left {
+.bases-tb__group-left,
+.bases-tb__group-right {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
@@ -721,8 +722,20 @@
   min-width: 0;
 }
 
-.bases-tb__group-left .bases-tb__btn {
+.bases-tb__group-right {
+  flex: 0 0 auto;
+}
+
+.bases-tb__group-left .bases-tb__btn,
+.bases-tb__group-right .bases-tb__btn {
   white-space: nowrap;
+}
+
+/* Right-hand popovers open flush to their button's right edge so they
+   don't overflow the viewport. */
+.bases-tb__group-right .bases-tb__panel {
+  left: auto;
+  right: 0;
 }
 
 .bases-tb__caret {

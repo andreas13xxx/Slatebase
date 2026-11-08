@@ -389,15 +389,15 @@ export const BasesToolbar = memo(function BasesToolbar({
     <div className="bases-view__toolbar" role="toolbar" aria-label="Base-Werkzeugleiste">
       <div className="bases-tb__group-left">
         <ViewMenu doc={doc} activeIndex={activeIndex} disabled={readOnly} onSelectView={onSelectView} onChange={handleChange} />
-        {mode === 'view' && view && (
-          <>
-            <Popover label="Sortieren" title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
-            <Popover label="Gruppieren" title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
-            <Popover label="Filtern" title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
-            <Popover label="Eigenschaften" title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
-          </>
-        )}
       </div>
+      {mode === 'view' && view && (
+        <div className="bases-tb__group-right">
+          <Popover label="Sortieren" title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
+          <Popover label="Gruppieren" title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
+          <Popover label="Filtern" title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
+          <Popover label="Eigenschaften" title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
+        </div>
+      )}
     </div>
   )
 })
