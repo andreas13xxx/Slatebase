@@ -80,12 +80,18 @@ describe('computeSummaries — empty set', () => {
 describe('computeSummaries — dates', () => {
   const rows = [row({ d: '2024-01-01' }), row({ d: '2024-01-11' }), row({ d: 'nope' })]
 
+  // A bare `YYYY-MM-DD` parses as LOCAL midnight (toDate), so compare the local
+  // calendar day, not toISOString() — the latter would shift it a day in a
+  // positive timezone and reintroduce exactly the bug this parsing fixes.
+  const localDay = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   it('computes earliest and latest', () => {
     const out = run(rows, { d: 'Earliest' }) as { d: Date }
     expect(out.d).toBeInstanceOf(Date)
-    expect((out.d as Date).toISOString().slice(0, 10)).toBe('2024-01-01')
+    expect(localDay(out.d as Date)).toBe('2024-01-01')
     const latest = run(rows, { d: 'Latest' }) as { d: Date }
-    expect((latest.d as Date).toISOString().slice(0, 10)).toBe('2024-01-11')
+    expect(localDay(latest.d as Date)).toBe('2024-01-11')
   })
 
   it('computes a date range in days when the column is non-numeric', () => {

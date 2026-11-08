@@ -34,6 +34,7 @@ import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 import { sortRowsByFormula } from './base-formula-sort'
+import './BasesView.css'
 
 // Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
 const BasesMapView = lazy(() => import('./BasesMapView').then((m) => ({ default: m.BasesMapView })))

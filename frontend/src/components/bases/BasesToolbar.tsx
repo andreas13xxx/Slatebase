@@ -10,6 +10,7 @@
 
 import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { ArrowUpDown, Rows3, Filter, Columns3, Table2 } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
 import {
   addView, availableColumns, deleteView, duplicateView, effectiveColumns, renameView, rootGroup,
@@ -292,7 +293,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   if (active && !typeOptions.includes(active.type)) typeOptions.push(active.type)
 
   return (
-    <Popover label={active?.name ?? 'Ansicht'} title="Ansichten">
+    <Popover label={<><Table2 aria-hidden="true" className="bases-tb__btn-icon" />{active?.name ?? 'Ansicht'}</>} title="Ansichten">
       <div className="bases-tb__section">
         <ul className="bases-tb__list" aria-label="Ansichten">
           {doc.views.map((v, i) => (
@@ -392,10 +393,10 @@ export const BasesToolbar = memo(function BasesToolbar({
       </div>
       {mode === 'view' && view && (
         <div className="bases-tb__group-right">
-          <Popover label="Sortieren" title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
-          <Popover label="Gruppieren" title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
-          <Popover label="Filtern" title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
-          <Popover label="Eigenschaften" title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
+          <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
+          <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
+          <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
+          <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
         </div>
       )}
     </div>
