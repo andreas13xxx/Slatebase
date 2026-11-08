@@ -111,6 +111,55 @@ describe('create_directory', () => {
   })
 })
 
+describe('unresolvable paths do not leak the server path', () => {
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0
+
+  beforeEach(async () => {
+    await fs.symlink(path.join(vaultDir, 'loop-b'), path.join(vaultDir, 'loop-a'))
+    await fs.symlink(path.join(vaultDir, 'loop-a'), path.join(vaultDir, 'loop-b'))
+  })
+
+  it('read_file: symlink loop gives a generic error', async () => {
+    const result = await tool('read_file')({ vaultId: 'v1', path: 'loop-a/x.md' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).not.toContain(baseDir)
+  })
+
+  it('create_directory: symlink loop gives a generic error', async () => {
+    const result = await tool('create_directory')({ vaultId: 'v1', path: 'loop-a/new' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).not.toContain(baseDir)
+  })
+
+  it('resources/read: symlink loop gives a generic error', async () => {
+    let cb!: (uri: URL, vars: Record<string, string>, extra: unknown) => Promise<unknown>
+    new McpHandlers({
+      vaultService: vaultService(),
+      vaultAccessControl: { checkReadAccess: vi.fn().mockResolvedValue(undefined) } as unknown as IVaultAccessControl,
+      vaultReader: {} as IVaultReader,
+      logger,
+      mcpConfig: { maxFileSize: 1024 * 1024 } as McpConfig,
+    }).register({ resource: (...a: unknown[]) => { cb = a[a.length - 1] as typeof cb } } as never)
+    const err = await cb(new URL('vault://v1/loop-a/x.md'), { vaultId: 'v1', path: 'loop-a/x.md' }, { authInfo: { extra: { userId: 'user-1' } } }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect((err as Error).message).not.toContain(baseDir)
+  })
+
+  it.skipIf(isRoot)('read_file: unreadable directory gives a generic error', async () => {
+    await fs.mkdir(path.join(vaultDir, 'locked'))
+    await fs.chmod(path.join(vaultDir, 'locked'), 0o000)
+    try {
+      for (const name of ['read_file', 'create_directory']) {
+        const result = await tool(name)({ vaultId: 'v1', path: 'locked/sub/x.md' })
+        expect(result.isError).toBe(true)
+        expect(text(result)).not.toContain(baseDir)
+      }
+    } finally {
+      await fs.chmod(path.join(vaultDir, 'locked'), 0o755)
+    }
+  })
+})
+
 describe('query_base', () => {
   it('refuses a symlinked .base file pointing outside the vault', async () => {
     await fs.writeFile(path.join(outsideDir, 'x.base'), 'views: []\n', 'utf-8')
