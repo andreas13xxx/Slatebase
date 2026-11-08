@@ -151,6 +151,19 @@ describe('useLongPress dispatchOnTarget', () => {
       expect(el.draggable).toBe(true)
     })
 
+    it('also handles a draggable ancestor of the pressed element', () => {
+      function Wrapped() {
+        const longPress = useLongPress({ suppressNativeDrag: true })
+        return <li data-testid="li" draggable><button data-testid="b" {...longPress}>x</button></li>
+      }
+      const { getByTestId } = render(<Wrapped />)
+      const li = getByTestId('li') as HTMLLIElement
+      fireEvent.pointerDown(getByTestId('b'), { pointerType: 'touch', isPrimary: true })
+      expect(li.draggable).toBe(false)
+      fireEvent.pointerUp(getByTestId('b'), { pointerType: 'touch' })
+      expect(li.draggable).toBe(true)
+    })
+
     it('does not turn on draggable for an element that was not draggable', () => {
       function Plain() {
         const longPress = useLongPress({ suppressNativeDrag: true })

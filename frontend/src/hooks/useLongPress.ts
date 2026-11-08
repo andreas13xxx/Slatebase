@@ -27,7 +27,7 @@ export interface LongPressHandlers {
  *
  * @param options.dispatchOnTarget Fire on the element that was actually pressed instead of the
  *   handler's element, for containers whose `contextmenu` listener inspects `event.target`.
- * @param options.suppressNativeDrag Turn off `draggable` on the pressed element for the duration of a touch.
+ * @param options.suppressNativeDrag Turn off `draggable` on the pressed element (or its closest draggable ancestor) for the duration of a touch.
  *   Browsers start a native drag on a held `draggable` element at about the same time the long-press fires,
  *   and that drag swallows the menu. Mouse and pen keep dragging.
  * @returns Handlers to spread onto the element.
@@ -79,9 +79,11 @@ export function useLongPress(options: { dispatchOnTarget?: boolean; suppressNati
     firedRef.current = false
     const currentTarget = e.currentTarget
     restoreDraggable()
-    if (suppressNativeDrag && currentTarget instanceof HTMLElement && currentTarget.draggable) {
-      currentTarget.draggable = false
-      undragRef.current = currentTarget
+    // The draggable element may be an ancestor of the one carrying the handlers (favorites: <li> around a button).
+    const draggable = suppressNativeDrag ? currentTarget.closest<HTMLElement>('[draggable="true"]') : null
+    if (draggable) {
+      draggable.draggable = false
+      undragRef.current = draggable
     }
     const target = dispatchOnTarget && e.target instanceof Element ? e.target : currentTarget
     const x = e.clientX

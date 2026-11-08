@@ -6827,7 +6827,9 @@
   }
 
   /* The long-press menu and a native drag compete for the same gesture; moving goes through "Verschieben nach…". */
-  .tree-node-row {
+  .tree-node-row,
+  .tab-bar-tab,
+  .favorites-view__item {
     -webkit-user-drag: none;
   }
 }

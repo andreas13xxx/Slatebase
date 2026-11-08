@@ -96,7 +96,7 @@ export function SidebarToolbar({
   onOpenQuickSwitcher, onOpenRandomNote, onInsertTemplate, onToggleDictation,
   isAdmin, isVaultOwner, globalUnreadCount,
 }: SidebarToolbarProps) {
-  const longPress = useLongPress()
+  const longPress = useLongPress({ suppressNativeDrag: true })
   const { isEnabled } = useFeatureContext()
   const { ribbonIcons } = usePluginContext()
   const prefs = useToolbarPrefs()

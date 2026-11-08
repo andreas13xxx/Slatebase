@@ -165,7 +165,7 @@ function buildRows(byParent: Map<string | null, FavoriteEntry[]>, collapsed: Set
  * (remove/reveal/rename/move), and custom labels.
  */
 export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _refreshKey, panelState, panelDispatch }: FavoritesViewProps): React.ReactElement {
-  const longPress = useLongPress()
+  const longPress = useLongPress({ suppressNativeDrag: true })
   const { t } = useTranslation()
   const groupName = t('bookmarkGroups.defaultName')
   const { dispatch: searchDispatch } = useSearchContext()

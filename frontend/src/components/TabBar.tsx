@@ -71,7 +71,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
   const tabs = showFileTabs ? tabState.tabs : []
   const dragIndexRef = useRef<number | null>(null)
   // One instance serves all tabs: only a single finger can long-press at a time.
-  const longPress = useLongPress()
+  const longPress = useLongPress({ suppressNativeDrag: true })
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
