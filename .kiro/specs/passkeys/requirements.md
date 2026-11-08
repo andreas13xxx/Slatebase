@@ -65,9 +65,9 @@ Betrieb: Slatebase läuft hinter einem Reverse Proxy und ist über eine **öffen
 4.1 Der Admin konfiguriert SMTP in der Admin-UI: Host, Port, Verschlüsselung (STARTTLS/TLS), Nutzer, Passwort, Absender.
     Das Passwort wird nicht im Klartext in der Config abgelegt und nie an die UI zurückgegeben.
 4.2 „Testmail senden“ prüft die Konfiguration. Ohne gültige Konfiguration ist der Mail-Reset in der UI unsichtbar.
-4.3 Ein Nutzer trägt seine Adresse in den Einstellungen ein und bestätigt sie per Link (Token ≥ 128 Bit, nur als Hash
+4.3 Ein Nutzer trägt seine Adresse in den Einstellungen ein und bestätigt sie per Link (Token 256 Bit, nur als Hash
     gespeichert, 24 h gültig, einmalig). Das Feld bekommt dafür ein `emailVerifiedAt`.
-4.4 Ändert sich die Adresse, gilt sie erst nach erneuter Bestätigung; die alte bleibt bis dahin aktiv.
+4.4 Ändert sich die Adresse, gilt sie erst nach erneuter Bestätigung; die alte bleibt bis dahin eingetragen. Wird die Adresse über das Profil direkt geändert, verliert sie die Bestätigung und offene Mail-Tokens verfallen.
 4.5 Eine Adresse darf nur bei einem Konto bestätigt sein (Eindeutigkeit, ohne bestätigte Adressen preiszugeben).
 4.6 Die Admin-Übersicht zeigt pro Nutzer „Adresse bestätigt“ ja/nein.
 
@@ -77,7 +77,7 @@ Betrieb: Slatebase läuft hinter einem Reverse Proxy und ist über eine **öffen
     Benutzername oder Mail-Adresse.
 5.2 Die Antwort ist immer gleich („Falls ein Konto mit bestätigter Adresse existiert, wurde eine Mail gesendet“), auch in der
     Antwortzeit (Versand asynchron, nach der Antwort).
-5.3 Gesendet wird nur an **bestätigte** Adressen. Der Link enthält einen Token ≥ 128 Bit, nur als Hash gespeichert, 30 Minuten
+5.3 Gesendet wird nur an **bestätigte** Adressen. Der Link enthält einen Token 256 Bit, nur als Hash gespeichert, 30 Minuten
     gültig, einmal einlösbar. Ein neuer Token macht den alten ungültig.
 5.4 Die Link-Basis kommt aus der Config (`mailBaseUrl`, muss in `allowedOrigins` stehen, Standard: erste HTTPS-Origin),
     **nie** aus dem Request.
@@ -94,5 +94,5 @@ Betrieb: Slatebase läuft hinter einem Reverse Proxy und ist über eine **öffen
 6.2 `/auth/passkey/*` und `/auth/password-reset/*` sind vom Auth-Bypass erfasst (wie `/auth/login`), aber CSRF- und
     Rate-Limit-geschützt.
 6.3 MCP-Tokens, öffentliche Freigabe-Links und API-Zugriff bleiben unverändert.
-6.4 Ist ein Toggle aus, antworten seine Endpunkte mit 404; gespeicherte Daten bleiben erhalten.
+6.4 Ist ein Toggle aus, antworten seine Endpunkte wie bei allen Toggles mit 403 `FEATURE_DISABLED`; gespeicherte Daten bleiben erhalten.
 6.5 Doku (DE/EN, Welcome-Vault, README, Betriebshinweise zu Proxy, Origins und SMTP) wird mit jeder Phase aktualisiert.

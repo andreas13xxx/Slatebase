@@ -83,6 +83,9 @@ src/
 │   ├── appConfigRoutes.ts    — `/vaults/:vaultId/app-config`: GET (read) all fields of `.obsidian/app.json`, PATCH (write) known keys; 409 `APP_CONFIG_INVALID` if the file is not a JSON object; publishes `vault:change` for the file
 │   ├── keychainRoutes.ts     — Vault keychain routes at `/vaults/:vaultId/keychain` (list IDs = read access; get value, put, delete = write access)
 │   ├── mailImportRoutes.ts   — Per-vault IMAP config routes (CRUD, mailbox-tree, status, import-now); feature-gated on `mail-import`
+│   ├── accountRoutes.ts      — Public `/auth/capabilities`, `/auth/password-reset/{request,confirm}`, `/auth/email/verify`; signed-in `/users/me/security` and `PUT /users/me/email`. The public ones are listed in `isPublicAuthPath` (auth/middleware.ts) and bypass session auth + CSRF
+│   ├── passkeyRoutes.ts      — WebAuthn: public `/auth/passkey/login/{options,verify}` (the `Origin` header is the gate, sets the session cookie), signed-in `/auth/passkey/register/*`, `/users/me/passkeys/:id`, admin `DELETE /admin/users/:userId/passkeys`; feature-gated on `passkeys`
+│   ├── accountSettingsRoutes.ts — Admin `/admin/account-settings` (SMTP, link base, shared passkey rpId; the SMTP password is write-only) and `/test` mail
 │   ├── proxyRoutes.ts    — POST /api/v1/proxy (CORS-free HTTP proxy for plugin requestUrl, SSRF protection, URL allowlist)
 │   ├── propertyTypeRoutes.ts — Property-type registry CRUD (GET/PUT /vaults/:vaultId/property-types, PUT /vaults/:vaultId/property-types/:key)
 │   ├── propertyTypeRoutes.test.ts — Integration tests for property-type routes
@@ -288,6 +291,14 @@ src/
 │   ├── ssh-keygen.ts          — SshKeyGenerator (generates a keypair, derives the public half via `ssh-keygen -y` so it can be shown for copying into GitHub as a deploy key)
 │   ├── sync-engine.ts         — GitSyncEngine (pull/rebase/push cycle, conflict detection, credentials read from ModuleSecretStore under GIT_SYNC_SECRET_MODULE_ID)
 │   └── git-sync-scheduler.ts  — GitSyncScheduler (per-remote interval timer, lifecycle owned by the composition root)
+├── account/                   — Passkeys and mail recovery (toggles `passkeys`, `mail-recovery`, hot, default-on). Spec: `.kiro/specs/passkeys/`.
+│   ├── origin.ts              — resolveRelyingParty (Origin header must be in `allowedOrigins`, HTTPS or localhost; rpId = hostname or the admin's shared `passkeyRpId`), validatePasskeyRpId, resolveMailBaseUrl. Never reads Host / X-Forwarded-Host
+│   ├── settings-store.ts      — AccountSettingsStore (`data/account/settings.json`: SMTP, mailBaseUrl, passkeyRpId); the SMTP password lives in ModuleSecretStore under vault `_server`, module `account`
+│   ├── mail-service.ts        — MailService (nodemailer, per-send transport)
+│   ├── mail-tokens.ts         — Single-use tokens (256-bit, stored as SHA-256 on the user record, constant-time compare)
+│   ├── account-recovery-service.ts — Address confirmation and password reset by mail (confirmed addresses only, uniform answer, async delivery, per-account/IP limits, ends all sessions)
+│   ├── passkey-service.ts     — PasskeyService (@simplewebauthn/server): register with password re-auth, discoverable login, single-use 2-min challenges bound to origin+rpId, counter check, in-memory credentialId→userId index rebuilt at startup
+│   └── test-support.ts        — In-memory user repository and a software ES256 authenticator for tests
 ├── mail-import/               — IMAP polling that writes unread mails into a vault as Markdown notes. Feature toggle `mail-import` (cold).
 │   ├── index.ts               — Barrel export for mail-import module
 │   ├── types.ts               — MailImportConfig (host/port/secure/username/mailbox/targetFolder/interval), MailImportRunStatus
@@ -353,6 +364,7 @@ src/
 │   ├── simpleMarkdownToHtml.test.ts — Unit tests for simpleMarkdownToHtml
 │   ├── imageResize.ts    — `resizeImageToDataUrl()`: centre-crops a picked/pasted image to a square, draws it into a 128×128 `<canvas>`, exports a WebP data URL (PNG fallback) and rejects a result over the backend's ~256 KB avatar-data limit (`ImageResizeError`). Backs the avatar image upload/paste; `imageBlobFromClipboard()` pulls the first image out of a paste event
 │   ├── dicebear.ts       — Pure DiceBear URL builder for the avatar gallery: `dicebearUrl(style, seed)` → `https://api.dicebear.com/9.x/<style>/svg?seed=…` (host pinned to match the backend `avatarDicebear` allowlist), a curated `DICEBEAR_STYLES` list and `dicebearSeeds()` for stable per-user seeds. No network — the gallery loads each URL via `<img>`, keeping DiceBear off the fetch/CSP surface
+├── account/                  — Frontend of passkeys and mail recovery. accountApi.ts (fetch client for the public and signed-in account endpoints; separate from ApiClient because most calls run before a session exists), passkeyClient.ts (@simplewebauthn/browser wrapper, conditional UI), SecuritySection.tsx (Settings → Security: address + passkeys), AdminAccountSettingsSection.tsx (SMTP, link base, shared rpId; rendered under Server configuration), ResetPasswordPage / VerifyEmailPage (landing pages of mailed links at `/reset-password` and `/verify-email`; token read from the URL fragment and removed from the address bar; App.tsx renders them before the auth gate)
 ├── canvas/
 │   ├── index.ts          — Barrel export (parser, serializer, types)
 │   ├── types.ts          — CanvasDocument, CanvasNode (Text/File/Link/Group), CanvasEdge, parse result types

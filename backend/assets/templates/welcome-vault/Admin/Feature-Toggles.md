@@ -28,6 +28,8 @@ Slatebase hat aktuell fünf registrierte Feature-Toggles:
 | `obsidian-plugin-compat` | aktiv | Cold | Obsidian-Plugin-Kompatibilitätsschicht (⚠️ experimentell) |
 | `git-sync` | aktiv | Cold | Serverseitige Git-Synchronisation von Vaults |
 | `mail-import` | aktiv | Cold | Serverseitiger IMAP-Mail-Import als Markdown-Notizen |
+| `passkeys` | aktiv | Hot | Anmeldung mit Passkeys; erscheint nur für erlaubte HTTPS-Origins |
+| `mail-recovery` | aktiv | Hot | Passwort-Reset und Adressbestätigung per Mail; benötigt SMTP |
 
 ---
 

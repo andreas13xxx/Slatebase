@@ -59,6 +59,7 @@ Discover the full feature set:
 - [[Features/Git Sync|Git Sync]]
 - [[Features/Mail Import|Mail Import]]
 - [[Features/Dictation|Dictation]]
+- [[Features/Passkeys and Password Reset|Passkeys and Password Reset]]
 - [[Features/Live Preview Editor|Live Preview Editor]]
 
 ---

@@ -46,6 +46,7 @@ Entdecke die vollständige Feature-Palette:
 - [[Features/Vorlagen und Daily Notes|Vorlagen und Daily Notes]]
 - [[Features/Papierkorb und Versionen|Papierkorb und Versionen]]
 - [[Features/Öffentliche Links|Öffentliche Links]]
+- [[Features/Passkeys und Passwort-Reset|Passkeys und Passwort-Reset]]
 - [[Features/Lesezeichen|Lesezeichen]]
 - [[Features/Statusleiste|Statusleiste]]
 - [[Features/Geteilte Ansichten|Geteilte Ansichten (Split Panes)]]

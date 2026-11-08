@@ -26,9 +26,9 @@ emailVerifiedAt?: string
 mailTokens?: Array<{ purpose: 'verify-email' | 'password-reset'; hash: string; expiresAt: string; email?: string }>
 ```
 
-Für den Login ohne Benutzername (Discoverable Credentials) braucht der Server `credentialId → userId`. Dafür kommt neben
-`_index.json` ein `_passkey-index.json` (credentialId → userId), das beim Registrieren, Löschen und beim Start aus den
-Nutzerdateien neu aufgebaut werden kann (analog zum Username-Index).
+Für den Login ohne Benutzername (Discoverable Credentials) braucht der Server `credentialId → userId`. Dieser Index liegt
+**nur im Speicher** und wird beim Start aus den Nutzerdateien aufgebaut (`PasskeyService.loadIndex`), beim Registrieren und
+Löschen gepflegt. Eine eigene Datei wäre eine zweite Wahrheit, die auseinanderlaufen kann.
 
 Challenges liegen im Speicher (`Map`, TTL 2 min, einmalig), analog zum `sse-ticket-store`.
 
@@ -66,7 +66,7 @@ Request → Origin-Header → in allowedOrigins? → nein: 403
 | `POST /auth/email/verify` | keine (Token) | Adresse bestätigen |
 | `POST /auth/password-reset/request` | keine | Benutzername oder Adresse, einheitliche Antwort |
 | `POST /auth/password-reset/confirm` | keine (Token) | Token + neues Passwort |
-| `GET /auth/capabilities` | keine | Welche Login-Optionen sichtbar sind (Passkey, Mail-Reset) |
+| `GET /auth/capabilities?origin=` | keine | Welche Login-Optionen sichtbar sind (Passkey, Mail-Reset). Same-Origin-GETs senden keinen `Origin`-Header, deshalb übergibt die Seite `location.origin` als Hinweis; er wird gegen `allowedOrigins` geprüft und ist nur eine Anzeige-Entscheidung |
 | `GET/PUT /admin/mail` · `POST /admin/mail/test` | Admin | SMTP lesen/setzen, Testmail |
 | `DELETE /admin/users/:id/passkeys` | Admin | Alle Passkeys entfernen |
 
@@ -77,8 +77,9 @@ identisch sind. Validierung der Bodies über Zod in `auth/validation.ts`.
 
 - **Versand**: `MailService` mit `nodemailer`. SMTP-Config (Host, Port, Verschlüsselung, Nutzer, Absender) in der Server-Config;
   das Passwort liegt im bestehenden Geheimnis-Speicher (Phase 0.5) und wird nie an die UI zurückgegeben.
-- **Token** (Bestätigung und Reset): 128 Bit aus `crypto.randomBytes`, base64url, gespeichert wird `sha256(token)` mit
-  Ablaufzeit und Zweck (`verify-email` | `password-reset`) im Nutzerdatensatz (`mailTokens`). Einlösen vergleicht in
+- **Token** (Bestätigung und Reset): 256 Bit aus `crypto.randomBytes`, base64url, gespeichert wird `sha256(token)` mit
+  Ablaufzeit und Zweck (`verify-email` | `password-reset`) im Nutzerdatensatz (`mailTokens`). Im Link steht `<userId>.<token>`,
+  damit das Konto ohne Suche über alle Nutzer gefunden wird. Einlösen vergleicht in
   konstanter Zeit, verbraucht den Token atomar und löscht abgelaufene.
 - **Anfrage**: Die Route antwortet sofort und einheitlich; der Versand läuft danach asynchron (keine Zeitdifferenz zwischen
   „Konto existiert“ und „nicht“). Rate-Limit über den vorhandenen `RateLimiter` (`reset:<userId>` und `reset:<ip>`).
@@ -86,6 +87,17 @@ identisch sind. Validierung der Bodies über Zod in `auth/validation.ts`.
   bei zwei Domains ist das die öffentliche. Das Fragment (`#`) gelangt nicht in Server-Logs und nicht in den Referrer.
 - **Einlösen**: Passwort setzen (Regeln wie bei der Registrierung), Token verbrauchen, alle Sitzungen des Kontos widerrufen,
   Audit, Info-Mail. Passkeys bleiben unberührt.
+
+## Abweichungen von der ersten Fassung
+
+- Die Einstellungen (SMTP, `mailBaseUrl`, `passkeyRpId`) liegen in `data/account/settings.json` (Admin-Route
+  `/admin/account-settings`), nicht in `ServerConfig`. Das SMTP-Passwort steht im `ModuleSecretStore` (`_server`/`account`).
+- Ein ausgeschalteter Toggle antwortet wie alle anderen Toggles mit **403 `FEATURE_DISABLED`** (nicht 404).
+- Eine Adressänderung über `PUT /users/me` setzt die Bestätigung zurück und verwirft offene Mail-Tokens; der geführte Weg
+  mit Bestätigungsmail ist `PUT /users/me/email` (die alte Adresse bleibt bis zur Bestätigung eingetragen).
+- Der Passkey-Login ist immer „discoverable“ (kein Benutzername). Eine Variante mit Benutzername gibt es nicht.
+- `passkeyRpId` prüft nur die HTTPS-Origins der Liste; der `localhost`-Eintrag der Standardliste bleibt zulässig und bekommt
+  dann keinen gemeinsamen Passkey.
 
 ## Frontend
 
