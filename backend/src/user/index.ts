@@ -98,6 +98,10 @@ export interface PublicUserInfo {
   suspended: boolean
   mustChangePassword: boolean
   createdAt: string
+  /** Admin lists only: the address was confirmed by mailed link. */
+  emailVerified?: boolean
+  /** Admin lists only: number of registered passkeys. */
+  passkeyCount?: number
 }
 
 /**
@@ -1402,6 +1406,11 @@ export class UserService implements IUserService {
    * admin lists and user-search responses.
    */
   private toPublicListInfo(user: UserRecord): PublicUserInfo {
-    return { ...this.toPublicInfo(user), avatarData: '' }
+    return {
+      ...this.toPublicInfo(user),
+      avatarData: '',
+      emailVerified: user.email !== '' && user.emailVerifiedAt !== undefined,
+      passkeyCount: user.passkeys?.length ?? 0,
+    }
   }
 }
