@@ -150,7 +150,7 @@ export class AccountRecoveryService implements IAccountRecoveryService {
       if (!valid) throw new AccountFlowError('INVALID_PASSWORD', 'Password is incorrect')
 
       this.verifyPerUser.recordRequest(userId)
-      const { token, record } = createMailToken('verify-email', VERIFY_EMAIL_TTL_MS, email)
+      const { token, record } = await createMailToken('verify-email', VERIFY_EMAIL_TTL_MS, email)
       await this.deps.userRepository.save({
         ...user,
         pendingEmail: email,
@@ -170,7 +170,7 @@ export class AccountRecoveryService implements IAccountRecoveryService {
     // interleave with another account confirming the same address, hence the global lock.
     await this.locks.runExclusive(EMAIL_UNIQUENESS_LOCK, () => this.locks.runExclusive(parts.userId, async () => {
       const user = await this.deps.userRepository.findById(parts.userId)
-      const token = user === null ? null : findMailToken(user.mailTokens, 'verify-email', parts.secret)
+      const token = user === null ? null : await findMailToken(user.mailTokens, 'verify-email', parts.secret)
       if (user === null || token === null || token.email === undefined) {
         this.redeemPerIp.recordRequest(ipAddress)
         throw new AccountFlowError('INVALID_TOKEN', 'Invalid or expired link')
@@ -224,7 +224,7 @@ export class AccountRecoveryService implements IAccountRecoveryService {
     if (!userLimit.allowed) return
     this.resetPerUser.recordRequest(user.userId)
 
-    const { token, record } = createMailToken('password-reset', PASSWORD_RESET_TTL_MS)
+    const { token, record } = await createMailToken('password-reset', PASSWORD_RESET_TTL_MS)
     await this.locks.runExclusive(user.userId, async () => {
       const fresh = await this.deps.userRepository.findById(user.userId)
       if (fresh === null) return
@@ -245,7 +245,7 @@ export class AccountRecoveryService implements IAccountRecoveryService {
 
     const user = await this.locks.runExclusive(parts.userId, async () => {
       const found = await this.deps.userRepository.findById(parts.userId)
-      const token = found === null ? null : findMailToken(found.mailTokens, 'password-reset', parts.secret)
+      const token = found === null ? null : await findMailToken(found.mailTokens, 'password-reset', parts.secret)
       if (found === null || token === null || found.suspended) {
         this.redeemPerIp.recordRequest(ipAddress)
         throw new AccountFlowError('INVALID_TOKEN', 'Invalid or expired link')

@@ -1,32 +1,36 @@
 // Single-use mailed tokens (email verification, password reset).
 //
 // The raw token has 256 bits of randomness and is only ever sent by mail; the
-// user record keeps a digest (HMAC-SHA-256 with a fixed domain label) plus an
-// expiry. Nothing to brute-force, so a fast digest is appropriate (same
-// reasoning as session tokens); it is not a password hash.
+// user record keeps a scrypt digest plus an expiry. The token is not guessable,
+// so the cost factor is deliberately small (about 10 ms): it exists to keep the
+// digest in the same class as other stored credentials, not to slow a brute force.
 
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import type { ScryptOptions } from 'node:crypto'
+import { promisify } from 'node:util'
 import type { MailTokenRecord } from '../user/index.js'
 
 export const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000
 export const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000
 
-/** Domain-separation key: keeps these digests distinct from other SHA-256 uses of a token. */
-const TOKEN_DIGEST_KEY = 'slatebase:mail-token:v1'
+/** Fixed domain label used as the scrypt salt; the token itself supplies the entropy. */
+const TOKEN_DIGEST_SALT = 'slatebase:mail-token:v1'
+const SCRYPT_OPTIONS: ScryptOptions = { N: 4096, r: 8, p: 1 }
+const scryptAsync = promisify(scrypt) as (password: string, salt: string, keylen: number, options: ScryptOptions) => Promise<Buffer>
 
-export function hashMailToken(token: string): string {
-  return createHmac('sha256', TOKEN_DIGEST_KEY).update(token).digest('hex')
+export async function hashMailToken(token: string): Promise<string> {
+  return (await scryptAsync(token, TOKEN_DIGEST_SALT, 32, SCRYPT_OPTIONS)).toString('hex')
 }
 
-export function createMailToken(
+export async function createMailToken(
   purpose: MailTokenRecord['purpose'],
   ttlMs: number,
   email?: string,
-): { token: string; record: MailTokenRecord } {
+): Promise<{ token: string; record: MailTokenRecord }> {
   const token = randomBytes(32).toString('base64url')
   const record: MailTokenRecord = {
     purpose,
-    hash: hashMailToken(token),
+    hash: await hashMailToken(token),
     expiresAt: new Date(Date.now() + ttlMs).toISOString(),
     ...(email !== undefined ? { email } : {}),
   }
@@ -45,12 +49,12 @@ export function withoutStaleTokens(
 }
 
 /** Finds a valid, unexpired token of `purpose` matching the raw token (constant-time compare). */
-export function findMailToken(
+export async function findMailToken(
   tokens: readonly MailTokenRecord[] | undefined,
   purpose: MailTokenRecord['purpose'],
   rawToken: string,
-): MailTokenRecord | null {
-  const wanted = Buffer.from(hashMailToken(rawToken), 'hex')
+): Promise<MailTokenRecord | null> {
+  const wanted = Buffer.from(await hashMailToken(rawToken), 'hex')
   const now = Date.now()
   let match: MailTokenRecord | null = null
   for (const t of tokens ?? []) {
