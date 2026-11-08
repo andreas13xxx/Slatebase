@@ -74,6 +74,7 @@ function createMockConfig(overrides?: Partial<ServerConfig>): IConfigService {
     getProxyConfig: () => config.proxy,
     getWelcomeVaultConfig: () => config.welcomeVault,
     getOverrides: () => ({}),
+    getShadowedKeys: () => [],
     updateOverrides: async () => [],
   }
 }

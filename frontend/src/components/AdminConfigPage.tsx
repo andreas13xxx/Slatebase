@@ -28,6 +28,8 @@ export interface ServerConfigData {
   sessionDurationHours?: number
   sessionMaxLifetimeDays?: number
   sse?: { maxConnections: number; maxPerUser: number }
+  /** Top-level config keys pinned by an environment variable (read-only in the UI). */
+  shadowedByEnv?: string[]
 }
 
 /** Props for the AdminConfigPage component. */
@@ -141,6 +143,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
           setSessionMaxLifetimeDays(String(data.sessionMaxLifetimeDays ?? 7))
           setSseMaxConnections(String(data.sse?.maxConnections ?? 1000))
           setSseMaxPerUser(String(data.sse?.maxPerUser ?? 3))
+          setShadowedByEnv(data.shadowedByEnv ?? [])
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -295,6 +298,13 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
 
   if (!config) return null
 
+  /** True when a config key is pinned by an environment variable. */
+  const isPinned = (key: string): boolean => shadowedByEnv.includes(key)
+
+  /** Renders the shared "pinned by environment" hint for a field. */
+  const envHint = (key: string) =>
+    isPinned(key) ? <p className="admin-config-hint">{t('admin.config.envPinned')}</p> : null
+
   return (
     <div className="admin-config-page">
       <div className="admin-config-header">
@@ -327,8 +337,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 max={65535}
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
+                disabled={isPinned('port')}
                 aria-invalid={errors.port !== undefined}
               />
+              {envHint('port')}
               {errors.port && <p className="admin-config-field-error">{errors.port}</p>}
             </div>
             <div className="admin-config-field">
@@ -338,8 +350,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 type="text"
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
+                disabled={isPinned('host')}
                 aria-invalid={errors.host !== undefined}
               />
+              {envHint('host')}
               {errors.host && <p className="admin-config-field-error">{errors.host}</p>}
             </div>
           </div>
@@ -350,9 +364,11 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
               type="text"
               value={allowedOrigins}
               onChange={(e) => setAllowedOrigins(e.target.value)}
+              disabled={isPinned('allowedOrigins')}
               placeholder="http://localhost:5173, https://example.com"
             />
             <p className="admin-config-hint">{t('admin.config.allowedOriginsHint')}</p>
+            {envHint('allowedOrigins')}
           </div>
         </section>
 
@@ -368,8 +384,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 min={1}
                 value={maxFileSize}
                 onChange={(e) => setMaxFileSize(e.target.value)}
+                disabled={isPinned('maxFileSize')}
                 aria-invalid={errors.maxFileSize !== undefined}
               />
+              {envHint('maxFileSize')}
               {errors.maxFileSize && <p className="admin-config-field-error">{errors.maxFileSize}</p>}
             </div>
             <div className="admin-config-field">
@@ -378,6 +396,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 id="config-log-level"
                 value={logLevel}
                 onChange={(e) => setLogLevel(e.target.value)}
+                disabled={isPinned('logLevel')}
                 aria-invalid={errors.logLevel !== undefined}
               >
                 <option value="debug">Debug</option>
@@ -385,6 +404,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 <option value="warn">Warn</option>
                 <option value="error">Error</option>
               </select>
+              {envHint('logLevel')}
               {errors.logLevel && <p className="admin-config-field-error">{errors.logLevel}</p>}
             </div>
           </div>
@@ -523,8 +543,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 min={1}
                 value={importMaxFileSize}
                 onChange={(e) => setImportMaxFileSize(e.target.value)}
+                disabled={isPinned('maxImportFileSize')}
               />
               <p className="admin-config-hint">Gesamtgröße eines Vault-Imports. Standard: 500 MB.</p>
+              {envHint('maxImportFileSize')}
             </div>
             <div className="admin-config-field">
               <label htmlFor="config-import-max-files">Import-Dateianzahl</label>
@@ -534,7 +556,9 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 min={1}
                 value={importMaxFiles}
                 onChange={(e) => setImportMaxFiles(e.target.value)}
+                disabled={isPinned('maxImportFiles')}
               />
+              {envHint('maxImportFiles')}
             </div>
             <div className="admin-config-field">
               <label htmlFor="config-import-max-depth">Import-Ordnertiefe</label>
@@ -545,7 +569,9 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 max={100}
                 value={importMaxDepth}
                 onChange={(e) => setImportMaxDepth(e.target.value)}
+                disabled={isPinned('maxImportDepth')}
               />
+              {envHint('maxImportDepth')}
             </div>
             <div className="admin-config-field">
               <label htmlFor="config-mcp-max-size">MCP-Dateigröße (Bytes)</label>
@@ -586,13 +612,11 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
               rows={5}
               value={proxyAllowedOrigins}
               onChange={(e) => setProxyAllowedOrigins(e.target.value)}
-              disabled={shadowedByEnv.includes('proxy')}
+              disabled={isPinned('proxy')}
               placeholder={'api.github.com\nraw.githubusercontent.com\n*.githubusercontent.com'}
             />
             <p className="admin-config-hint">{t('admin.config.proxyAllowedOriginsHint')}</p>
-            {shadowedByEnv.includes('proxy') && (
-              <p className="admin-config-hint">{t('admin.config.proxyEnvPinned')}</p>
-            )}
+            {envHint('proxy')}
           </div>
         </section>
 
@@ -610,8 +634,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 max={8760}
                 value={sessionDurationHours}
                 onChange={(e) => setSessionDurationHours(e.target.value)}
+                disabled={isPinned('sessionDurationHours')}
               />
               <p className="admin-config-hint">{t('admin.config.sessionDurationHint')}</p>
+              {envHint('sessionDurationHours')}
             </div>
             <div className="admin-config-field">
               <label htmlFor="config-session-lifetime">{t('admin.config.sessionLifetimeLabel')}</label>
@@ -622,8 +648,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 max={365}
                 value={sessionMaxLifetimeDays}
                 onChange={(e) => setSessionMaxLifetimeDays(e.target.value)}
+                disabled={isPinned('sessionMaxLifetimeDays')}
               />
               <p className="admin-config-hint">{t('admin.config.sessionLifetimeHint')}</p>
+              {envHint('sessionMaxLifetimeDays')}
             </div>
             <div className="admin-config-field">
               <label htmlFor="config-sse-max-connections">{t('admin.config.sseMaxConnectionsLabel')}</label>
@@ -634,8 +662,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 max={100000}
                 value={sseMaxConnections}
                 onChange={(e) => setSseMaxConnections(e.target.value)}
+                disabled={isPinned('sse')}
               />
               <p className="admin-config-hint">{t('admin.config.sseMaxConnectionsHint')}</p>
+              {envHint('sse')}
             </div>
             <div className="admin-config-field">
               <label htmlFor="config-sse-max-per-user">{t('admin.config.sseMaxPerUserLabel')}</label>
@@ -646,8 +676,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 max={1000}
                 value={sseMaxPerUser}
                 onChange={(e) => setSseMaxPerUser(e.target.value)}
+                disabled={isPinned('sse')}
               />
               <p className="admin-config-hint">{t('admin.config.sseMaxPerUserHint')}</p>
+              {envHint('sse')}
             </div>
           </div>
         </section>
@@ -656,7 +688,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
         {saveMessage && <div className="admin-config-message admin-config-message--success">{saveMessage}</div>}
         {shadowedByEnv.length > 0 && (
           <div className="admin-config-message admin-config-message--error">
-            Per Umgebungsvariable festgelegt und daher unverändert: {shadowedByEnv.join(', ')}
+            {t('admin.config.envPinnedSummary')}: {shadowedByEnv.join(', ')}
           </div>
         )}
         {saveError && <div className="admin-config-message admin-config-message--error">{saveError}</div>}

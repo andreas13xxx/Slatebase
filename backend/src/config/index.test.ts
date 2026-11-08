@@ -296,6 +296,32 @@ describe('ConfigService — admin overrides', () => {
     expect(config.getOverrides().maxFileSize).toBe(9999)
   })
 
+  it('reports no UI-field key as shadowed when no relevant env var is set', () => {
+    // SLATEBASE_DATA_DIR is set by beforeEach, so `dataDir` is in the overlay —
+    // but it has no admin UI field and must NOT surface as shadowed.
+    const config = new ConfigService()
+    const shadowed = config.getShadowedKeys()
+    expect(shadowed).not.toContain('dataDir')
+    expect(shadowed).not.toContain('maxFileSize')
+    expect(shadowed).not.toContain('sse')
+    expect(shadowed).not.toContain('proxy')
+  })
+
+  it('lists every top-level key an environment variable pins, without a save', () => {
+    process.env['SLATEBASE_MAX_FILE_SIZE'] = '1234'
+    process.env['SLATEBASE_SSE_MAX_PER_USER'] = '9'
+    try {
+      // No updateOverrides() call: the UI must learn the pinned keys on load.
+      const config = new ConfigService()
+      const shadowed = config.getShadowedKeys()
+      expect(shadowed).toContain('maxFileSize')
+      expect(shadowed).toContain('sse')
+    } finally {
+      delete process.env['SLATEBASE_MAX_FILE_SIZE']
+      delete process.env['SLATEBASE_SSE_MAX_PER_USER']
+    }
+  })
+
   it('rejects an override that would produce an invalid config', async () => {
     const config = new ConfigService()
     await expect(config.updateOverrides({ port: -1 })).rejects.toThrow()

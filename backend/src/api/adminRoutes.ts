@@ -426,7 +426,10 @@ export class AdminController implements IAdminController {
   async getConfig(c: Context): Promise<Response> {
     try {
       const config = this.configService.getServerConfig()
-      return c.json(config, 200)
+      // Env-pinned keys win over the admin UI; surface them so the UI can
+      // disable those fields on load instead of only after a save attempt.
+      const shadowedByEnv = this.configService.getShadowedKeys()
+      return c.json({ ...config, shadowedByEnv }, 200)
     } catch (error) {
       return this.handleError(c, error)
     }

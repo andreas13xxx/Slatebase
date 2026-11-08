@@ -135,6 +135,9 @@ beforeAll(async () => {
     getOverrides() {
       return {}
     },
+    getShadowedKeys() {
+      return []
+    },
     async updateOverrides() {
       return []
     },
