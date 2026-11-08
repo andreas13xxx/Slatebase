@@ -160,6 +160,36 @@ describe('unresolvable paths do not leak the server path', () => {
   })
 })
 
+describe('search_vault', () => {
+  it('skips a file that became a symlink after the tree scan and keeps searching', async () => {
+    await fs.writeFile(path.join(vaultDir, 'Other.md'), 'SECRET also here', 'utf-8')
+    await fs.writeFile(path.join(outsideDir, 'secret.md'), 'SECRET outside', 'utf-8')
+    const handlers = new Map<string, (args: Record<string, unknown>) => Promise<CallToolResult>>()
+    const server = { tool: (...a: unknown[]) => { handlers.set(a[0] as string, a[a.length - 1] as never) } }
+    const stale = {
+      name: 'vault', type: 'directory', path: '',
+      children: [
+        { name: 'Swapped.md', type: 'file', path: 'Swapped.md' },
+        { name: 'Other.md', type: 'file', path: 'Other.md' },
+      ],
+    }
+    // Swapped.md was a regular file when the (cached) tree was built, then replaced by a symlink
+    await fs.symlink(path.join(outsideDir, 'secret.md'), path.join(vaultDir, 'Swapped.md'))
+    registerToolHandlers(server as never, {
+      vaultService: { ...vaultService(), getVaultTree: vi.fn().mockResolvedValue(stale) } as unknown as IVaultService,
+      vaultAccessControl: { checkReadAccess: vi.fn().mockResolvedValue(undefined), checkWriteAccess: vi.fn() } as unknown as IVaultAccessControl,
+      logger,
+      mcpConfig: { maxFileSize: 1024 * 1024 } as McpConfig,
+      getUserId: () => 'user-1',
+    })
+    const result = await handlers.get('search_vault')!({ vaultId: 'v1', query: 'SECRET', maxResults: 10 })
+    const out = text(result)
+    expect(out).toContain('Other.md')
+    expect(out).not.toContain('Swapped.md')
+    expect(out).not.toContain('outside')
+  })
+})
+
 describe('query_base', () => {
   it('refuses a symlinked .base file pointing outside the vault', async () => {
     await fs.writeFile(path.join(outsideDir, 'x.base'), 'views: []\n', 'utf-8')
