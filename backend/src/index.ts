@@ -27,6 +27,7 @@ import { SessionStore, AuthService } from './auth/index.js'
 import { CsrfSecretManager } from './auth/csrf-secret.js'
 import { SESSION_COOKIE_NAME } from './auth/cookies.js'
 import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, createMustChangePasswordMiddleware } from './auth/middleware.js'
+import { createSessionWriteRateLimit, parseWriteRateLimitMode } from './auth/session-write-rate-limit.js'
 import { createClientIpMiddleware } from './api/client-ip.js'
 import { createRequestIdMiddleware } from './api/request-id.js'
 import { RateLimiter } from './auth/ratelimit.js'
@@ -735,6 +736,12 @@ app.use('*', createClientIpMiddleware({ trustedProxies: serverConfig.trustedProx
 app.use('/api/v1/*', authMiddleware)
 app.use('/api/v1/*', createCsrfMiddleware(authService))
 app.use('/api/v1/*', createRateLimitMiddleware(rateLimiter))
+// Central limit for session writes (log-only unless SLATEBASE_WRITE_RATE_LIMIT_MODE=enforce).
+const writeRateLimit = createSessionWriteRateLimit({
+  mode: parseWriteRateLimitMode(process.env['SLATEBASE_WRITE_RATE_LIMIT_MODE']),
+  logger,
+})
+app.use('/api/v1/*', writeRateLimit.middleware)
 app.use('/api/v1/*', createMustChangePasswordMiddleware(userRepository))
 
 // Global error handler — catches unhandled exceptions and returns proper JSON
@@ -1541,6 +1548,7 @@ const gracefulShutdown = async (signal: string, exitCode = 0): Promise<void> => 
   chatRateLimiter.destroy()
   mcpRateLimiter?.destroy()
   proxyRateLimiter.destroy()
+  writeRateLimit.destroy()
 
   // Shutdown realtime connections (sends server:shutdown event, closes all streams)
   await realtimeConnectionManager.shutdown()
