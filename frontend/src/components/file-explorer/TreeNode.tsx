@@ -93,7 +93,7 @@ export function TreeNode({
     }
   }, [node.path, node.name, node.type])
 
-  const longPress = useLongPress()
+  const longPress = useLongPress({ suppressNativeDrag: true })
 
   if (isDirectory) {
     const isValidTarget = dragState.draggedPath !== null && dragState.draggedVaultId === vaultId && dragState.validTargets.has(node.path)
