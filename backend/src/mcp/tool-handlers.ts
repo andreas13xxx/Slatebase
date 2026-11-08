@@ -26,6 +26,7 @@ import type { ILinkIndex } from '../link-index/index.js'
 import type { McpConfig } from './config.js'
 import { mcpToolError, mcpToolSuccess } from './tool-results.js'
 import { registerQueryBase } from './query-base-tool.js'
+import { resolveContainedPath } from './real-path.js'
 import {
   MCP_ERROR_ACCESS_DENIED,
   MCP_ERROR_NOT_FOUND,
@@ -522,7 +523,7 @@ function registerReadFile(server: McpServer, deps: ToolHandlerDeps): void {
         // Validate file path (path traversal protection)
         let resolvedPath: string
         try {
-          resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
+          resolvedPath = await resolveContainedPath(deps.vaultService, args.vaultId, args.path, deps.logger)
         } catch (error) {
           if (error instanceof PathTraversalError) {
             return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid file path')
@@ -711,7 +712,7 @@ function registerCreateDirectory(server: McpServer, deps: ToolHandlerDeps): void
         // Resolve and validate path
         let resolvedPath: string
         try {
-          resolvedPath = deps.vaultService.resolveFilePath(args.vaultId, args.path)
+          resolvedPath = await resolveContainedPath(deps.vaultService, args.vaultId, args.path, deps.logger)
         } catch (error) {
           if (error instanceof PathTraversalError) {
             return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid directory path')
