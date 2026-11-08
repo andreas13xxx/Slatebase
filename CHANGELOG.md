@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.79.0](https://github.com/andreas13xxx/Slatebase/compare/v0.78.0...v0.79.0) (2026-11-08)
+
+
+### Features
+
+* **auth:** Passkeys, Mail-Bestätigung und Passwort-Reset per Mail ([#345](https://github.com/andreas13xxx/Slatebase/issues/345)) ([1c54e4f](https://github.com/andreas13xxx/Slatebase/commit/1c54e4f74497b638023e6baabf658c701cf8c072))
+
+
+### Bugfixes
+
+* **mcp:** enforce realpath containment for file access ([#343](https://github.com/andreas13xxx/Slatebase/issues/343)) ([a3bc9b6](https://github.com/andreas13xxx/Slatebase/commit/a3bc9b611142acbf87e9de74afa8329f34c72d7f))
+
+
+### Sonstige Änderungen
+
+* sync route authorization inventory and structure steering ([#342](https://github.com/andreas13xxx/Slatebase/issues/342)) ([9cce4b6](https://github.com/andreas13xxx/Slatebase/commit/9cce4b6e1c1538fe1b0f0f81cc4c03eac8a19476))
+
 ## [0.78.0](https://github.com/andreas13xxx/Slatebase/compare/v0.77.0...v0.78.0) (2026-11-07)
 
 
