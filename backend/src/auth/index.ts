@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomBytes, randomUUID, createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { hash, verify } from 'argon2'
-import type { UserRole, PublicUserInfo, IUserRepository } from '../user/index.js'
+import type { UserRole, UserRecord, PublicUserInfo, IUserRepository } from '../user/index.js'
 import { AccountSuspendedError, ARGON2_OPTIONS, toPublicUserInfo } from '../user/index.js'
 import type { ILogger } from '../logger/index.js'
 import type { IAuditService } from '../audit/index.js'
@@ -124,6 +124,16 @@ export interface IAuthService {
 
   /** Invalidate all sessions for a user except the one identified by currentToken. */
   invalidateOtherSessions(userId: string, currentToken: string): Promise<void>
+
+  /** Invalidate every session of a user (password reset, credential compromise). */
+  invalidateAllSessions(userId: string): Promise<void>
+
+  /**
+   * Open a session for a user whose identity was already proven by another
+   * means (passkey). Applies the same suspended check, audit and session
+   * parameters as the password login.
+   */
+  loginVerifiedUser(user: UserRecord, meta: LoginMeta): Promise<LoginResult>
 
   /** Generate a CSRF token bound to a session. */
   generateCsrfToken(sessionId: string): string
@@ -707,6 +717,32 @@ export class AuthService implements IAuthService {
       throw new AccountSuspendedError()
     }
 
+    return this.issueSession(user, meta)
+  }
+
+  /**
+   * Open a session for a user whose identity was already proven by another
+   * means (passkey). Same suspended check, session parameters and audit as
+   * the password login.
+   */
+  async loginVerifiedUser(user: UserRecord, meta: LoginMeta): Promise<LoginResult> {
+    if (user.suspended) {
+      this.logger.info('Login failed: account suspended', { userId: user.userId })
+      await this.auditService?.log({
+        userId: user.userId,
+        action: 'LOGIN_FAILED',
+        target: user.userId,
+        ipAddress: meta.ipAddress,
+        success: false,
+        details: 'Account suspended',
+      })
+      throw new AccountSuspendedError()
+    }
+    return this.issueSession(user, meta)
+  }
+
+  /** Creates and persists a session for an authenticated user and audits the login. */
+  private async issueSession(user: UserRecord, meta: LoginMeta): Promise<LoginResult> {
     // Generate session tokens
     const token = randomBytes(64).toString('hex') // 128 chars
     const sessionId = randomUUID()
@@ -886,6 +922,14 @@ export class AuthService implements IAuthService {
   async invalidateOtherSessions(userId: string, currentToken: string): Promise<void> {
     await this.sessionStore.invalidateAllForUser(userId, currentToken)
     this.logger.info('Other sessions invalidated', { userId })
+  }
+
+  /**
+   * Invalidate every session of a user.
+   */
+  async invalidateAllSessions(userId: string): Promise<void> {
+    await this.sessionStore.invalidateAllForUser(userId)
+    this.logger.info('All sessions invalidated', { userId })
   }
 
   /**

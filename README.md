@@ -98,6 +98,22 @@ slatebase.example.com {
 
 For detailed reverse proxy setup (Nginx Proxy Manager, Traefik, etc.), see [CONTRIBUTING.md](CONTRIBUTING.md#reverse-proxy).
 
+### Passkeys, password reset by mail, and the reverse proxy
+
+Two features, both on by default (`passkeys`, `mail-recovery`); their UI appears only when the prerequisites are met.
+
+- **Passkeys (WebAuthn)** sign a user in without a password and sit next to the password, which always stays valid. A passkey is
+  bound to one domain, so a public and an internal address need one passkey each — unless both share a parent domain, which an
+  admin can set as the shared passkey domain. Passkeys work only on origins listed in `SLATEBASE_ALLOWED_ORIGINS` (Admin → Server
+  configuration) that are HTTPS (or `localhost`). Slatebase takes the origin from the browser's `Origin` header and checks it against
+  that list; it never derives it from `Host` or `X-Forwarded-Host`, so **your proxy must pass `Origin` through unchanged**. TLS
+  termination at the proxy is fine. Changing the domain later invalidates existing passkeys (the password still works).
+- **Password reset by mail** needs SMTP (Admin → Server configuration → *Sign-in and recovery*; the password is stored encrypted and
+  never shown) and a *confirmed* address per user (Settings → Security). Links in mails use one of the allowed origins, by default the
+  first HTTPS one. Reset links are single-use, valid 30 minutes, stored only as hashes, answer identically for unknown accounts, are
+  rate-limited, and end all sessions of the account on use. Without a confirmed address only an admin can reset a password (and can
+  remove all of an account's passkeys).
+
 ### Public links and the reverse proxy
 
 If you enable `public-shares`, the paths `/s/*` (the reading page) and `/api/v1/public/*` must be reachable by people outside
@@ -205,7 +221,7 @@ oversight — but it means:
 | 👥 **Multi-User & Sharing** | Invite others to your vaults with read or write access, transfer ownership |
 | 🔗 **Public Links** | Share a single note read-only with people who have no account: a link with optional password and expiry that always shows the current note, embedded notes and media included. Off by default (`public-shares` toggle); see [Public links and the reverse proxy](#public-links-and-the-reverse-proxy) |
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
-| 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting |
+| 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting. Optional **passkeys** (WebAuthn) next to the password, and **password reset by mail** with confirmed addresses; see [Passkeys, password reset by mail, and the reverse proxy](#passkeys-password-reset-by-mail-and-the-reverse-proxy) |
 | 🔄 **Vault Sync** | Via Obsidian LiveSync plugin (running in plugin compat layer with server-side CORS proxy) |
 | 🗃️ **Git-Sync** | Sync a vault with one or more git remotes — HTTPS token or SSH deploy key, shared branch, per-remote interval, manual sync; credentials encrypted at rest |
 | 📧 **Mail-Import** | Poll IMAP mailboxes server-side and file unread mails as Markdown notes with attachments — mailbox tree picker, target folder, per-config interval |
@@ -343,6 +359,14 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | PUT | `/users/me` | Update profile |
 | PUT | `/users/me/password` | Change password |
 | DELETE | `/users/me` | Delete account |
+| GET | `/auth/capabilities?origin=` | Public: which login options apply (`passkey`, `passwordReset`) |
+| POST | `/auth/passkey/login/options` · `/auth/passkey/login/verify` | Public: sign in with a passkey (needs an allowed `Origin`) |
+| POST | `/auth/passkey/register/options` · `/auth/passkey/register/verify` | Register a passkey (password re-entered) |
+| GET | `/users/me/security` | Address state and passkeys |
+| PUT | `/users/me/email` | Start an address change (password required); sends a confirmation mail |
+| PUT · DELETE | `/users/me/passkeys/:id` | Rename · delete a passkey |
+| POST | `/auth/email/verify` | Public: confirm an address with the mailed token |
+| POST | `/auth/password-reset/request` · `/auth/password-reset/confirm` | Public: request a reset mail · set a new password with the token |
 
 ### Admin
 
@@ -355,6 +379,9 @@ Behind the `public-shares` feature toggle (off by default). The first group need
 | PUT | `/admin/users/:userId/suspend` | Suspend user |
 | PUT | `/admin/users/:userId/unsuspend` | Unsuspend user |
 | GET | `/admin/audit` | Audit log |
+| DELETE | `/admin/users/:userId/passkeys` | Remove all passkeys of an account |
+| GET · PUT | `/admin/account-settings` | SMTP, link base, shared passkey domain (the SMTP password is write-only) |
+| POST | `/admin/account-settings/test` | Send a test mail with the saved settings |
 | GET | `/admin/config` | Server config |
 | PUT | `/admin/config` | Update config |
 | GET | `/admin/features` | List feature toggles |

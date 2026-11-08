@@ -555,6 +555,43 @@ describe('AuthService', () => {
     })
   })
 
+  describe('invalidateAllSessions', () => {
+    it('should invalidate every session of the user', async () => {
+      const { hash } = await import('argon2')
+      const passwordHash = await hash('password123', { type: 2, memoryCost: 4096, timeCost: 2, parallelism: 1 })
+      const user = createMockUser({ passwordHash })
+      const authService = new AuthService(sessionStore, createMockUserRepository([user]), logger, csrfSecret)
+
+      await authService.login('testuser', 'password123', loginMeta)
+      await authService.login('testuser', 'password123', loginMeta)
+      await authService.invalidateAllSessions('user-1')
+
+      expect(sessionStore.sessions).toHaveLength(0)
+    })
+  })
+
+  describe('loginVerifiedUser', () => {
+    it('should open a session for a user verified by another means', async () => {
+      const user = createMockUser()
+      const authService = new AuthService(sessionStore, createMockUserRepository([user]), logger, csrfSecret)
+
+      const result = await authService.loginVerifiedUser(user, loginMeta)
+
+      expect(result.user.userId).toBe('user-1')
+      expect(sessionStore.sessions).toHaveLength(1)
+      expect(sessionStore.sessions[0]!.tokenHash).toBe(hashToken(result.token))
+      expect(result.csrfToken).toBe(authService.generateCsrfToken(sessionStore.sessions[0]!.sessionId))
+    })
+
+    it('should refuse a suspended account and create no session', async () => {
+      const user = createMockUser({ suspended: true })
+      const authService = new AuthService(sessionStore, createMockUserRepository([user]), logger, csrfSecret)
+
+      await expect(authService.loginVerifiedUser(user, loginMeta)).rejects.toThrow(AccountSuspendedError)
+      expect(sessionStore.sessions).toHaveLength(0)
+    })
+  })
+
   describe('generateCsrfToken', () => {
     it('should generate a deterministic token for the same sessionId', () => {
       const userRepo = createMockUserRepository([])

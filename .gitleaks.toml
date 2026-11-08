@@ -63,6 +63,8 @@ regexes = [
   '''a-brand-new-password''',
   '''whatever-password''',
   '''secret-pw''',
+  # Dummy password in the account/passkey service tests.
+  '''correct-horse-battery''',
 ]
 
 [allowlist]
@@ -97,6 +99,9 @@ regexes = [
   # rule flags it, so it has to sit in the global allowlist (a rule-scoped entry
   # would only cover slatebase-password-literal).
   '''ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789''',
+  # Fake mailed-link token in the verify-email page test (`#token=u1.verify-secret`);
+  # the default generic-api-key rule reads "token=<word>" as a key.
+  '''u1\.verify-secret''',
 ]
 
 # The credential removed in this branch is still reachable in history at commit

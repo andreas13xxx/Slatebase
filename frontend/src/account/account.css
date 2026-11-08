@@ -1,0 +1,166 @@
+/* Account security, admin account settings, reset and confirmation pages. */
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  margin-top: 8px;
+}
+
+.account-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.account-field input,
+.account-field select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.account-field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.account-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.account-badge--ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.account-badge--warn {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.account-passkey-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-passkey {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.account-passkey-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-passkey-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.account-passkey-actions,
+.account-passkey-rename {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.account-passkey-rename {
+  flex: 1;
+}
+
+.account-passkey-rename input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.login-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #4f8cff);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.login-secondary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.login-secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-links {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 13px;
+}
+
+.login-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.login-success {
+  font-size: 13px;
+  color: var(--success);
+  margin: 0 0 12px;
+}
+
+.login-title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}

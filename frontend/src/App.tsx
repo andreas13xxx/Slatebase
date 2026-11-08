@@ -59,6 +59,8 @@ import { TabContent } from './components/TabContent'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UserMenu } from './components/UserMenu'
 import { LoginPage } from './components/LoginPage'
+import { ResetPasswordPage } from './account/ResetPasswordPage'
+import { VerifyEmailPage } from './account/VerifyEmailPage'
 import { ChangePasswordPage } from './components/ChangePasswordPage'
 import { SlatebaseLogo } from './components/SlatebaseLogo'
 import { SidebarToolbar } from './components/SidebarToolbar'
@@ -1622,6 +1624,10 @@ function AuthGuard() {
     void bootstrap()
     return () => { cancelled = true }
   }, [authState.isBootstrapping, authDispatch])
+
+  // Landing pages of mailed links work with or without a session.
+  if (window.location.pathname === '/reset-password') return <ResetPasswordPage />
+  if (window.location.pathname === '/verify-email') return <VerifyEmailPage />
 
   if (authState.isBootstrapping) {
     return (

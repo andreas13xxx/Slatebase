@@ -2,8 +2,19 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { useAuthContext } from '../state/authContext'
 import { useTranslation } from '../i18n'
 import type { IApiClient } from '../api'
+import type { PublicUserInfo } from '../state/authState'
 import { SlatebaseLogo } from './SlatebaseLogo'
 import { PasswordInput } from './PasswordInput'
+import { createAccountApi } from '../account/accountApi'
+import type { AccountApiError, AuthCapabilities } from '../account/accountApi'
+import {
+  cancelPasskeyPrompt,
+  isPasskeyAutofillSupported,
+  isPasskeyCancelled,
+  isPasskeySupported,
+  signInWithPasskey,
+} from '../account/passkeyClient'
+import '../account/account.css'
 
 /** Props for the LoginPage component. */
 export interface LoginPageProps {
@@ -50,6 +61,52 @@ export function LoginPage({ apiClient }: LoginPageProps) {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null)
   const [version, setVersion] = useState<string | null>(null)
+  const [accountApi] = useState(() => createAccountApi())
+  const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null)
+  const [view, setView] = useState<'login' | 'forgot'>('login')
+  const [forgotIdentifier, setForgotIdentifier] = useState('')
+  const [forgotBusy, setForgotBusy] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotError, setForgotError] = useState<string | null>(null)
+  const [passkeyError, setPasskeyError] = useState<string | null>(null)
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
+
+  const passkeyAvailable = capabilities?.passkey === true && isPasskeySupported()
+
+  /** Finishes a login (password or passkey): CSRF token into the client, user into the auth state. */
+  function completeLogin(result: { csrfToken: string; user: PublicUserInfo }): void {
+    apiClient.setCsrfToken(result.csrfToken)
+    authDispatch({ type: 'LOGIN_SUCCESS', payload: { csrfToken: result.csrfToken, user: result.user } })
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    accountApi.getCapabilities()
+      .then((caps) => { if (!cancelled) setCapabilities(caps) })
+      .catch(() => { /* capabilities are optional: without them the page offers the password login only */ })
+    return () => { cancelled = true }
+  }, [accountApi])
+
+  // Conditional UI: offer saved passkeys in the username field's autofill list.
+  useEffect(() => {
+    if (!passkeyAvailable || view !== 'login') return
+    let cancelled = false
+    void isPasskeyAutofillSupported().then(async (supported) => {
+      if (!supported || cancelled) return
+      try {
+        const result = await signInWithPasskey(accountApi, true)
+        if (!cancelled) completeLogin(result)
+      } catch {
+        // dismissed, superseded by a password login or the explicit button: nothing to report
+      }
+    })
+    return () => {
+      cancelled = true
+      cancelPasskeyPrompt()
+    }
+    // completeLogin only closes over the stable dispatch and client references
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkeyAvailable, view, accountApi])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -85,15 +142,13 @@ export function LoginPage({ apiClient }: LoginPageProps) {
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault()
     setRateLimitMessage(null)
+    setPasskeyError(null)
     if (!validate()) return
+    cancelPasskeyPrompt()
     authDispatch({ type: 'LOGIN_STARTED' })
     try {
       const result = await apiClient.login(username, password)
-      apiClient.setCsrfToken(result.csrfToken)
-      authDispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: { csrfToken: result.csrfToken, user: result.user },
-      })
+      completeLogin(result)
     } catch (err: unknown) {
       if (isRateLimitError(err)) {
         const retryAfter = extractRetryAfter(err)
@@ -107,6 +162,95 @@ export function LoginPage({ apiClient }: LoginPageProps) {
         })
       }
     }
+  }
+
+  async function handlePasskeyLogin(): Promise<void> {
+    setPasskeyError(null)
+    setRateLimitMessage(null)
+    setPasskeyBusy(true)
+    cancelPasskeyPrompt()
+    try {
+      const result = await signInWithPasskey(accountApi, false)
+      completeLogin(result)
+    } catch (err: unknown) {
+      const apiError = err as AccountApiError
+      if (apiError.code === 'RATE_LIMITED') {
+        setPasskeyError(t('auth.rateLimited', { seconds: apiError.retryAfter ?? 900 }))
+      } else if (apiError.code === 'ACCOUNT_SUSPENDED') {
+        setPasskeyError(t('auth.loginFailed'))
+      } else if (!isPasskeyCancelled(err)) {
+        setPasskeyError(t('account.passkeyLoginFailed'))
+      }
+    } finally {
+      setPasskeyBusy(false)
+    }
+  }
+
+  async function handleForgotSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault()
+    setForgotError(null)
+    if (forgotIdentifier.trim() === '') return
+    setForgotBusy(true)
+    try {
+      await accountApi.requestPasswordReset(forgotIdentifier.trim())
+      setForgotSent(true)
+    } catch (err: unknown) {
+      const apiError = err as AccountApiError
+      setForgotError(
+        apiError.code === 'RATE_LIMITED'
+          ? t('account.rateLimited', { seconds: apiError.retryAfter ?? 900 })
+          : t('account.forgotFailed'),
+      )
+    } finally {
+      setForgotBusy(false)
+    }
+  }
+
+  if (view === 'forgot') {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-logo">
+            <SlatebaseLogo size={36} className="login-logo-icon" />
+            <span className="login-logo-text">Slatebase</span>
+          </div>
+          <h1 className="login-title">{t('account.forgotTitle')}</h1>
+          {forgotSent ? (
+            <p className="login-success" role="status">{t('account.forgotSent')}</p>
+          ) : (
+            <form className="login-form" onSubmit={(e) => void handleForgotSubmit(e)} noValidate>
+              <p className="login-info">{t('account.forgotInfo')}</p>
+              <div className="login-field">
+                <label className="login-label" htmlFor="forgot-identifier">{t('account.forgotIdentifier')}</label>
+                <input
+                  id="forgot-identifier"
+                  className="login-input"
+                  type="text"
+                  maxLength={254}
+                  value={forgotIdentifier}
+                  onChange={(e) => setForgotIdentifier(e.target.value)}
+                  autoComplete="username"
+                  autoFocus
+                />
+              </div>
+              {forgotError !== null && <p className="login-error" role="alert">{forgotError}</p>}
+              <button type="submit" className="login-submit" disabled={forgotBusy || forgotIdentifier.trim() === ''}>
+                {forgotBusy ? t('account.forgotSending') : t('account.forgotSubmit')}
+              </button>
+            </form>
+          )}
+          <p className="login-links">
+            <button
+              type="button"
+              className="login-link-button"
+              onClick={() => { setView('login'); setForgotSent(false); setForgotError(null) }}
+            >
+              {t('account.backToLogin')}
+            </button>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -135,7 +279,7 @@ export function LoginPage({ apiClient }: LoginPageProps) {
               onChange={(e) => { setUsername(e.target.value); if (usernameError) setUsernameError(null) }}
               aria-invalid={usernameError !== null}
               aria-describedby={usernameError ? 'login-username-error' : undefined}
-              autoComplete="username"
+              autoComplete={passkeyAvailable ? 'username webauthn' : 'username'}
               autoFocus
             />
             {usernameError && (
@@ -173,6 +317,28 @@ export function LoginPage({ apiClient }: LoginPageProps) {
             {authState.isLoading ? t('auth.loggingIn') : t('auth.login')}
           </button>
         </form>
+
+        {passkeyAvailable && (
+          <>
+            <button
+              type="button"
+              className="login-secondary"
+              onClick={() => void handlePasskeyLogin()}
+              disabled={passkeyBusy || authState.isLoading}
+            >
+              {t('account.passkeyLogin')}
+            </button>
+            {passkeyError !== null && <p className="login-error" role="alert">{passkeyError}</p>}
+          </>
+        )}
+
+        {capabilities?.passwordReset === true && (
+          <p className="login-links">
+            <button type="button" className="login-link-button" onClick={() => setView('forgot')}>
+              {t('account.forgotPassword')}
+            </button>
+          </p>
+        )}
 
         {version && (
           <p className="login-version">

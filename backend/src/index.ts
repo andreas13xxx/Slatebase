@@ -96,6 +96,14 @@ import { createSpellcheckDictionaryRoutes } from './api/spellcheckDictionaryRout
 import { createPropertyRoutes } from './api/propertyRoutes.js'
 import { createBasesRoutes } from './api/basesRoutes.js'
 import { createPublicShareManagementRoutes, createPublicShareReaderRoutes } from './api/publicShareRoutes.js'
+import { AccountSettingsStore } from './account/settings-store.js'
+import { MailService } from './account/mail-service.js'
+import { AccountRecoveryService } from './account/account-recovery-service.js'
+import { PasskeyService } from './account/passkey-service.js'
+import { resolveRelyingParty } from './account/origin.js'
+import { createAccountRoutes } from './api/accountRoutes.js'
+import { createPasskeyRoutes } from './api/passkeyRoutes.js'
+import { createAccountSettingsRoutes } from './api/accountSettingsRoutes.js'
 import { createPublicShareService, createPublicShareStore, createPublicShareVaultAccess } from './public-share/index.js'
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
@@ -144,6 +152,8 @@ featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import a
 featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten', defaultEnabled: false, type: 'cold' })
 featureRegistry.register({ name: 'public-shares', description: 'Öffentliche Freigabe-Links — Notizen per Link für Personen ohne Konto lesbar machen (Inhalte verlassen den Server)', defaultEnabled: false, type: 'hot' })
+featureRegistry.register({ name: 'passkeys', description: 'Anmeldung mit Passkeys (WebAuthn) als Alternative zum Passwort', defaultEnabled: true, type: 'hot' })
+featureRegistry.register({ name: 'mail-recovery', description: 'Passwort zurücksetzen per Mail und Bestätigung der Mail-Adresse (benötigt SMTP)', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste', defaultEnabled: false, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
@@ -571,6 +581,28 @@ function getLinkIndex(vaultId: string): ILinkIndex | undefined {
   return linkIndexCache.get(vaultId)
 }
 
+// Account recovery (mail) and passkeys
+const accountSettingsStore = new AccountSettingsStore(serverConfig.dataDir, moduleSecretStore)
+const mailService = new MailService(accountSettingsStore, logger)
+const getAllowedOrigins = (): readonly string[] => config.getServerConfig().allowedOrigins
+const accountRecoveryService = new AccountRecoveryService({
+  userRepository,
+  mailService,
+  settings: accountSettingsStore,
+  authService,
+  getAllowedOrigins,
+  isEnabled: () => featureToggleService.isEnabled('mail-recovery'),
+  logger,
+  auditService,
+})
+const passkeyService = new PasskeyService({ userRepository, authService, logger, auditService })
+await passkeyService.loadIndex()
+const resolvePasskeyRelyingParty = async (originHeader: string | undefined) => {
+  if (!featureToggleService.isEnabled('passkeys')) return null
+  const { passkeyRpId } = await accountSettingsStore.get()
+  return resolveRelyingParty(originHeader, getAllowedOrigins(), passkeyRpId)
+}
+
 // 5. Controllers
 const sseTicketStore = new SseTicketStore()
 const vaultController = new VaultController(vaultService, logger, importService, userRepository, vaultAccessControl, vaultShareRegistry)
@@ -750,9 +782,28 @@ app.use('/api/v1/public/s/*', async (c, next) => {
   return c.json({ code: 'NOT_FOUND', message: 'Not found', timestamp: new Date().toISOString() }, 404)
 })
 app.use('/api/v1/vaults/:vaultId/activity', createFeatureGuard('activity-timeline', featureToggleService))
+app.use('/api/v1/auth/passkey/*', createFeatureGuard('passkeys', featureToggleService))
+app.use('/api/v1/users/me/passkeys/*', createFeatureGuard('passkeys', featureToggleService))
+app.use('/api/v1/admin/users/:userId/passkeys', createFeatureGuard('passkeys', featureToggleService))
+app.use('/api/v1/auth/password-reset/*', createFeatureGuard('mail-recovery', featureToggleService))
+app.use('/api/v1/auth/email/*', createFeatureGuard('mail-recovery', featureToggleService))
+app.use('/api/v1/users/me/email', createFeatureGuard('mail-recovery', featureToggleService))
 
 // Route registration
 app.route('/api/v1', router)
+app.route('/api/v1', createAccountRoutes({
+  recovery: accountRecoveryService,
+  passkeys: passkeyService,
+  logger,
+  isPasskeyAvailable: async (originHeader) => (await resolvePasskeyRelyingParty(originHeader)) !== null,
+}))
+app.route('/api/v1', createPasskeyRoutes({
+  passkeys: passkeyService,
+  logger,
+  cookieConfig: { trustedProxies: serverConfig.trustedProxies, cookieSecureMode: serverConfig.cookieSecure, sessionMaxLifetimeDays: serverConfig.sessionMaxLifetimeDays },
+  resolveRelyingParty: resolvePasskeyRelyingParty,
+}))
+app.route('/api/v1', createAccountSettingsRoutes({ settings: accountSettingsStore, mailService, getAllowedOrigins, logger, auditService }))
 
 // Feature toggle routes (admin + public)
 const adminFeatureApp = createAdminFeatureRoutes({ featureToggleService, auditService })

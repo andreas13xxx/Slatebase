@@ -1,5 +1,5 @@
 import { useState, useCallback, type FormEvent } from 'react'
-import { UserCog, KeyRound, Ban, Unlock, Trash2 } from 'lucide-react'
+import { UserCog, KeyRound, Fingerprint, Ban, Unlock, Trash2 } from 'lucide-react'
 import type { IApiClient } from '../api'
 import type { UserRole } from '../state/authState'
 import { useTranslation } from '../i18n'
@@ -8,6 +8,8 @@ import { usePaginatedResource } from '../hooks/usePaginatedResource'
 import { ConfirmModal } from './ConfirmModal'
 import { SettingSection, Button } from './settings/ui'
 import { PasswordInput } from './PasswordInput'
+import { createAccountApi } from '../account/accountApi'
+import '../account/account.css'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,10 @@ interface AdminUserInfo {
   suspended: boolean
   mustChangePassword: boolean
   createdAt: string
+  /** Address confirmed by mailed link (admin list only). */
+  emailVerified?: boolean
+  /** Number of registered passkeys (admin list only). */
+  passkeyCount?: number
 }
 
 /** Paginated response from the admin users endpoint. */
@@ -175,6 +181,24 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
         try {
           await adminFetch<void>('DELETE', `/api/v1/admin/users/${user.userId}`)
           setActionSuccess(t('admin.users.deleteSuccess', { username: user.username }))
+          void loadUsers(page)
+        } catch (err: unknown) {
+          setActionError(extractErrorMessage(err, t('admin.users.unknownError')))
+        }
+      },
+    })
+  }
+
+  function handleRemovePasskeys(user: AdminUserInfo): void {
+    setConfirmDialog({
+      message: t('account.users.removePasskeysConfirm', { username: user.username }),
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setActionError(null)
+        setActionSuccess(null)
+        try {
+          const { removed } = await createAccountApi(() => apiClient.getCsrfToken()).removeUserPasskeys(user.userId)
+          setActionSuccess(t('account.users.removePasskeysDone', { username: user.username, count: removed }))
           void loadUsers(page)
         } catch (err: unknown) {
           setActionError(extractErrorMessage(err, t('admin.users.unknownError')))
@@ -372,7 +396,14 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
                   <tr key={user.userId} className={user.suspended ? 'admin-users-row--suspended' : ''}>
                     <td>{user.username}</td>
                     <td>{user.displayName}</td>
-                    <td>{user.email || '—'}</td>
+                    <td>
+                      {user.email || '—'}
+                      {user.email !== '' && (
+                        <span className={`account-badge ${user.emailVerified === true ? 'account-badge--ok' : 'account-badge--warn'}`}>
+                          {user.emailVerified === true ? t('account.users.emailVerified') : t('account.users.emailUnverified')}
+                        </span>
+                      )}
+                    </td>
                     <td>{user.role === 'admin' ? t('admin.users.roleAdmin') : t('admin.users.roleUser')}</td>
                     <td>{user.suspended ? t('admin.users.statusSuspended') : t('admin.users.statusActive')}</td>
                     <td>{formatDate(user.createdAt)}</td>
@@ -395,6 +426,17 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
                       >
                         <KeyRound size={15} />
                       </Button>
+                      {(user.passkeyCount ?? 0) > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemovePasskeys(user)}
+                          title={`${t('account.users.removePasskeys')} (${t('account.users.passkeyCount', { count: user.passkeyCount ?? 0 })})`}
+                          aria-label={`${t('account.users.removePasskeys')}: ${user.username}`}
+                        >
+                          <Fingerprint size={15} />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

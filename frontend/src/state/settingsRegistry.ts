@@ -38,6 +38,7 @@ export const SETTINGS_SECTIONS: ISettingsSectionDef[] = [
   // Konto
   { id: 'profile', labelKey: 'settings.sections.profile', category: 'account', requiresAdmin: false, requiresVault: false },
   { id: 'password', labelKey: 'settings.sections.password', category: 'account', requiresAdmin: false, requiresVault: false },
+  { id: 'security', labelKey: 'settings.sections.security', category: 'account', requiresAdmin: false, requiresVault: false },
   { id: 'sessions', labelKey: 'settings.sections.sessions', category: 'account', requiresAdmin: false, requiresVault: false },
   { id: 'mcp-tokens', labelKey: 'settings.sections.mcpTokens', category: 'account', requiresAdmin: false, requiresVault: false, feature: 'mcp' },
   { id: 'public-shares', labelKey: 'settings.sections.publicShares', category: 'account', requiresAdmin: false, requiresVault: false, feature: 'public-shares' },

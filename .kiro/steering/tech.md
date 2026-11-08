@@ -95,6 +95,8 @@ Threshold rules live in `quality.md`.
 | argon2 | Password hashing (argon2id) |
 | adm-zip | ZIP extraction (plugin upload) |
 | imapflow | IMAP client (mail-import) |
+| nodemailer | SMTP delivery of confirmation and password-reset mails (account/) |
+| @simplewebauthn/server · @simplewebauthn/browser | WebAuthn passkeys (backend ceremonies · frontend prompts) |
 | postal-mime | MIME parsing of fetched mails (mail-import) |
 | turndown | HTML → Markdown conversion for HTML mail bodies (mail-import) |
 | fast-check | Property-based testing (devDependency, `.pbt.test.ts` files) |
