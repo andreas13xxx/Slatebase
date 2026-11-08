@@ -81,6 +81,7 @@ function createMockConfigService(): IConfigService {
     getProxyConfig: () => ({ allowedOrigins: [] }) as ReturnType<IConfigService['getProxyConfig']>,
     getWelcomeVaultConfig: () => ({}) as ReturnType<IConfigService['getWelcomeVaultConfig']>,
     getOverrides: () => ({}),
+    getShadowedKeys: () => [],
     updateOverrides: async () => [],
   }
 }

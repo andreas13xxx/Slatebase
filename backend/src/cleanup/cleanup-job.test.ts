@@ -65,6 +65,7 @@ function createMockConfigService(overrides?: {
     getProxyConfig: vi.fn().mockReturnValue({ allowedOrigins: ['api.github.com'] }),
     getWelcomeVaultConfig: vi.fn().mockReturnValue({ name: { de: 'Willkommen', en: 'Welcome' } }),
     getOverrides: vi.fn().mockReturnValue({}),
+    getShadowedKeys: vi.fn().mockReturnValue([]),
     updateOverrides: vi.fn().mockResolvedValue([]),
   }
 }
