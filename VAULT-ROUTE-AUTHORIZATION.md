@@ -267,6 +267,11 @@ originally documented 4 `read` exceptions were removed).
 
 ## PR 2 — handler-check removal (2026-09-12)
 
+> **Historical, as of `8e61aee` (2026-09-12).** This section records what PR 2 removed and the levels
+> that were enforced at that time. Levels have changed since (plugin/snippet/plugin-store mutations,
+> `/detected*` routes gone, `store-install`/`update-all`/`:pluginId/update` now `write`): the tables in
+> §1–19 and "Current state" at the end are authoritative, not the level statements below.
+
 For every route below, the handler-level check was **removed** because §-referenced row
 above shows the middleware now enforces the identical level — removal is belegt
 (evidenced) by that row, not a fresh decision. Routes not listed here either kept their
@@ -396,7 +401,7 @@ eliminates: enforcement no longer depends on every call site remembering to pass
 
 Added after the inventory above, so the counts above do not include it. Mounted via
 `app.route('/api/v1/vaults/:vaultId/themes', themeRoutes)` (`index.ts`). The routes contain no access
-checks of their own: the middleware default applies, and **no exception was added** — unlike snippets
+checks of their own: the middleware default applies, and **no exception was added** — unlike the snippet and plugin routes as they were originally documented (since tightened to write, see §16–17)
 and plugins, mutating theme routes require **write** access, because a theme is a file in the vault
 (`.obsidian/themes/`) and the selection (`.obsidian/appearance.json`) applies to every user of the vault.
 
@@ -587,8 +592,12 @@ middleware), so the document cannot be checked against the code mechanically.
 
 ## Current state (2026-11-08, `ef82dbc`)
 
-- **112** routes match `/api/v1/vaults/:vaultId/*` (95 mounted in the test harness, 17 not: themes 6, theme-store 2,
-  hotkeys-config 2, workspaces-config 2, activity 1, bases 1, spellcheck 3).
+- **111** routes match `/api/v1/vaults/:vaultId/*` (94 mounted in the test harness, 17 not: themes 6, theme-store 2,
+  hotkeys-config 2, workspaces-config 2, activity 1, bases 1, spellcheck 3). Counting method: the harness figure is
+  the number of entries in `app.routes` with a method other than `ALL` whose path matches
+  `^/api/v1/vaults/:vaultId(/|$)` (the same filter as the test, dumped once with a temporary test); the 17 are
+  counted from the route registrations of the unmounted modules. An earlier count of 112/95 wrongly included the
+  one `ALL` entry, the authorization middleware itself (`app.use('/api/v1/vaults/:vaultId/*')`).
 - **13** entries in `VAULT_ROUTE_LEVEL_EXCEPTIONS`: 3× `read` instead of `write` (`POST /properties/query`,
   `PUT /plugins/:pluginId/settings`, `POST /plugins/check-updates`), 3× `write` instead of `read`
   (`GET /public-shares`, `GET /public-shares/preview`, `GET /keychain/:secretId`), 7× `owner` (`GET`/`POST /shares`,
