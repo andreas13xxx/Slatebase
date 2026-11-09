@@ -5,12 +5,13 @@
  */
 
 import { memo, useCallback, useEffect, useState } from 'react'
-import type { BaseFilterNode } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseFilterNode, BaseRow } from '@slatebase/shared-contracts'
 import {
   addFilterChild, childrenOf, conditionToExpression, groupKeyOf, parseCondition, removeFilterNode,
   OPERATOR_LABELS, replaceFilterNode, setGroupKey, VALUELESS_OPERATORS,
   type ColumnChoice, type Condition, type FilterGroupKey, type FilterPath, type Operator,
 } from './base-edit'
+import { ColumnDropdown } from './base-column-dropdown'
 
 const GROUP_LABELS: Record<FilterGroupKey, string> = {
   and: 'Alle Bedingungen treffen zu',
@@ -51,18 +52,19 @@ export const CommitInput = memo(function CommitInput({
 
 interface ConditionRowProps {
   expression: string
+  doc: BaseDocument
+  rows: BaseRow[]
   columns: ColumnChoice[]
   disabled: boolean
   onChange: (expression: string) => void
   onRemove: () => void
 }
 
-const ConditionRow = memo(function ConditionRow({ expression, columns, disabled, onChange, onRemove }: ConditionRowProps) {
+const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns, disabled, onChange, onRemove }: ConditionRowProps) {
   const parsed = parseCondition(expression)
   const [rawMode, setRawMode] = useState(parsed === null && expression !== '')
   const condition = parsed ?? DEFAULT_CONDITION
   const emit = (next: Condition) => onChange(conditionToExpression(next))
-  const known = columns.some((c) => c.id === condition.property)
   const fixedProperty = condition.operator === 'hasTag' || condition.operator === 'inFolder'
 
   return (
@@ -78,16 +80,15 @@ const ConditionRow = memo(function ConditionRow({ expression, columns, disabled,
         />
       ) : (
         <>
-          <select
-            className="bases-tb__select"
-            aria-label="Eigenschaft"
+          <ColumnDropdown
+            doc={doc}
+            rows={rows}
+            columns={columns}
             value={condition.property}
+            label="Eigenschaft"
             disabled={disabled || fixedProperty}
-            onChange={(e) => emit({ ...condition, property: e.target.value })}
-          >
-            {!known && <option value={condition.property}>{condition.property}</option>}
-            {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
+            onChange={(property) => emit({ ...condition, property })}
+          />
           <select
             className="bases-tb__select"
             aria-label="Operator"
@@ -131,12 +132,14 @@ const ConditionRow = memo(function ConditionRow({ expression, columns, disabled,
 interface GroupEditorProps {
   node: BaseFilterNode
   path: FilterPath
+  doc: BaseDocument
+  rows: BaseRow[]
   columns: ColumnChoice[]
   disabled: boolean
   onChange: (update: RootUpdate) => void
 }
 
-const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, onChange }: GroupEditorProps) {
+const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, disabled, onChange }: GroupEditorProps) {
   const key = groupKeyOf(node)
   if (key === null) return null
   const children = childrenOf(node)
@@ -162,13 +165,15 @@ const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, o
           <ConditionRow
             key={i}
             expression={child}
+            doc={doc}
+            rows={rows}
             columns={columns}
             disabled={disabled}
             onChange={(expr) => onChange((r) => replaceFilterNode(r, childPath, expr))}
             onRemove={() => onChange((r) => removeFilterNode(r, childPath))}
           />
         ) : (
-          <GroupEditor key={i} node={child} path={childPath} columns={columns} disabled={disabled} onChange={onChange} />
+          <GroupEditor key={i} node={child} path={childPath} doc={doc} rows={rows} columns={columns} disabled={disabled} onChange={onChange} />
         )
       })}
       {!disabled && (
@@ -191,11 +196,13 @@ export type RootUpdate = (root: BaseFilterNode) => BaseFilterNode
 export interface BasesFilterEditorProps {
   /** Root group being edited (use `rootGroup()` for a missing filter). */
   root: BaseFilterNode
+  doc: BaseDocument
+  rows: BaseRow[]
   columns: ColumnChoice[]
   disabled: boolean
   onChange: (update: RootUpdate) => void
 }
 
-export const BasesFilterEditor = memo(function BasesFilterEditor({ root, columns, disabled, onChange }: BasesFilterEditorProps) {
-  return <GroupEditor node={root} path={[]} columns={columns} disabled={disabled} onChange={onChange} />
+export const BasesFilterEditor = memo(function BasesFilterEditor({ root, doc, rows, columns, disabled, onChange }: BasesFilterEditorProps) {
+  return <GroupEditor node={root} path={[]} doc={doc} rows={rows} columns={columns} disabled={disabled} onChange={onChange} />
 })

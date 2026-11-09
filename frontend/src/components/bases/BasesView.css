@@ -1102,3 +1102,167 @@
   color: var(--text-subtle);
   font-weight: 400;
 }
+
+/* ── Toolbar: quick search bar (#7) ───────────────────────────────────── */
+.bases-view__toolbar-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.bases-view__searchbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.bases-view__searchbar .bases-tb__btn-icon {
+  color: var(--text-subtle);
+}
+
+/* ── Toolbar: column dropdown (icon + technical name) (#6) ─────────────── */
+.bases-tb__col-dd {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.bases-tb__col-dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  /* Reuse .bases-tb__select's box, but no native caret background. */
+  background-image: none;
+  padding-right: 8px;
+}
+
+.bases-tb__col-dd-selected {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bases-tb__col-dd-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(360px, 80vw);
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.bases-tb__col-dd-opt {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.85em;
+}
+
+.bases-tb__col-dd-opt:hover {
+  background: var(--bg-hover, var(--bg-surface));
+}
+
+.bases-tb__col-dd-check {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--accent-text);
+}
+
+.bases-tb__col-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bases-tb__col-id {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-subtle);
+  font-family: var(--font-monospace, monospace);
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+/* ── Kanban: column header row, grip, per-column add (#3, #4) ──────────── */
+.bases-kanban__column-header-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bases-kanban__column-header-row[draggable='true'] {
+  cursor: grab;
+}
+
+.bases-kanban__column-header-row .bases-kanban__column-header {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: none;
+}
+
+.bases-kanban__column-grip {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  color: var(--text-subtle);
+  opacity: 0.6;
+}
+
+.bases-kanban__column-add {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.bases-kanban__column-add:hover {
+  background: var(--bg-hover, var(--bg-base));
+  color: var(--text-primary);
+}
+
+.bases-kanban__column--col-drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.bases-kanban__column--dragging {
+  opacity: 0.5;
+}

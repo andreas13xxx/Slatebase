@@ -38,16 +38,33 @@ function findInFolder(node: BaseFilterNode | undefined): string | null {
 }
 
 /**
- * Blank YAML frontmatter for the displayed property columns, each key left
- * empty, so the new note starts with the base's shape ready to fill in. A
- * `property == "X"` equality filter pre-fills that key with X, so the new note
- * actually matches the base. Returns '' when there are no property columns.
+ * Blank YAML frontmatter for the displayed property columns — Obsidian's "new
+ * item from a base" behaviour: the displayed properties are already in the
+ * frontmatter, and the base's filters pre-fill them where possible so the new
+ * note actually matches (and the active filters are respected). Pre-fill
+ * sources, in precedence:
+ *   1. `overrides` (e.g. the Kanban column a note is created in → its groupBy
+ *      value), highest priority so the note lands in the right column.
+ *   2. a `property == "X"` equality filter → that key gets X.
+ *   3. a `file.hasTag("X")` filter → the `tags` key gets X.
+ * Returns '' when there are no property columns.
  */
-export function buildBlankFrontmatter(columns: string[], doc: BaseDocument, view: BaseView | undefined): string {
-  if (columns.length === 0) return ''
-  const prefills = collectEqualityPrefills(doc.filters)
-  if (view) Object.assign(prefills, collectEqualityPrefills(view.filters))
-  const lines = columns.map((key) => {
+export function buildBlankFrontmatter(
+  columns: string[],
+  doc: BaseDocument,
+  view: BaseView | undefined,
+  overrides: Record<string, string> = {},
+): string {
+  if (columns.length === 0 && Object.keys(overrides).length === 0) return ''
+  const prefills = collectPrefills(doc.filters)
+  if (view) collectPrefills(view.filters, prefills)
+  Object.assign(prefills, overrides)
+  // An override may name a key that is not a displayed column (e.g. the group
+  // property is hidden from the card chips); write it anyway so the note lands
+  // in the right group.
+  const keys = [...columns]
+  for (const key of Object.keys(overrides)) if (!keys.includes(key)) keys.push(key)
+  const lines = keys.map((key) => {
     const value = prefills[key]
     return value !== undefined ? `${key}: ${value}` : `${key}:`
   })
@@ -56,9 +73,16 @@ export function buildBlankFrontmatter(columns: string[], doc: BaseDocument, view
 
 /** Matches `prop == "value"` / `prop == 'value'` equality predicates. */
 const EQUALITY_RE = /([A-Za-z_][\w-]*)\s*==\s*["']([^"']*)["']/g
+/** Matches `file.hasTag("X")` / `file.hasTag('X')` so a tag filter pre-fills `tags`. */
+const HAS_TAG_RE = /file\.hasTag\(\s*["']([^"']+)["']\s*\)/g
 
-/** Collects `prop == "value"` equalities from a filter tree as key→value prefills. */
-function collectEqualityPrefills(node: BaseFilterNode | undefined, into: Record<string, string> = {}): Record<string, string> {
+/**
+ * Collects pre-fillable values from a filter tree: `prop == "value"` equalities
+ * (key→value) and `file.hasTag("X")` (→ the `tags` key). Only the cheap,
+ * unambiguous predicates — `!=`, `contains`, ranges etc. cannot name a concrete
+ * value and are left blank.
+ */
+function collectPrefills(node: BaseFilterNode | undefined, into: Record<string, string> = {}): Record<string, string> {
   if (!node) return into
   if (typeof node === 'string') {
     EQUALITY_RE.lastIndex = 0
@@ -67,10 +91,12 @@ function collectEqualityPrefills(node: BaseFilterNode | undefined, into: Record<
       const key = m[1]!
       if (!key.startsWith('file.') && !key.startsWith('formula.')) into[key] = m[2]!
     }
+    HAS_TAG_RE.lastIndex = 0
+    while ((m = HAS_TAG_RE.exec(node)) !== null) into['tags'] = m[1]!
     return into
   }
   const children = 'and' in node ? node.and : 'or' in node ? node.or : node.not
-  for (const child of children) collectEqualityPrefills(child, into)
+  for (const child of children) collectPrefills(child, into)
   return into
 }
 

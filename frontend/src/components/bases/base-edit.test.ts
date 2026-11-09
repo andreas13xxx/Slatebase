@@ -3,7 +3,7 @@ import type { BaseDocument, BaseFilterNode, BaseRow } from '@slatebase/shared-co
 import { evaluateCondition, rowContext } from '@slatebase/shared-contracts'
 import {
   addView, renameView, duplicateView, deleteView, setViewType, uniqueViewName,
-  setSort, setGroupBy, setOrder, effectiveColumns, availableColumns,
+  setSort, setGroupBy, setGroupOrder, setOrder, effectiveColumns, availableColumns,
   rootGroup, normalizeFilter, replaceFilterNode, removeFilterNode, addFilterChild, setGroupKey,
   setViewFilter, setDocFilter, conditionToExpression, parseCondition, propertyRef,
   type Condition,
@@ -72,6 +72,13 @@ describe('sort / group / columns', () => {
     expect('groupBy' in setGroupBy(next, 0, undefined).views[0]!).toBe(false)
   })
 
+  it('sets and clears groupOrder (reorder of columns)', () => {
+    const next = setGroupOrder(doc(), 0, ['open', null, 'done'])
+    expect(next.views[0]!.groupOrder).toEqual(['open', null, 'done'])
+    // An empty list removes the key (fall back to default order), not groupOrder: [].
+    expect('groupOrder' in setGroupOrder(next, 0, []).views[0]!).toBe(false)
+  })
+
   it('effective columns fall back to the declared properties', () => {
     expect(effectiveColumns(doc(), doc().views[0])).toEqual(['status'])
     expect(effectiveColumns(doc(), doc().views[1])).toEqual(['status'])
@@ -87,6 +94,16 @@ describe('sort / group / columns', () => {
     expect(ids).toContain('prio')
     expect(ids.filter((i) => i === 'file.ctime')).toHaveLength(1)
     expect(availableColumns(doc(), rows, undefined).find((c) => c.id === 'status')!.label).toBe('Status')
+  })
+
+  it('collapses a note.-prefixed order id and the bare observed key into one choice', () => {
+    // `view.order` holds `note.status`, the rows carry the bare `status` (the
+    // backend strips `note.`): one choice, under the canonical bare id.
+    const d: BaseDocument = { properties: { status: { displayName: 'Status' } }, views: [{ type: 'table', name: 'A', order: ['note.status'] }] }
+    const rows = [{ path: 'a.md', fileName: 'a', values: { status: ['x'] } }]
+    const statusChoices = availableColumns(d, rows, d.views[0]).filter((c) => c.id === 'status' || c.id === 'note.status')
+    expect(statusChoices).toHaveLength(1)
+    expect(statusChoices[0]!.id).toBe('status')
   })
 })
 

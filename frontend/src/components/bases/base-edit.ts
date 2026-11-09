@@ -10,8 +10,9 @@
  * expression fallback for anything that does not round-trip.
  */
 
+import { rowValueKey } from '@slatebase/shared-contracts'
 import type {
-  BaseDocument, BaseFilterNode, BaseGroupBy, BaseRow, BaseSortClause, BaseView,
+  BaseDocument, BaseFilterNode, BaseGroupBy, BaseGroupValue, BaseRow, BaseSortClause, BaseView,
 } from '@slatebase/shared-contracts'
 
 // ─── Views ──────────────────────────────────────────────────────────────────
@@ -90,6 +91,19 @@ export function setGroupBy(doc: BaseDocument, index: number, groupBy: BaseGroupB
 
 export function setOrder(doc: BaseDocument, index: number, order: string[]): BaseDocument {
   return withView(doc, index, (v) => ({ ...v, order }))
+}
+
+/**
+ * Sets the explicit order of Kanban/cards groups (`groupOrder`), e.g. after a
+ * drag-reorder of the columns. An empty list removes the key (fall back to the
+ * default alphabetical order) rather than writing `groupOrder: []`, which
+ * Obsidian reads as "hide all groups".
+ */
+export function setGroupOrder(doc: BaseDocument, index: number, groupOrder: BaseGroupValue[]): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { groupOrder: _old, ...rest } = v
+    return groupOrder.length > 0 ? { ...rest, groupOrder } : rest
+  })
 }
 
 // ─── Formulas ───────────────────────────────────────────────────────────────
@@ -184,12 +198,17 @@ export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseV
   for (const row of rows) {
     for (const key of Object.keys(row.values)) if (!key.startsWith('file.')) ids.push(key)
   }
+  // Dedup on the normalized key so a `note.`-prefixed id from `view.order` and
+  // the bare key observed in the rows collapse to one choice (the backend
+  // strips `note.` when filling rows). The bare id is the canonical choice —
+  // it matches the row-value key and the form `setGroupBy`/`setOrder` write.
   const seen = new Set<string>()
   const out: ColumnChoice[] = []
   for (const id of ids) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    out.push({ id, label: columnLabel(doc, id) })
+    const key = rowValueKey(id)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ id: key, label: columnLabel(doc, key) })
   }
   return out
 }

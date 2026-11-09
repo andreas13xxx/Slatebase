@@ -46,4 +46,25 @@ describe('buildBlankFrontmatter', () => {
     const view: BaseView = { type: 'table', filters: 'type == "task"' }
     expect(buildBlankFrontmatter(['type'], doc, view)).toBe('---\ntype: task\n---\n')
   })
+
+  it('pre-fills tags from a file.hasTag filter', () => {
+    const doc: BaseDocument = { filters: 'file.hasTag("buch")', views: [] }
+    expect(buildBlankFrontmatter(['tags'], doc, undefined)).toBe('---\ntags: buch\n---\n')
+  })
+
+  it('an override takes precedence over a filter prefill', () => {
+    const doc: BaseDocument = { filters: 'status == "open"', views: [] }
+    const fm = buildBlankFrontmatter(['status'], doc, undefined, { status: 'done' })
+    expect(fm).toBe('---\nstatus: done\n---\n')
+  })
+
+  it('an override key not among the columns is still written', () => {
+    const fm = buildBlankFrontmatter(['title'], { views: [] }, undefined, { status: 'done' })
+    expect(fm).toBe('---\ntitle:\nstatus: done\n---\n')
+  })
+
+  it('writes an override even with no property columns', () => {
+    const fm = buildBlankFrontmatter([], { views: [] }, undefined, { status: 'done' })
+    expect(fm).toBe('---\nstatus: done\n---\n')
+  })
 })
