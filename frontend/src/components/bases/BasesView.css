@@ -893,9 +893,45 @@
   color: var(--text-primary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
-  padding: 2px 6px;
+  padding: 5px 8px;
   font-size: 0.85em;
   min-width: 0;
+  min-height: 30px;
+}
+
+.bases-tb__select:hover:not(:disabled),
+.bases-tb__input:hover:not(:disabled) {
+  border-color: var(--border-strong, var(--text-subtle));
+}
+
+.bases-tb__select:focus-visible,
+.bases-tb__input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft, rgba(99, 102, 241, 0.25));
+}
+
+/* Custom caret so native <select> matches the rest of the toolbar instead of
+   drawing the raw browser dropdown arrow. */
+.bases-tb__select {
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.bases-tb__select:disabled {
+  opacity: 1;
+  color: var(--text-subtle);
+  cursor: not-allowed;
+}
+
+/* Paired controls in one row share the width evenly instead of butting edge
+   to edge; the row gap gives them breathing space. */
+.bases-tb__row > .bases-tb__select,
+.bases-tb__row > .bases-tb__input {
+  flex: 1 1 0;
 }
 
 .bases-tb__input--grow {
