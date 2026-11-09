@@ -313,8 +313,16 @@ export function evaluateCondition(source: string, ctx: FormulaContext): boolean 
 export function formatFormulaValue(value: FormulaValue): string {
   if (value === null) return ''
   if (value instanceof Date) {
-    const iso = value.toISOString()
-    return iso.endsWith('T00:00:00.000Z') ? iso.slice(0, 10) : iso
+    // A bare calendar date is LOCAL midnight (see toDate), so render the local
+    // Y-M-D rather than toISOString() — the latter would shift it to the UTC
+    // day and show the day before in a positive timezone.
+    if (value.getHours() === 0 && value.getMinutes() === 0 && value.getSeconds() === 0 && value.getMilliseconds() === 0) {
+      const y = value.getFullYear()
+      const mo = String(value.getMonth() + 1).padStart(2, '0')
+      const d = String(value.getDate()).padStart(2, '0')
+      return `${y}-${mo}-${d}`
+    }
+    return value.toISOString()
   }
   return stringify(value)
 }

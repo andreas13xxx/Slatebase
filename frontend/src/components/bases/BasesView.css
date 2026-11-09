@@ -5,8 +5,8 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg-primary);
-  color: var(--text-normal);
+  background: var(--bg-base);
+  color: var(--text-primary);
 }
 
 .bases-view__toolbar {
@@ -21,7 +21,7 @@
 
 .bases-view__title {
   font-weight: 600;
-  color: var(--text-normal);
+  color: var(--text-primary);
 }
 
 .bases-view__modes {
@@ -32,7 +32,7 @@
 .bases-view__mode {
   appearance: none;
   border: 1px solid var(--border-default);
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   color: var(--text-subtle);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
@@ -41,14 +41,14 @@
 }
 
 .bases-view__mode--active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-color: var(--interactive-accent);
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
 }
 
 .bases-view__error {
   padding: var(--spacing-sm) var(--spacing-md);
-  color: var(--text-on-accent);
+  color: var(--text-inverse);
   background: var(--danger);
 }
 
@@ -87,7 +87,7 @@
 .bases-table__header {
   position: sticky;
   top: 0;
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   border-right: 1px solid var(--border-default);
   text-align: left;
@@ -106,7 +106,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   font-weight: 500;
   font-size: 0.9em;
   cursor: pointer;
@@ -116,12 +116,12 @@
 }
 
 .bases-table__header-btn:hover {
-  color: var(--text-normal);
-  background: var(--bg-hover, var(--bg-primary));
+  color: var(--text-primary);
+  background: var(--bg-hover, var(--bg-base));
 }
 
 .bases-table__row:hover > .bases-table__cell {
-  background: var(--bg-hover, var(--bg-secondary));
+  background: var(--bg-hover, var(--bg-surface));
 }
 
 .bases-table__cell {
@@ -200,7 +200,7 @@
 }
 
 .bases-table__cell--formula {
-  color: var(--text-normal);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -208,7 +208,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--text-accent);
+  color: var(--accent-text);
   cursor: pointer;
   padding: 0;
   text-align: left;
@@ -231,7 +231,7 @@
 
 .bases-table__summary-row > .bases-table__cell {
   border-top: 1px solid var(--border-default);
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   height: auto;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -249,19 +249,19 @@
 }
 
 .bases-table__summary-label {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   text-transform: uppercase;
   font-size: 0.75em;
   letter-spacing: 0.03em;
 }
 
 .bases-table__summary-value {
-  color: var(--text-normal);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .base-cell--readonly {
-  color: var(--text-normal);
+  color: var(--text-primary);
 }
 
 /* ── Source view ───────────────────────────────────────────────────────── */
@@ -290,9 +290,9 @@
 
 .bases-source-view__apply-btn {
   appearance: none;
-  border: 1px solid var(--interactive-accent);
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--text-inverse);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
   cursor: pointer;
@@ -306,7 +306,7 @@
 
 .bases-source-view__error {
   padding: var(--spacing-xs) var(--spacing-md);
-  color: var(--text-on-accent);
+  color: var(--text-inverse);
   background: var(--danger);
   font-size: 0.85em;
 }
@@ -319,8 +319,8 @@
   box-sizing: border-box;
   resize: none;
   border: none;
-  background: var(--bg-primary);
-  color: var(--text-normal);
+  background: var(--bg-base);
+  color: var(--text-primary);
   font-family: var(--font-monospace, monospace);
   font-size: 0.85em;
   padding: var(--spacing-md);
@@ -338,7 +338,7 @@
 .bases-view__view {
   appearance: none;
   border: 1px solid var(--border-default);
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   color: var(--text-subtle);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
@@ -348,9 +348,9 @@
 }
 
 .bases-view__view--active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-color: var(--interactive-accent);
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
 }
 
 /* Container a plugin-contributed Bases view renders its own DOM into. */
@@ -374,7 +374,7 @@
   flex-wrap: wrap;
   gap: 16px;
   padding: 8px 12px;
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   font-size: 0.85em;
 }
@@ -386,19 +386,19 @@
 }
 
 .bases-kanban__summary-col {
-  color: var(--text-normal);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .bases-kanban__summary-label {
-  color: var(--text-muted);
+  color: var(--text-subtle);
   text-transform: uppercase;
   font-size: 0.75em;
   letter-spacing: 0.03em;
 }
 
 .bases-kanban__summary-value {
-  color: var(--text-normal);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -410,6 +410,30 @@
   min-height: 0;
   overflow-x: auto;
   padding: 12px;
+}
+
+/* Grouped-cards layout: groups stacked as rows, each a horizontal card grid. */
+.bases-kanban--rows {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.bases-kanban--rows .bases-kanban__column {
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+}
+
+.bases-kanban--rows .bases-kanban__cards {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.bases-kanban--rows .bases-kanban__card {
+  flex: 0 0 auto;
+  width: 220px;
 }
 
 .bases-kanban--error,
@@ -537,13 +561,13 @@
   border-radius: var(--radius-md, 6px);
   overflow: auto;
   max-height: 480px;
-  background: var(--bg-primary);
-  color: var(--text-normal);
+  background: var(--bg-base);
+  color: var(--text-primary);
 }
 
 .bases-embed--loading {
   padding: var(--spacing-md);
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 
 .cm-lp-embed-base {
@@ -564,7 +588,7 @@
   flex-wrap: wrap;
   gap: 16px;
   padding: 8px 12px;
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   font-size: 0.85em;
 }
@@ -576,7 +600,7 @@
 }
 
 .bases-list__summary-col {
-  color: var(--text-normal);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -588,7 +612,7 @@
 }
 
 .bases-list__summary-value {
-  color: var(--text-normal);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -624,7 +648,7 @@
   border-radius: var(--radius-md);
   text-align: left;
   cursor: pointer;
-  color: var(--text-normal);
+  color: var(--text-primary);
 }
 
 .bases-list__entry:hover {
@@ -688,7 +712,7 @@
   overflow: hidden;
   cursor: pointer;
   color: inherit;
-  background: var(--bg-secondary, transparent);
+  background: var(--bg-surface, transparent);
   border: 1px solid var(--border-color, currentColor);
   border-radius: var(--radius-md, 6px);
 }
@@ -713,7 +737,8 @@
 
 /* ── Toolbar (views, sort, group, filter, properties) ─────────────────── */
 
-.bases-tb__group-left {
+.bases-tb__group-left,
+.bases-tb__group-right {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
@@ -721,13 +746,41 @@
   min-width: 0;
 }
 
-.bases-tb__group-left .bases-tb__btn {
+.bases-tb__group-right {
+  flex: 0 0 auto;
+}
+
+.bases-tb__group-left .bases-tb__btn,
+.bases-tb__group-right .bases-tb__btn {
   white-space: nowrap;
+}
+
+/* Right-hand popovers open flush to their button's right edge so they
+   don't overflow the viewport. */
+.bases-tb__group-right .bases-tb__panel {
+  left: auto;
+  right: 0;
 }
 
 .bases-tb__caret {
   font-size: 0.8em;
   opacity: 0.7;
+}
+
+.bases-tb__btn-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+/* Column-type icon in headers and the properties picker. */
+.bases-col-type-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  opacity: 0.65;
+  vertical-align: text-bottom;
+  margin-right: 4px;
 }
 
 .bases-tb__pop {
@@ -741,7 +794,7 @@
   gap: 4px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   border-radius: var(--radius-sm);
   padding: 3px 8px;
   font-size: 0.85em;
@@ -750,8 +803,8 @@
 
 .bases-tb__btn:hover:not(:disabled),
 .bases-tb__btn--active {
-  background: var(--bg-hover, var(--bg-secondary));
-  color: var(--text-normal);
+  background: var(--bg-hover, var(--bg-surface));
+  color: var(--text-primary);
 }
 
 .bases-tb__btn:disabled {
@@ -760,22 +813,22 @@
 }
 
 .bases-tb__btn--primary {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-color: var(--interactive-accent);
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
 }
 
 .bases-tb__btn--danger {
   background: var(--danger);
-  color: var(--text-on-accent);
+  color: var(--text-inverse);
 }
 
 .bases-tb__badge {
   min-width: 1.3em;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  background: var(--accent);
+  color: var(--text-inverse);
   font-size: 0.8em;
   text-align: center;
 }
@@ -790,7 +843,7 @@
   max-width: min(560px, 90vw);
   max-height: 70vh;
   overflow-y: auto;
-  background: var(--bg-primary);
+  background: var(--bg-base);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md, 6px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
@@ -836,8 +889,8 @@
 
 .bases-tb__select,
 .bases-tb__input {
-  background: var(--bg-secondary);
-  color: var(--text-normal);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 2px 6px;
@@ -849,11 +902,37 @@
   flex: 1 1 8em;
 }
 
+.bases-tb__input--invalid {
+  border-color: var(--danger);
+}
+
+.bases-tb__formula-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.bases-tb__formula-name {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.bases-tb__formula-expr {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-subtle);
+  font-size: 0.8em;
+}
+
 .bases-tb__icon-btn {
   appearance: none;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   border-radius: var(--radius-sm);
   min-width: 24px;
   padding: 2px 4px;
@@ -862,8 +941,8 @@
 }
 
 .bases-tb__icon-btn:hover:not(:disabled) {
-  background: var(--bg-hover, var(--bg-secondary));
-  color: var(--text-normal);
+  background: var(--bg-hover, var(--bg-surface));
+  color: var(--text-primary);
 }
 
 .bases-tb__icon-btn:disabled {
@@ -875,7 +954,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--text-accent);
+  color: var(--accent-text);
   cursor: pointer;
   padding: 2px 0;
   font-size: 0.85em;
@@ -902,7 +981,7 @@
   width: 100%;
   border: none;
   background: transparent;
-  color: var(--text-normal);
+  color: var(--text-primary);
   padding: 4px 6px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -911,7 +990,7 @@
 
 .bases-tb__view-item:hover,
 .bases-tb__view-item--active {
-  background: var(--bg-hover, var(--bg-secondary));
+  background: var(--bg-hover, var(--bg-surface));
 }
 
 .bases-tb__view-item--active {
@@ -933,15 +1012,15 @@
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-subtle);
   padding: 2px 8px;
   cursor: pointer;
   font-size: 0.85em;
 }
 
 .bases-tb__tab--active {
-  color: var(--text-normal);
-  border-bottom-color: var(--interactive-accent);
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
 }
 
 .bases-tb__group {

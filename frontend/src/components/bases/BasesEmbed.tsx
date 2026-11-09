@@ -27,6 +27,7 @@ import { BasesCardsView } from './BasesCardsView'
 import { embedViewKind } from './pickEmbedView'
 import { BasesTableView } from './BasesTableView'
 import { pickEmbedView } from './pickEmbedView'
+import './BasesView.css'
 
 /** The minimal API surface BasesEmbed needs — a subset of IApiClient. */
 export interface IBasesEmbedApiClient {

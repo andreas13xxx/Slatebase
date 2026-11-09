@@ -34,6 +34,7 @@ import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 import { sortRowsByFormula } from './base-formula-sort'
+import './BasesView.css'
 
 // Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
 const BasesMapView = lazy(() => import('./BasesMapView').then((m) => ({ default: m.BasesMapView })))
@@ -94,11 +95,12 @@ export const BasesView = memo(function BasesView({
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
-  // Obsidian 1.14 has a dedicated `kanban` layout; a grouped `cards` view keeps
-  // rendering as the board (historic behaviour). An ungrouped `cards` view is
-  // the Obsidian image-card grid.
-  const isKanbanView = !!activeView && !isPluginView
-    && (activeView.type === 'kanban' || (activeView.type === 'cards' && !!activeView.groupBy))
+  // Both board layouts share BasesKanbanView, differing only in orientation:
+  // `kanban` groups into horizontal columns, a grouped `cards` view stacks the
+  // groups as vertical rows (each a card grid). An ungrouped `cards` view is
+  // the plain Obsidian image-card grid (BasesCardsView).
+  const isKanbanView = !!activeView && !isPluginView && activeView.type === 'kanban'
+  const isGroupedCardsView = !!activeView && !isPluginView && activeView.type === 'cards' && !!activeView.groupBy
   const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
   const isMapView = !!activeView && activeView.type === 'map' && !isPluginView
@@ -236,6 +238,37 @@ export const BasesView = memo(function BasesView({
   // Expose this base to the `bases:*` core commands (single-active-instance,
   // same as activeCanvasBridge).
   const rootRef = useRef<HTMLDivElement>(null)
+
+  // Create a new note scoped to this base and open it. Shared by the
+  // `bases:add-item` core command (via the controller below) and the toolbar's
+  // "Neuer Eintrag" button, so the two cannot drift.
+  const addItem = useCallback(async (): Promise<string | null> => {
+    if (!doc) return null
+    const view = doc.views[safeIndex]
+    const folder = deriveBaseScopeFolder(doc, view)
+    const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
+      (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
+    )
+    const frontmatter = buildBlankFrontmatter(columns, doc, view)
+    const baseName = 'Unbenannt'
+    try {
+      // Resolve a non-colliding file name under the target folder.
+      const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
+      await apiClient.saveFile(vaultId, path, frontmatter)
+      // The backend's vault:change excludes the user who triggered the write,
+      // so our own SSE live-refresh never fires for a note we just created —
+      // re-query directly so the new row shows up without a manual reload.
+      void runQueryRef.current()
+      onOpenNote(path)
+      return path
+    } catch {
+      return null
+    }
+  }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
+
+  // Fire-and-forget wrapper for the toolbar button (which wants `() => void`).
+  const handleAddItem = useCallback(() => { void addItem() }, [addItem])
+
   useEffect(() => {
     const controller: ActiveBasesController = {
       nextView: () => {
@@ -262,29 +295,11 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
-      addItem: async () => {
-        if (!doc) return null
-        const view = doc.views[safeIndex]
-        const folder = deriveBaseScopeFolder(doc, view)
-        const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
-          (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
-        )
-        const frontmatter = buildBlankFrontmatter(columns, doc, view)
-        const baseName = 'Unbenannt'
-        try {
-          // Resolve a non-colliding file name under the target folder.
-          const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
-          await apiClient.saveFile(vaultId, path, frontmatter)
-          onOpenNote(path)
-          return path
-        } catch {
-          return null
-        }
-      },
+      addItem,
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote, showView])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -312,6 +327,7 @@ export const BasesView = memo(function BasesView({
         mode={mode}
         onSelectView={(i) => { setSelectedViewIndex(i); showView() }}
         onChange={handleDocChange}
+        onAddItem={handleAddItem}
       />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
@@ -343,11 +359,12 @@ export const BasesView = memo(function BasesView({
         </ErrorBoundary>
       )}
 
-      {mode === 'view' && !isPluginView && isKanbanView && activeView && (
+      {mode === 'view' && !isPluginView && (isKanbanView || isGroupedCardsView) && activeView && (
         <BasesKanbanView
           doc={doc}
           view={activeView}
           rows={displayRows}
+          layout={isKanbanView ? 'columns' : 'rows'}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
         />
@@ -385,7 +402,7 @@ export const BasesView = memo(function BasesView({
         </Suspense>
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && !isCardsView && !isListView && !isMapView && activeView && (
+      {mode === 'view' && !isPluginView && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && !isMapView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

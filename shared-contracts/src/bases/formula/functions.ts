@@ -61,11 +61,23 @@ export function toRegExp(value: RegexValue, extraFlags = ''): RegExp | null {
   }
 }
 
+/** A bare calendar date `YYYY-MM-DD` with no time component. */
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
 /** Coerces a value to a Date, or null when it cannot be parsed. */
 export function toDate(value: FormulaValue): Date | null {
   if (value instanceof Date) return value
   if (typeof value === 'number') return new Date(value)
   if (typeof value === 'string') {
+    // A bare `YYYY-MM-DD` parses as LOCAL midnight (not UTC, as `new Date(str)`
+    // would), so it lines up with today()'s local midnight. Otherwise a date
+    // difference like `date(deadline) - today()` carried the timezone offset as
+    // a sub-day remainder and `.days` showed 23.0416… instead of 23.
+    const m = DATE_ONLY_RE.exec(value)
+    if (m) {
+      const [y, mo, d] = value.split('-').map(Number) as [number, number, number]
+      return new Date(y, mo - 1, d)
+    }
     const d = new Date(value)
     return Number.isNaN(d.getTime()) ? null : d
   }
