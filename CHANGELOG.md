@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.81.0](https://github.com/andreas13xxx/Slatebase/compare/v0.80.0...v0.81.0) (2026-11-09)
+
+
+### Features
+
+* **bases:** tree refresh, Obsidian-like prefill, per-column add, column DnD, icon dropdowns, search ([#354](https://github.com/andreas13xxx/Slatebase/issues/354)) ([e023361](https://github.com/andreas13xxx/Slatebase/commit/e02336114846ae9270db843cec37761361a4527b))
+
+
+### Bugfixes
+
+* **bases:** define missing spacing tokens and polish toolbar dropdowns ([#352](https://github.com/andreas13xxx/Slatebase/issues/352)) ([4ad752d](https://github.com/andreas13xxx/Slatebase/commit/4ad752d797ffdcb61b8f361a6c17e42d137c571c))
+
 ## [0.80.0](https://github.com/andreas13xxx/Slatebase/compare/v0.79.0...v0.80.0) (2026-11-09)
 
 
