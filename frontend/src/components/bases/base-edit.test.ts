@@ -3,7 +3,7 @@ import type { BaseDocument, BaseFilterNode, BaseRow } from '@slatebase/shared-co
 import { evaluateCondition, rowContext } from '@slatebase/shared-contracts'
 import {
   addView, renameView, duplicateView, deleteView, setViewType, uniqueViewName,
-  setSort, setGroupBy, setOrder, effectiveColumns, availableColumns,
+  setSort, setGroupBy, setGroupOrder, setOrder, effectiveColumns, availableColumns,
   rootGroup, normalizeFilter, replaceFilterNode, removeFilterNode, addFilterChild, setGroupKey,
   setViewFilter, setDocFilter, conditionToExpression, parseCondition, propertyRef,
   type Condition,
@@ -70,6 +70,13 @@ describe('sort / group / columns', () => {
     expect(next.views[0]).toMatchObject({ groupBy: { property: 'b', direction: 'ASC' } })
     expect('groupOrder' in next.views[0]!).toBe(false)
     expect('groupBy' in setGroupBy(next, 0, undefined).views[0]!).toBe(false)
+  })
+
+  it('sets and clears groupOrder (reorder of columns)', () => {
+    const next = setGroupOrder(doc(), 0, ['open', null, 'done'])
+    expect(next.views[0]!.groupOrder).toEqual(['open', null, 'done'])
+    // An empty list removes the key (fall back to default order), not groupOrder: [].
+    expect('groupOrder' in setGroupOrder(next, 0, []).views[0]!).toBe(false)
   })
 
   it('effective columns fall back to the declared properties', () => {

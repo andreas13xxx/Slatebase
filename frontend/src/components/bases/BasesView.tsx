@@ -20,6 +20,8 @@ import type { BaseDocument, BaseRow, BaseSortClause, BaseView, FileContent } fro
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { requestVaultTreeRefresh } from '../../state/vaultTreeRefreshBridge'
+import { requestReveal } from '../../state/revealFileBridge'
 import { setActiveBasesController, clearActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
 import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
@@ -33,7 +35,9 @@ import { BasesSourceView } from './BasesSourceView'
 import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
+import { setGroupOrder } from './base-edit'
 import { sortRowsByFormula } from './base-formula-sort'
+import { filterRowsByText } from './base-row-search'
 import './BasesView.css'
 
 // Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
@@ -72,6 +76,7 @@ export const BasesView = memo(function BasesView({
   useEffect(() => { modeRef.current = mode }, [mode])
   const showView = useCallback(() => { if (modeRef.current === 'source') showViewRef.current?.() }, [])
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
@@ -108,9 +113,15 @@ export const BasesView = memo(function BasesView({
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
   // sort the already-fetched rows here by the evaluated value, stable on ties.
-  const displayRows = useMemo(
+  const sortedRows = useMemo(
     () => (doc ? sortRowsByFormula(rows, doc, activeView) : rows),
     [rows, doc, activeView],
+  )
+  // Quick-search narrows the rendered rows (file name + visible values), after
+  // sorting so the order is stable; empty query passes everything through.
+  const displayRows = useMemo(
+    () => filterRowsByText(sortedRows, searchQuery),
+    [sortedRows, searchQuery],
   )
 
   const runQuery = useCallback(async () => {
@@ -240,16 +251,18 @@ export const BasesView = memo(function BasesView({
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Create a new note scoped to this base and open it. Shared by the
-  // `bases:add-item` core command (via the controller below) and the toolbar's
-  // "Neuer Eintrag" button, so the two cannot drift.
-  const addItem = useCallback(async (): Promise<string | null> => {
+  // `bases:add-item` core command (via the controller below), the toolbar's
+  // "Neuer Eintrag" button and each Kanban column's "+" button, so they cannot
+  // drift. `overrides` pre-fills specific frontmatter keys (the Kanban column's
+  // groupBy value) so the note lands in the right column.
+  const addItem = useCallback(async (overrides: Record<string, string> = {}): Promise<string | null> => {
     if (!doc) return null
     const view = doc.views[safeIndex]
     const folder = deriveBaseScopeFolder(doc, view)
     const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
       (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
     )
-    const frontmatter = buildBlankFrontmatter(columns, doc, view)
+    const frontmatter = buildBlankFrontmatter(columns, doc, view, overrides)
     const baseName = 'Unbenannt'
     try {
       // Resolve a non-colliding file name under the target folder.
@@ -257,8 +270,12 @@ export const BasesView = memo(function BasesView({
       await apiClient.saveFile(vaultId, path, frontmatter)
       // The backend's vault:change excludes the user who triggered the write,
       // so our own SSE live-refresh never fires for a note we just created —
-      // re-query directly so the new row shows up without a manual reload.
+      // re-query directly so the new row shows up, and refresh the File
+      // Explorer tree + reveal the new note there (the explorer has its own
+      // `vaultTrees` cache that our query does not touch).
       void runQueryRef.current()
+      requestVaultTreeRefresh(vaultId)
+      requestReveal(path, 'file', vaultId)
       onOpenNote(path)
       return path
     } catch {
@@ -268,6 +285,17 @@ export const BasesView = memo(function BasesView({
 
   // Fire-and-forget wrapper for the toolbar button (which wants `() => void`).
   const handleAddItem = useCallback(() => { void addItem() }, [addItem])
+
+  // Per-column add in the Kanban view: pre-fill the grouping property with the
+  // column's value so the new card appears in that column ('' clears it).
+  const handleAddCardInColumn = useCallback((property: string, value: string) => {
+    void addItem(value === '' ? {} : { [property]: value })
+  }, [addItem])
+
+  // Persist a drag-reorder of the Kanban columns into the view's `groupOrder`.
+  const handleReorderColumns = useCallback((groupOrder: (string | null)[]) => {
+    handleDocChange((d) => setGroupOrder(d, safeIndex, groupOrder))
+  }, [handleDocChange, safeIndex])
 
   useEffect(() => {
     const controller: ActiveBasesController = {
@@ -328,6 +356,8 @@ export const BasesView = memo(function BasesView({
         onSelectView={(i) => { setSelectedViewIndex(i); showView() }}
         onChange={handleDocChange}
         onAddItem={handleAddItem}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
       />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
@@ -367,6 +397,8 @@ export const BasesView = memo(function BasesView({
           layout={isKanbanView ? 'columns' : 'rows'}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
+          onAddCard={readOnly ? undefined : handleAddCardInColumn}
+          onReorderColumns={readOnly ? undefined : handleReorderColumns}
         />
       )}
 

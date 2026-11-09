@@ -19,6 +19,7 @@ function setup(over: Partial<{ doc: BaseDocument; readOnly: boolean; index: numb
   current = over.doc ?? makeDoc()
   const onChange = vi.fn()
   const onSelectView = vi.fn()
+  const onSearchQueryChange = vi.fn()
   render(
     <BasesToolbar
       doc={over.doc ?? makeDoc()}
@@ -28,9 +29,18 @@ function setup(over: Partial<{ doc: BaseDocument; readOnly: boolean; index: numb
       mode="view"
       onSelectView={onSelectView}
       onChange={onChange}
+      searchQuery=""
+      onSearchQueryChange={onSearchQueryChange}
     />,
   )
-  return { onChange, onSelectView }
+  return { onChange, onSelectView, onSearchQueryChange }
+}
+
+/** Pick an option from a custom ColumnDropdown: open it by its button, then click the option. */
+function pickColumn(triggerLabel: string, optionLabel: RegExp | string) {
+  fireEvent.click(screen.getByRole('button', { name: triggerLabel }))
+  const list = screen.getByRole('listbox', { name: triggerLabel })
+  fireEvent.click(within(list).getByRole('button', { name: optionLabel }))
 }
 
 const open = (name: RegExp | string) => fireEvent.click(screen.getByRole('button', { name }))
@@ -106,7 +116,7 @@ describe('BasesToolbar — sort, group, properties', () => {
   it('sets and clears the grouping', () => {
     const { onChange } = setup()
     open('Gruppieren')
-    fireEvent.change(screen.getByLabelText('Gruppieren nach'), { target: { value: 'status' } })
+    pickColumn('Gruppieren nach', /Status/)
     expect(lastDoc(onChange).views[0]!.groupBy).toEqual({ property: 'status', direction: 'ASC' })
   })
 
@@ -144,7 +154,8 @@ describe('BasesToolbar — filter', () => {
     doc.views[0]!.filters = { and: ['status == "open"'] }
     const { onChange } = setup({ doc })
     open(/Filtern/)
-    expect((screen.getByLabelText('Eigenschaft') as HTMLSelectElement).value).toBe('status')
+    // The property picker is now a custom dropdown; its button shows the column's label.
+    expect(screen.getByRole('button', { name: 'Eigenschaft' }).textContent).toContain('Status')
     fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'neq' } })
     expect(lastDoc(onChange).views[0]!.filters).toEqual({ and: ['status != "open"'] })
     const value = screen.getByLabelText('Wert')

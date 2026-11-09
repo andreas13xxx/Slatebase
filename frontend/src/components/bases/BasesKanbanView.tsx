@@ -16,7 +16,7 @@
 
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { DragEvent } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, GripVertical } from 'lucide-react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue, rowValueKey } from '@slatebase/shared-contracts'
 import { columnLabel as baseColumnLabel } from './base-edit'
@@ -39,6 +39,18 @@ export interface BasesKanbanViewProps {
    * when the view is read-only — cards are then not draggable.
    */
   onMoveCard?: (path: string, groupByProperty: string, newValue: string) => void
+  /**
+   * Create a new note in a column: `value` is the column's grouping value ('' for
+   * the ungrouped column), pre-filled into the new note's grouping property so it
+   * lands there. Omitted when read-only — the per-column "+" is then hidden.
+   */
+  onAddCard?: (groupByProperty: string, value: string) => void
+  /**
+   * Persist a drag-reorder of the columns as the view's `groupOrder` (full list,
+   * with `null` for the ungrouped column). Omitted when read-only — column
+   * headers are then not draggable.
+   */
+  onReorderColumns?: (groupOrder: (string | null)[]) => void
 }
 
 /** Sentinel key for the "no value for the grouping property" column. */
@@ -62,10 +74,15 @@ interface KanbanColumn {
 }
 
 export const BasesKanbanView = memo(function BasesKanbanView({
-  doc, view, rows, layout = 'columns', onOpenNote, onMoveCard,
+  doc, view, rows, layout = 'columns', onOpenNote, onMoveCard, onAddCard, onReorderColumns,
 }: BasesKanbanViewProps) {
   // The grouping property name (the new `groupBy` is an object `{property, direction}`).
   const groupBy = view.groupBy?.property
+  // The frontmatter key to write when moving/adding a card: the row-value key
+  // (`note.`-prefixed group ids strip to the bare frontmatter key, same as the
+  // row values are keyed), so a move/add writes `task_status:`, not
+  // `note.task_status:`. Reads already go through `rowValueKey` in `firstValue`.
+  const groupByKey = groupBy ? rowValueKey(groupBy) : undefined
   // Chip columns: the view's configured columns minus the grouping property
   // itself (redundant on every card in a column) and the file name (it is the
   // card title). Formula columns are left out — the table view evaluates those.
@@ -108,22 +125,24 @@ export const BasesKanbanView = memo(function BasesKanbanView({
       if (b === UNGROUPED) return -1
       return a.localeCompare(b)
     })
-    // `groupOrder` (Obsidian 1.14.3): only the listed groups, in that order;
-    // `null` is the group of notes without a value; an empty list hides all.
+    const toColumn = (key: string): KanbanColumn => ({
+      key,
+      label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
+      rows: byValue.get(key) ?? [],
+    })
+    // `groupOrder` (Obsidian 1.14.3, also written by a drag-reorder of the
+    // columns): the listed groups first, in that order; `null` is the group of
+    // notes without a value. Groups present in the data but NOT listed (e.g. a
+    // new property value created after the reorder) are appended after, in the
+    // default alphabetical order — so a new value never silently drops its rows.
     if (view.groupOrder) {
       const wanted = view.groupOrder.map((g) => (g === null ? UNGROUPED : String(g)))
       const listed = wanted.filter((key, i) => wanted.indexOf(key) === i)
-      return listed.map((key) => ({
-        key,
-        label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
-        rows: byValue.get(key) ?? [],
-      }))
+      const listedSet = new Set(listed)
+      const rest = order.filter((key) => !listedSet.has(key))
+      return [...listed, ...rest].map(toColumn)
     }
-    return order.map((key) => ({
-      key,
-      label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
-      rows: byValue.get(key)!,
-    }))
+    return order.map(toColumn)
   }, [groupBy, rows, columnLabel, view.groupOrder])
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -169,17 +188,59 @@ export const BasesKanbanView = memo(function BasesKanbanView({
 
   const handleColumnDrop = useCallback(
     (e: DragEvent, columnKey: string) => {
-      if (!draggable || dragPath === null || !groupBy) return
+      if (!draggable || dragPath === null || !groupByKey) return
       e.preventDefault()
       const path = dragPath
       const from = dragFromKey
       handleDragEnd()
       if (columnKey === from) return // dropped back on its own column
       const newValue = columnKey === UNGROUPED ? '' : columnKey
-      onMoveCard?.(path, groupBy, newValue)
+      onMoveCard?.(path, groupByKey, newValue)
     },
-    [draggable, dragPath, dragFromKey, groupBy, onMoveCard, handleDragEnd],
+    [draggable, dragPath, dragFromKey, groupByKey, onMoveCard, handleDragEnd],
   )
+
+  // ── Column reorder (drag the header) ──────────────────────────────────────
+  // Only when a reorder handler is wired (write access). Dropping a column onto
+  // another reorders the live `columns` and persists the whole order as the
+  // view's `groupOrder` (with `null` for the ungrouped column).
+  const reorderable = !!onReorderColumns && columns.length > 1
+  const [colDragKey, setColDragKey] = useState<string | null>(null)
+  const [colOverKey, setColOverKey] = useState<string | null>(null)
+
+  const handleColHeaderDragStart = useCallback((e: DragEvent, columnKey: string) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', columnKey)
+    setColDragKey(columnKey)
+  }, [])
+
+  const handleColHeaderDragEnd = useCallback(() => {
+    setColDragKey(null)
+    setColOverKey(null)
+  }, [])
+
+  const handleColHeaderDragOver = useCallback((e: DragEvent, columnKey: string) => {
+    if (!reorderable || colDragKey === null) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (colOverKey !== columnKey) setColOverKey(columnKey)
+  }, [reorderable, colDragKey, colOverKey])
+
+  const handleColHeaderDrop = useCallback((e: DragEvent, targetKey: string) => {
+    if (!reorderable || colDragKey === null) return
+    e.preventDefault()
+    const from = colDragKey
+    handleColHeaderDragEnd()
+    if (from === targetKey) return
+    const order = columns.map((c) => c.key)
+    const fromIdx = order.indexOf(from)
+    const toIdx = order.indexOf(targetKey)
+    if (fromIdx < 0 || toIdx < 0) return
+    const [moved] = order.splice(fromIdx, 1)
+    order.splice(toIdx, 0, moved!)
+    // Serialize to groupOrder, mapping the ungrouped sentinel back to null.
+    onReorderColumns?.(order.map((k) => (k === UNGROUPED ? null : k)))
+  }, [reorderable, colDragKey, columns, onReorderColumns, handleColHeaderDragEnd])
 
   if (!groupBy) {
     return (
@@ -210,28 +271,66 @@ export const BasesKanbanView = memo(function BasesKanbanView({
       <div className={layout === 'rows' ? 'bases-kanban bases-kanban--rows' : 'bases-kanban'} role="list" aria-label="Karten-Ansicht">
         {columns.map((column) => {
         const isCollapsed = collapsed[column.key] ?? false
-        const isDropTarget = draggable && dragOverKey === column.key && dragFromKey !== column.key
+        const isCardDropTarget = draggable && dragOverKey === column.key && dragFromKey !== column.key
+        const isColDropTarget = reorderable && colOverKey === column.key && colDragKey !== column.key
+        const columnValue = column.key === UNGROUPED ? '' : column.key
+        const sectionClass = [
+          'bases-kanban__column',
+          isCardDropTarget ? 'bases-kanban__column--drop-target' : '',
+          isColDropTarget ? 'bases-kanban__column--col-drop-target' : '',
+          reorderable && colDragKey === column.key ? 'bases-kanban__column--dragging' : '',
+        ].filter(Boolean).join(' ')
         return (
           <section
             key={column.key}
-            className={isDropTarget ? 'bases-kanban__column bases-kanban__column--drop-target' : 'bases-kanban__column'}
+            className={sectionClass}
             role="listitem"
-            onDragOver={draggable ? (e) => handleColumnDragOver(e, column.key) : undefined}
-            onDrop={draggable ? (e) => handleColumnDrop(e, column.key) : undefined}
-            onDragLeave={draggable ? () => setDragOverKey((k) => (k === column.key ? null : k)) : undefined}
+            onDragOver={(e) => {
+              if (colDragKey !== null) handleColHeaderDragOver(e, column.key)
+              else if (draggable) handleColumnDragOver(e, column.key)
+            }}
+            onDrop={(e) => {
+              if (colDragKey !== null) handleColHeaderDrop(e, column.key)
+              else if (draggable) handleColumnDrop(e, column.key)
+            }}
+            onDragLeave={() => {
+              setDragOverKey((k) => (k === column.key ? null : k))
+              setColOverKey((k) => (k === column.key ? null : k))
+            }}
           >
-            <button
-              type="button"
-              className="bases-kanban__column-header"
-              aria-expanded={!isCollapsed}
-              onClick={() => toggle(column.key)}
+            <div
+              className="bases-kanban__column-header-row"
+              draggable={reorderable}
+              onDragStart={reorderable ? (e) => handleColHeaderDragStart(e, column.key) : undefined}
+              onDragEnd={reorderable ? handleColHeaderDragEnd : undefined}
             >
-              {isCollapsed
-                ? <ChevronRight size={14} aria-hidden="true" />
-                : <ChevronDown size={14} aria-hidden="true" />}
-              <span className="bases-kanban__column-title">{column.label}</span>
-              <span className="bases-kanban__column-count">{column.rows.length}</span>
-            </button>
+              {reorderable && (
+                <GripVertical size={14} aria-hidden="true" className="bases-kanban__column-grip" />
+              )}
+              <button
+                type="button"
+                className="bases-kanban__column-header"
+                aria-expanded={!isCollapsed}
+                onClick={() => toggle(column.key)}
+              >
+                {isCollapsed
+                  ? <ChevronRight size={14} aria-hidden="true" />
+                  : <ChevronDown size={14} aria-hidden="true" />}
+                <span className="bases-kanban__column-title">{column.label}</span>
+                <span className="bases-kanban__column-count">{column.rows.length}</span>
+              </button>
+              {onAddCard && groupByKey && (
+                <button
+                  type="button"
+                  className="bases-kanban__column-add"
+                  aria-label={`Neuer Eintrag in ${column.label}`}
+                  title={`Neuer Eintrag in ${column.label}`}
+                  onClick={() => onAddCard(groupByKey, columnValue)}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                </button>
+              )}
+            </div>
             {!isCollapsed && (
               <div className="bases-kanban__cards">
                 {column.rows.map((row) => (

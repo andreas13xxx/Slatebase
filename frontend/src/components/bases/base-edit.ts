@@ -12,7 +12,7 @@
 
 import { rowValueKey } from '@slatebase/shared-contracts'
 import type {
-  BaseDocument, BaseFilterNode, BaseGroupBy, BaseRow, BaseSortClause, BaseView,
+  BaseDocument, BaseFilterNode, BaseGroupBy, BaseGroupValue, BaseRow, BaseSortClause, BaseView,
 } from '@slatebase/shared-contracts'
 
 // ─── Views ──────────────────────────────────────────────────────────────────
@@ -91,6 +91,19 @@ export function setGroupBy(doc: BaseDocument, index: number, groupBy: BaseGroupB
 
 export function setOrder(doc: BaseDocument, index: number, order: string[]): BaseDocument {
   return withView(doc, index, (v) => ({ ...v, order }))
+}
+
+/**
+ * Sets the explicit order of Kanban/cards groups (`groupOrder`), e.g. after a
+ * drag-reorder of the columns. An empty list removes the key (fall back to the
+ * default alphabetical order) rather than writing `groupOrder: []`, which
+ * Obsidian reads as "hide all groups".
+ */
+export function setGroupOrder(doc: BaseDocument, index: number, groupOrder: BaseGroupValue[]): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { groupOrder: _old, ...rest } = v
+    return groupOrder.length > 0 ? { ...rest, groupOrder } : rest
+  })
 }
 
 // ─── Formulas ───────────────────────────────────────────────────────────────
