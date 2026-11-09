@@ -88,6 +88,16 @@ describe('sort / group / columns', () => {
     expect(ids.filter((i) => i === 'file.ctime')).toHaveLength(1)
     expect(availableColumns(doc(), rows, undefined).find((c) => c.id === 'status')!.label).toBe('Status')
   })
+
+  it('collapses a note.-prefixed order id and the bare observed key into one choice', () => {
+    // `view.order` holds `note.status`, the rows carry the bare `status` (the
+    // backend strips `note.`): one choice, under the canonical bare id.
+    const d: BaseDocument = { properties: { status: { displayName: 'Status' } }, views: [{ type: 'table', name: 'A', order: ['note.status'] }] }
+    const rows = [{ path: 'a.md', fileName: 'a', values: { status: ['x'] } }]
+    const statusChoices = availableColumns(d, rows, d.views[0]).filter((c) => c.id === 'status' || c.id === 'note.status')
+    expect(statusChoices).toHaveLength(1)
+    expect(statusChoices[0]!.id).toBe('status')
+  })
 })
 
 describe('filter tree', () => {

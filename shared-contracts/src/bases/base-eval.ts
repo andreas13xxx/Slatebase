@@ -55,7 +55,7 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
     // `this.*` reads the host note, not the candidate rows — see `buildHostQuerySpec`.
     if (isThisRef(id)) return false
     return true
-  }).map((id) => (id.startsWith('note.') ? id.slice('note.'.length) : id))
+  }).map(rowValueKey)
 
   const spec: BaseQuerySpecWire = { columns: Array.from(new Set(propertyColumns)) }
 
@@ -85,6 +85,18 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpec
 /** `this` or a `this.…` reference — the host note of an embedded base. */
 function isThisRef(id: string): boolean {
   return id === 'this' || id.startsWith('this.')
+}
+
+/**
+ * The key a property column is stored under in a `BaseRow.values` map. The
+ * backend strips the optional `note.` frontmatter prefix when it fills the row
+ * (see `buildQuerySpec`), so `note.task_status` and `task_status` are the same
+ * column and must resolve to one key. `file.*` and `formula.*` ids are kept
+ * verbatim. Use this wherever a column id from the view (order / groupBy) is
+ * looked up against row values or deduplicated against observed keys.
+ */
+export function rowValueKey(id: string): string {
+  return id.startsWith('note.') ? id.slice('note.'.length) : id
 }
 
 /** Every `this.*` reference in the document's and the view's filters and formulas. */

@@ -26,6 +26,11 @@ describe('groupRows', () => {
     expect(keys({ type: 'table', groupBy: { property: 'status' }, groupOrder: ['open', null] })).toEqual(['open', UNGROUPED])
     expect(keys({ type: 'table', groupBy: { property: 'status' }, groupOrder: [] })).toEqual([])
   })
+  it('resolves a note.-prefixed groupBy against the bare row-value key', () => {
+    // The backend strips `note.` when filling rows, so `note.status` must group
+    // against `row.values.status` — not land everything in the empty group.
+    expect(keys({ type: 'table', groupBy: { property: 'note.status' } })).toEqual(['done', 'open', UNGROUPED])
+  })
 })
 
 describe('grouped table and list views', () => {

@@ -18,7 +18,7 @@ import { memo, useCallback, useMemo, useState } from 'react'
 import type { DragEvent } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
-import { computeSummaries, formatFormulaValue } from '@slatebase/shared-contracts'
+import { computeSummaries, formatFormulaValue, rowValueKey } from '@slatebase/shared-contracts'
 import { columnLabel as baseColumnLabel } from './base-edit'
 
 export interface BasesKanbanViewProps {
@@ -47,7 +47,7 @@ const UNGROUPED = '\u0000ungrouped'
 /** First scalar value of a row property, as a display string ('' when absent). */
 function firstValue(row: BaseRow, key: string): string {
   if (key === 'file.name') return row.fileName
-  const v = row.values[key]
+  const v = row.values[rowValueKey(key)]
   if (Array.isArray(v)) return v.length > 0 ? String(v[0]) : ''
   if (v === undefined || v === null) return ''
   return String(v)
@@ -72,7 +72,8 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
   const chipColumns = useMemo(() => {
     const configured = view.order ?? Object.keys(doc.properties ?? {})
-    return configured.filter((c) => c !== groupBy && c !== 'file.name' && !formulaKeys.has(c))
+    const groupKey = groupBy ? rowValueKey(groupBy) : undefined
+    return configured.filter((c) => rowValueKey(c) !== groupKey && c !== 'file.name' && !formulaKeys.has(c))
   }, [view.order, doc.properties, groupBy, formulaKeys])
 
   const columnLabel = useCallback(

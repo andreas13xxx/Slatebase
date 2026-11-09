@@ -10,6 +10,7 @@
  * expression fallback for anything that does not round-trip.
  */
 
+import { rowValueKey } from '@slatebase/shared-contracts'
 import type {
   BaseDocument, BaseFilterNode, BaseGroupBy, BaseRow, BaseSortClause, BaseView,
 } from '@slatebase/shared-contracts'
@@ -184,12 +185,17 @@ export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseV
   for (const row of rows) {
     for (const key of Object.keys(row.values)) if (!key.startsWith('file.')) ids.push(key)
   }
+  // Dedup on the normalized key so a `note.`-prefixed id from `view.order` and
+  // the bare key observed in the rows collapse to one choice (the backend
+  // strips `note.` when filling rows). The bare id is the canonical choice —
+  // it matches the row-value key and the form `setGroupBy`/`setOrder` write.
   const seen = new Set<string>()
   const out: ColumnChoice[] = []
   for (const id of ids) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    out.push({ id, label: columnLabel(doc, id) })
+    const key = rowValueKey(id)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ id: key, label: columnLabel(doc, key) })
   }
   return out
 }
