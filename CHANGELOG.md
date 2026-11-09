@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.80.0](https://github.com/andreas13xxx/Slatebase/compare/v0.79.0...v0.80.0) (2026-11-09)
+
+
+### Features
+
+* **admin:** disable env-pinned config fields in the UI ([#350](https://github.com/andreas13xxx/Slatebase/issues/350)) ([912afe5](https://github.com/andreas13xxx/Slatebase/commit/912afe54dc9d85d3cf2a6dbaaa0ae988aa1e89fa))
+* **bases:** toolbar layout, icons, add-item/formula UI, date fix; enable bases/timeline/shares by default ([#351](https://github.com/andreas13xxx/Slatebase/issues/351)) ([b68a237](https://github.com/andreas13xxx/Slatebase/commit/b68a237d198d3fd6c76e3d290e98e339b2244f26))
+* **security:** rate-limit session write requests (log-only by default) ([#349](https://github.com/andreas13xxx/Slatebase/issues/349)) ([5c3443c](https://github.com/andreas13xxx/Slatebase/commit/5c3443c1abb1ff9c6561fd72c9ff1d5c6864d1cb))
+
+
+### Bugfixes
+
+* **explorer:** Long-Press auf Touch öffnet Kontextmenü statt Drag ([#346](https://github.com/andreas13xxx/Slatebase/issues/346)) ([d4baf38](https://github.com/andreas13xxx/Slatebase/commit/d4baf38867a921d8e505b7d78d1858913c725a01))
+* scope vault name uniqueness to the user's own vaults ([#348](https://github.com/andreas13xxx/Slatebase/issues/348)) ([8d01641](https://github.com/andreas13xxx/Slatebase/commit/8d016412fab9255310dce7f5ed0c19596d7ba961))
+
 ## [0.79.0](https://github.com/andreas13xxx/Slatebase/compare/v0.78.0...v0.79.0) (2026-11-08)
 
 
