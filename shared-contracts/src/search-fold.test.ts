@@ -64,6 +64,13 @@ describe('toOriginalRange', () => {
     expect(toOriginalRange(folded, original, at, at + 2)).toEqual([5, 7])
   })
 
+  it('includes combining marks of already-decomposed text in the highlight', () => {
+    const original = 'cafe\u0301 au lait' // "café" typed as e + combining acute
+    const folded = foldForSearch(original)
+    expect(folded.text.startsWith('cafe ')).toBe(true)
+    expect(toOriginalRange(folded, original, 0, 4)).toEqual([0, 5])
+  })
+
   it('keeps astral code points whole', () => {
     const original = 'é😀'
     const folded = foldForSearch(original)

@@ -82,7 +82,10 @@ export function toOriginalRange(
   const start = map[from] ?? original.length
   const lastIndex = map[to - 1] ?? start
   const codePoint = original.codePointAt(lastIndex)
-  const end = lastIndex + (codePoint !== undefined && codePoint > 0xffff ? 2 : 1)
+  let end = lastIndex + (codePoint !== undefined && codePoint > 0xffff ? 2 : 1)
+  // Already-decomposed text ("e" + U+0301): keep the combining marks that were folded away
+  // inside the highlight instead of leaving them dangling after it.
+  while (end < original.length && COMBINING_MARK.test(original.charAt(end))) end++
   return [start, Math.max(end, start)]
 }
 
