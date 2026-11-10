@@ -17,11 +17,11 @@ Zuerst die Fold-Funktion mit Tests, dann Stelle für Stelle anbinden. Jede Phase
   - [x] 2.3 Tests in neuer Datei; bestehende `install-globals.test.ts` unverändert lassen und mitlaufen lassen
   - _Requirements: 2.1–2.3_
 
-- [ ] 3. Quick Switcher, Link-Vorschläge, Befehlspalette
-  - [ ] 3.1 `utils/fuzzyMatch.ts` intern falten (Signatur unverändert)
-  - [ ] 3.2 `editor/suggest/link-complete.ts` auf Fold umstellen
-  - [ ] 3.3 Befehlspalette prüfen und anbinden
-  - [ ] 3.4 Tests je Stelle (neue Dateien), inkl. Highlighting-Offsets
+- [x] 3. Quick Switcher, Link-Vorschläge, Befehlspalette
+  - [x] 3.1 `utils/fuzzyMatch.ts` intern falten (Signatur unverändert)
+  - [x] 3.2 `editor/suggest/link-complete.ts` auf Fold umstellen
+  - [x] 3.3 Befehlspalette prüfen und anbinden
+  - [x] 3.4 Tests je Stelle (neue Dateien), inkl. Highlighting-Offsets
   - _Requirements: 3.1–3.3, 3.6_
 
 - [ ] 4. Filter in Seitenpanels und Bases

@@ -1,5 +1,7 @@
+import { foldForSearch, foldQuery } from './searchFold'
+
 /**
- * Subsequence-based fuzzy match, case-insensitive.
+ * Subsequence-based fuzzy match, case- and accent-insensitive.
  *
  * Returns `null` if every character of `query` does not appear in `text` in
  * order (no match). Otherwise returns a score where **lower is better** —
@@ -9,8 +11,9 @@
 export function fuzzyMatch(query: string, text: string): number | null {
   if (query.length === 0) return 0
 
-  const q = query.toLowerCase()
-  const t = text.toLowerCase()
+  // Accent-insensitive (Obsidian 1.15): "cafe" matches "café", "strasse" matches "Straße".
+  const q = foldQuery(query)
+  const t = foldForSearch(text).text
 
   let score = 0
   let textIndex = 0
