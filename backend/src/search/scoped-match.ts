@@ -9,6 +9,7 @@
  */
 
 import type { ParsedOperator, TextOperatorType } from './query-parser.js'
+import { foldForSearch, foldQuery, toOriginalRange } from '@slatebase/shared-contracts'
 
 /** A matched line, in the shape the search service builds hits from. */
 export interface ScopedHit {
@@ -75,7 +76,8 @@ export function matchTextOperator(
   const terms = op.terms ?? []
   if (terms.length === 0) return null
   const caseSensitive = type === 'match-case' ? true : type === 'ignore-case' ? false : defaultCaseSensitive
-  const norm = (s: string) => (caseSensitive ? s : s.toLowerCase())
+  // Case-insensitive operators also ignore accents (Obsidian 1.15).
+  const norm = (s: string) => (caseSensitive ? s : foldQuery(s))
   const needles = terms.map(norm)
 
   const hits: ScopedHit[] = []
@@ -91,12 +93,14 @@ export function matchTextOperator(
     satisfied = true
     // Report every line of the scope that contains a term.
     scopeLines.forEach((line, k) => {
-      const hay = norm(line)
+      const folded = caseSensitive ? null : foldForSearch(line)
+      const hay = folded ? folded.text : line
       const idx = needles.map((n) => hay.indexOf(n)).filter((p) => p >= 0)
       if (idx.length === 0) return
       const first = Math.min(...idx)
       const needle = needles.find((n) => hay.indexOf(n) === first)!
-      hits.push({ lineIndex: from + k, matchText: line.slice(first, first + needle.length), matchLine: line })
+      const [start, end] = folded ? toOriginalRange(folded, line, first, first + needle.length) : [first, first + needle.length]
+      hits.push({ lineIndex: from + k, matchText: line.slice(start, end), matchLine: line })
     })
   }
   return satisfied ? hits : null

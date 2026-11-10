@@ -45,5 +45,5 @@ Slatebase vergleicht heute nur per `toLowerCase()`. Für deutsche Nutzer ist „
 
 #### Acceptance Criteria
 
-1. THE Backend-Volltextsuche (`search_vault`, Suche im Hauptfenster) SHALL in diesem Spec NICHT verändert werden; ob sie Akzente ignoriert, wird in Task 5.1 geprüft und als Folgepunkt vermerkt.
+1. THE Backend-Volltextsuche (Klartext, `file:` und die Text-Operatoren wie `line:`/`section:`) SHALL bei nicht-case-sensitiver Suche Akzente ignorieren; Treffer-Bereiche beziehen sich auf den Originaltext. Suchen & Ersetzen bleibt exakt (nur case-insensitiv), damit nichts unbeabsichtigt ersetzt wird.
 2. THE Ranking-Verbesserungen und die „Relevanz“-Sortierung aus 1.15.1 SHALL nicht Teil dieses Specs sein.

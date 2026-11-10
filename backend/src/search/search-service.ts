@@ -17,6 +17,7 @@ import { matchTextOperators } from './scoped-match.js'
 import type { ParsedOperator } from './query-parser.js'
 import { globMatch } from './glob-match.js'
 import type { ILinkIndex } from '../link-index/types.js'
+import { foldForSearch, foldQuery, toOriginalRange } from '@slatebase/shared-contracts'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -581,20 +582,20 @@ export class SearchService implements ISearchService {
       }
     }
 
-    // Plain-text search
-    const query = options.caseSensitive ? options.query : options.query.toLowerCase()
+    // Plain-text search. Case-insensitive search also ignores accents ("cafe" finds "café",
+    // Obsidian 1.15); the match range is mapped back onto the original line.
+    const query = options.caseSensitive ? options.query : foldQuery(options.query)
     return (line: string) => {
-      const searchLine = options.caseSensitive ? line : line.toLowerCase()
+      const folded = options.caseSensitive ? null : foldForSearch(line)
+      const searchLine = folded ? folded.text : line
       const matches: Array<{ start: number; end: number; text: string }> = []
+      if (query === '') return null
       let startPos = 0
       while (true) {
         const idx = searchLine.indexOf(query, startPos)
         if (idx === -1) break
-        matches.push({
-          start: idx,
-          end: idx + query.length,
-          text: line.substring(idx, idx + query.length),
-        })
+        const [start, end] = folded ? toOriginalRange(folded, line, idx, idx + query.length) : [idx, idx + query.length]
+        matches.push({ start, end, text: line.substring(start, end) })
         startPos = idx + 1
       }
       return matches.length > 0 ? matches : null
@@ -862,10 +863,10 @@ export class SearchService implements ISearchService {
       }
 
       case 'file': {
-        const pattern = op.value.toLowerCase()
+        const pattern = foldQuery(op.value)
         const result = new Set<string>()
         for (const fp of allFiles) {
-          const fileName = this.getFileName(fp).toLowerCase()
+          const fileName = foldForSearch(this.getFileName(fp)).text
           if (fileName.includes(pattern)) {
             result.add(fp)
           }

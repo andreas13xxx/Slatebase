@@ -31,7 +31,7 @@ Zuerst die Fold-Funktion mit Tests, dann Stelle für Stelle anbinden. Jede Phase
   - _Requirements: 3.4–3.5_
 
 - [ ] 5. Abgrenzung und Doku
-  - [x] 5.1 Backend-Suche (`search-service.ts`) ist nur case-insensitive (`toLowerCase`), Folgepunkt in `structure.md` vermerkt
+  - [x] 5.1 Backend-Suche (`search-service.ts`, `scoped-match.ts`) faltet jetzt ebenfalls (Fold-Funktion nach `shared-contracts` verschoben); Suchen & Ersetzen bleibt bewusst exakt
   - [x] 5.2 Doku in `product.md` und `structure.md`
   - [x] 5.3 Verbraucher-Tests laufen lassen (nur betroffene Ordner, `--testTimeout=60000`)
   - _Requirements: 4.1–4.2_

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { foldForSearch, foldQuery, toOriginalRange, mergeRanges } from './searchFold'
+import { foldForSearch, foldQuery, toOriginalRange, mergeRanges } from './search-fold.js'
 
 describe('foldForSearch', () => {
   it('lowercases ASCII and keeps positions identical (fast path)', () => {
