@@ -13,17 +13,17 @@ Jede Phase ist einzeln grün (lint, build, betroffene Tests) und wird separat co
   - [x] 1.4 Tests (neue Datei, z. B. `file-manager-shim.trash.test.ts`): Erfolg, Fehler → false, Abbruch → false
   - _Requirements: 1.1–1.4_
 
-- [ ] 2. Mermaid-Alias und `loadPixi`
-  - [ ] 2.1 `loadMermaid` setzt `window.mermaid` und `window.pele`; Fehlerfall ohne Setzen
-  - [ ] 2.2 `loadPixi` als Stub mit `warnNoOp`, in `registerUnsupportedLoaders` registrieren
-  - [ ] 2.3 Tests: Methoden vorhanden (`initialize`, `render`, `parse`, `mermaidAPI.getConfig/setConfig`), Alias identisch, `loadPixi` → null
+- [x] 2. Mermaid-Alias und `loadPixi`
+  - [x] 2.1 `loadMermaid` setzt `window.mermaid` und `window.pele`; Fehlerfall ohne Setzen
+  - [x] 2.2 `loadPixi` als Stub mit `warnNoOp`, in `registerUnsupportedLoaders` registrieren
+  - [x] 2.3 Tests: Methoden vorhanden (`initialize`, `render`, `parse`, `mermaidAPI.getConfig/setConfig`), Alias identisch, `loadPixi` → null
   - _Requirements: 2.1–2.4, 3.1–3.2_
 
-- [ ] 3. Settings-`id`, Math-Klasse, CSS-Variable
-  - [ ] 3.1 `id` im Declarative_Settings_Renderer → `data-setting-id`
-  - [ ] 3.2 `--font-preferred-size` in `App.css`
-  - [ ] 3.3 Prüfen, wie `$$`-Blöcke in Live Preview gerendert werden; `HyperMD-math` pro Zeile ergänzen oder Abweichung in `design.md` notieren
-  - [ ] 3.4 Tests
+- [x] 3. Settings-`id`, Math-Klasse, CSS-Variable
+  - [x] 3.1 `id` im Declarative_Settings_Renderer → `data-setting-id`
+  - [x] 3.2 `--font-preferred-size` in `App.css`
+  - [x] 3.3 Prüfen, wie `$$`-Blöcke in Live Preview gerendert werden; `HyperMD-math` pro Zeile ergänzen oder Abweichung in `design.md` notieren
+  - [x] 3.4 Tests
   - _Requirements: 5.1–5.3, 6.1–6.2_
 
 - [ ] 4. Schließende Formatierungs-Tokens

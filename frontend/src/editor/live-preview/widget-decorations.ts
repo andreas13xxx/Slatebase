@@ -1894,6 +1894,13 @@ export function buildWidgetDecorations(
       if (!source) continue
 
       const widget = new BlockMathWidget(source)
+      // Obsidian 1.14 marks every line of a `$$` block with `.HyperMD-math`
+      // (line decorations are kept when the cursor reveals the source).
+      const firstLine = doc.lineAt(matchFrom).number
+      const lastLine = doc.lineAt(Math.max(matchFrom, matchTo - 1)).number
+      for (let n = firstLine; n <= lastLine; n++) {
+        decorations.push(Decoration.line({ class: 'HyperMD-math' }).range(doc.line(n).from))
+      }
       decorations.push(
         Decoration.replace({ widget }).range(matchFrom, matchTo)
       )
