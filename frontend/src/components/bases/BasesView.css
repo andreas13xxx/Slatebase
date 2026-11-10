@@ -853,6 +853,15 @@
   gap: var(--spacing-sm);
 }
 
+/* Sort / group panels hold an openable column dropdown whose list is absolutely
+   positioned; the panel's own scroll box would clip it (both in height and
+   width). These panels are always short, so they don't need to scroll — let the
+   dropdown list overflow the panel freely instead. */
+.bases-tb__panel--dropdown {
+  overflow: visible;
+  max-height: none;
+}
+
 .bases-tb__section {
   display: flex;
   flex-direction: column;

@@ -13,7 +13,7 @@ import type { ReactNode } from 'react'
 import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
 import { ColumnTypeIcon } from './base-column-icon'
-import { ColumnDropdown } from './base-column-dropdown'
+import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
   addFormula, addView, availableColumns, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
   removeFormula, renameView, rootGroup,
@@ -53,8 +53,8 @@ export interface BasesToolbarProps {
 // ─── Popover ────────────────────────────────────────────────────────────────
 
 const Popover = memo(function Popover({
-  label, title, badge, children,
-}: { label: ReactNode; title: string; badge?: number; children: ReactNode }) {
+  label, title, badge, panelClassName, children,
+}: { label: ReactNode; title: string; badge?: number; panelClassName?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const panelId = useId()
@@ -94,7 +94,7 @@ const Popover = memo(function Popover({
         <span aria-hidden="true" className="bases-tb__caret">▾</span>
       </button>
       {open && (
-        <div id={panelId} role="dialog" aria-label={title} className="bases-tb__panel">
+        <div id={panelId} role="dialog" aria-label={title} className={panelClassName ? `bases-tb__panel ${panelClassName}` : 'bases-tb__panel'}>
           {children}
         </div>
       )}
@@ -192,7 +192,8 @@ const GroupPanel = memo(function GroupPanel({ doc, index, columns, rows, disable
 
 const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const shown = effectiveColumns(doc, doc.views[index])
-  const labelOf = (id: string) => columns.find((c) => c.id === id)?.label ?? id
+  const choiceOf = (id: string): ColumnChoice => columns.find((c) => c.id === id) ?? { id, label: id }
+  const labelOf = (id: string) => choiceOf(id).label
   const hidden = columns.filter((c) => !shown.includes(c.id))
   const edit = (fn: (current: string[]) => string[]) =>
     onChange((d) => setOrder(d, index, fn(effectiveColumns(d, d.views[index]))))
@@ -211,7 +212,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, row
             <label className="bases-tb__check">
               <input type="checkbox" checked disabled={disabled} onChange={() => edit((cur) => cur.filter((c) => c !== id))} />
               <ColumnTypeIcon doc={doc} col={id} rows={rows} />
-              <span>{labelOf(id)}</span>
+              <ColumnOptionText choice={choiceOf(id)} />
             </label>
             <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
             <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach unten`} disabled={disabled || i === shown.length - 1} onClick={() => move(i, 1)}>↓</button>
@@ -227,7 +228,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, row
                 <label className="bases-tb__check">
                   <input type="checkbox" checked={false} disabled={disabled} onChange={() => edit((cur) => (cur.includes(c.id) ? cur : [...cur, c.id]))} />
                   <ColumnTypeIcon doc={doc} col={c.id} rows={rows} />
-                  <span>{c.label}</span>
+                  <ColumnOptionText choice={c} />
                 </label>
               </li>
             ))}
@@ -490,8 +491,8 @@ export const BasesToolbar = memo(function BasesToolbar({
               <Search aria-hidden="true" className="bases-tb__btn-icon" />
               Suchen
             </button>
-            <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
-            <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
+            <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0} panelClassName="bases-tb__panel--dropdown"><SortPanel {...panelProps} /></Popover>
+            <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0} panelClassName="bases-tb__panel--dropdown"><GroupPanel {...panelProps} /></Popover>
             <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
             <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
           </div>
