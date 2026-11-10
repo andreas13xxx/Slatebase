@@ -6,9 +6,9 @@ Zuerst die Fold-Funktion mit Tests, dann Stelle für Stelle anbinden. Jede Phase
 
 ## Tasks
 
-- [ ] 1. Fold-Funktion
-  - [ ] 1.1 `utils/searchFold.ts` mit `foldForSearch`, `foldQuery` und Offset_Map
-  - [ ] 1.2 Tests (neue Datei `searchFold.test.ts`): Sonderbuchstaben-Tabelle, Umlaute, `ß→ss`, Offsets, ASCII-Schnellpfad, Surrogatpaare
+- [x] 1. Fold-Funktion
+  - [x] 1.1 `utils/searchFold.ts` mit `foldForSearch`, `foldQuery` und Offset_Map
+  - [x] 1.2 Tests (neue Datei `searchFold.test.ts`): Sonderbuchstaben-Tabelle, Umlaute, `ß→ss`, Offsets, ASCII-Schnellpfad, Surrogatpaare
   - _Requirements: 1.1–1.4_
 
 - [ ] 2. Plugin-API
