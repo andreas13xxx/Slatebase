@@ -59,24 +59,12 @@ describe('BasesKanbanView — grouped by file.folder (Obsidian 1.14.2)', () => {
     expect(onMoveCard).toHaveBeenCalledWith('Projekte/a.md', 'file.folder', '')
   })
 
-  it('offers "Neue Notiz" per folder column and passes the folder (root as "")', () => {
+  it('passes the folder column value (root as "") to the per-column add button', () => {
     const onAddCard = vi.fn()
     render(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} onAddCard={onAddCard} />)
-    const buttons = screen.getAllByRole('button', { name: '+ Neue Notiz' })
-    expect(buttons).toHaveLength(3)
-    fireEvent.click(columnFor('Archiv').querySelector('.bases-kanban__add') as HTMLElement)
-    expect(onAddCard).toHaveBeenLastCalledWith('Archiv')
-    fireEvent.click(columnFor('(Wurzel)').querySelector('.bases-kanban__add') as HTMLElement)
-    expect(onAddCard).toHaveBeenLastCalledWith('')
-  })
-
-  it('offers no "Neue Notiz" when grouped by a property or without a handler', () => {
-    const propertyView: BaseView = { type: 'cards', groupBy: { property: 'status' }, order: ['file.name'] }
-    const { rerender } = render(
-      <BasesKanbanView doc={doc} view={propertyView} rows={[{ path: 'a.md', fileName: 'A', values: { status: ['x'] } }]} onOpenNote={vi.fn()} onAddCard={vi.fn()} />,
-    )
-    expect(screen.queryByRole('button', { name: '+ Neue Notiz' })).toBeNull()
-    rerender(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} />)
-    expect(screen.queryByRole('button', { name: '+ Neue Notiz' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in Archiv' }))
+    expect(onAddCard).toHaveBeenLastCalledWith('file.folder', 'Archiv')
+    fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in (Wurzel)' }))
+    expect(onAddCard).toHaveBeenLastCalledWith('file.folder', '')
   })
 })

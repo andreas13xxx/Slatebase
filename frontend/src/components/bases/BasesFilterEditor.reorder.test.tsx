@@ -9,7 +9,7 @@ function setup(root: BaseFilterNode, extra: { disabled?: boolean; scopeMove?: { 
   const updates: RootUpdate[] = []
   const onChange = vi.fn((u: RootUpdate) => { updates.push(u) })
   const view = render(
-    <BasesFilterEditor root={root} columns={columns} disabled={extra.disabled ?? false} onChange={onChange} scopeMove={extra.scopeMove} />,
+    <BasesFilterEditor root={root} doc={{ views: [] }} rows={[]} columns={columns} disabled={extra.disabled ?? false} onChange={onChange} scopeMove={extra.scopeMove} />,
   )
   const apply = (from: BaseFilterNode) => updates.reduce<BaseFilterNode>((acc, u) => u(acc), from)
   return { ...view, onChange, apply }

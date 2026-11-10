@@ -10,8 +10,9 @@
  * expression fallback for anything that does not round-trip.
  */
 
+import { rowValueKey } from '@slatebase/shared-contracts'
 import type {
-  BaseDocument, BaseFilterNode, BaseGroupBy, BaseRow, BaseSortClause, BaseView,
+  BaseDocument, BaseFilterNode, BaseGroupBy, BaseGroupValue, BaseRow, BaseSortClause, BaseView,
 } from '@slatebase/shared-contracts'
 
 // ─── Views ──────────────────────────────────────────────────────────────────
@@ -92,6 +93,55 @@ export function setOrder(doc: BaseDocument, index: number, order: string[]): Bas
   return withView(doc, index, (v) => ({ ...v, order }))
 }
 
+/**
+ * Sets the explicit order of Kanban/cards groups (`groupOrder`), e.g. after a
+ * drag-reorder of the columns. An empty list removes the key (fall back to the
+ * default alphabetical order) rather than writing `groupOrder: []`, which
+ * Obsidian reads as "hide all groups".
+ */
+export function setGroupOrder(doc: BaseDocument, index: number, groupOrder: BaseGroupValue[]): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { groupOrder: _old, ...rest } = v
+    return groupOrder.length > 0 ? { ...rest, groupOrder } : rest
+  })
+}
+
+// ─── Formulas ───────────────────────────────────────────────────────────────
+
+const FORMULA_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+/** Whether a formula name is a valid identifier not already taken. */
+export function isValidFormulaName(doc: BaseDocument, name: string): boolean {
+  const n = name.trim()
+  return FORMULA_NAME.test(n) && !(doc.formulas && n in doc.formulas)
+}
+
+/**
+ * Adds a formula `name: expression` to the document and appends `formula.name`
+ * as a column of the given view, so it shows up right away. A no-op when the
+ * name is invalid or taken.
+ */
+export function addFormula(doc: BaseDocument, viewIndex: number, name: string, expression: string): BaseDocument {
+  const n = name.trim()
+  if (!isValidFormulaName(doc, n)) return doc
+  const withFormula: BaseDocument = { ...doc, formulas: { ...(doc.formulas ?? {}), [n]: expression.trim() } }
+  const colId = `formula.${n}`
+  return withView(withFormula, viewIndex, (v) => {
+    const order = v.order ?? Object.keys(doc.properties ?? {})
+    return order.includes(colId) ? v : { ...v, order: [...order, colId] }
+  })
+}
+
+/** Removes a formula from the document and drops its column from every view. */
+export function removeFormula(doc: BaseDocument, name: string): BaseDocument {
+  if (!doc.formulas || !(name in doc.formulas)) return doc
+  const { [name]: _drop, ...rest } = doc.formulas
+  const colId = `formula.${name}`
+  const views = doc.views.map((v) => (v.order ? { ...v, order: v.order.filter((c) => c !== colId) } : v))
+  const formulas = Object.keys(rest).length > 0 ? rest : undefined
+  return { ...doc, formulas, views } as BaseDocument
+}
+
 /** The columns a view shows: its `order`, else the declared properties. */
 export function effectiveColumns(doc: BaseDocument, view: BaseView | undefined): string[] {
   return view?.order ?? Object.keys(doc.properties ?? {})
@@ -107,6 +157,38 @@ const FILE_COLUMNS = [
   'file.ctime', 'file.mtime', 'file.tags', 'file.links', 'file.backlinks', 'file.embeds',
 ]
 
+/**
+ * Plain-language labels for the technical `file.*` pseudo-columns, so a header
+ * or picker shows "Ordner" instead of "file.folder". A user-declared
+ * `properties['file.x'].displayName` still wins (handled in `columnLabel`).
+ */
+export const FILE_COLUMN_LABELS: Record<string, string> = {
+  'file.name': 'Name',
+  'file.path': 'Pfad',
+  'file.folder': 'Ordner',
+  'file.ext': 'Dateiendung',
+  'file.size': 'Größe',
+  'file.ctime': 'Erstellt',
+  'file.mtime': 'Geändert',
+  'file.tags': 'Tags',
+  'file.links': 'Links',
+  'file.backlinks': 'Backlinks',
+  'file.embeds': 'Einbettungen',
+}
+
+/**
+ * The display label for a column id: a declared displayName wins, then the
+ * plain-language name of a `file.*` field, then a formula's own key, else the
+ * id verbatim (a user property).
+ */
+export function columnLabel(doc: BaseDocument, id: string): string {
+  const declared = doc.properties?.[id]?.displayName
+  if (declared) return declared
+  if (id in FILE_COLUMN_LABELS) return FILE_COLUMN_LABELS[id]!
+  if (id.startsWith('formula.')) return id.slice('formula.'.length)
+  return id
+}
+
 /** Every column the toolbar offers: file fields, formulas, declared and observed properties. */
 export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseView | undefined): ColumnChoice[] {
   const ids: string[] = [...FILE_COLUMNS]
@@ -116,12 +198,17 @@ export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseV
   for (const row of rows) {
     for (const key of Object.keys(row.values)) if (!key.startsWith('file.')) ids.push(key)
   }
+  // Dedup on the normalized key so a `note.`-prefixed id from `view.order` and
+  // the bare key observed in the rows collapse to one choice (the backend
+  // strips `note.` when filling rows). The bare id is the canonical choice —
+  // it matches the row-value key and the form `setGroupBy`/`setOrder` write.
   const seen = new Set<string>()
   const out: ColumnChoice[] = []
   for (const id of ids) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    out.push({ id, label: doc.properties?.[id]?.displayName ?? id })
+    const key = rowValueKey(id)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ id: key, label: columnLabel(doc, key) })
   }
   return out
 }

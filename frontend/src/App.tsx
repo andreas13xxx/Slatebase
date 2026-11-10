@@ -52,6 +52,7 @@ import {
 } from './state/realtimeChatBridge'
 import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from './state/realtimeVaultBridge'
 import type { VaultChangeEvent } from './state/realtimeVaultBridge'
+import { onVaultTreeRefreshRequest } from './state/vaultTreeRefreshBridge'
 import { refreshAliasMap, clearAliasMap } from './state/aliasStore'
 import { dispatchPluginSettingsChange } from './state/pluginSettingsChangeBridge'
 import { FileExplorer } from './components/FileExplorer'
@@ -344,6 +345,15 @@ function AppContent() {
       }
     })
   }, [state.vaultTrees, state.selectedVaultId, tabState.tabs, dispatch, tabDispatch])
+
+  // Explicit tree-refresh requests from surfaces without appDispatch (e.g.
+  // BasesView after creating a note — the backend's vault:change excludes the
+  // writer, so no SSE event fires for the user's own write).
+  useEffect(() => {
+    return onVaultTreeRefreshRequest((vaultId) => {
+      void reloadVaultTree(dispatch, apiClient, vaultId)
+    })
+  }, [dispatch])
 
   useEffect(() => {
     // Skip polling when SSE is connected — unread updates come via realtime push

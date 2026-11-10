@@ -40,6 +40,7 @@ src/
 │   ├── index.ts          — AuthService, SessionStore, interfaces, error classes. Session reads distinguish "provably gone" (ENOENT / parses but fails schema) from a transient read failure (EPERM/EBUSY from antivirus or a synced folder, torn read mid-write) and only deindex the former, so a locked file never kills a valid session. `startCleanup()`/`stopCleanup()` (composition-root lifecycle, not on ISessionStore) sweep expired session files periodically — otherwise abandoned sessions accumulate and slow every `findByUserId()`
 │   ├── middleware.ts     — authMiddleware, csrfMiddleware, rateLimitMiddleware
 │   ├── ratelimit.ts     — In-memory rate limiter for login attempts (composite key username:ip)
+│   ├── session-write-rate-limit.ts — Central per-user limit for session writes (default + autosave bucket + declarative `EXPENSIVE_ROUTE_RULES` table; modes `log-only`/`enforce`/`off` via `SLATEBASE_WRITE_RATE_LIMIT_MODE`)
 │   ├── validation.ts    — Zod schemas for login request validation (loginRequestSchema)
 │   ├── csrf-secret.ts   — CsrfSecretManager (persistent CSRF secret: env → file → generate)
 │   └── sse-ticket-store.ts — SseTicketStore (short-lived one-time tickets for SSE connections)
@@ -771,7 +772,7 @@ src/
 │   │   ├── BasesView.tsx         — Container: parse → query → render table / raw-source toggle, error state, `vault:change` live-refresh, cell-commit (frontmatter save), sort write-back
 │   │   ├── BasesTableView.tsx    — Sortable table: one row per note, property cells editable, formula columns evaluated client-side (read-only)
 │   │   ├── base-filter-tree.ts   — Pure helpers to rearrange a filter tree: `moveFilterNode`/`nudgeFilterNode` (reorder inside a group), `moveFilterBetweenScopes` ("this view" ↔ "all views"). Used by `BasesFilterEditor` (grip drag via native HTML5 DnD on the handle only, plus ↑/↓ buttons as keyboard/touch path, and a ⇄ scope-move button per row; none of it while read-only)
-│   │   ├── base-folder-move.ts   — Kanban grouped by `file.folder` (Obsidian 1.14.2): `folderMoveTarget()` computes the new path; `BasesView.handleMoveCard` then calls `apiClient.moveContent` instead of writing frontmatter, the root column is labelled `(Wurzel)`, and each folder column offers "+ Neue Notiz" (`createNote(folder)` in `BasesView`)
+│   │   ├── base-folder-move.ts   — Kanban grouped by `file.folder` (Obsidian 1.14.2): `folderMoveTarget()` computes the new path; `BasesView.handleMoveCard` then calls `apiClient.moveContent` instead of writing frontmatter, the root column is labelled `(Wurzel)`, and the per-column "+" creates the note in that folder (`addItem({}, folder)` in `BasesView`)
 │   │   ├── BasesKanbanView.tsx   — Cards/Kanban view (`type: cards`): groups rows into collapsible columns by `view.groupBy`, cards link to their note and show other columns as chips; drag-between-columns rewrites the groupBy property
 │   │   ├── BaseCell.tsx          — One cell: formula/`file.*` read-only, property editable via the Properties-editor controls (`useCommitOnUnmount` semantics inherited)
 │   │   ├── base-cell-type.ts     — `inferCellType()` + `BaseCellType` (kept out of the component files for the react-refresh single-export rule)

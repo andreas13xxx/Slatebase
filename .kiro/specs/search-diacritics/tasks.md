@@ -26,7 +26,7 @@ Zuerst die Fold-Funktion mit Tests, dann Stelle für Stelle anbinden. Jede Phase
 
 - [ ] 4. Filter in Seitenpanels und Bases
   - [x] 4.1 Filter gesucht: Backlinks, Outline, Bookmarks und Tags haben kein Textfilter-Feld; angebunden wurden stattdessen `MoveTargetDialog` und `TemplateSelector`
-  - [x] 4.2 Bases hat noch keine Suche; entfällt (Folgepunkt, falls Bases-Suche ergänzt wird)
+  - [x] 4.2 Bases-Schnellsuche (`base-row-search.ts`, seit Master #354) akzent-unabhängig
   - [x] 4.3 Tests (`MoveTargetDialog.accents.test.tsx`)
   - _Requirements: 3.4–3.5_
 

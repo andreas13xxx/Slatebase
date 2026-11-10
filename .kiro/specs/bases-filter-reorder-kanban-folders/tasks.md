@@ -22,7 +22,7 @@ Jede Phase einzeln grün (lint, build, betroffene Tests) und separat committed; 
 - [x] 3. Kanban nach Ordner
   - [x] 3.1 Per grep klären, wo `onMoveCard` implementiert wird; Pfad für `file.folder` verzweigen
   - [x] 3.2 Vault-Verschiebung inkl. Link-Aktualisierung und Fehlerbehandlung (Karte bleibt, Meldung)
-  - [x] 3.3 Neue Notiz in Spalte im Ordner der Spalte anlegen (`base-add-item.ts`)
+  - [x] 3.3 Neue Notiz in Spalte im Ordner der Spalte anlegen (Master #354 brachte das „+“ je Spalte; `BasesView.addItem` bekam einen Ordner-Override für `file.folder`)
   - [x] 3.4 Spaltenname für Wurzelordner
   - [x] 3.5 Tests (neue Datei neben `BasesKanbanView.test.tsx`)
   - [x] 3.6 Doku

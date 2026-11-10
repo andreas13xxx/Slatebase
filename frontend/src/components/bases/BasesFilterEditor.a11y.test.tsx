@@ -10,6 +10,8 @@ describe('BasesFilterEditor accessibility', () => {
     const { container } = render(
       <BasesFilterEditor
         root={{ and: ['status == "a"', 'status == "b"', { or: ['status == "c"', 'status == "d"'] }] }}
+        doc={{ views: [] }}
+        rows={[]}
         columns={columns}
         disabled={false}
         onChange={vi.fn()}

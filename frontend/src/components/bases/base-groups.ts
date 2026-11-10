@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useState } from 'react'
+import { rowValueKey } from '@slatebase/shared-contracts'
 import type { BaseRow, BaseView } from '@slatebase/shared-contracts'
 
 /** Key of the group of notes without a value for the grouping property. */
@@ -23,7 +24,7 @@ export interface RowGroup {
 /** First scalar value of a row property as a display string ('' when absent). */
 function groupValue(row: BaseRow, property: string): string {
   if (property === 'file.name') return row.fileName
-  const v = row.values[property]
+  const v = row.values[rowValueKey(property)]
   if (Array.isArray(v)) return v.length > 0 ? String(v[0]) : ''
   if (v === undefined || v === null) return ''
   return String(v)

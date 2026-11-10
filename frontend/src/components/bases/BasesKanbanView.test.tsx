@@ -140,4 +140,50 @@ describe('BasesKanbanView', () => {
     fireEvent.drop(todo, { dataTransfer: data })
     expect(onMoveCard).not.toHaveBeenCalled()
   })
+
+  // ── Per-column add (#3) ────────────────────────────────────────────────────
+
+  it('shows a per-column "+" only when onAddCard is supplied', () => {
+    const { rerender } = render(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /Neuer Eintrag in/ })).toBeNull()
+    rerender(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} onAddCard={vi.fn()} />)
+    expect(screen.getAllByRole('button', { name: /Neuer Eintrag in/ }).length).toBeGreaterThan(0)
+  })
+
+  it('the column "+" pre-fills the grouping value of that column', () => {
+    const onAddCard = vi.fn()
+    render(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} onAddCard={onAddCard} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in done' }))
+    expect(onAddCard).toHaveBeenCalledWith('status', 'done')
+  })
+
+  it('the ungrouped column "+" clears the grouping value', () => {
+    const onAddCard = vi.fn()
+    render(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} onAddCard={onAddCard} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in Ohne status' }))
+    expect(onAddCard).toHaveBeenCalledWith('status', '')
+  })
+
+  // ── Column reorder (#4) ─────────────────────────────────────────────────────
+
+  it('column headers are draggable only when onReorderColumns is supplied', () => {
+    const { rerender } = render(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} />)
+    const headerRow = (label: string) => screen.getByText(label).closest('.bases-kanban__column-header-row') as HTMLElement
+    expect(headerRow('todo').getAttribute('draggable')).toBe('false')
+    rerender(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} onReorderColumns={vi.fn()} />)
+    expect(headerRow('todo').getAttribute('draggable')).toBe('true')
+  })
+
+  it('reordering a column persists the full groupOrder with null for the ungrouped column', () => {
+    const onReorderColumns = vi.fn()
+    render(<BasesKanbanView doc={doc} view={view} rows={rows()} onOpenNote={vi.fn()} onReorderColumns={onReorderColumns} />)
+    const headerRow = (label: string) => screen.getByText(label).closest('.bases-kanban__column-header-row') as HTMLElement
+    const section = (label: string) => screen.getByText(label).closest('section') as HTMLElement
+    const data = dt()
+    // Default column order is alphabetical: done, todo, then the ungrouped column last.
+    fireEvent.dragStart(headerRow('todo'), { dataTransfer: data })
+    fireEvent.dragOver(section('done'), { dataTransfer: data })
+    fireEvent.drop(section('done'), { dataTransfer: data })
+    expect(onReorderColumns).toHaveBeenCalledWith(['todo', 'done', null])
+  })
 })

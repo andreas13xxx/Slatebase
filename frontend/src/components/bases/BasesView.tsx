@@ -20,6 +20,8 @@ import type { BaseDocument, BaseRow, BaseSortClause, BaseView, FileContent } fro
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { requestVaultTreeRefresh } from '../../state/vaultTreeRefreshBridge'
+import { requestReveal } from '../../state/revealFileBridge'
 import { setActiveBasesController, clearActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
 import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
@@ -33,8 +35,11 @@ import { BasesSourceView } from './BasesSourceView'
 import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
+import { setGroupOrder } from './base-edit'
 import { sortRowsByFormula } from './base-formula-sort'
 import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
+import { filterRowsByText } from './base-row-search'
+import './BasesView.css'
 
 // Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
 const BasesMapView = lazy(() => import('./BasesMapView').then((m) => ({ default: m.BasesMapView })))
@@ -72,6 +77,7 @@ export const BasesView = memo(function BasesView({
   useEffect(() => { modeRef.current = mode }, [mode])
   const showView = useCallback(() => { if (modeRef.current === 'source') showViewRef.current?.() }, [])
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
   // Matches before the view's `limit` (Obsidian 1.15: "Showing 10 of 40").
@@ -97,11 +103,12 @@ export const BasesView = memo(function BasesView({
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
     [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
   )
-  // Obsidian 1.14 has a dedicated `kanban` layout; a grouped `cards` view keeps
-  // rendering as the board (historic behaviour). An ungrouped `cards` view is
-  // the Obsidian image-card grid.
-  const isKanbanView = !!activeView && !isPluginView
-    && (activeView.type === 'kanban' || (activeView.type === 'cards' && !!activeView.groupBy))
+  // Both board layouts share BasesKanbanView, differing only in orientation:
+  // `kanban` groups into horizontal columns, a grouped `cards` view stacks the
+  // groups as vertical rows (each a card grid). An ungrouped `cards` view is
+  // the plain Obsidian image-card grid (BasesCardsView).
+  const isKanbanView = !!activeView && !isPluginView && activeView.type === 'kanban'
+  const isGroupedCardsView = !!activeView && !isPluginView && activeView.type === 'cards' && !!activeView.groupBy
   const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
   const isMapView = !!activeView && activeView.type === 'map' && !isPluginView
@@ -109,9 +116,15 @@ export const BasesView = memo(function BasesView({
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
   // sort the already-fetched rows here by the evaluated value, stable on ties.
-  const displayRows = useMemo(
+  const sortedRows = useMemo(
     () => (doc ? sortRowsByFormula(rows, doc, activeView) : rows),
     [rows, doc, activeView],
+  )
+  // Quick-search narrows the rendered rows (file name + visible values), after
+  // sorting so the order is stable; empty query passes everything through.
+  const displayRows = useMemo(
+    () => filterRowsByText(sortedRows, searchQuery),
+    [sortedRows, searchQuery],
   )
 
   const runQuery = useCallback(async () => {
@@ -246,19 +259,36 @@ export const BasesView = memo(function BasesView({
     onSaveSource(serializeBase(next))
   }, [readOnly, doc, onSaveSource])
 
-  // Create a blank note shaped like this base (its property columns) in `folder`
-  // and open it. Used by the `bases:add-item` command and the Kanban folder columns.
-  const createNote = useCallback(async (folder: string): Promise<string | null> => {
+  // Expose this base to the `bases:*` core commands (single-active-instance,
+  // same as activeCanvasBridge).
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // Create a new note scoped to this base and open it. Shared by the
+  // `bases:add-item` core command (via the controller below), the toolbar's
+  // "Neuer Eintrag" button and each Kanban column's "+" button, so they cannot
+  // drift. `overrides` pre-fills specific frontmatter keys (the Kanban column's
+  // groupBy value) so the note lands in the right column.
+  const addItem = useCallback(async (overrides: Record<string, string> = {}, folderOverride?: string): Promise<string | null> => {
     if (!doc) return null
     const view = doc.views[safeIndex]
+    const folder = folderOverride ?? deriveBaseScopeFolder(doc, view)
     const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
       (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
     )
-    const frontmatter = buildBlankFrontmatter(columns, doc, view)
+    const frontmatter = buildBlankFrontmatter(columns, doc, view, overrides)
+    const baseName = 'Unbenannt'
     try {
       // Resolve a non-colliding file name under the target folder.
-      const path = await resolveNewNotePath(apiClient, vaultId, folder, 'Unbenannt')
+      const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
       await apiClient.saveFile(vaultId, path, frontmatter)
+      // The backend's vault:change excludes the user who triggered the write,
+      // so our own SSE live-refresh never fires for a note we just created —
+      // re-query directly so the new row shows up, and refresh the File
+      // Explorer tree + reveal the new note there (the explorer has its own
+      // `vaultTrees` cache that our query does not touch).
+      void runQueryRef.current()
+      requestVaultTreeRefresh(vaultId)
+      requestReveal(path, 'file', vaultId)
       onOpenNote(path)
       return path
     } catch {
@@ -266,9 +296,22 @@ export const BasesView = memo(function BasesView({
     }
   }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
 
-  // Expose this base to the `bases:*` core commands (single-active-instance,
-  // same as activeCanvasBridge).
-  const rootRef = useRef<HTMLDivElement>(null)
+  // Fire-and-forget wrapper for the toolbar button (which wants `() => void`).
+  const handleAddItem = useCallback(() => { void addItem() }, [addItem])
+
+  // Per-column add in the Kanban view: pre-fill the grouping property with the
+  // column's value so the new card appears in that column ('' clears it).
+  const handleAddCardInColumn = useCallback((property: string, value: string) => {
+    // Folder columns: the column's value is the folder to create the note in.
+    if (property === FOLDER_GROUP_PROPERTY) { void addItem({}, value); return }
+    void addItem(value === '' ? {} : { [property]: value })
+  }, [addItem])
+
+  // Persist a drag-reorder of the Kanban columns into the view's `groupOrder`.
+  const handleReorderColumns = useCallback((groupOrder: (string | null)[]) => {
+    handleDocChange((d) => setGroupOrder(d, safeIndex, groupOrder))
+  }, [handleDocChange, safeIndex])
+
   useEffect(() => {
     const controller: ActiveBasesController = {
       nextView: () => {
@@ -295,11 +338,11 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
-      addItem: () => createNote(doc ? deriveBaseScopeFolder(doc, doc.views[safeIndex]) : ''),
+      addItem,
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, createNote, showView])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -327,6 +370,9 @@ export const BasesView = memo(function BasesView({
         mode={mode}
         onSelectView={(i) => { setSelectedViewIndex(i); showView() }}
         onChange={handleDocChange}
+        onAddItem={handleAddItem}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
       />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
@@ -363,14 +409,16 @@ export const BasesView = memo(function BasesView({
         </ErrorBoundary>
       )}
 
-      {mode === 'view' && !isPluginView && isKanbanView && activeView && (
+      {mode === 'view' && !isPluginView && (isKanbanView || isGroupedCardsView) && activeView && (
         <BasesKanbanView
           doc={doc}
           view={activeView}
           rows={displayRows}
+          layout={isKanbanView ? 'columns' : 'rows'}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
-          onAddCard={readOnly ? undefined : (folder) => { void createNote(folder) }}
+          onAddCard={readOnly ? undefined : handleAddCardInColumn}
+          onReorderColumns={readOnly ? undefined : handleReorderColumns}
         />
       )}
 
@@ -406,7 +454,7 @@ export const BasesView = memo(function BasesView({
         </Suspense>
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && !isCardsView && !isListView && !isMapView && activeView && (
+      {mode === 'view' && !isPluginView && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && !isMapView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

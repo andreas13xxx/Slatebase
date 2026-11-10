@@ -27,6 +27,7 @@ import { SessionStore, AuthService } from './auth/index.js'
 import { CsrfSecretManager } from './auth/csrf-secret.js'
 import { SESSION_COOKIE_NAME } from './auth/cookies.js'
 import { createAuthMiddleware, createCsrfMiddleware, createRateLimitMiddleware, createMustChangePasswordMiddleware } from './auth/middleware.js'
+import { createSessionWriteRateLimit, parseWriteRateLimitMode } from './auth/session-write-rate-limit.js'
 import { createClientIpMiddleware } from './api/client-ip.js'
 import { createRequestIdMiddleware } from './api/request-id.js'
 import { RateLimiter } from './auth/ratelimit.js'
@@ -150,11 +151,11 @@ featureRegistry.register({ name: 'mcp', description: 'AI Context Server (MCP Int
 featureRegistry.register({ name: 'git-sync', description: 'Git-Synchronisation von Vaults mit externen Remotes', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'mail-import', description: 'IMAP-Mail-Import als Markdown-Notizen', defaultEnabled: true, type: 'cold' })
 featureRegistry.register({ name: 'voice-transcription', description: 'Diktieren / Spracherkennung via self-hosted Whisper (rechenintensiv, GPU empfohlen)', defaultEnabled: false, type: 'cold' })
-featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten', defaultEnabled: false, type: 'cold' })
-featureRegistry.register({ name: 'public-shares', description: 'Öffentliche Freigabe-Links — Notizen per Link für Personen ohne Konto lesbar machen (Inhalte verlassen den Server)', defaultEnabled: false, type: 'hot' })
+featureRegistry.register({ name: 'bases', description: 'Bases — filterbare, editierbare Tabellen über die Vault-Metadaten', defaultEnabled: true, type: 'cold' })
+featureRegistry.register({ name: 'public-shares', description: 'Öffentliche Freigabe-Links — Notizen per Link für Personen ohne Konto lesbar machen (Inhalte verlassen den Server)', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'passkeys', description: 'Anmeldung mit Passkeys (WebAuthn) als Alternative zum Passwort', defaultEnabled: true, type: 'hot' })
 featureRegistry.register({ name: 'mail-recovery', description: 'Passwort zurücksetzen per Mail und Bestätigung der Mail-Adresse (benötigt SMTP)', defaultEnabled: true, type: 'hot' })
-featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste', defaultEnabled: false, type: 'cold' })
+featureRegistry.register({ name: 'activity-timeline', description: 'Aktivitätszeitleiste — chronologische Vault-Aktivität als Tab und Seitenleiste', defaultEnabled: true, type: 'cold' })
 
 const featureToggleStore = new FeatureToggleStore(serverConfig.dataDir, logger)
 const persistedFeatureState = await featureToggleStore.load()
@@ -735,6 +736,12 @@ app.use('*', createClientIpMiddleware({ trustedProxies: serverConfig.trustedProx
 app.use('/api/v1/*', authMiddleware)
 app.use('/api/v1/*', createCsrfMiddleware(authService))
 app.use('/api/v1/*', createRateLimitMiddleware(rateLimiter))
+// Central limit for session writes (log-only unless SLATEBASE_WRITE_RATE_LIMIT_MODE=enforce).
+const writeRateLimit = createSessionWriteRateLimit({
+  mode: parseWriteRateLimitMode(process.env['SLATEBASE_WRITE_RATE_LIMIT_MODE']),
+  logger,
+})
+app.use('/api/v1/*', writeRateLimit.middleware)
 app.use('/api/v1/*', createMustChangePasswordMiddleware(userRepository))
 
 // Global error handler — catches unhandled exceptions and returns proper JSON
@@ -1541,6 +1548,7 @@ const gracefulShutdown = async (signal: string, exitCode = 0): Promise<void> => 
   chatRateLimiter.destroy()
   mcpRateLimiter?.destroy()
   proxyRateLimiter.destroy()
+  writeRateLimit.destroy()
 
   // Shutdown realtime connections (sends server:shutdown event, closes all streams)
   await realtimeConnectionManager.shutdown()

@@ -345,4 +345,25 @@ describe('AdminConfigPage', () => {
     })
   })
 
+  it('locks env-pinned fields already on load, before any save', async () => {
+    mockFetchWithVersion(
+      new Response(
+        JSON.stringify({ ...SAMPLE_CONFIG, shadowedByEnv: ['host', 'maxFileSize'] }),
+        { status: 200 },
+      ),
+    )
+    renderAdminConfigPage(createMockApiClient())
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Host')).toBeInTheDocument()
+    })
+
+    // Pinned fields are disabled straight away, without a save round-trip.
+    expect((screen.getByLabelText('Host') as HTMLInputElement).disabled).toBe(true)
+    // An un-pinned field stays editable.
+    expect((screen.getByLabelText('Port') as HTMLInputElement).disabled).toBe(false)
+    // The shared hint names the reason.
+    expect(screen.getAllByText(/Umgebungsvariable/).length).toBeGreaterThan(0)
+  })
+
 })

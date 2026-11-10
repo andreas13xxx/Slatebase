@@ -92,6 +92,28 @@ export const DEFAULT_PROXY_ALLOWED_ORIGINS: readonly string[] = [
 ]
 
 /**
+ * Top-level config keys that have an editable field in the admin UI. Only
+ * these can be "shadowed" from the UI's point of view — an env-pinned key
+ * without a UI field (e.g. `dataDir`, `templatesDir`, `trustedProxies`) would
+ * otherwise appear in the UI's "pinned by environment" summary with no field
+ * to point at, which only confuses. `getShadowedKeys()` filters to this set.
+ */
+export const ADMIN_EDITABLE_CONFIG_KEYS: readonly string[] = [
+  'port',
+  'host',
+  'allowedOrigins',
+  'maxFileSize',
+  'logLevel',
+  'maxImportFileSize',
+  'maxImportFiles',
+  'maxImportDepth',
+  'proxy',
+  'sessionDurationHours',
+  'sessionMaxLifetimeDays',
+  'sse',
+]
+
+/**
  * Obsidian plugin request-proxy configuration. `allowedOrigins` is the SSRF
  * allowlist the proxy route checks every target URL against — an empty list
  * disables the route entirely (default-deny, no "allow everything" fallback).
@@ -240,6 +262,13 @@ export interface IConfigService {
   /** Returns the admin-set runtime overrides currently persisted on disk. */
   getOverrides(): ServerConfigOverrides
   /**
+   * Returns the top-level config keys currently pinned by an environment
+   * variable. These keys win over the admin UI, so the UI should disable the
+   * matching fields and say so instead of letting an admin edit a value the
+   * process will not use.
+   */
+  getShadowedKeys(): string[]
+  /**
    * Merges `overrides` into the persisted admin overrides, writes them to
    * `<dataDir>/server-config.json`, and applies them to the live config.
    *
@@ -326,6 +355,12 @@ export class ConfigService implements IConfigService {
     return structuredClone(this.overrides)
   }
 
+  getShadowedKeys(): string[] {
+    // Only the keys with an admin UI field: an env-pinned key without a field
+    // (dataDir, templatesDir, …) has nothing for the UI to disable or name.
+    return ADMIN_EDITABLE_CONFIG_KEYS.filter((key) => this.envOverlay[key] !== undefined)
+  }
+
   async updateOverrides(overrides: ServerConfigOverrides): Promise<string[]> {
     const next = deepMerge(
       this.overrides as Record<string, unknown>,
@@ -341,7 +376,7 @@ export class ConfigService implements IConfigService {
     this.config = this.buildConfig()
     this.validateRanges()
 
-    return Object.keys(overrides).filter((key) => key in this.envOverlay)
+    return Object.keys(overrides).filter((key) => this.envOverlay[key] !== undefined)
   }
 
   /**

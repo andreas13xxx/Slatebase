@@ -105,6 +105,7 @@ function createMockConfigService(overrides: Partial<IConfigService> = {}): IConf
       name: { de: 'Willkommen', en: 'Welcome' },
     }),
     getOverrides: () => ({}),
+    getShadowedKeys: () => [],
     updateOverrides: async () => [],
     ...overrides,
   }

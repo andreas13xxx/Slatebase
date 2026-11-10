@@ -1,7 +1,7 @@
 /**
  * BasesView — Kanban grouped by `file.folder` (Obsidian 1.14.2): dragging a card
  * moves the note into the column's folder (vault move, not a frontmatter write);
- * "Neue Notiz" creates a note in the column's folder.
+ * the per-column "+" creates a note in the column's folder.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -86,8 +86,7 @@ describe('BasesView Kanban by file.folder', () => {
       <BasesView apiClient={apiClient} vaultId="v1" source={folderSource} readOnly={false} onOpenNote={onOpenNote} onSaveSource={() => {}} />,
     )
     await waitFor(() => expect(screen.getByText('Task B')).toBeTruthy())
-    const archiv = screen.getByText('Archiv').closest('section') as HTMLElement
-    fireEvent.click(archiv.querySelector('.bases-kanban__add') as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in Archiv' }))
     await waitFor(() => expect(apiClient.saveFile).toHaveBeenCalled())
     expect(vi.mocked(apiClient.saveFile).mock.calls[0]?.[1]).toBe('Archiv/Unbenannt.md')
     await waitFor(() => expect(onOpenNote).toHaveBeenCalledWith('Archiv/Unbenannt.md'))

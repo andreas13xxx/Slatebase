@@ -10,9 +10,13 @@
 
 import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
+import { ColumnTypeIcon } from './base-column-icon'
+import { ColumnDropdown } from './base-column-dropdown'
 import {
-  addView, availableColumns, deleteView, duplicateView, effectiveColumns, renameView, rootGroup,
+  addFormula, addView, availableColumns, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
+  removeFormula, renameView, rootGroup,
   setDocFilter, setGroupBy, setOrder, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
@@ -36,6 +40,15 @@ export interface BasesToolbarProps {
    * then a click on "+ Bedingung") compose instead of the second overwriting the first.
    */
   onChange: (update: DocUpdate) => void
+  /**
+   * Create a new note scoped to this base and open it (the `bases:add-item` path).
+   * Absent / disabled when the base is read-only; the button then does not render.
+   */
+  onAddItem?: () => void
+  /** Current quick-search text (filters the rendered rows client-side). */
+  searchQuery: string
+  /** Change the quick-search text. */
+  onSearchQueryChange: (query: string) => void
 }
 
 // ─── Popover ────────────────────────────────────────────────────────────────
@@ -96,23 +109,13 @@ interface PanelProps {
   doc: BaseDocument
   index: number
   columns: ColumnChoice[]
+  /** Current rows — used only to infer a column's type icon. */
+  rows: BaseRow[]
   disabled: boolean
   onChange: (update: DocUpdate) => void
 }
 
-function ColumnSelect({ columns, value, onChange, label, disabled }: {
-  columns: ColumnChoice[]; value: string; onChange: (id: string) => void; label: string; disabled: boolean
-}) {
-  const known = columns.some((c) => c.id === value)
-  return (
-    <select className="bases-tb__select" aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
-      {!known && value !== '' && <option value={value}>{value}</option>}
-      {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-    </select>
-  )
-}
-
-const SortPanel = memo(function SortPanel({ doc, index, columns, disabled, onChange }: PanelProps) {
+const SortPanel = memo(function SortPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const sort: BaseSortClause[] = doc.views[index]?.sort ?? []
   const edit = (fn: (current: BaseSortClause[]) => BaseSortClause[]) =>
     onChange((d) => setSort(d, index, fn(d.views[index]?.sort ?? [])))
@@ -130,7 +133,7 @@ const SortPanel = memo(function SortPanel({ doc, index, columns, disabled, onCha
       {sort.length === 0 && <p className="bases-tb__hint">Keine Sortierung.</p>}
       {sort.map((s, i) => (
         <div key={`${s.column}-${i}`} className="bases-tb__row">
-          <ColumnSelect columns={columns} value={s.column} label="Sortieren nach" disabled={disabled} onChange={(id) => update(i, { column: id })} />
+          <ColumnDropdown doc={doc} rows={rows} columns={columns} value={s.column} label="Sortieren nach" disabled={disabled} onChange={(id) => update(i, { column: id })} />
           <select
             className="bases-tb__select"
             aria-label="Richtung"
@@ -155,22 +158,22 @@ const SortPanel = memo(function SortPanel({ doc, index, columns, disabled, onCha
   )
 })
 
-const GroupPanel = memo(function GroupPanel({ doc, index, columns, disabled, onChange }: PanelProps) {
+const GroupPanel = memo(function GroupPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const groupBy = doc.views[index]?.groupBy
   return (
     <div className="bases-tb__section">
       <div className="bases-tb__row">
-        <select
-          className="bases-tb__select"
-          aria-label="Gruppieren nach"
+        <ColumnDropdown
+          doc={doc}
+          rows={rows}
+          columns={columns}
           value={groupBy?.property ?? ''}
+          label="Gruppieren nach"
           disabled={disabled}
-          onChange={(e) => { const property = e.target.value; onChange((d) => setGroupBy(d, index, property ? { property, direction: groupBy?.direction ?? 'ASC' } : undefined)) }}
-        >
-          <option value="">Keine Gruppierung</option>
-          {groupBy && !columns.some((c) => c.id === groupBy.property) && <option value={groupBy.property}>{groupBy.property}</option>}
-          {columns.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-        </select>
+          allowEmpty
+          emptyLabel="Keine Gruppierung"
+          onChange={(property) => onChange((d) => setGroupBy(d, index, property ? { property, direction: groupBy?.direction ?? 'ASC' } : undefined))}
+        />
         {groupBy && (
           <select
             className="bases-tb__select"
@@ -184,12 +187,11 @@ const GroupPanel = memo(function GroupPanel({ doc, index, columns, disabled, onC
           </select>
         )}
       </div>
-      <p className="bases-tb__hint">Gruppen zeigen Karten- und Kanban-Ansichten als Spalten.</p>
     </div>
   )
 })
 
-const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, disabled, onChange }: PanelProps) {
+const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const shown = effectiveColumns(doc, doc.views[index])
   const labelOf = (id: string) => columns.find((c) => c.id === id)?.label ?? id
   const hidden = columns.filter((c) => !shown.includes(c.id))
@@ -209,6 +211,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
           <li key={id} className="bases-tb__row">
             <label className="bases-tb__check">
               <input type="checkbox" checked disabled={disabled} onChange={() => edit((cur) => cur.filter((c) => c !== id))} />
+              <ColumnTypeIcon doc={doc} col={id} rows={rows} />
               <span>{labelOf(id)}</span>
             </label>
             <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
@@ -224,6 +227,7 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
               <li key={c.id} className="bases-tb__row">
                 <label className="bases-tb__check">
                   <input type="checkbox" checked={false} disabled={disabled} onChange={() => edit((cur) => (cur.includes(c.id) ? cur : [...cur, c.id]))} />
+                  <ColumnTypeIcon doc={doc} col={c.id} rows={rows} />
                   <span>{c.label}</span>
                 </label>
               </li>
@@ -239,11 +243,72 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, dis
           onCommit={(name) => { const n = name.trim(); if (n) edit((cur) => (cur.includes(n) ? cur : [...cur, n])) }}
         />
       )}
+      <FormulaSection doc={doc} index={index} disabled={disabled} onChange={onChange} />
     </div>
   )
 })
 
-const FilterPanel = memo(function FilterPanel({ doc, index, columns, disabled, onChange }: PanelProps) {
+/** Add / list / remove the document's formula columns (inside the Properties panel). */
+const FormulaSection = memo(function FormulaSection({ doc, index, disabled, onChange }: {
+  doc: BaseDocument; index: number; disabled: boolean; onChange: (update: DocUpdate) => void
+}) {
+  const [name, setName] = useState('')
+  const [expr, setExpr] = useState('')
+  const formulas = Object.entries(doc.formulas ?? {})
+  const nameOk = name.trim() === '' || isValidFormulaName(doc, name)
+  const canAdd = name.trim() !== '' && expr.trim() !== '' && isValidFormulaName(doc, name)
+
+  const add = () => {
+    if (!canAdd) return
+    onChange((d) => addFormula(d, index, name, expr))
+    setName('')
+    setExpr('')
+  }
+
+  return (
+    <div className="bases-tb__section">
+      <p className="bases-tb__hint">Formeln</p>
+      {formulas.length === 0 && <p className="bases-tb__hint">Noch keine Formel.</p>}
+      <ul className="bases-tb__list" aria-label="Formeln">
+        {formulas.map(([key, expression]) => (
+          <li key={key} className="bases-tb__row">
+            <span className="bases-tb__formula-name">{key}</span>
+            <code className="bases-tb__formula-expr" title={expression}>{expression}</code>
+            {!disabled && (
+              <button type="button" className="bases-tb__icon-btn" aria-label={`Formel ${key} entfernen`} onClick={() => onChange((d) => removeFormula(d, key))}>×</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {!disabled && (
+        <div className="bases-tb__formula-add">
+          <input
+            type="text"
+            className={nameOk ? 'bases-tb__input' : 'bases-tb__input bases-tb__input--invalid'}
+            aria-label="Name der Formel"
+            placeholder="Name (z.B. tage_übrig)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            type="text"
+            className="bases-tb__input bases-tb__input--grow"
+            aria-label="Formelausdruck"
+            placeholder='Ausdruck (z.B. (date(deadline) - today()).days)'
+            value={expr}
+            onChange={(e) => setExpr(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+          />
+          <button type="button" className="bases-tb__btn bases-tb__btn--primary" disabled={!canAdd} onClick={add}>
+            Hinzufügen
+          </button>
+        </div>
+      )}
+    </div>
+  )
+})
+
+const FilterPanel = memo(function FilterPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const [scope, setScope] = useState<'view' | 'all'>('view')
   const view = doc.views[index]
   const node: BaseFilterNode | undefined = scope === 'view' ? view?.filters : doc.filters
@@ -259,6 +324,8 @@ const FilterPanel = memo(function FilterPanel({ doc, index, columns, disabled, o
       </div>
       <BasesFilterEditor
         root={rootGroup(node)}
+        doc={doc}
+        rows={rows}
         columns={columns}
         disabled={disabled}
         scopeMove={{
@@ -297,7 +364,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   if (active && !typeOptions.includes(active.type)) typeOptions.push(active.type)
 
   return (
-    <Popover label={active?.name ?? 'Ansicht'} title="Ansichten">
+    <Popover label={<><Table2 aria-hidden="true" className="bases-tb__btn-icon" />{active?.name ?? 'Ansicht'}</>} title="Ansichten">
       <div className="bases-tb__section">
         <ul className="bases-tb__list" aria-label="Ansichten">
           {doc.views.map((v, i) => (
@@ -382,27 +449,83 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
 // ─── Toolbar ────────────────────────────────────────────────────────────────
 
 export const BasesToolbar = memo(function BasesToolbar({
-  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange,
+  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange,
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
   const columns = availableColumns(doc, rows, view)
   const handleChange = useCallback((update: DocUpdate) => { if (!readOnly) onChange(update) }, [readOnly, onChange])
-  const panelProps: PanelProps = { doc, index: activeIndex, columns, disabled: readOnly, onChange: handleChange }
+  const panelProps: PanelProps = { doc, index: activeIndex, columns, rows, disabled: readOnly, onChange: handleChange }
   const filterCount = countConditions(view?.filters) + countConditions(doc.filters)
 
+  // Quick search is open whenever it has text, or the user toggled it open.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const showSearch = searchOpen || searchQuery !== ''
+  const toggleSearch = useCallback(() => {
+    setSearchOpen((v) => {
+      const next = !v
+      if (next) requestAnimationFrame(() => searchInputRef.current?.focus())
+      else onSearchQueryChange('')
+      return next
+    })
+  }, [onSearchQueryChange])
+
   return (
-    <div className="bases-view__toolbar" role="toolbar" aria-label="Base-Werkzeugleiste">
-      <div className="bases-tb__group-left">
-        <ViewMenu doc={doc} activeIndex={activeIndex} disabled={readOnly} onSelectView={onSelectView} onChange={handleChange} />
+    <div className="bases-view__toolbar-wrap">
+      <div className="bases-view__toolbar" role="toolbar" aria-label="Base-Werkzeugleiste">
+        <div className="bases-tb__group-left">
+          <ViewMenu doc={doc} activeIndex={activeIndex} disabled={readOnly} onSelectView={onSelectView} onChange={handleChange} />
+          {mode === 'view' && !readOnly && onAddItem && (
+            <button type="button" className="bases-tb__btn bases-tb__btn--primary" title="Neuen Eintrag anlegen" onClick={onAddItem}>
+              <Plus aria-hidden="true" className="bases-tb__btn-icon" />
+              Neuer Eintrag
+            </button>
+          )}
+        </div>
         {mode === 'view' && view && (
-          <>
-            <Popover label="Sortieren" title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
-            <Popover label="Gruppieren" title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
-            <Popover label="Filtern" title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
-            <Popover label="Eigenschaften" title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
-          </>
+          <div className="bases-tb__group-right">
+            <button
+              type="button"
+              className={showSearch ? 'bases-tb__btn bases-tb__btn--active' : 'bases-tb__btn'}
+              title="Suchen"
+              aria-label="Suchen"
+              aria-pressed={showSearch}
+              onClick={toggleSearch}
+            >
+              <Search aria-hidden="true" className="bases-tb__btn-icon" />
+              Suchen
+            </button>
+            <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
+            <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
+            <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
+            <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
+          </div>
         )}
       </div>
+      {mode === 'view' && view && showSearch && (
+        <div className="bases-view__searchbar">
+          <Search aria-hidden="true" className="bases-tb__btn-icon" />
+          <input
+            ref={searchInputRef}
+            type="search"
+            className="bases-tb__input bases-tb__input--grow"
+            aria-label="In den Einträgen suchen"
+            placeholder="In den Einträgen suchen…"
+            value={searchQuery}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { onSearchQueryChange(''); setSearchOpen(false) } }}
+          />
+          <button
+            type="button"
+            className="bases-tb__icon-btn"
+            aria-label="Suche schließen"
+            title="Suche schließen"
+            onClick={() => { onSearchQueryChange(''); setSearchOpen(false) }}
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </div>
   )
 })

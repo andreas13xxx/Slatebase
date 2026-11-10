@@ -17,6 +17,7 @@ import { memo, useCallback, useMemo } from 'react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
 import { computeSummaries, formatFormulaValue, evaluateFormula, rowContext } from '@slatebase/shared-contracts'
+import { columnLabel as baseColumnLabel } from './base-edit'
 
 export interface BasesListViewProps {
   doc: BaseDocument
@@ -49,8 +50,8 @@ export const BasesListView = memo(function BasesListView({
   }, [view.order, doc.properties])
 
   const columnLabel = useCallback(
-    (col: string): string => doc.properties?.[col]?.displayName ?? col,
-    [doc.properties],
+    (col: string): string => baseColumnLabel(doc, col),
+    [doc],
   )
 
   // Value for one detail column: a formula column is evaluated per row; any
