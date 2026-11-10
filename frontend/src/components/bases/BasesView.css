@@ -1126,6 +1126,7 @@
 
 .bases-tb__grip {
   cursor: grab;
+  touch-action: none; /* the pointer drag, not the browser, handles the gesture on touch screens */
   color: var(--text-subtle);
   padding: 0 4px;
   user-select: none;

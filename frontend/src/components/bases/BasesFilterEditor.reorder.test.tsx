@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { BaseFilterNode } from '@slatebase/shared-contracts'
@@ -38,16 +39,48 @@ describe('BasesFilterEditor — reorder (Obsidian 1.14/1.15)', () => {
     expect(downs[downs.length - 1]!.disabled).toBe(true)
   })
 
-  it('reorders by dragging the handle onto another row', () => {
+  /** jsdom has no layout: give the row wrappers stacked 20px-high boxes. */
+  function stackRows(container: HTMLElement): HTMLElement[] {
+    const wraps = Array.from(container.querySelectorAll<HTMLElement>('.bases-tb__row-wrap'))
+    wraps.forEach((el, k) => {
+      el.getBoundingClientRect = () => ({ top: k * 20, bottom: k * 20 + 20, left: 0, right: 100, width: 100, height: 20, x: 0, y: k * 20, toJSON: () => ({}) })
+    })
+    return wraps
+  }
+
+  it('reorders by dragging the handle with the pointer (mouse, pen and touch alike)', () => {
     const { container, apply } = setup(root())
     const grips = container.querySelectorAll('.bases-tb__grip')
-    const wraps = container.querySelectorAll('.bases-tb__row-wrap')
-    const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
-    fireEvent.dragStart(grips[0]!, { dataTransfer })
-    fireEvent.dragOver(wraps[2]!, { dataTransfer })
+    const wraps = stackRows(container)
+    fireEvent.pointerDown(grips[0]!, { pointerId: 1, pointerType: 'touch', button: 0, clientY: 5 })
+    fireEvent.pointerMove(grips[0]!, { pointerId: 1, pointerType: 'touch', clientY: 50 })
     expect(wraps[2]!.className).toContain('bases-tb__row--drop-after')
-    fireEvent.drop(wraps[2]!, { dataTransfer })
+    fireEvent.pointerUp(grips[0]!, { pointerId: 1, pointerType: 'touch', clientY: 50 })
     expect(apply(root())).toEqual({ and: ['status == "b"', 'status == "c"', 'status == "a"'] })
+  })
+
+  it('moves a row up when dropped above it, and ignores a drop on its own row', () => {
+    const { container, apply, onChange } = setup(root())
+    const grips = container.querySelectorAll('.bases-tb__grip')
+    stackRows(container)
+    fireEvent.pointerDown(grips[2]!, { pointerId: 1, pointerType: 'mouse', button: 0, clientY: 50 })
+    fireEvent.pointerUp(grips[2]!, { pointerId: 1, pointerType: 'mouse', clientY: 5 })
+    expect(apply(root())).toEqual({ and: ['status == "c"', 'status == "a"', 'status == "b"'] })
+    onChange.mockClear()
+    fireEvent.pointerDown(grips[1]!, { pointerId: 2, pointerType: 'mouse', button: 0, clientY: 30 })
+    fireEvent.pointerUp(grips[1]!, { pointerId: 2, pointerType: 'mouse', clientY: 30 })
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('cancels a drag on pointercancel without changing anything', () => {
+    const { container, onChange } = setup(root())
+    const grips = container.querySelectorAll('.bases-tb__grip')
+    stackRows(container)
+    fireEvent.pointerDown(grips[0]!, { pointerId: 1, pointerType: 'touch', button: 0, clientY: 5 })
+    fireEvent.pointerMove(grips[0]!, { pointerId: 1, pointerType: 'touch', clientY: 50 })
+    fireEvent.pointerCancel(grips[0]!, { pointerId: 1 })
+    expect(container.querySelector('.bases-tb__row-wrap--dragging')).toBeNull()
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('shows no reorder controls with a single condition, but keeps the scope move', () => {
@@ -71,5 +104,35 @@ describe('BasesFilterEditor — reorder (Obsidian 1.14/1.15)', () => {
     expect(container.querySelector('.bases-tb__grip')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Bedingung nach unten' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Verschieben' })).toBeNull()
+  })
+
+  it('keeps the raw-expression mode with its row when the row is moved', () => {
+    const Harness = () => {
+      const [tree, setTree] = useState<BaseFilterNode>(root())
+      return (
+        <BasesFilterEditor
+          root={tree}
+          doc={{ views: [] }}
+          rows={[]}
+          columns={columns}
+          disabled={false}
+          onChange={(u) => setTree((t) => u(t))}
+        />
+      )
+    }
+    render(<Harness />)
+    // Switch the FIRST row to the raw editor, then move it down one place.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Als Ausdruck bearbeiten' })[0]!)
+    const rawFirst = screen.getAllByLabelText('Filterausdruck')
+    expect(rawFirst).toHaveLength(1)
+    expect((rawFirst[0] as HTMLInputElement).value).toBe('status == "a"')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Bedingung nach unten' })[0]!)
+    const rawAfter = screen.getAllByLabelText('Filterausdruck')
+    expect(rawAfter).toHaveLength(1)
+    expect((rawAfter[0] as HTMLInputElement).value).toBe('status == "a"')
+    // It is now the second row: the first row is the guided builder again.
+    const rowsEls = document.querySelectorAll('.bases-tb__row-wrap')
+    expect(rowsEls[0]!.querySelector('[aria-label="Filterausdruck"]')).toBeNull()
+    expect(rowsEls[1]!.querySelector('[aria-label="Filterausdruck"]')).not.toBeNull()
   })
 })

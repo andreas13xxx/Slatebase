@@ -4,7 +4,7 @@
  * when its expression can be split that way, otherwise the raw expression.
  */
 
-import { memo, useCallback, useState, type DragEvent } from 'react'
+import { memo, useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { BaseDocument, BaseFilterNode, BaseRow } from '@slatebase/shared-contracts'
 import {
   addFilterChild, childrenOf, conditionToExpression, groupKeyOf, parseCondition, removeFilterNode,
@@ -64,11 +64,13 @@ interface ConditionRowProps {
   disabled: boolean
   onChange: (expression: string) => void
   onRemove: () => void
+  /** Whether the user switched this row to the raw-expression editor. Owned by the group, so it follows the row when rows are reordered. */
+  rawMode: boolean
+  onRawModeChange: (raw: boolean) => void
 }
 
-const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns, disabled, onChange, onRemove }: ConditionRowProps) {
+const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns, disabled, onChange, onRemove, rawMode, onRawModeChange }: ConditionRowProps) {
   const parsed = parseCondition(expression)
-  const [rawMode, setRawMode] = useState(parsed === null && expression !== '')
   const condition = parsed ?? DEFAULT_CONDITION
   const emit = (next: Condition) => onChange(conditionToExpression(next))
   const fixedProperty = condition.operator === 'hasTag' || condition.operator === 'inFolder'
@@ -126,7 +128,7 @@ const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns
         aria-label={rawMode ? 'Zurück zum Baukasten' : 'Als Ausdruck bearbeiten'}
         aria-pressed={rawMode}
         disabled={disabled || (rawMode && parsed === null && expression !== '')}
-        onClick={() => setRawMode((v) => !v)}
+        onClick={() => onRawModeChange(!rawMode)}
       >
         {'</>'}
       </button>
@@ -152,16 +154,23 @@ interface GroupEditorProps {
   scopeMove?: ScopeMove
 }
 
+/** Pointer handlers of a row's grip: one drag works for mouse, pen and touch alike. */
+interface GripHandlers {
+  onPointerDown: (e: ReactPointerEvent<HTMLSpanElement>) => void
+  onPointerMove: (e: ReactPointerEvent<HTMLSpanElement>) => void
+  onPointerUp: (e: ReactPointerEvent<HTMLSpanElement>) => void
+  onPointerCancel: () => void
+}
+
 /** Handle, up/down and scope-move controls of one row. Hidden while the base is read-only. */
-function RowTools({ index, count, kind, scopeMove, path, onChange, onDragStart, onDragEnd }: {
+function RowTools({ index, count, kind, scopeMove, path, onChange, grip }: {
   index: number
   count: number
   kind: 'Bedingung' | 'Gruppe'
   scopeMove?: ScopeMove
   path: FilterPath
   onChange: (update: RootUpdate) => void
-  onDragStart: (e: DragEvent<HTMLSpanElement>) => void
-  onDragEnd: () => void
+  grip: GripHandlers
 }) {
   return (
     <div className="bases-tb__row-tools">
@@ -169,11 +178,9 @@ function RowTools({ index, count, kind, scopeMove, path, onChange, onDragStart, 
         <>
           <span
             className="bases-tb__grip"
-            draggable
             title="Ziehen zum Umsortieren"
             aria-hidden="true"
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
+            {...grip}
           >
             ⠿
           </span>
@@ -191,10 +198,45 @@ function RowTools({ index, count, kind, scopeMove, path, onChange, onDragStart, 
 const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, disabled, onChange, scopeMove }: GroupEditorProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
+  const rowEls = useRef<Array<HTMLDivElement | null>>([])
+  // Expressions whose row is in raw-editor mode. Keyed by the expression (not the index) so the
+  // mode follows a row when it is moved; an edit in raw mode carries the entry over to the new text.
+  const [rawExpressions, setRawExpressions] = useState<ReadonlySet<string>>(() => new Set())
   const key = groupKeyOf(node)
   if (key === null) return null
   const children = childrenOf(node)
   const endDrag = () => { setDragIndex(null); setOverIndex(null) }
+  // The row under the pointer (clamped to the first/last row), by the rows' own boxes.
+  const rowIndexAt = (clientY: number): number => {
+    const boxes = rowEls.current.slice(0, children.length)
+    for (let k = 0; k < boxes.length; k++) {
+      const rect = boxes[k]?.getBoundingClientRect()
+      if (rect && clientY < rect.bottom) return k
+    }
+    return Math.max(0, children.length - 1)
+  }
+  const gripFor = (i: number): GripHandlers => ({
+    onPointerDown: (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      setDragIndex(i)
+      setOverIndex(i)
+    },
+    onPointerMove: (e) => {
+      if (dragIndex === null) return
+      const over = rowIndexAt(e.clientY)
+      if (over !== overIndex) setOverIndex(over)
+    },
+    onPointerUp: (e) => {
+      if (dragIndex === null) return
+      const from = dragIndex
+      const to = rowIndexAt(e.clientY)
+      e.currentTarget.releasePointerCapture?.(e.pointerId)
+      endDrag()
+      if (from !== to) onChange((r) => moveFilterNode(r, [...path, from], to))
+    },
+    onPointerCancel: endDrag,
+  })
   return (
     <div className={path.length === 0 ? 'bases-tb__group' : 'bases-tb__group bases-tb__group--nested'}>
       <div className="bases-tb__group-head">
@@ -220,8 +262,20 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
             rows={rows}
             columns={columns}
             disabled={disabled}
-            onChange={(expr) => onChange((r) => replaceFilterNode(r, childPath, expr))}
+            onChange={(expr) => {
+              if (rawExpressions.has(child) && expr !== child) {
+                setRawExpressions((prev) => { const next = new Set(prev); next.delete(child); next.add(expr); return next })
+              }
+              onChange((r) => replaceFilterNode(r, childPath, expr))
+            }}
             onRemove={() => onChange((r) => removeFilterNode(r, childPath))}
+            rawMode={rawExpressions.has(child)}
+            onRawModeChange={(raw) => setRawExpressions((prev) => {
+              const next = new Set(prev)
+              if (raw) next.add(child)
+              else next.delete(child)
+              return next
+            })}
           />
         ) : (
           <GroupEditor node={child} path={childPath} doc={doc} rows={rows} columns={columns} disabled={disabled} onChange={onChange} scopeMove={scopeMove} />
@@ -233,14 +287,8 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
         return (
           <div
             key={i}
+            ref={(el) => { rowEls.current[i] = el }}
             className={`bases-tb__row-wrap${dragIndex === i ? ' bases-tb__row-wrap--dragging' : ''}${dropClass}`}
-            onDragOver={dragIndex === null ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIndex !== i) setOverIndex(i) }}
-            onDrop={dragIndex === null ? undefined : (e) => {
-              e.preventDefault()
-              const from = dragIndex
-              endDrag()
-              if (from !== i) onChange((r) => moveFilterNode(r, [...path, from], i))
-            }}
           >
             <RowTools
               index={i}
@@ -249,8 +297,7 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
               scopeMove={scopeMove}
               path={childPath}
               onChange={onChange}
-              onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); setDragIndex(i) }}
-              onDragEnd={endDrag}
+              grip={gripFor(i)}
             />
             <div className="bases-tb__row-content">{content}</div>
           </div>
