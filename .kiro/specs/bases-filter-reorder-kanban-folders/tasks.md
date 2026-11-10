@@ -28,10 +28,10 @@ Jede Phase einzeln grün (lint, build, betroffene Tests) und separat committed; 
   - [x] 3.6 Doku
   - _Requirements: 3.1–3.5_
 
-- [ ] 4. Limit-Hinweis und Standardname
-  - [ ] 4.1 Gesamtanzahl vs. Limit in der Ergebnisberechnung mitführen, Hinweis in Toolbar/Suche
-  - [ ] 4.2 Standardname der ersten Ansicht prüfen und ggf. auf „View“ setzen
-  - [ ] 4.3 Tests und Doku
+- [x] 4. Limit-Hinweis und Standardname
+  - [x] 4.1 `total` aus `filterRows` ist bereits vorhanden; `BasesView` zeigt „Zeigt N von M“, Hinweis in Toolbar/Suche
+  - [x] 4.2 Starter-Base in `App.tsx` nannte die Ansicht „Neue Base“, jetzt „View“ (wie Obsidian in die Datei schreibt)
+  - [x] 4.3 Tests und Doku
   - _Requirements: 4.1–4.2, 5.1_
 
 - [ ] 5. Abschluss

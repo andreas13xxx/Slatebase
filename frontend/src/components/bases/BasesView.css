@@ -1056,3 +1056,9 @@
     transition: opacity 120ms ease;
   }
 }
+
+.bases-view__hint {
+  color: var(--text-subtle);
+  font-size: 0.8em;
+  padding: 0 var(--spacing-sm);
+}

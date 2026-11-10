@@ -591,7 +591,7 @@ function AppContent() {
       '    displayName: Name',
       'views:',
       '  - type: table',
-      '    name: Neue Base',
+      '    name: View',
       '    order:',
       '      - file.name',
       '',

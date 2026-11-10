@@ -74,6 +74,8 @@ export const BasesView = memo(function BasesView({
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
+  // Matches before the view's `limit` (Obsidian 1.15: "Showing 10 of 40").
+  const [totalMatches, setTotalMatches] = useState(0)
   const [queryError, setQueryError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -116,8 +118,9 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
+      const { rows: resultRows, total: resultTotal, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
+      setTotalMatches(resultTotal)
       setTruncated(resultTruncated)
       setQueryError(null)
     } catch (err) {
@@ -330,6 +333,11 @@ export const BasesView = memo(function BasesView({
       {truncated && !queryError && (
         <div className="bases-view__warning" role="status" aria-live="polite">
           Es werden nicht alle Treffer angezeigt — das Ergebnis wurde gekappt. Verfeinere die Filter, um alle passenden Notizen zu sehen.
+        </div>
+      )}
+      {!queryError && activeView?.limit !== undefined && totalMatches > rows.length && (
+        <div className="bases-view__hint" role="status" aria-live="polite">
+          {`Zeigt ${String(rows.length)} von ${String(totalMatches)} (Limit der Ansicht)`}
         </div>
       )}
       {pluginViewError && (
