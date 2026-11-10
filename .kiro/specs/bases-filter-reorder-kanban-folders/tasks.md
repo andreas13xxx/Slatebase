@@ -6,9 +6,9 @@ Jede Phase einzeln grün (lint, build, betroffene Tests) und separat committed; 
 
 ## Tasks
 
-- [ ] 1. Filterbaum-Funktionen
-  - [ ] 1.1 `components/bases/base-filter-tree.ts`: `moveNode`, `extractNode`, `appendNode`
-  - [ ] 1.2 Tests (neue Datei): Randfälle, Verschachtelung, `not`, keine Verluste/Duplikate
+- [x] 1. Filterbaum-Funktionen
+  - [x] 1.1 `components/bases/base-filter-tree.ts`: `moveNode`, `extractNode`, `appendNode`
+  - [x] 1.2 Tests (neue Datei): Randfälle, Verschachtelung, `not`, keine Verluste/Duplikate
   - _Requirements: 1.1, 1.5, 2.2, 2.3_
 
 - [ ] 2. Filter-Editor: Umsortieren und Ebenenwechsel
