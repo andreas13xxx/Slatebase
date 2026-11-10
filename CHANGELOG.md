@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.0](https://github.com/andreas13xxx/Slatebase/compare/v0.81.0...v0.82.0) (2026-11-10)
+
+
+### Features
+
+* Obsidian 1.14/1.15 Parität (API-Compat, akzent-unabhängige Suche, Bases) ([#355](https://github.com/andreas13xxx/Slatebase/issues/355)) ([da5e9ef](https://github.com/andreas13xxx/Slatebase/commit/da5e9ef6956415d6f43b51b7081db60ad3c455d9))
+
 ## [0.81.0](https://github.com/andreas13xxx/Slatebase/compare/v0.80.0...v0.81.0) (2026-11-09)
 
 
