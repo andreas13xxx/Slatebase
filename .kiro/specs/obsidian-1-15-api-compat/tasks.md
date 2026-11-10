@@ -6,11 +6,11 @@ Jede Phase ist einzeln grün (lint, build, betroffene Tests) und wird separat co
 
 ## Tasks
 
-- [ ] 1. FileManager: Löschen meldet Misserfolg
-  - [ ] 1.1 `trashFile` → `Promise<boolean>`, Fehler abfangen und warnen
-  - [ ] 1.2 `promptForDeletion` ergänzen, Proxy-Whitelist erweitern
-  - [ ] 1.3 Aufrufer von `trashFile` per grep prüfen und anpassen
-  - [ ] 1.4 Tests (neue Datei, z. B. `file-manager-shim.trash.test.ts`): Erfolg, Fehler → false, Abbruch → false
+- [x] 1. FileManager: Löschen meldet Misserfolg
+  - [x] 1.1 `trashFile` → `Promise<boolean>`, Fehler abfangen und warnen
+  - [x] 1.2 `promptForDeletion` ergänzen, Proxy-Whitelist erweitern
+  - [x] 1.3 Aufrufer von `trashFile` per grep prüfen und anpassen
+  - [x] 1.4 Tests (neue Datei, z. B. `file-manager-shim.trash.test.ts`): Erfolg, Fehler → false, Abbruch → false
   - _Requirements: 1.1–1.4_
 
 - [ ] 2. Mermaid-Alias und `loadPixi`

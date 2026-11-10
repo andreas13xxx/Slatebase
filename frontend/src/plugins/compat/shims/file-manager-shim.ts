@@ -41,8 +41,10 @@ export interface IFileManagerShim {
   createNewFolder(parentFolder: TFolder, name?: string): Promise<TFolder>;
   /** Create a new markdown file in the default new-file location and open it. */
   createAndOpenMarkdownFile(filename: string): Promise<TFile>;
-  /** Move a file to trash (soft-delete). Used by LiveSync and other plugins. */
-  trashFile(file: TFile): Promise<void>;
+  /** Move a file to trash (soft-delete). Resolves to `false` when it could not be trashed (Obsidian 1.15.1). */
+  trashFile(file: TFile): Promise<boolean>;
+  /** Ask the user, then trash the file or folder. Resolves to `false` if cancelled or trashing failed (Obsidian 1.15.1). */
+  promptForDeletion(file: TFile | TFolder): Promise<boolean>;
   /** Get an available path for an attachment file. */
   getAvailablePathForAttachment(filename: string, sourcePath?: string): Promise<string>;
 }
@@ -304,8 +306,25 @@ export class FileManagerShim implements IFileManagerShim {
    * Move a file to trash (soft-delete).
    * Delegates to vault.trash() which uses the backend's soft-delete mechanism.
    */
-  async trashFile(file: TFile): Promise<void> {
-    await this.vault.trash(file);
+  async trashFile(file: TFile): Promise<boolean> {
+    try {
+      await this.vault.trash(file);
+      return true;
+    } catch (err) {
+      console.warn('[FileManager] trashFile failed:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Ask the user for confirmation, then move the file or folder to trash.
+   * Resolves to `false` when the user cancels or trashing fails (Obsidian 1.15.1).
+   */
+  async promptForDeletion(file: TFile | TFolder): Promise<boolean> {
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (!window.confirm(`"${file.name}" löschen?`)) return false;
+    }
+    return this.trashFile(file as TFile);
   }
 
   /**
@@ -342,6 +361,7 @@ export class FileManagerShim implements IFileManagerShim {
       'promptForFileDeletion',
       'promptForFolderDeletion',
       'trashFile',
+      'promptForDeletion',
       'promptForFileRename',
       'getAvailablePathForAttachment',
     ]);
