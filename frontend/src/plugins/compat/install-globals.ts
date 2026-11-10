@@ -121,6 +121,7 @@ import { debugOnce, warnNoOp, warnOnce } from './log'
 import { isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
 import { createEmbedRegistryShim } from './embed-registry'
+import { closingMarkType } from '../../editor/token-class-node-prop'
 // Aliased: the Plugin methods below carry the same names and would read as
 // recursive calls otherwise.
 import {
@@ -147,7 +148,7 @@ import {
  * The wrapper intercepts `tree.iterate()` and `tree.cursor()` to provide adjusted
  * node boundaries when visiting InlineCode nodes with CodeMark children.
  */
-function createObsidianCompatSyntaxTree(
+export function createObsidianCompatSyntaxTree(
   originalSyntaxTree: typeof CmLanguage.syntaxTree
 ): typeof CmLanguage.syntaxTree {
   return function obsidianCompatSyntaxTree(
@@ -217,6 +218,21 @@ function createObsidianCompatSyntaxTree(
                           cursor.to = origTo
                         }
                       }
+                    }
+                  }
+                }
+                // Obsidian 1.15: closing formatting marks carry a `formatting-*-end` class.
+                if (name === 'CodeMark' || name === 'EmphasisMark') {
+                  const closing = closingMarkType(cursor.type)
+                  const parent = closing ? cursor.node?.parent : null
+                  const last = parent?.lastChild
+                  if (closing && parent && last && last.from === cursor.from && last.to === cursor.to && parent.firstChild?.from !== cursor.from) {
+                    const original = cursor.type
+                    cursor.type = closing
+                    try {
+                      return originalEnter(cursor)
+                    } finally {
+                      cursor.type = original
                     }
                   }
                 }

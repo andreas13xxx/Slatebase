@@ -28,8 +28,8 @@ Jede Phase ist einzeln grün (lint, build, betroffene Tests) und wird separat co
 
 - [x] 4. Schließende Formatierungs-Tokens
   - [x] 4.1 Echtes Obsidian-Verhalten verifizieren (Changelog 1.15.0, ggf. Obsidian-Typings/Plugin-Quellen), Ergebnis in `design.md` festhalten
-  - [x] 4.2 Entscheidung: bewusste Lücke, dokumentiert in `tech.md` (kein Parser-Wrapper)
-  - [x] 4.3 Entfällt (keine Code-Änderung)
+  - [x] 4.2 Umgesetzt im Plugin-`syntaxTree()`-Wrapper (`closingMarkType`), dokumentiert in `tech.md`
+  - [x] 4.3 Tests: `install-globals.closing-marks.test.ts`
   - _Requirements: 4.1–4.4_
 
 - [x] 5. API-Version und Doku
