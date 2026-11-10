@@ -3,6 +3,7 @@ import { Folder, Search } from 'lucide-react'
 import { useTranslation } from '../i18n'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import './MoveTargetDialog.css'
+import { foldForSearch, foldQuery } from '../utils/searchFold'
 
 export interface MoveTargetDialogProps {
   /** Display name of the file or folder being moved. */
@@ -28,9 +29,9 @@ export function MoveTargetDialog({ itemName, vaultName, folders, currentFolder, 
   const containerRef = useFocusTrap<HTMLDivElement>({ isActive: true, onEscape: onClose, returnFocusOnDeactivate: true })
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = foldQuery(query.trim())
     // Match what the row shows: the root by its label and the vault name, others by their full path.
-    const matches = (path: string) => (path === '' ? `${t('moveDialog.vaultRoot')} ${vaultName}` : path).toLowerCase().includes(q)
+    const matches = (path: string) => foldForSearch(path === '' ? `${t('moveDialog.vaultRoot')} ${vaultName}` : path).text.includes(q)
     return [...folders].sort((a, b) => a.localeCompare(b)).filter(matches)
   }, [folders, query, vaultName, t])
 

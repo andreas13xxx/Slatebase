@@ -25,13 +25,13 @@ Zuerst die Fold-Funktion mit Tests, dann Stelle für Stelle anbinden. Jede Phase
   - _Requirements: 3.1–3.3, 3.6_
 
 - [ ] 4. Filter in Seitenpanels und Bases
-  - [ ] 4.1 Vorhandene Filter in Backlinks, Outline, Bookmarks, Tags suchen und anbinden
-  - [ ] 4.2 Bases-Suche anbinden
-  - [ ] 4.3 Tests
+  - [x] 4.1 Filter gesucht: Backlinks, Outline, Bookmarks und Tags haben kein Textfilter-Feld; angebunden wurden stattdessen `MoveTargetDialog` und `TemplateSelector`
+  - [x] 4.2 Bases hat noch keine Suche; entfällt (Folgepunkt, falls Bases-Suche ergänzt wird)
+  - [x] 4.3 Tests (`MoveTargetDialog.accents.test.tsx`)
   - _Requirements: 3.4–3.5_
 
 - [ ] 5. Abgrenzung und Doku
-  - [ ] 5.1 Backend-Suche auf Akzent-Verhalten prüfen und Ergebnis als Folgepunkt in der Doku vermerken
-  - [ ] 5.2 Doku: Suchverhalten (Umlaute → Grundbuchstabe, kein `ae`-Mapping) beschreiben
-  - [ ] 5.3 Verbraucher-Tests laufen lassen (nur betroffene Ordner, `--testTimeout=60000`)
+  - [x] 5.1 Backend-Suche (`search-service.ts`) ist nur case-insensitive (`toLowerCase`), Folgepunkt in `structure.md` vermerkt
+  - [x] 5.2 Doku in `product.md` und `structure.md`
+  - [x] 5.3 Verbraucher-Tests laufen lassen (nur betroffene Ordner, `--testTimeout=60000`)
   - _Requirements: 4.1–4.2_

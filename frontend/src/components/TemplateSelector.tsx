@@ -5,6 +5,7 @@ import { showToast } from './ToastNotification'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { substituteTemplatePlaceholders } from '../utils/templatePlaceholders'
 import './TemplateSelector.css'
+import { foldForSearch, foldQuery } from '../utils/searchFold'
 
 /**
  * Template entry returned by the API.
@@ -389,6 +390,6 @@ export function TemplateSelector({
  */
 function filterTemplates(templates: TemplateEntry[], query: string): TemplateEntry[] {
   if (!query) return templates
-  const lowerQuery = query.toLowerCase()
-  return templates.filter(t => t.name.toLowerCase().includes(lowerQuery))
+  const lowerQuery = foldQuery(query)
+  return templates.filter(t => foldForSearch(t.name).text.includes(lowerQuery))
 }
