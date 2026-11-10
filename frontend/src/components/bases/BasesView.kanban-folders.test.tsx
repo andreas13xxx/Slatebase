@@ -51,9 +51,9 @@ function makeApi(overrides: Partial<Record<string, unknown>> = {}) {
   } as unknown as IApiClient
 }
 
-async function dragAToArchiv(apiClient: IApiClient): Promise<void> {
+async function dragAToArchiv(apiClient: IApiClient, onNoteMoved?: (o: string, n: string) => void): Promise<void> {
   render(
-    <BasesView apiClient={apiClient} vaultId="v1" source={folderSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
+    <BasesView apiClient={apiClient} vaultId="v1" source={folderSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} onNoteMoved={onNoteMoved} />,
   )
   await waitFor(() => expect(screen.getByText('Task A')).toBeTruthy())
   const data = dt()
@@ -70,6 +70,22 @@ describe('BasesView Kanban by file.folder', () => {
     await waitFor(() => expect(apiClient.moveContent).toHaveBeenCalledWith('v1', 'Projekte/a.md', 'Archiv/a.md'))
     expect(apiClient.fetchFileContent).not.toHaveBeenCalled()
     expect(apiClient.saveFile).not.toHaveBeenCalled()
+  })
+
+  it('tells the host about the move and re-queries the rows', async () => {
+    const apiClient = makeApi()
+    const onNoteMoved = vi.fn()
+    await dragAToArchiv(apiClient, onNoteMoved)
+    await waitFor(() => expect(onNoteMoved).toHaveBeenCalledWith('Projekte/a.md', 'Archiv/a.md'))
+    await waitFor(() => expect(apiClient.queryBase).toHaveBeenCalledTimes(2))
+  })
+
+  it('does not notify the host when the move fails', async () => {
+    const apiClient = makeApi({ moveContent: vi.fn().mockRejectedValue(new Error('nope')) })
+    const onNoteMoved = vi.fn()
+    await dragAToArchiv(apiClient, onNoteMoved)
+    await screen.findByText(/nope/)
+    expect(onNoteMoved).not.toHaveBeenCalled()
   })
 
   it('shows an error and leaves the card when the move fails', async () => {

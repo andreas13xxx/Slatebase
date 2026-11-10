@@ -58,6 +58,11 @@ export interface BasesViewProps {
   /** Persist new `.base` file content (sort change, raw-source apply). */
   onSaveSource: (yaml: string) => void
   /**
+   * Called after a note was moved to another folder from inside the view (a Kanban card dragged
+   * between `file.folder` columns), so the host can update open tabs, favorites and shares.
+   */
+  onNoteMoved?: (oldPath: string, newPath: string) => void
+  /**
    * `view` (default) renders the base; `source` shows its YAML. Owned by the host (the tab's mode,
    * switched from the breadcrumb), not by the view itself.
    */
@@ -67,7 +72,7 @@ export interface BasesViewProps {
 }
 
 export const BasesView = memo(function BasesView({
-  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, mode = 'view', onShowView,
+  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, onNoteMoved, mode = 'view', onShowView,
 }: BasesViewProps) {
   // Leaving source mode goes through a ref: the host passes a fresh callback every render, and the
   // `bases:*` controller effect below must not re-register on each of them.
@@ -222,6 +227,9 @@ export const BasesView = memo(function BasesView({
     }, 'Zelle konnte nicht gespeichert werden')
   }, [writeFrontmatter])
 
+  const onNoteMovedRef = useRef(onNoteMoved)
+  useEffect(() => { onNoteMovedRef.current = onNoteMoved }, [onNoteMoved])
+
   // Move a Kanban card to another column: write the grouping property of the
   // dragged note's frontmatter to the target column's value ('' clears it).
   const handleMoveCard = useCallback((path: string, property: string, newValue: string) => {
@@ -229,7 +237,13 @@ export const BasesView = memo(function BasesView({
       // Columns are folders: move the note itself (links are updated by the vault move).
       const target = folderMoveTarget(path, newValue)
       if (target === null) return
-      void apiClient.moveContent(vaultId, path, target).catch((err: unknown) => {
+      void apiClient.moveContent(vaultId, path, target).then(() => {
+        // The backend's vault:change excludes the user who made the change, so refresh by hand
+        // (rows + File Explorer tree) and let the host re-point tabs, favorites and shares.
+        onNoteMovedRef.current?.(path, target)
+        void runQueryRef.current()
+        requestVaultTreeRefresh(vaultId)
+      }).catch((err: unknown) => {
         setQueryError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
       })
       return
