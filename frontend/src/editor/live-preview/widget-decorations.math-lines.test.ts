@@ -35,3 +35,28 @@ describe('block math line class (Obsidian 1.14)', () => {
     expect(lineClassStarts('just text\n\nmore')).toEqual([])
   })
 })
+
+describe('block math line class in a mounted Live Preview view', () => {
+  it('renders without errors and marks the visible block line', async () => {
+    const { EditorView } = await import('@codemirror/view')
+    const { createLivePreviewField } = await import('./live-preview-extension')
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    const view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: 'intro\n\n$$\na = b\nc = d\n$$\n\noutro',
+        extensions: [markdown({ extensions: GFM }), createLivePreviewField({ vaultId: 'v1', directoryTree: null })],
+      }),
+    })
+    try {
+      expect(view.dom.querySelector('.HyperMD-math')).not.toBeNull()
+      // Cursor inside the block reveals its source lines; they keep the class.
+      view.dispatch({ selection: { anchor: view.state.doc.line(4).from } })
+      expect(view.dom.querySelectorAll('.HyperMD-math').length).toBeGreaterThan(0)
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
+  })
+})
