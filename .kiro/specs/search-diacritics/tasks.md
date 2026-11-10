@@ -11,10 +11,10 @@ Zuerst die Fold-Funktion mit Tests, dann Stelle für Stelle anbinden. Jede Phase
   - [x] 1.2 Tests (neue Datei `searchFold.test.ts`): Sonderbuchstaben-Tabelle, Umlaute, `ß→ss`, Offsets, ASCII-Schnellpfad, Surrogatpaare
   - _Requirements: 1.1–1.4_
 
-- [ ] 2. Plugin-API
-  - [ ] 2.1 `prepareFuzzySearch`/`prepareSimpleSearch` auf Fold umstellen, Matches auf Originaltext abbilden
-  - [ ] 2.2 `fallbackPrepareSearch` und `fuzzyMatchText` angleichen (möglichst gemeinsame Implementierung statt Kopien)
-  - [ ] 2.3 Tests in neuer Datei; bestehende `install-globals.test.ts` unverändert lassen und mitlaufen lassen
+- [x] 2. Plugin-API
+  - [x] 2.1 `prepareFuzzySearch`/`prepareSimpleSearch` auf Fold umstellen, Matches auf Originaltext abbilden
+  - [x] 2.2 `fuzzyMatchText`/FuzzySuggestModal auf Fold umgestellt (`fallbackPrepareSearch` ist ein reiner Stub ohne Match-Logik, unverändert)
+  - [x] 2.3 Tests in neuer Datei; bestehende `install-globals.test.ts` unverändert lassen und mitlaufen lassen
   - _Requirements: 2.1–2.3_
 
 - [ ] 3. Quick Switcher, Link-Vorschläge, Befehlspalette

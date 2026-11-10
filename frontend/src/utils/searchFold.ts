@@ -90,3 +90,16 @@ export function mergeRanges(ranges: Array<[number, number]>): Array<[number, num
   }
   return merged
 }
+
+/**
+ * Maps half-open match ranges found in `folded.text` back onto the original
+ * text. Returns the input unchanged when the fold did not move any position.
+ */
+export function mapFoldedMatches(
+  folded: FoldedText,
+  original: string,
+  matches: Array<[number, number]>,
+): Array<[number, number]> {
+  if (!folded.map) return matches
+  return mergeRanges(matches.map(([from, to]) => toOriginalRange(folded, original, from, to)))
+}
