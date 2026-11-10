@@ -4,7 +4,7 @@
  * when its expression can be split that way, otherwise the raw expression.
  */
 
-import { memo, useCallback, useEffect, useState, type DragEvent } from 'react'
+import { memo, useCallback, useState, type DragEvent } from 'react'
 import type { BaseFilterNode } from '@slatebase/shared-contracts'
 import {
   addFilterChild, childrenOf, conditionToExpression, groupKeyOf, parseCondition, removeFilterNode,
@@ -33,7 +33,12 @@ export const CommitInput = memo(function CommitInput({
   className?: string
 }) {
   const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  // Follow external value changes (e.g. after the file round-trip) without an effect.
+  const [seenValue, setSeenValue] = useState(value)
+  if (value !== seenValue) {
+    setSeenValue(value)
+    setDraft(value)
+  }
   const commit = useCallback(() => { if (draft !== value) onCommit(draft) }, [draft, value, onCommit])
   return (
     <input

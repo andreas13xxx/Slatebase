@@ -32,11 +32,17 @@ const SPECIAL_LETTERS: Readonly<Record<string, string>> = {
   'þ': 'th',
 }
 
-const ASCII_ONLY = /^[\x00-\x7f]*$/
 const COMBINING_MARK = /\p{M}/u
 
+function isAscii(input: string): boolean {
+  for (let i = 0; i < input.length; i++) {
+    if (input.charCodeAt(i) > 0x7f) return false
+  }
+  return true
+}
+
 export function foldForSearch(input: string): FoldedText {
-  if (ASCII_ONLY.test(input)) return { text: input.toLowerCase(), map: null }
+  if (isAscii(input)) return { text: input.toLowerCase(), map: null }
 
   let out = ''
   const map: number[] = []
