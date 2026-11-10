@@ -987,3 +987,56 @@
   color: var(--text-subtle);
   font-weight: 400;
 }
+
+/* Filter rows: reorder handle + up/down + scope move (Obsidian 1.14/1.15) */
+.bases-tb__row-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  position: relative;
+}
+
+.bases-tb__row-tools {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+.bases-tb__row-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bases-tb__grip {
+  cursor: grab;
+  color: var(--text-subtle);
+  padding: 0 4px;
+  user-select: none;
+  line-height: 1;
+}
+
+.bases-tb__row-wrap--dragging {
+  opacity: 0.5;
+}
+
+.bases-tb__row--drop-before::before,
+.bases-tb__row--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--text-accent);
+  pointer-events: none;
+}
+
+.bases-tb__row--drop-before::before { top: -2px; }
+.bases-tb__row--drop-after::after { bottom: -2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bases-tb__row-wrap {
+    transition: opacity 120ms ease;
+  }
+}

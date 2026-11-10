@@ -4,13 +4,14 @@
  * when its expression can be split that way, otherwise the raw expression.
  */
 
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useState, type DragEvent } from 'react'
 import type { BaseFilterNode } from '@slatebase/shared-contracts'
 import {
   addFilterChild, childrenOf, conditionToExpression, groupKeyOf, parseCondition, removeFilterNode,
   OPERATOR_LABELS, replaceFilterNode, setGroupKey, VALUELESS_OPERATORS,
   type ColumnChoice, type Condition, type FilterGroupKey, type FilterPath, type Operator,
 } from './base-edit'
+import { moveFilterNode, nudgeFilterNode } from './base-filter-tree'
 
 const GROUP_LABELS: Record<FilterGroupKey, string> = {
   and: 'Alle Bedingungen treffen zu',
@@ -128,18 +129,64 @@ const ConditionRow = memo(function ConditionRow({ expression, columns, disabled,
   )
 })
 
+/** Moves a filter node to the other scope ("this view" ↔ "all views"). */
+export interface ScopeMove {
+  label: string
+  onMove: (path: FilterPath) => void
+}
+
 interface GroupEditorProps {
   node: BaseFilterNode
   path: FilterPath
   columns: ColumnChoice[]
   disabled: boolean
   onChange: (update: RootUpdate) => void
+  scopeMove?: ScopeMove
 }
 
-const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, onChange }: GroupEditorProps) {
+/** Handle, up/down and scope-move controls of one row. Hidden while the base is read-only. */
+function RowTools({ index, count, kind, scopeMove, path, onChange, onDragStart, onDragEnd }: {
+  index: number
+  count: number
+  kind: 'Bedingung' | 'Gruppe'
+  scopeMove?: ScopeMove
+  path: FilterPath
+  onChange: (update: RootUpdate) => void
+  onDragStart: (e: DragEvent<HTMLSpanElement>) => void
+  onDragEnd: () => void
+}) {
+  return (
+    <div className="bases-tb__row-tools">
+      {count > 1 && (
+        <>
+          <span
+            className="bases-tb__grip"
+            draggable
+            title="Ziehen zum Umsortieren"
+            aria-hidden="true"
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+          >
+            ⠿
+          </span>
+          <button type="button" className="bases-tb__icon-btn" aria-label={`${kind} nach oben`} title={`${kind} nach oben`} disabled={index === 0} onClick={() => onChange((r) => nudgeFilterNode(r, path, -1))}>↑</button>
+          <button type="button" className="bases-tb__icon-btn" aria-label={`${kind} nach unten`} title={`${kind} nach unten`} disabled={index === count - 1} onClick={() => onChange((r) => nudgeFilterNode(r, path, 1))}>↓</button>
+        </>
+      )}
+      {scopeMove && (
+        <button type="button" className="bases-tb__icon-btn" aria-label={scopeMove.label} title={scopeMove.label} onClick={() => scopeMove.onMove(path)}>⇄</button>
+      )}
+    </div>
+  )
+}
+
+const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, onChange, scopeMove }: GroupEditorProps) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
   const key = groupKeyOf(node)
   if (key === null) return null
   const children = childrenOf(node)
+  const endDrag = () => { setDragIndex(null); setOverIndex(null) }
   return (
     <div className={path.length === 0 ? 'bases-tb__group' : 'bases-tb__group bases-tb__group--nested'}>
       <div className="bases-tb__group-head">
@@ -158,9 +205,8 @@ const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, o
       </div>
       {children.map((child, i) => {
         const childPath = [...path, i]
-        return typeof child === 'string' ? (
+        const content = typeof child === 'string' ? (
           <ConditionRow
-            key={i}
             expression={child}
             columns={columns}
             disabled={disabled}
@@ -168,7 +214,36 @@ const GroupEditor = memo(function GroupEditor({ node, path, columns, disabled, o
             onRemove={() => onChange((r) => removeFilterNode(r, childPath))}
           />
         ) : (
-          <GroupEditor key={i} node={child} path={childPath} columns={columns} disabled={disabled} onChange={onChange} />
+          <GroupEditor node={child} path={childPath} columns={columns} disabled={disabled} onChange={onChange} scopeMove={scopeMove} />
+        )
+        if (disabled) return <div key={i}>{content}</div>
+        const dropClass = dragIndex !== null && overIndex === i && dragIndex !== i
+          ? (dragIndex < i ? ' bases-tb__row--drop-after' : ' bases-tb__row--drop-before')
+          : ''
+        return (
+          <div
+            key={i}
+            className={`bases-tb__row-wrap${dragIndex === i ? ' bases-tb__row-wrap--dragging' : ''}${dropClass}`}
+            onDragOver={dragIndex === null ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIndex !== i) setOverIndex(i) }}
+            onDrop={dragIndex === null ? undefined : (e) => {
+              e.preventDefault()
+              const from = dragIndex
+              endDrag()
+              if (from !== i) onChange((r) => moveFilterNode(r, [...path, from], i))
+            }}
+          >
+            <RowTools
+              index={i}
+              count={children.length}
+              kind={typeof child === 'string' ? 'Bedingung' : 'Gruppe'}
+              scopeMove={scopeMove}
+              path={childPath}
+              onChange={onChange}
+              onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); setDragIndex(i) }}
+              onDragEnd={endDrag}
+            />
+            <div className="bases-tb__row-content">{content}</div>
+          </div>
         )
       })}
       {!disabled && (
@@ -194,8 +269,10 @@ export interface BasesFilterEditorProps {
   columns: ColumnChoice[]
   disabled: boolean
   onChange: (update: RootUpdate) => void
+  /** Offers "move to the other scope" on every row when given. */
+  scopeMove?: ScopeMove
 }
 
-export const BasesFilterEditor = memo(function BasesFilterEditor({ root, columns, disabled, onChange }: BasesFilterEditorProps) {
-  return <GroupEditor node={root} path={[]} columns={columns} disabled={disabled} onChange={onChange} />
+export const BasesFilterEditor = memo(function BasesFilterEditor({ root, columns, disabled, onChange, scopeMove }: BasesFilterEditorProps) {
+  return <GroupEditor node={root} path={[]} columns={columns} disabled={disabled} onChange={onChange} scopeMove={scopeMove} />
 })

@@ -770,6 +770,7 @@ src/
 │   ├── bases/                    — Bases table UI (feature `bases`); routed from `TabContent.tsx` for `.base` files
 │   │   ├── BasesView.tsx         — Container: parse → query → render table / raw-source toggle, error state, `vault:change` live-refresh, cell-commit (frontmatter save), sort write-back
 │   │   ├── BasesTableView.tsx    — Sortable table: one row per note, property cells editable, formula columns evaluated client-side (read-only)
+│   │   ├── base-filter-tree.ts   — Pure helpers to rearrange a filter tree: `moveFilterNode`/`nudgeFilterNode` (reorder inside a group), `moveFilterBetweenScopes` ("this view" ↔ "all views"). Used by `BasesFilterEditor` (grip drag via native HTML5 DnD on the handle only, plus ↑/↓ buttons as keyboard/touch path, and a ⇄ scope-move button per row; none of it while read-only)
 │   │   ├── BasesKanbanView.tsx   — Cards/Kanban view (`type: cards`): groups rows into collapsible columns by `view.groupBy`, cards link to their note and show other columns as chips; drag-between-columns rewrites the groupBy property
 │   │   ├── BaseCell.tsx          — One cell: formula/`file.*` read-only, property editable via the Properties-editor controls (`useCommitOnUnmount` semantics inherited)
 │   │   ├── base-cell-type.ts     — `inferCellType()` + `BaseCellType` (kept out of the component files for the react-refresh single-export rule)

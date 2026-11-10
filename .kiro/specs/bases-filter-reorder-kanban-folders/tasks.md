@@ -11,12 +11,12 @@ Jede Phase einzeln grün (lint, build, betroffene Tests) und separat committed; 
   - [x] 1.2 Tests (neue Datei): Randfälle, Verschachtelung, `not`, keine Verluste/Duplikate
   - _Requirements: 1.1, 1.5, 2.2, 2.3_
 
-- [ ] 2. Filter-Editor: Umsortieren und Ebenenwechsel
-  - [ ] 2.1 Griff, Zeiger-basiertes Ziehen, Einfügemarkierung, Animation (reduced-motion beachten)
-  - [ ] 2.2 Menüeinträge „Nach oben/unten“ und „Zu allen Ansichten / Zu dieser Ansicht verschieben“
-  - [ ] 2.3 Anbindung an `setDocFilter`/`setViewFilter` in einer Transaktion; `disabled` respektieren
-  - [ ] 2.4 Komponenten- und axe-Tests (Timeout ~30 s)
-  - [ ] 2.5 Doku
+- [x] 2. Filter-Editor: Umsortieren und Ebenenwechsel
+  - [x] 2.1 Griff, Ziehen am Griff (HTML5-DnD), Einfügemarkierung, Animation (reduced-motion beachten)
+  - [x] 2.2 Menüeinträge „Nach oben/unten“ und „Zu allen Ansichten / Zu dieser Ansicht verschieben“
+  - [x] 2.3 Anbindung an `setDocFilter`/`setViewFilter` in einer Transaktion; `disabled` respektieren
+  - [x] 2.4 Komponenten- und axe-Tests (Timeout ~30 s)
+  - [x] 2.5 Doku
   - _Requirements: 1.1–1.5, 2.1–2.3_
 
 - [ ] 3. Kanban nach Ordner

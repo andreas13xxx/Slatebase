@@ -17,6 +17,7 @@ import {
   type ColumnChoice,
 } from './base-edit'
 import { BasesFilterEditor, CommitInput } from './BasesFilterEditor'
+import { moveFilterBetweenScopes } from './base-filter-tree'
 
 export type BasesMode = 'view' | 'source'
 export type DocUpdate = (doc: BaseDocument) => BaseDocument
@@ -260,6 +261,10 @@ const FilterPanel = memo(function FilterPanel({ doc, index, columns, disabled, o
         root={rootGroup(node)}
         columns={columns}
         disabled={disabled}
+        scopeMove={{
+          label: scope === 'view' ? 'Zu allen Ansichten verschieben' : 'Zu dieser Ansicht verschieben',
+          onMove: (path) => onChange((d) => moveFilterBetweenScopes(d, index, scope === 'view' ? 'view' : 'all', path)),
+        }}
         onChange={(update) => onChange((d) => (scope === 'view'
           ? setViewFilter(d, index, update(rootGroup(d.views[index]?.filters)))
           : setDocFilter(d, update(rootGroup(d.filters)))))}
