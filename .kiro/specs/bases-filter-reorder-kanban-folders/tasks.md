@@ -19,13 +19,13 @@ Jede Phase einzeln grün (lint, build, betroffene Tests) und separat committed; 
   - [x] 2.5 Doku
   - _Requirements: 1.1–1.5, 2.1–2.3_
 
-- [ ] 3. Kanban nach Ordner
-  - [ ] 3.1 Per grep klären, wo `onMoveCard` implementiert wird; Pfad für `file.folder` verzweigen
-  - [ ] 3.2 Vault-Verschiebung inkl. Link-Aktualisierung und Fehlerbehandlung (Karte bleibt, Meldung)
-  - [ ] 3.3 Neue Notiz in Spalte im Ordner der Spalte anlegen (`base-add-item.ts`)
-  - [ ] 3.4 Spaltenname für Wurzelordner
-  - [ ] 3.5 Tests (neue Datei neben `BasesKanbanView.test.tsx`)
-  - [ ] 3.6 Doku
+- [x] 3. Kanban nach Ordner
+  - [x] 3.1 Per grep klären, wo `onMoveCard` implementiert wird; Pfad für `file.folder` verzweigen
+  - [x] 3.2 Vault-Verschiebung inkl. Link-Aktualisierung und Fehlerbehandlung (Karte bleibt, Meldung)
+  - [x] 3.3 Neue Notiz in Spalte im Ordner der Spalte anlegen (`base-add-item.ts`)
+  - [x] 3.4 Spaltenname für Wurzelordner
+  - [x] 3.5 Tests (neue Datei neben `BasesKanbanView.test.tsx`)
+  - [x] 3.6 Doku
   - _Requirements: 3.1–3.5_
 
 - [ ] 4. Limit-Hinweis und Standardname

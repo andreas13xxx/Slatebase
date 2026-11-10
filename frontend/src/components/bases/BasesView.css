@@ -501,6 +501,22 @@
   cursor: grabbing;
 }
 
+.bases-kanban__add {
+  appearance: none;
+  border: 1px dashed var(--border-default);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.bases-kanban__add:hover {
+  color: var(--text-normal);
+  border-color: var(--text-muted);
+}
+
 .bases-kanban__column--drop-target {
   border-color: var(--accent);
   background: var(--bg-elevated);

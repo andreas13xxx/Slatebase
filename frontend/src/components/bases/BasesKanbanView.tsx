@@ -19,6 +19,7 @@ import type { DragEvent } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue } from '@slatebase/shared-contracts'
+import { FOLDER_GROUP_PROPERTY, ROOT_FOLDER_LABEL } from './base-folder-move'
 
 export interface BasesKanbanViewProps {
   doc: BaseDocument
@@ -32,6 +33,11 @@ export interface BasesKanbanViewProps {
    * when the view is read-only — cards are then not draggable.
    */
   onMoveCard?: (path: string, groupByProperty: string, newValue: string) => void
+  /**
+   * Create a new note in a folder column (only offered when grouped by
+   * `file.folder`; '' is the vault root). Omitted when the view is read-only.
+   */
+  onAddCard?: (folder: string) => void
 }
 
 /** Sentinel key for the "no value for the grouping property" column. */
@@ -55,7 +61,7 @@ interface KanbanColumn {
 }
 
 export const BasesKanbanView = memo(function BasesKanbanView({
-  doc, view, rows, onOpenNote, onMoveCard,
+  doc, view, rows, onOpenNote, onMoveCard, onAddCard,
 }: BasesKanbanViewProps) {
   // The grouping property name (the new `groupBy` is an object `{property, direction}`).
   const groupBy = view.groupBy?.property
@@ -86,6 +92,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
 
   const columns = useMemo<KanbanColumn[]>(() => {
     if (!groupBy) return []
+    const ungroupedLabel = groupBy === FOLDER_GROUP_PROPERTY ? ROOT_FOLDER_LABEL : `Ohne ${columnLabel(groupBy)}`
     const byValue = new Map<string, BaseRow[]>()
     const order: string[] = []
     for (const row of rows) {
@@ -107,13 +114,13 @@ export const BasesKanbanView = memo(function BasesKanbanView({
       const listed = wanted.filter((key, i) => wanted.indexOf(key) === i)
       return listed.map((key) => ({
         key,
-        label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
+        label: key === UNGROUPED ? ungroupedLabel : key,
         rows: byValue.get(key) ?? [],
       }))
     }
     return order.map((key) => ({
       key,
-      label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
+      label: key === UNGROUPED ? ungroupedLabel : key,
       rows: byValue.get(key)!,
     }))
   }, [groupBy, rows, columnLabel, view.groupOrder])
@@ -253,6 +260,15 @@ export const BasesKanbanView = memo(function BasesKanbanView({
                     })}
                   </button>
                 ))}
+                {onAddCard && groupBy === FOLDER_GROUP_PROPERTY && (
+                  <button
+                    type="button"
+                    className="bases-kanban__add"
+                    onClick={() => onAddCard(column.key === UNGROUPED ? '' : column.key)}
+                  >
+                    + Neue Notiz
+                  </button>
+                )}
               </div>
             )}
           </section>

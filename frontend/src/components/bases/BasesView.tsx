@@ -34,6 +34,7 @@ import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 import { sortRowsByFormula } from './base-formula-sort'
+import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
 
 // Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
 const BasesMapView = lazy(() => import('./BasesMapView').then((m) => ({ default: m.BasesMapView })))
@@ -208,11 +209,20 @@ export const BasesView = memo(function BasesView({
   // Move a Kanban card to another column: write the grouping property of the
   // dragged note's frontmatter to the target column's value ('' clears it).
   const handleMoveCard = useCallback((path: string, property: string, newValue: string) => {
+    if (property === FOLDER_GROUP_PROPERTY) {
+      // Columns are folders: move the note itself (links are updated by the vault move).
+      const target = folderMoveTarget(path, newValue)
+      if (target === null) return
+      void apiClient.moveContent(vaultId, path, target).catch((err: unknown) => {
+        setQueryError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
+      })
+      return
+    }
     void writeFrontmatter(path, (fm) => {
       if (newValue === '') fm[property] = undefined
       else fm[property] = newValue
     }, 'Karte konnte nicht verschoben werden')
-  }, [writeFrontmatter])
+  }, [writeFrontmatter, apiClient, vaultId])
 
   // Write a sort change back into the selected view in the `.base` file.
   const handleSortChange = useCallback((sort: BaseSortClause[]) => {
@@ -232,6 +242,26 @@ export const BasesView = memo(function BasesView({
     pendingDocRef.current = next
     onSaveSource(serializeBase(next))
   }, [readOnly, doc, onSaveSource])
+
+  // Create a blank note shaped like this base (its property columns) in `folder`
+  // and open it. Used by the `bases:add-item` command and the Kanban folder columns.
+  const createNote = useCallback(async (folder: string): Promise<string | null> => {
+    if (!doc) return null
+    const view = doc.views[safeIndex]
+    const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
+      (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
+    )
+    const frontmatter = buildBlankFrontmatter(columns, doc, view)
+    try {
+      // Resolve a non-colliding file name under the target folder.
+      const path = await resolveNewNotePath(apiClient, vaultId, folder, 'Unbenannt')
+      await apiClient.saveFile(vaultId, path, frontmatter)
+      onOpenNote(path)
+      return path
+    } catch {
+      return null
+    }
+  }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
 
   // Expose this base to the `bases:*` core commands (single-active-instance,
   // same as activeCanvasBridge).
@@ -262,29 +292,11 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
-      addItem: async () => {
-        if (!doc) return null
-        const view = doc.views[safeIndex]
-        const folder = deriveBaseScopeFolder(doc, view)
-        const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
-          (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
-        )
-        const frontmatter = buildBlankFrontmatter(columns, doc, view)
-        const baseName = 'Unbenannt'
-        try {
-          // Resolve a non-colliding file name under the target folder.
-          const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
-          await apiClient.saveFile(vaultId, path, frontmatter)
-          onOpenNote(path)
-          return path
-        } catch {
-          return null
-        }
-      },
+      addItem: () => createNote(doc ? deriveBaseScopeFolder(doc, doc.views[safeIndex]) : ''),
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, apiClient, vaultId, onOpenNote, showView])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, createNote, showView])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -350,6 +362,7 @@ export const BasesView = memo(function BasesView({
           rows={displayRows}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
+          onAddCard={readOnly ? undefined : (folder) => { void createNote(folder) }}
         />
       )}
 
