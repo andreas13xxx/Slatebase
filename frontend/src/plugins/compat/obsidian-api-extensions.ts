@@ -833,7 +833,15 @@ export function getBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
  */
 export async function loadMermaid(): Promise<unknown> {
   const mod = await import('mermaid');
-  return mod.default ?? mod;
+  const mermaid = mod.default ?? mod;
+  // Obsidian 1.15 exposes the renderer as `window.mermaid` and, once loaded, as
+  // `window.pele`. Both point at the same object here (Slatebase keeps real Mermaid).
+  if (typeof window !== 'undefined') {
+    const w = window as unknown as { mermaid?: unknown; pele?: unknown };
+    w.mermaid = mermaid;
+    w.pele = mermaid;
+  }
+  return mermaid;
 }
 
 /**
@@ -856,6 +864,8 @@ function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
 
   if (!obs['loadPrism']) obs['loadPrism'] = unavailable('loadPrism', 'Prism');
   if (!obs['loadPdfJs']) obs['loadPdfJs'] = unavailable('loadPdfJs', 'PDF.js');
+  // Obsidian 1.15 loads PIXI lazily on first graph open; Slatebase's graph does not use it.
+  if (!obs['loadPixi']) obs['loadPixi'] = unavailable('loadPixi', 'PIXI');
 
   // KaTeX-backed math rendering
   if (!obs['loadMathJax']) {
