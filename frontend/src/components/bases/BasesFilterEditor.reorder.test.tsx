@@ -72,6 +72,17 @@ describe('BasesFilterEditor — reorder (Obsidian 1.14/1.15)', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('clears the dragging state when pointer capture is lost without a pointerup', () => {
+    const { container, onChange } = setup(root())
+    const grips = container.querySelectorAll('.bases-tb__grip')
+    stackRows(container)
+    fireEvent.pointerDown(grips[0]!, { pointerId: 1, pointerType: 'mouse', button: 0, clientY: 5 })
+    expect(container.querySelector('.bases-tb__row-wrap--dragging')).not.toBeNull()
+    fireEvent.lostPointerCapture(grips[0]!, { pointerId: 1 })
+    expect(container.querySelector('.bases-tb__row-wrap--dragging')).toBeNull()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('cancels a drag on pointercancel without changing anything', () => {
     const { container, onChange } = setup(root())
     const grips = container.querySelectorAll('.bases-tb__grip')

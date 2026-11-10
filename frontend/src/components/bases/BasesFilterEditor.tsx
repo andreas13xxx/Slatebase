@@ -160,6 +160,7 @@ interface GripHandlers {
   onPointerMove: (e: ReactPointerEvent<HTMLSpanElement>) => void
   onPointerUp: (e: ReactPointerEvent<HTMLSpanElement>) => void
   onPointerCancel: () => void
+  onLostPointerCapture: () => void
 }
 
 /** Handle, up/down and scope-move controls of one row. Hidden while the base is read-only. */
@@ -218,6 +219,7 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
   const gripFor = (i: number): GripHandlers => ({
     onPointerDown: (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      e.preventDefault() // no text selection while dragging
       e.currentTarget.setPointerCapture?.(e.pointerId)
       setDragIndex(i)
       setOverIndex(i)
@@ -236,6 +238,9 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
       if (from !== to) onChange((r) => moveFilterNode(r, [...path, from], to))
     },
     onPointerCancel: endDrag,
+    // The grip was removed (e.g. the file round-trip re-rendered the list) or capture was taken away:
+    // never leave a row stuck in its "dragging" state.
+    onLostPointerCapture: endDrag,
   })
   return (
     <div className={path.length === 0 ? 'bases-tb__group' : 'bases-tb__group bases-tb__group--nested'}>
