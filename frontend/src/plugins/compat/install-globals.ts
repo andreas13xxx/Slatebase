@@ -111,6 +111,7 @@ import {
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { VaultShim } from './shims/vault-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
+import { foldForSearch, foldQuery, mapFoldedMatches } from '../../utils/searchFold'
 import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions, dispatchKeydownToScopeStack, Scope, renderMatches } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
@@ -120,6 +121,7 @@ import { debugOnce, warnNoOp, warnOnce } from './log'
 import { isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
 import { createEmbedRegistryShim } from './embed-registry'
+import { closingMarkType } from '../../editor/token-class-node-prop'
 // Aliased: the Plugin methods below carry the same names and would read as
 // recursive calls otherwise.
 import {
@@ -146,7 +148,7 @@ import {
  * The wrapper intercepts `tree.iterate()` and `tree.cursor()` to provide adjusted
  * node boundaries when visiting InlineCode nodes with CodeMark children.
  */
-function createObsidianCompatSyntaxTree(
+export function createObsidianCompatSyntaxTree(
   originalSyntaxTree: typeof CmLanguage.syntaxTree
 ): typeof CmLanguage.syntaxTree {
   return function obsidianCompatSyntaxTree(
@@ -219,6 +221,21 @@ function createObsidianCompatSyntaxTree(
                     }
                   }
                 }
+                // Obsidian 1.15: closing formatting marks carry a `formatting-*-end` class.
+                if (name === 'CodeMark' || name === 'EmphasisMark') {
+                  const closing = closingMarkType(cursor.type)
+                  const parent = closing ? cursor.node?.parent : null
+                  const last = parent?.lastChild
+                  if (closing && parent && last && last.from === cursor.from && last.to === cursor.to && parent.firstChild?.from !== cursor.from) {
+                    const original = cursor.type
+                    cursor.type = closing
+                    try {
+                      return originalEnter(cursor)
+                    } finally {
+                      cursor.type = original
+                    }
+                  }
+                }
                 return originalEnter(cursor)
               },
             })
@@ -274,7 +291,7 @@ function fuzzyMatchText(query: string, text: string): { score: number; matches: 
         i++
       }
       i--
-      matches.push([start, i])
+      matches.push([start, i + 1])
       if (lastMatchIdx >= 0) score += start - lastMatchIdx - 1
       if (start === 0 || text[start - 1] === ' ' || text[start - 1] === '/' || text[start - 1] === '-' || text[start - 1] === '_') {
         score -= 2
@@ -3409,12 +3426,18 @@ export function installObsidianGlobals(): void {
         if (!query.trim()) {
           return items.map(item => ({ item, match: { score: 0, matches: [] } }))
         }
-        const lowerQuery = query.toLowerCase()
+        const foldedQuery = foldQuery(query)
         const results: FuzzyMatchResult<T>[] = []
         for (const item of items) {
           const text = this.getItemText(item)
-          const matchResult = fuzzyMatchText(lowerQuery, text.toLowerCase())
-          if (matchResult) results.push({ item, match: matchResult })
+          const folded = foldForSearch(text)
+          const matchResult = fuzzyMatchText(foldedQuery, folded.text)
+          if (matchResult) {
+            results.push({
+              item,
+              match: { score: matchResult.score, matches: mapFoldedMatches(folded, text, matchResult.matches) },
+            })
+          }
         }
         // Lower score is better (fewer/tighter gaps between matched characters).
         results.sort((a, b) => a.match.score - b.match.score)

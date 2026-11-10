@@ -18,7 +18,7 @@
  * @module token-class-node-prop
  */
 
-import { NodeProp } from '@lezer/common'
+import { NodeProp, NodeType } from '@lezer/common'
 
 /**
  * Singleton NodeProp instance — the same reference must be used everywhere:
@@ -81,3 +81,40 @@ const nodeClassMapping: Record<string, string> = {
  * Adds tokenClassNodeProp values to all mapped Markdown NodeTypes.
  */
 export const tokenClassNodePropSource = tokenClassNodeProp.add(nodeClassMapping)
+
+// ─── Closing tokens (Obsidian 1.15) ──────────────────────────────────────────
+//
+// Obsidian 1.15 gives CLOSING formatting tokens a `formatting-*-end` class
+// segment (e.g. the closing backtick: `formatting-code-end`). The Lezer
+// Markdown parser uses one node type per mark kind for opening and closing
+// marks, and `tokenClassNodeProp` holds one value per node type, so the
+// distinction cannot live in the parser props. Instead the plugin-facing
+// `syntaxTree()` wrapper swaps in a derived node type for closing marks.
+
+/** Mark node types that come in open/close pairs. */
+const PAIRED_MARKS: ReadonlySet<string> = new Set(['CodeMark', 'EmphasisMark'])
+
+/** The class list of a closing mark, or `undefined` when the node name has no `-end` variant. */
+export function closingTokenClass(nodeName: string): string | undefined {
+  if (!PAIRED_MARKS.has(nodeName)) return undefined
+  const base = nodeClassMapping[nodeName]
+  const kind = base?.split(' ').find((c) => c.startsWith('formatting-'))
+  return base && kind ? `${base} ${kind}-end` : undefined
+}
+
+const closingTypeCache = new Map<NodeType, NodeType>()
+let nextClosingTypeId = 0x7fff0000
+
+/**
+ * A node type equal to `type` (same name) whose `tokenClassNodeProp` carries the
+ * `formatting-*-end` class. `undefined` for node types without a closing variant.
+ */
+export function closingMarkType(type: NodeType): NodeType | undefined {
+  const cached = closingTypeCache.get(type)
+  if (cached) return cached
+  const classes = closingTokenClass(type.name)
+  if (classes === undefined) return undefined
+  const derived = NodeType.define({ id: nextClosingTypeId++, name: type.name, props: [[tokenClassNodeProp, classes]] })
+  closingTypeCache.set(type, derived)
+  return derived
+}

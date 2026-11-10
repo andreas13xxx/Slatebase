@@ -8,7 +8,7 @@
 
 ## Zusammenfassung
 
-Slatebase emuliert eine Teilmenge der Obsidian-Plugin-API (`App`, `Vault`, `Workspace`, `MetadataCache`, `FileManager`, Command-Palette, Event-System) im Browser, damit echte Obsidian-Community-Plugins im Web-Frontend laufen — ohne Electron, ohne Node.js, ohne lokales Dateisystem. Der Layer gilt weiterhin als **⚠️ experimentell**. Emulierte API-Version: **1.13.2** (APIs bis einschließlich 1.13.1 implementiert).
+Slatebase emuliert eine Teilmenge der Obsidian-Plugin-API (`App`, `Vault`, `Workspace`, `MetadataCache`, `FileManager`, Command-Palette, Event-System) im Browser, damit echte Obsidian-Community-Plugins im Web-Frontend laufen — ohne Electron, ohne Node.js, ohne lokales Dateisystem. Der Layer gilt weiterhin als **⚠️ experimentell**. Emulierte API-Version: **1.15.1** (APIs bis einschließlich 1.15.1 implementiert).
 
 Von den 100 meistheruntergeladenen Community-Plugins:
 

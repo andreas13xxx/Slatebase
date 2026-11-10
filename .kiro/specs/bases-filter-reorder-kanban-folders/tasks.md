@@ -1,0 +1,40 @@
+# Implementation Plan: Bases Filter-Umsortierung und Kanban-Ordner
+
+## Overview
+
+Jede Phase einzeln grün (lint, build, betroffene Tests) und separat committed; nach jeder Phase die Doku aktualisieren.
+
+## Tasks
+
+- [x] 1. Filterbaum-Funktionen
+  - [x] 1.1 `components/bases/base-filter-tree.ts`: `moveNode`, `extractNode`, `appendNode`
+  - [x] 1.2 Tests (neue Datei): Randfälle, Verschachtelung, `not`, keine Verluste/Duplikate
+  - _Requirements: 1.1, 1.5, 2.2, 2.3_
+
+- [x] 2. Filter-Editor: Umsortieren und Ebenenwechsel
+  - [x] 2.1 Griff, Ziehen am Griff (HTML5-DnD), Einfügemarkierung, Animation (reduced-motion beachten)
+  - [x] 2.2 Menüeinträge „Nach oben/unten“ und „Zu allen Ansichten / Zu dieser Ansicht verschieben“
+  - [x] 2.3 Anbindung an `setDocFilter`/`setViewFilter` in einer Transaktion; `disabled` respektieren
+  - [x] 2.4 Komponenten- und axe-Tests (Timeout ~30 s)
+  - [x] 2.5 Doku
+  - _Requirements: 1.1–1.5, 2.1–2.3_
+
+- [x] 3. Kanban nach Ordner
+  - [x] 3.1 Per grep klären, wo `onMoveCard` implementiert wird; Pfad für `file.folder` verzweigen
+  - [x] 3.2 Vault-Verschiebung inkl. Link-Aktualisierung und Fehlerbehandlung (Karte bleibt, Meldung)
+  - [x] 3.3 Neue Notiz in Spalte im Ordner der Spalte anlegen (Master #354 brachte das „+“ je Spalte; `BasesView.addItem` bekam einen Ordner-Override für `file.folder`)
+  - [x] 3.4 Spaltenname für Wurzelordner
+  - [x] 3.5 Tests (neue Datei neben `BasesKanbanView.test.tsx`)
+  - [x] 3.6 Doku
+  - _Requirements: 3.1–3.5_
+
+- [x] 4. Limit-Hinweis und Standardname
+  - [x] 4.1 `total` aus `filterRows` ist bereits vorhanden; `BasesView` zeigt „Zeigt N von M“, Hinweis in Toolbar/Suche
+  - [x] 4.2 Starter-Base in `App.tsx` nannte die Ansicht „Neue Base“, jetzt „View“ (wie Obsidian in die Datei schreibt)
+  - [x] 4.3 Tests und Doku
+  - _Requirements: 4.1–4.2, 5.1_
+
+- [ ] 5. Abschluss
+  - [ ] 5.1 `npm run lint` und `npm run build`
+  - [ ] 5.2 Verbraucher-Tests (`components/bases`, `plugins/compat`, mit `--testTimeout=60000`)
+  - [ ] 5.3 Push, PR, CI-Schleife (max. 3 Iterationen), danach Review

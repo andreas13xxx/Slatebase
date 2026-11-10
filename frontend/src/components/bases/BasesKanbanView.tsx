@@ -20,6 +20,7 @@ import { ChevronDown, ChevronRight, Plus, GripVertical } from 'lucide-react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue, rowValueKey } from '@slatebase/shared-contracts'
 import { columnLabel as baseColumnLabel } from './base-edit'
+import { FOLDER_GROUP_PROPERTY, ROOT_FOLDER_LABEL } from './base-folder-move'
 
 export interface BasesKanbanViewProps {
   doc: BaseDocument
@@ -127,7 +128,9 @@ export const BasesKanbanView = memo(function BasesKanbanView({
     })
     const toColumn = (key: string): KanbanColumn => ({
       key,
-      label: key === UNGROUPED ? `Ohne ${columnLabel(groupBy)}` : key,
+      label: key === UNGROUPED
+        ? (groupBy === FOLDER_GROUP_PROPERTY ? ROOT_FOLDER_LABEL : `Ohne ${columnLabel(groupBy)}`)
+        : key,
       rows: byValue.get(key) ?? [],
     })
     // `groupOrder` (Obsidian 1.14.3, also written by a drag-reorder of the

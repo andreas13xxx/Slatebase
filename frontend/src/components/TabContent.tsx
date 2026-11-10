@@ -3,6 +3,8 @@ import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { useFeatureContext } from '../state/featureContext'
 import { openTab, saveTab } from '../state/tabActions'
+import { favoritesStore } from '../state/favoritesStore'
+import { notifyPublicSharesChanged } from '../public-share/publicShareEvents'
 import type { DirectoryTree } from '../types'
 import type { PropertyType, PropertyTypeEntry } from '../state/propertyTypes'
 import { EditMode } from './EditMode'
@@ -483,6 +485,11 @@ export function TabContent() {
               }}
               onSaveSource={(yaml) => {
                 void saveTab(tabDispatch, apiClient!, activeTab.vaultId, activeTab.filePath, yaml)
+              }}
+              onNoteMoved={(oldPath, newPath) => {
+                tabDispatch({ type: 'UPDATE_TAB_PATHS', payload: { oldPathPrefix: oldPath, newPathPrefix: newPath } })
+                favoritesStore.updatePath(activeTab.vaultId, oldPath, newPath)
+                notifyPublicSharesChanged()
               }}
             />
           </Suspense>

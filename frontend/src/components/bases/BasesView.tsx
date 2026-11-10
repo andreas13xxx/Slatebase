@@ -37,6 +37,7 @@ import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
 import { setGroupOrder } from './base-edit'
 import { sortRowsByFormula } from './base-formula-sort'
+import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
 import { filterRowsByText } from './base-row-search'
 import './BasesView.css'
 
@@ -57,6 +58,11 @@ export interface BasesViewProps {
   /** Persist new `.base` file content (sort change, raw-source apply). */
   onSaveSource: (yaml: string) => void
   /**
+   * Called after a note was moved to another folder from inside the view (a Kanban card dragged
+   * between `file.folder` columns), so the host can update open tabs, favorites and shares.
+   */
+  onNoteMoved?: (oldPath: string, newPath: string) => void
+  /**
    * `view` (default) renders the base; `source` shows its YAML. Owned by the host (the tab's mode,
    * switched from the breadcrumb), not by the view itself.
    */
@@ -66,7 +72,7 @@ export interface BasesViewProps {
 }
 
 export const BasesView = memo(function BasesView({
-  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, mode = 'view', onShowView,
+  apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, onNoteMoved, mode = 'view', onShowView,
 }: BasesViewProps) {
   // Leaving source mode goes through a ref: the host passes a fresh callback every render, and the
   // `bases:*` controller effect below must not re-register on each of them.
@@ -79,6 +85,8 @@ export const BasesView = memo(function BasesView({
   const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
+  // Matches before the view's `limit` (Obsidian 1.15: "Showing 10 of 40").
+  const [totalMatches, setTotalMatches] = useState(0)
   const [queryError, setQueryError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -128,8 +136,9 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
+      const { rows: resultRows, total: resultTotal, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
+      setTotalMatches(resultTotal)
       setTruncated(resultTruncated)
       setQueryError(null)
     } catch (err) {
@@ -218,14 +227,32 @@ export const BasesView = memo(function BasesView({
     }, 'Zelle konnte nicht gespeichert werden')
   }, [writeFrontmatter])
 
+  const onNoteMovedRef = useRef(onNoteMoved)
+  useEffect(() => { onNoteMovedRef.current = onNoteMoved }, [onNoteMoved])
+
   // Move a Kanban card to another column: write the grouping property of the
   // dragged note's frontmatter to the target column's value ('' clears it).
   const handleMoveCard = useCallback((path: string, property: string, newValue: string) => {
+    if (property === FOLDER_GROUP_PROPERTY) {
+      // Columns are folders: move the note itself (links are updated by the vault move).
+      const target = folderMoveTarget(path, newValue)
+      if (target === null) return
+      void apiClient.moveContent(vaultId, path, target).then(() => {
+        // The backend's vault:change excludes the user who made the change, so refresh by hand
+        // (rows + File Explorer tree) and let the host re-point tabs, favorites and shares.
+        onNoteMovedRef.current?.(path, target)
+        void runQueryRef.current()
+        requestVaultTreeRefresh(vaultId)
+      }).catch((err: unknown) => {
+        setQueryError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
+      })
+      return
+    }
     void writeFrontmatter(path, (fm) => {
       if (newValue === '') fm[property] = undefined
       else fm[property] = newValue
     }, 'Karte konnte nicht verschoben werden')
-  }, [writeFrontmatter])
+  }, [writeFrontmatter, apiClient, vaultId])
 
   // Write a sort change back into the selected view in the `.base` file.
   const handleSortChange = useCallback((sort: BaseSortClause[]) => {
@@ -255,10 +282,10 @@ export const BasesView = memo(function BasesView({
   // "Neuer Eintrag" button and each Kanban column's "+" button, so they cannot
   // drift. `overrides` pre-fills specific frontmatter keys (the Kanban column's
   // groupBy value) so the note lands in the right column.
-  const addItem = useCallback(async (overrides: Record<string, string> = {}): Promise<string | null> => {
+  const addItem = useCallback(async (overrides: Record<string, string> = {}, folderOverride?: string): Promise<string | null> => {
     if (!doc) return null
     const view = doc.views[safeIndex]
-    const folder = deriveBaseScopeFolder(doc, view)
+    const folder = folderOverride ?? deriveBaseScopeFolder(doc, view)
     const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
       (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
     )
@@ -289,6 +316,8 @@ export const BasesView = memo(function BasesView({
   // Per-column add in the Kanban view: pre-fill the grouping property with the
   // column's value so the new card appears in that column ('' clears it).
   const handleAddCardInColumn = useCallback((property: string, value: string) => {
+    // Folder columns: the column's value is the folder to create the note in.
+    if (property === FOLDER_GROUP_PROPERTY) { void addItem({}, value); return }
     void addItem(value === '' ? {} : { [property]: value })
   }, [addItem])
 
@@ -364,6 +393,11 @@ export const BasesView = memo(function BasesView({
       {truncated && !queryError && (
         <div className="bases-view__warning" role="status" aria-live="polite">
           Es werden nicht alle Treffer angezeigt — das Ergebnis wurde gekappt. Verfeinere die Filter, um alle passenden Notizen zu sehen.
+        </div>
+      )}
+      {!queryError && activeView?.limit !== undefined && totalMatches > rows.length && (
+        <div className="bases-view__hint" role="status" aria-live="polite">
+          {`Zeigt ${String(rows.length)} von ${String(totalMatches)} (Limit der Ansicht)`}
         </div>
       )}
       {pluginViewError && (

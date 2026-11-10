@@ -58,6 +58,8 @@ export interface SettingControl {
 
 /** Base for all definition items. */
 export interface SettingDefinitionBase {
+  /** Optional unique ID for this setting (Obsidian 1.14). Rendered as `data-setting-id`. */
+  id?: string
   name: string
   desc?: string | DocumentFragment
   aliases?: string[]
@@ -275,6 +277,7 @@ function renderList(
         const setting = new Setting(itemEl)
         if (def.name) setting.setName(def.name)
         if (def.desc) setting.setDesc(def.desc)
+        if (typeof def.id === 'string' && def.id) setting.settingEl.dataset.settingId = def.id
 
         // If has action callback — make clickable
         if ('action' in def && def.action && typeof def.action === 'function') {
@@ -434,6 +437,7 @@ function renderDefinition(
 
   if (def.name) setting.setName(def.name)
   if (def.desc) setting.setDesc(def.desc)
+  if (typeof def.id === 'string' && def.id) setting.settingEl.dataset.settingId = def.id
 
   // Render callback (imperative)
   if ('render' in def && def.render) {

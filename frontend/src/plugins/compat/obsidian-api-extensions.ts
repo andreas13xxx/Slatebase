@@ -30,6 +30,7 @@
 import DOMPurify from 'dompurify';
 import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml';
 import { errorOnce, warnNoOp } from './log';
+import { foldForSearch, foldQuery, mapFoldedMatches } from '../../utils/searchFold';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
 import { renderLucideIconInto } from './lucide-icons';
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon';
@@ -110,7 +111,7 @@ import { InputSuggestPopover } from './input-suggest-popover';
  *   for a handler to attach to; the call warns and is a no-op
  *   (install-globals.ts), flagged 'partial' by the analyzer.
  */
-export const OBSIDIAN_API_VERSION = '1.13.2';
+export const OBSIDIAN_API_VERSION = '1.15.1';
 
 /**
  * Compare two dotted version strings. Missing components count as 0, so
@@ -645,9 +646,11 @@ export function parseFrontMatterStringArray(frontmatter: Record<string, unknown>
  * Construct a fuzzy search callback.
  */
 export function prepareFuzzySearch(query: string): (text: string) => { score: number; matches: Array<[number, number]> } | null {
-  const lower = query.toLowerCase();
+  // Accent-insensitive since Obsidian 1.15: query and text are folded, matches map back to the original text.
+  const lower = foldQuery(query);
   return (text: string) => {
-    const textLower = text.toLowerCase();
+    const folded = foldForSearch(text);
+    const textLower = folded.text;
     let score = 0;
     let qIdx = 0;
     const matches: Array<[number, number]> = [];
@@ -659,7 +662,7 @@ export function prepareFuzzySearch(query: string): (text: string) => { score: nu
       }
     }
     if (qIdx < lower.length) return null;
-    return { score: score / text.length, matches };
+    return { score: score / text.length, matches: mapFoldedMatches(folded, text, matches) };
   };
 }
 
@@ -667,16 +670,17 @@ export function prepareFuzzySearch(query: string): (text: string) => { score: nu
  * Construct a simple search callback (space-separated words).
  */
 export function prepareSimpleSearch(query: string): (text: string) => { score: number; matches: Array<[number, number]> } | null {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = foldQuery(query).split(/\s+/).filter(Boolean);
   return (text: string) => {
-    const textLower = text.toLowerCase();
+    const folded = foldForSearch(text);
+    const textLower = folded.text;
     const matches: Array<[number, number]> = [];
     for (const word of words) {
       const idx = textLower.indexOf(word);
       if (idx === -1) return null;
       matches.push([idx, idx + word.length]);
     }
-    return { score: matches.length / text.length, matches };
+    return { score: matches.length / text.length, matches: mapFoldedMatches(folded, text, matches) };
   };
 }
 
@@ -833,7 +837,15 @@ export function getBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
  */
 export async function loadMermaid(): Promise<unknown> {
   const mod = await import('mermaid');
-  return mod.default ?? mod;
+  const mermaid = mod.default ?? mod;
+  // Obsidian 1.15 exposes the renderer as `window.mermaid` and, once loaded, as
+  // `window.pele`. Both point at the same object here (Slatebase keeps real Mermaid).
+  if (typeof window !== 'undefined') {
+    const w = window as unknown as { mermaid?: unknown; pele?: unknown };
+    w.mermaid = mermaid;
+    w.pele = mermaid;
+  }
+  return mermaid;
 }
 
 /**
@@ -856,6 +868,8 @@ function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
 
   if (!obs['loadPrism']) obs['loadPrism'] = unavailable('loadPrism', 'Prism');
   if (!obs['loadPdfJs']) obs['loadPdfJs'] = unavailable('loadPdfJs', 'PDF.js');
+  // Obsidian 1.15 loads PIXI lazily on first graph open; Slatebase's graph does not use it.
+  if (!obs['loadPixi']) obs['loadPixi'] = unavailable('loadPixi', 'PIXI');
 
   // KaTeX-backed math rendering
   if (!obs['loadMathJax']) {

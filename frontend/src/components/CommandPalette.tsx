@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import type { Command } from '../plugins/compat/command-registry'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { getShortcut, formatShortcut } from '../state/keybindingsStore'
+import { foldForSearch, foldQuery } from '../utils/searchFold'
 
 export interface CommandPaletteProps {
   /** All available commands from the command registry */
@@ -249,11 +250,11 @@ function filterCommands(commands: Command[], query: string): Command[] {
     return sorted.slice(0, MAX_RESULTS)
   }
 
-  const lowerQuery = query.toLowerCase()
+  const lowerQuery = foldQuery(query)
   const results: Command[] = []
 
   for (const cmd of sorted) {
-    if (cmd.name.toLowerCase().includes(lowerQuery)) {
+    if (foldForSearch(cmd.name).text.includes(lowerQuery)) {
       results.push(cmd)
       if (results.length >= MAX_RESULTS) break
     }

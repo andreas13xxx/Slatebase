@@ -21,6 +21,7 @@ import type { EditorView } from '@codemirror/view'
 import type { DirectoryTree } from '../../types'
 import { getAliasMapSnapshot, getAliasEntriesSnapshot } from '../../state/aliasStore'
 import { collectFilesSorted, resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { foldForSearch, foldQuery } from '../../utils/searchFold'
 
 /** Where the completion source gets its candidates from. */
 export interface LinkSuggestSource {
@@ -85,14 +86,14 @@ function linkSafeHeading(heading: string): string {
   return heading.replace(/[#|^:%[\]]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-/** Case-insensitive substring filter; prefix matches first. */
+/** Case- and accent-insensitive substring filter; prefix matches first. */
 function rank<T>(items: T[], text: (item: T) => string, query: string): T[] {
-  const q = query.trim().toLowerCase()
+  const q = foldQuery(query.trim())
   if (q === '') return items.slice(0, MAX_OPTIONS)
   const starts: T[] = []
   const contains: T[] = []
   for (const item of items) {
-    const idx = text(item).toLowerCase().indexOf(q)
+    const idx = foldForSearch(text(item)).text.indexOf(q)
     if (idx === 0) starts.push(item)
     else if (idx > 0) contains.push(item)
   }

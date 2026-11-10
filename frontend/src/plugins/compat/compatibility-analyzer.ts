@@ -262,6 +262,7 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'fileManager.createNewFolder',
   'fileManager.createAndOpenMarkdownFile',
   'fileManager.trashFile',
+  'fileManager.promptForDeletion',
   'fileManager.getAvailablePathForAttachment',
   // No rename dialog — the call logs a console message and leaves the file untouched.
   'fileManager.promptForFileRename',
