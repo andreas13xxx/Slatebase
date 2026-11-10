@@ -110,7 +110,7 @@ import { InputSuggestPopover } from './input-suggest-popover';
  *   for a handler to attach to; the call warns and is a no-op
  *   (install-globals.ts), flagged 'partial' by the analyzer.
  */
-export const OBSIDIAN_API_VERSION = '1.13.2';
+export const OBSIDIAN_API_VERSION = '1.15.1';
 
 /**
  * Compare two dotted version strings. Missing components count as 0, so

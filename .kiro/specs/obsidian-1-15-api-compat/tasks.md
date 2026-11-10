@@ -32,8 +32,8 @@ Jede Phase ist einzeln grün (lint, build, betroffene Tests) und wird separat co
   - [x] 4.3 Entfällt (keine Code-Änderung)
   - _Requirements: 4.1–4.4_
 
-- [ ] 5. API-Version und Doku
-  - [ ] 5.1 `OBSIDIAN_API_VERSION` → `1.15.1`, `requireApiVersion`-Tests anpassen
-  - [ ] 5.2 Doku: Compat-Inventar und Non-Goals ergänzen
-  - [ ] 5.3 Verbraucher-Tests (`plugins/compat/*`, mit `--testTimeout=60000`) laufen lassen
+- [x] 5. API-Version und Doku
+  - [x] 5.1 `OBSIDIAN_API_VERSION` → `1.15.1`, `requireApiVersion`-Tests anpassen
+  - [x] 5.2 Doku: Compat-Inventar und Non-Goals ergänzen
+  - [x] 5.3 Verbraucher-Tests (`plugins/compat/*`, mit `--testTimeout=60000`) laufen lassen
   - _Requirements: 7.1–7.2_

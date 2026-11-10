@@ -61,7 +61,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Vault sync via the Obsidian LiveSync plugin (CouchDB, bidirectional, running natively in the plugin compat layer with server-side CORS proxy)
 
 ### Plugins & Customization
-- Obsidian plugin compat ⚠️ experimental — API shims at level 1.13.2, sandbox, command palette, CSS injection, workspace leaf API with plugin views as tabs/sidebar sections. Twelve real community plugin bundles verified. Full details and per-plugin status: `PLUGIN-COMPAT.md`
+- Obsidian plugin compat ⚠️ experimental — API shims at level 1.15.1, sandbox, command palette, CSS injection, workspace leaf API with plugin views as tabs/sidebar sections. Twelve real community plugin bundles verified. Full details and per-plugin status: `PLUGIN-COMPAT.md`
 - Community Plugin Store (browse the full Obsidian list in Settings, filters, install from GitHub releases, single + bulk updates, 24h update check, download counts; desktop-only gate, domain allowlist, size limits)
 - CSS Snippets (per-vault custom CSS in Settings, per-snippet enable/disable, applied unscoped — distinct from the plugin-CSS injector scoped to `[data-plugin-id]`)
 - Unified Settings Panel (Ctrl+`,`, categorized sidebar, searchable, keyboard-navigable, one shared `settings/ui` design system across all tabs)
