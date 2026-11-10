@@ -26,10 +26,10 @@ Jede Phase ist einzeln grün (lint, build, betroffene Tests) und wird separat co
   - [x] 3.4 Tests
   - _Requirements: 5.1–5.3, 6.1–6.2_
 
-- [ ] 4. Schließende Formatierungs-Tokens
-  - [ ] 4.1 Echtes Obsidian-Verhalten verifizieren (Changelog 1.15.0, ggf. Obsidian-Typings/Plugin-Quellen), Ergebnis in `design.md` festhalten
-  - [ ] 4.2 Je nach Ergebnis: Umsetzung (Parser-Wrapper) oder Analyzer-Eintrag „partial“ plus Doku
-  - [ ] 4.3 Tests in `token-class-node-prop`-nahem, neu benanntem Testfile
+- [x] 4. Schließende Formatierungs-Tokens
+  - [x] 4.1 Echtes Obsidian-Verhalten verifizieren (Changelog 1.15.0, ggf. Obsidian-Typings/Plugin-Quellen), Ergebnis in `design.md` festhalten
+  - [x] 4.2 Entscheidung: bewusste Lücke, dokumentiert in `tech.md` (kein Parser-Wrapper)
+  - [x] 4.3 Entfällt (keine Code-Änderung)
   - _Requirements: 4.1–4.4_
 
 - [ ] 5. API-Version und Doku

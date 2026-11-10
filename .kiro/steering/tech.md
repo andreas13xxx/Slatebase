@@ -186,6 +186,7 @@ Kein Express/Fastify/Koa, kein Redux/Zustand, kein ORM, kein DI-Container, kein 
 - Parser wird in `CodeMirrorEditor.tsx` via `markdownLanguage.parser.configure({props: [tokenClassNodePropSource]})` konfiguriert.
 - **InlineCode-Range-Problem**: Standard-Lezer inkludiert Backticks in `node.from/to`, Obsidian nicht. Fix: `createObsidianCompatSyntaxTree()` in `setting-tab.ts` wrapped `syntaxTree()` mit Proxy der `iterate()`-Callbacks für `InlineCode`-Nodes adjustierte from/to liefert (CodeMark-Children-basiert).
 - Wichtig: Werte werden nach dem Callback wiederhergestellt (Tree-Navigation bleibt intakt).
+- **Bekannte Lücke (Obsidian 1.15)**: Schließende Formatierungs-Tokens haben in Obsidian ein `formatting-*-end`-Segment im Knotennamen (z. B. `formatting_formatting-code_formatting-code-end_inline-code`). Unsere Prop liefert pro Lezer-NodeType nur eine Klassenliste, öffnend und schließend sind nicht unterscheidbar — daher keine `-end`-Klassen. Plugins, die wie von Obsidian empfohlen `formatting-code` matchen, funktionieren.
 
 ### Rechtschreibprüfung → Web Worker + statische Wörterbücher
 - **Nicht die Browser-Prüfung.** Der Editor ersetzt das native Kontextmenü durch ein eigenes (`editor-context-menu.ts`), und kein Browser gibt seine Rechtschreibvorschläge an JavaScript heraus — die native Prüfung könnte also nur unterringeln, nie korrigieren. `contentDOM` bekommt deshalb unbedingt `spellcheck="false"`, sonst stünden zwei verschiedene Unterringelungen unter denselben Wörtern.

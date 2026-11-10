@@ -29,7 +29,8 @@ Kleine, voneinander unabhängige Änderungen im Compat-Layer. Reihenfolge nach R
 - Kein voller vitest-Lauf auf dem 2-Core-Host; nur betroffene Dateien (`file-manager-shim`, `obsidian-api-extensions`, `token-class-node-prop`, `declarative-settings-renderer`, `compatibility-analyzer`).
 - Vor dem Push: `npm run lint` und `npm run build` (nicht nur `tsc`), sowie Tests der Verbraucher der geänderten Funktionen.
 
-## Offene Fragen
+## Ergebnisse der Verifikation (Task 4.1, 3.3)
 
-- Exakte Form der `-end`-Klassen (Task 4.1).
-- Ob der Math-Block bei uns zeilenweise dekoriert wird (Task 6.1).
+- **`formatting-*-end`:** Wortlaut im 1.15-Changelog: Schließende Formatierungs-Tokens tragen nun ein `formatting-*-end`-Segment in den Syntaxbaum-Knotennamen; Beispiel: schließendes Inline-Code-Backtick = `formatting_formatting-code_formatting-code-end_inline-code`. Plugins sollen `formatting-code` statt des vollen Namens `formatting-code_inline-code` matchen. Unsere `tokenClassNodeProp`-Werte (`inline-code formatting formatting-code`) enthalten `formatting-code`, die empfohlene Match-Form funktioniert also. Die Unterscheidung öffnend/schließend ist mit einer Prop pro NodeType nicht möglich; ein Parser-Wrapper wäre ein Eingriff in den Editor-Parser mit unverhältnismäßigem Risiko. **Entscheidung: bewusste Lücke, dokumentiert (`.kiro/steering/tech.md`), keine Code-Änderung.**
+- **Math-Block:** Block-Math wird als `Decoration.replace`-Widget gerendert (`widget-decorations.ts`); `HyperMD-math` wird zusätzlich als Zeilen-Dekoration je Zeile gesetzt (bleibt auch bei aufgedecktem Quelltext erhalten).
+- **API-Quelle:** `obsidian.d.ts` (Master) enthält `promptForDeletion(file): Promise<boolean>` und `SettingDefinitionItem`-`id`; 1.15-Änderungen (z. B. `trashFile` → boolean) sind dort noch nicht nachgezogen.
