@@ -115,10 +115,30 @@ export class BasesQueryController {
     })
   }
 
+  /**
+   * Property keys a plugin view references through its own view config (not
+   * through `view.order`). The Maps plugin, for instance, reads
+   * `config.getAsPropertyId('coordinates')` and then `entry.getValue(thatProp)`
+   * — the referenced property is whatever STRING sits in the view's config
+   * bucket (`_unknown`), e.g. `coordinates: geo`. These string values are
+   * candidate property names, so request them as extra query columns; a value
+   * that is not a real property simply returns no row value, which is harmless.
+   */
+  private pluginConfigColumns(): string[] {
+    const u = this.view._unknown ?? {}
+    const cols = new Set<string>()
+    for (const value of Object.values(u)) {
+      if (typeof value === 'string' && value.trim()) cols.add(value.trim())
+    }
+    return Array.from(cols)
+  }
+
   /** Re-runs the query and calls the view's onDataUpdated(). */
   async refresh(): Promise<void> {
     try {
-      const { rows } = await runBaseQuery(this.apiClient, this.vaultId, this.doc, this.view)
+      const { rows } = await runBaseQuery(
+        this.apiClient, this.vaultId, this.doc, this.view, undefined, this.pluginConfigColumns(),
+      )
       if (this.stopped) return
       const entries = rows.map((row) => this.buildEntry(row))
       const columns = this.view.order ?? Object.keys(this.doc.properties ?? {})
@@ -146,6 +166,8 @@ export class BasesQueryController {
 
     const entry = EntryCtor ? new EntryCtor() : ({ file: null, setValue() {} } as { file: unknown; setValue(k: string, v: unknown): void })
     entry.file = { path: row.path, name: row.fileName }
+
+    // Displayed columns (incl. formula and file.* pseudo-columns).
     for (const col of columns) {
       if (formulaKeys.has(col)) {
         entry.setValue(col, formulaValue(this.doc.formulas?.[col] ?? '', row))
@@ -155,6 +177,16 @@ export class BasesQueryController {
         entry.setValue(col, toValue(toStringList(row.values[col]), this.declaredTypes.get(col)))
       }
     }
+
+    // Every other property the query returned (e.g. a plugin's marker
+    // properties like `coordinates`, which are not displayed columns). The
+    // plugin reads them via `entry.getValue(<prop>)`, so they must be present
+    // on the entry even though they are not in the view's column order.
+    for (const key of Object.keys(row.values)) {
+      if (columns.includes(key)) continue
+      entry.setValue(key, toValue(toStringList(row.values[key]), this.declaredTypes.get(key)))
+    }
+
     return entry
   }
 

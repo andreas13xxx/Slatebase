@@ -359,6 +359,10 @@
   min-height: 0;
   overflow: auto;
   padding: var(--spacing-md);
+  /* Keep the plugin view (and its internally z-indexed layers, e.g. Leaflet
+     panes/controls) below the toolbar's dropdown panels. */
+  position: relative;
+  z-index: 0;
 }
 
 /* ─── Kanban (cards) view ──────────────────────────────────────────────── */
@@ -1167,6 +1171,13 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  /* Own stacking context above the view body. A plugin view (e.g. the Maps
+     plugin's Leaflet map) renders with internal z-index up to ~1000; this wrap
+     is the direct sibling of `.bases-view__plugin-container`, so the z-index
+     belongs HERE (not on the inner `.bases-view__toolbar`) or the toolbar's
+     open dropdown panels (sort/group/filter/properties) stay under the map. */
+  position: relative;
+  z-index: 2;
 }
 
 .bases-view__searchbar {
