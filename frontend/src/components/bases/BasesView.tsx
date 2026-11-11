@@ -16,7 +16,7 @@ import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
 import { serializeBase } from '@slatebase/shared-contracts'
 import { runBaseQuery } from '../../bases/query-engine'
-import type { BaseDocument, BaseRow, BaseSortClause, BaseView, FileContent } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseGroupValue, BaseRow, BaseSortClause, BaseView, FileContent } from '@slatebase/shared-contracts'
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
@@ -305,7 +305,9 @@ export const BasesView = memo(function BasesView({
       requestReveal(path, 'file', vaultId)
       onOpenNote(path)
       return path
-    } catch {
+    } catch (err) {
+      // Surface the failure (permissions, quota, network) instead of doing nothing on click.
+      setQueryError(extractErrorMessage(err, 'Eintrag konnte nicht angelegt werden'))
       return null
     }
   }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
@@ -322,7 +324,7 @@ export const BasesView = memo(function BasesView({
   }, [addItem])
 
   // Persist a drag-reorder of the Kanban columns into the view's `groupOrder`.
-  const handleReorderColumns = useCallback((groupOrder: (string | null)[]) => {
+  const handleReorderColumns = useCallback((groupOrder: BaseGroupValue[]) => {
     handleDocChange((d) => setGroupOrder(d, safeIndex, groupOrder))
   }, [handleDocChange, safeIndex])
 

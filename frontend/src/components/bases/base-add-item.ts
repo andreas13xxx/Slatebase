@@ -66,9 +66,23 @@ export function buildBlankFrontmatter(
   for (const key of Object.keys(overrides)) if (!keys.includes(key)) keys.push(key)
   const lines = keys.map((key) => {
     const value = prefills[key]
-    return value !== undefined ? `${key}: ${value}` : `${key}:`
+    return value !== undefined ? `${key}: ${yamlScalar(value)}` : `${key}:`
   })
   return `---\n${lines.join('\n')}\n---\n`
+}
+
+/**
+ * A value as a YAML scalar: plain when that reads back as the same string (or a plain number),
+ * double-quoted otherwise — `Phase: 2`, `#urgent`, `- x`, `[a]`, `true`, a leading/trailing space
+ * and the like would otherwise break the frontmatter or turn into another type.
+ */
+export function yamlScalar(value: string): string {
+  if (/^-?\d+(\.\d+)?$/.test(value)) return value
+  const plain = /^[A-Za-z0-9_À-ɏ][^:#\n\r\t"'\\]*$/.test(value)
+    && !/\s$/.test(value)
+    && !/^(true|false|yes|no|on|off|null|~)$/i.test(value)
+    && !/:\s|\s#/.test(value)
+  return plain ? value : JSON.stringify(value)
 }
 
 /** Matches `prop == "value"` / `prop == 'value'` equality predicates. */
