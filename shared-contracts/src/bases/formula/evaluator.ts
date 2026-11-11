@@ -313,6 +313,7 @@ export function evaluateCondition(source: string, ctx: FormulaContext): boolean 
 export function formatFormulaValue(value: FormulaValue): string {
   if (value === null) return ''
   if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '' // an invalid Date has no ISO string (toISOString would throw)
     // A bare calendar date is LOCAL midnight (see toDate), so render the local
     // Y-M-D rather than toISOString() — the latter would shift it to the UTC
     // day and show the day before in a positive timezone.

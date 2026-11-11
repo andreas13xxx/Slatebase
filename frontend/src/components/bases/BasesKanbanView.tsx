@@ -17,7 +17,7 @@
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { DragEvent } from 'react'
 import { ChevronDown, ChevronRight, Plus, GripVertical } from 'lucide-react'
-import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseGroupValue, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue, rowValueKey } from '@slatebase/shared-contracts'
 import { columnLabel as baseColumnLabel } from './base-edit'
 import { FOLDER_GROUP_PROPERTY, ROOT_FOLDER_LABEL } from './base-folder-move'
@@ -51,7 +51,7 @@ export interface BasesKanbanViewProps {
    * with `null` for the ungrouped column). Omitted when read-only — column
    * headers are then not draggable.
    */
-  onReorderColumns?: (groupOrder: (string | null)[]) => void
+  onReorderColumns?: (groupOrder: BaseGroupValue[]) => void
 }
 
 /** Sentinel key for the "no value for the grouping property" column. */
@@ -241,9 +241,27 @@ export const BasesKanbanView = memo(function BasesKanbanView({
     if (fromIdx < 0 || toIdx < 0) return
     const [moved] = order.splice(fromIdx, 1)
     order.splice(toIdx, 0, moved!)
-    // Serialize to groupOrder, mapping the ungrouped sentinel back to null.
-    onReorderColumns?.(order.map((k) => (k === UNGROUPED ? null : k)))
-  }, [reorderable, colDragKey, columns, onReorderColumns, handleColHeaderDragEnd])
+    // Serialize to groupOrder, mapping the ungrouped sentinel back to null. A column's key is
+    // its display string, so numbers and booleans (priority 1, 2, 3) are restored from the
+    // raw row value — otherwise the `.base` file would silently change their type to string.
+    const typedValue = (key: string): BaseGroupValue => {
+      const isTyped = (v: unknown): v is number | boolean =>
+        (typeof v === 'number' || typeof v === 'boolean') && String(v) === key
+      // The saved order first (it also knows columns that currently have no cards) …
+      const listed = view.groupOrder?.find((g) => isTyped(g))
+      if (listed !== undefined && listed !== null) return listed
+      // … then any row of the board, looking at every value of a multi-value property.
+      if (groupByKey) {
+        for (const row of rows) {
+          const raw = row.values[groupByKey]
+          const found = (Array.isArray(raw) ? raw : [raw]).find((v) => isTyped(v))
+          if (found !== undefined) return found as number | boolean
+        }
+      }
+      return key
+    }
+    onReorderColumns?.(order.map((k) => (k === UNGROUPED ? null : typedValue(k))))
+  }, [reorderable, colDragKey, columns, groupByKey, rows, view.groupOrder, onReorderColumns, handleColHeaderDragEnd])
 
   if (!groupBy) {
     return (
@@ -296,7 +314,9 @@ export const BasesKanbanView = memo(function BasesKanbanView({
               if (colDragKey !== null) handleColHeaderDrop(e, column.key)
               else if (draggable) handleColumnDrop(e, column.key)
             }}
-            onDragLeave={() => {
+            onDragLeave={(e) => {
+              // Moving onto a child of this column fires dragleave too; only clear when really leaving it.
+              if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
               setDragOverKey((k) => (k === column.key ? null : k))
               setColOverKey((k) => (k === column.key ? null : k))
             }}

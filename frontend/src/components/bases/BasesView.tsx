@@ -16,7 +16,7 @@ import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
 import { serializeBase } from '@slatebase/shared-contracts'
 import { runBaseQuery } from '../../bases/query-engine'
-import type { BaseDocument, BaseRow, BaseSortClause, BaseView, FileContent } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseGroupValue, BaseRow, BaseSortClause, BaseView, FileContent } from '@slatebase/shared-contracts'
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
@@ -88,6 +88,9 @@ export const BasesView = memo(function BasesView({
   // Matches before the view's `limit` (Obsidian 1.15: "Showing 10 of 40").
   const [totalMatches, setTotalMatches] = useState(0)
   const [queryError, setQueryError] = useState<string | null>(null)
+  // A failed user action (create an entry, move a card to another folder): shown next to the board,
+  // not as a query failure, so it neither hides the truncation/limit notices nor outlives the next action.
+  const [actionError, setActionError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   // Operator-configured map tile source, fetched lazily when a map view is shown.
@@ -237,6 +240,7 @@ export const BasesView = memo(function BasesView({
       // Columns are folders: move the note itself (links are updated by the vault move).
       const target = folderMoveTarget(path, newValue)
       if (target === null) return
+      setActionError(null)
       void apiClient.moveContent(vaultId, path, target).then(() => {
         // The backend's vault:change excludes the user who made the change, so refresh by hand
         // (rows + File Explorer tree) and let the host re-point tabs, favorites and shares.
@@ -244,7 +248,7 @@ export const BasesView = memo(function BasesView({
         void runQueryRef.current()
         requestVaultTreeRefresh(vaultId)
       }).catch((err: unknown) => {
-        setQueryError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
+        setActionError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
       })
       return
     }
@@ -285,6 +289,7 @@ export const BasesView = memo(function BasesView({
   const addItem = useCallback(async (overrides: Record<string, string> = {}, folderOverride?: string): Promise<string | null> => {
     if (!doc) return null
     const view = doc.views[safeIndex]
+    setActionError(null)
     const folder = folderOverride ?? deriveBaseScopeFolder(doc, view)
     const columns = (view?.order ?? Object.keys(doc.properties ?? {})).filter(
       (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
@@ -305,7 +310,9 @@ export const BasesView = memo(function BasesView({
       requestReveal(path, 'file', vaultId)
       onOpenNote(path)
       return path
-    } catch {
+    } catch (err) {
+      // Surface the failure (permissions, quota, network) instead of doing nothing on click.
+      setActionError(extractErrorMessage(err, 'Eintrag konnte nicht angelegt werden'))
       return null
     }
   }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
@@ -322,7 +329,7 @@ export const BasesView = memo(function BasesView({
   }, [addItem])
 
   // Persist a drag-reorder of the Kanban columns into the view's `groupOrder`.
-  const handleReorderColumns = useCallback((groupOrder: (string | null)[]) => {
+  const handleReorderColumns = useCallback((groupOrder: BaseGroupValue[]) => {
     handleDocChange((d) => setGroupOrder(d, safeIndex, groupOrder))
   }, [handleDocChange, safeIndex])
 
@@ -390,6 +397,12 @@ export const BasesView = memo(function BasesView({
       />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
+      {actionError && (
+        <div className="bases-view__error" role="alert">
+          {actionError}
+          <button type="button" className="bases-view__error-dismiss" onClick={() => setActionError(null)}>Schließen</button>
+        </div>
+      )}
       {truncated && !queryError && (
         <div className="bases-view__warning" role="status" aria-live="polite">
           Es werden nicht alle Treffer angezeigt — das Ergebnis wurde gekappt. Verfeinere die Filter, um alle passenden Notizen zu sehen.
