@@ -57,4 +57,38 @@ describe('BasesKanbanView — column reorder keeps value types', () => {
     leave(document.body)
     expect(target.className).not.toContain('drop-target')
   })
+
+  it('restores the type of a column that currently has no cards from the saved groupOrder', () => {
+    const onReorderColumns = vi.fn()
+    const withOrder: BaseView = { ...view, groupOrder: [1, 2, 3] }
+    // No row has priority 3: its column is empty but listed in groupOrder.
+    const r: BaseRow[] = [
+      { path: 'a.md', fileName: 'A', values: { priority: [1] } },
+      { path: 'b.md', fileName: 'B', values: { priority: [2] } },
+    ]
+    render(<BasesKanbanView doc={doc} view={withOrder} rows={r} onOpenNote={vi.fn()} onReorderColumns={onReorderColumns} />)
+    const title = (label: string) => screen.getAllByText(label).find((el) => el.classList.contains('bases-kanban__column-title')) as HTMLElement
+    const data = dt()
+    fireEvent.dragStart(title('2').closest('.bases-kanban__column-header-row') as HTMLElement, { dataTransfer: data })
+    fireEvent.dragOver(title('1').closest('section') as HTMLElement, { dataTransfer: data })
+    fireEvent.drop(title('1').closest('section') as HTMLElement, { dataTransfer: data })
+    expect(onReorderColumns).toHaveBeenCalledWith([2, 1, 3])
+  })
+
+  it('finds the type in any value of a multi-value property, on any row', () => {
+    const onReorderColumns = vi.fn()
+    const r: BaseRow[] = [
+      { path: 'a.md', fileName: 'A', values: { priority: ['high', 7] } },
+      { path: 'b.md', fileName: 'B', values: { priority: [1] } },
+    ]
+    render(<BasesKanbanView doc={doc} view={view} rows={r} onOpenNote={vi.fn()} onReorderColumns={onReorderColumns} />)
+    const title = (label: string) => screen.getAllByText(label).find((el) => el.classList.contains('bases-kanban__column-title')) as HTMLElement
+    const data = dt()
+    fireEvent.dragStart(title('1').closest('.bases-kanban__column-header-row') as HTMLElement, { dataTransfer: data })
+    fireEvent.dragOver(title('high').closest('section') as HTMLElement, { dataTransfer: data })
+    fireEvent.drop(title('high').closest('section') as HTMLElement, { dataTransfer: data })
+    const order = onReorderColumns.mock.calls[0]![0] as unknown[]
+    expect(order).toContain(1)
+    expect(order).not.toContain('1')
+  })
 })

@@ -77,11 +77,15 @@ export function buildBlankFrontmatter(
  * and the like would otherwise break the frontmatter or turn into another type.
  */
 export function yamlScalar(value: string): string {
-  if (/^-?\d+(\.\d+)?$/.test(value)) return value
-  const plain = /^[A-Za-z0-9_À-ɏ][^:#\n\r\t"'\\]*$/.test(value)
+  // A plain decimal reads back as the same number the Kanban column came from.
+  if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(value)) return value
+  const plain = /^[A-Za-z_À-ɏ][^:#\n\r\t"'\\]*$/.test(value)
     && !/\s$/.test(value)
-    && !/^(true|false|yes|no|on|off|null|~)$/i.test(value)
     && !/:\s|\s#/.test(value)
+    // YAML 1.1 booleans/null — including the one-letter y/n — would change type.
+    && !/^(true|false|yes|no|on|off|y|n|null|~)$/i.test(value)
+  // Anything starting with a digit, sign or dot (1e3, 0x1F, 1_000, 007, 2024-01-05, .5, +1) can
+  // parse as a number or date, so it is quoted unless it is a plain decimal (handled above).
   return plain ? value : JSON.stringify(value)
 }
 

@@ -40,6 +40,21 @@ describe('BasesView — creating an entry', () => {
     await waitFor(() => expect(screen.getByText('Task A')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in todo' }))
     expect(await screen.findByText(/Speicherplatz erschöpft/)).toBeTruthy()
+    // It is an action error: dismissable, and not mistaken for a failed query.
+    fireEvent.click(screen.getByRole('button', { name: 'Schließen' }))
+    expect(screen.queryByText(/Speicherplatz erschöpft/)).toBeNull()
+  })
+
+  it('clears the error when the next attempt starts', async () => {
+    const saveFile = vi.fn().mockRejectedValueOnce(new Error('Netzwerk weg')).mockResolvedValue({ path: 'x', name: 'x', size: 0, etag: 'e' })
+    render(<BasesView apiClient={makeApi(saveFile)} vaultId="v1" source={source} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Task A')).toBeTruthy())
+    const add = () => fireEvent.click(screen.getByRole('button', { name: 'Neuer Eintrag in todo' }))
+    add()
+    expect(await screen.findByText(/Netzwerk weg/)).toBeTruthy()
+    add()
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText(/Netzwerk weg/)).toBeNull())
   })
 
   it('writes a column value with special characters as quoted YAML', async () => {

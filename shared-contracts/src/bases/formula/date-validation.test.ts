@@ -17,6 +17,12 @@ describe('toDate — bare YYYY-MM-DD', () => {
     expect(toDate('2024-00-10')).toBeNull()
   })
 
+  it('accepts the valid leap day 0000-02-29 (year 0 is a leap year)', () => {
+    const d = toDate('0000-02-29')
+    expect(d).not.toBeNull()
+    expect([d!.getFullYear(), d!.getMonth(), d!.getDate()]).toEqual([0, 1, 29])
+  })
+
   it('keeps years below 100 as written instead of mapping them to 19xx', () => {
     const d = toDate('0050-01-01')
     expect(d?.getFullYear()).toBe(50)

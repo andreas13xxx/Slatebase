@@ -1325,3 +1325,15 @@
 .bases-kanban__column--dragging {
   opacity: 0.5;
 }
+
+.bases-view__error-dismiss {
+  margin-left: var(--spacing-sm);
+  appearance: none;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--spacing-xs);
+  cursor: pointer;
+  font-size: 0.85em;
+}

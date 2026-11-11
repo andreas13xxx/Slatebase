@@ -245,12 +245,23 @@ export const BasesKanbanView = memo(function BasesKanbanView({
     // its display string, so numbers and booleans (priority 1, 2, 3) are restored from the
     // raw row value — otherwise the `.base` file would silently change their type to string.
     const typedValue = (key: string): BaseGroupValue => {
-      const raw = groupByKey ? columns.find((c) => c.key === key)?.rows[0]?.values[groupByKey] : undefined
-      const first = Array.isArray(raw) ? raw[0] : raw
-      return (typeof first === 'number' || typeof first === 'boolean') && String(first) === key ? first : key
+      const isTyped = (v: unknown): v is number | boolean =>
+        (typeof v === 'number' || typeof v === 'boolean') && String(v) === key
+      // The saved order first (it also knows columns that currently have no cards) …
+      const listed = view.groupOrder?.find((g) => isTyped(g))
+      if (listed !== undefined && listed !== null) return listed
+      // … then any row of the board, looking at every value of a multi-value property.
+      if (groupByKey) {
+        for (const row of rows) {
+          const raw = row.values[groupByKey]
+          const found = (Array.isArray(raw) ? raw : [raw]).find((v) => isTyped(v))
+          if (found !== undefined) return found as number | boolean
+        }
+      }
+      return key
     }
     onReorderColumns?.(order.map((k) => (k === UNGROUPED ? null : typedValue(k))))
-  }, [reorderable, colDragKey, columns, groupByKey, onReorderColumns, handleColHeaderDragEnd])
+  }, [reorderable, colDragKey, columns, groupByKey, rows, view.groupOrder, onReorderColumns, handleColHeaderDragEnd])
 
   if (!groupBy) {
     return (

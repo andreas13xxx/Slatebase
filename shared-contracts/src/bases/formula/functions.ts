@@ -76,8 +76,10 @@ export function toDate(value: FormulaValue): Date | null {
     const m = DATE_ONLY_RE.exec(value)
     if (m) {
       const [y, mo, d] = value.split('-').map(Number) as [number, number, number]
-      const date = new Date(y, mo - 1, d)
-      date.setFullYear(y) // `new Date(50, …)` would mean 1950
+      // setFullYear, not the Date constructor: `new Date(50, …)` would mean 1950 and
+      // `new Date(0, 1, 29)` the non-leap 1900.
+      const date = new Date(2000, 0, 1)
+      date.setFullYear(y, mo - 1, d)
       // `2024-02-31` must not roll over into March: an impossible date is not a date.
       if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null
       return date
