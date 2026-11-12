@@ -122,6 +122,8 @@ describe('ConfigService', () => {
       expect(proxy.allowedOrigins).toContain('api.github.com')
       expect(proxy.allowedOrigins).toContain('raw.githubusercontent.com')
       expect(proxy.allowedOrigins).toContain('*.githubusercontent.com')
+      // The official Maps plugin's Bases map view fetches tiles/styles from here.
+      expect(proxy.allowedOrigins).toContain('tiles.openfreemap.org')
     })
   })
 
