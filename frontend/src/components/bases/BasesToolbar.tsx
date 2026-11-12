@@ -8,7 +8,7 @@
  * With `readOnly` the panels still open but every control is disabled.
  */
 
-import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
@@ -20,7 +20,10 @@ import {
   setDocFilter, setGroupBy, setOrder, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
-import { getBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
+import {
+  getBasesViewRegistration, listBasesViewRegistrations,
+  subscribeBasesViewRegistry, getBasesViewRegistryVersion,
+} from '../../plugins/compat/bases-view-registry'
 import { BasesFilterEditor, CommitInput } from './BasesFilterEditor'
 import { moveFilterBetweenScopes } from './base-filter-tree'
 
@@ -375,8 +378,25 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<string>('table')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const typeOptions: string[] = [...VIEW_TYPES]
-  if (active && !typeOptions.includes(active.type)) typeOptions.push(active.type)
+  // The Bases view registry fills asynchronously as plugins (Maps, Base Graph, …)
+  // load, so subscribe to its version — otherwise a plugin-registered type never
+  // appears in the "new view" / "change type" dropdowns until a `.base` already
+  // holds a view of that type.
+  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
+  // Built-in types first, then every plugin-registered type (deduplicated).
+  const allTypeOptions = useMemo<string[]>(() => {
+    void registryVersion
+    const types: string[] = [...VIEW_TYPES]
+    for (const { viewId } of listBasesViewRegistrations()) {
+      if (!types.includes(viewId)) types.push(viewId)
+    }
+    return types
+  }, [registryVersion])
+  // "Change type" dropdown: all options plus the active view's own type as a
+  // fallback (so an unknown/uninstalled type still shows instead of jumping).
+  const typeOptions: string[] = active && !allTypeOptions.includes(active.type)
+    ? [...allTypeOptions, active.type]
+    : allTypeOptions
 
   return (
     <Popover label={<><Table2 aria-hidden="true" className="bases-tb__btn-icon" />{active?.name ?? 'Ansicht'}</>} title="Ansichten">
@@ -440,7 +460,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
           <div className="bases-tb__row">
             <input type="text" className="bases-tb__input" aria-label="Name der neuen Ansicht" placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <select className="bases-tb__select" aria-label="Typ der neuen Ansicht" value={newType} onChange={(e) => setNewType(e.target.value)}>
-              {VIEW_TYPES.map((t) => <option key={t} value={t}>{viewTypeLabel(t)}</option>)}
+              {allTypeOptions.map((t) => <option key={t} value={t}>{viewTypeLabel(t)}</option>)}
             </select>
           </div>
           <button
