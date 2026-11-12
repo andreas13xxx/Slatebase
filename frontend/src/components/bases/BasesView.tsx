@@ -117,6 +117,12 @@ export const BasesView = memo(function BasesView({
   const isGroupedCardsView = !!activeView && !isPluginView && activeView.type === 'cards' && !!activeView.groupBy
   const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
+  // A non-built-in view type with no plugin registered for it (e.g. `type: map`
+  // without the Maps plugin installed) silently falls back to the table below.
+  // Surface that so the user knows the requested view type was not available.
+  const isUnknownViewType = !!activeView
+    && !BUILT_IN_VIEW_TYPES.has(activeView.type)
+    && !hasBasesViewRegistration(activeView.type)
 
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
@@ -401,6 +407,11 @@ export const BasesView = memo(function BasesView({
       {pluginViewError && (
         <div className="bases-view__error" role="alert">
           Die Plugin-Ansicht ist fehlgeschlagen ({pluginViewError}) — es wird die Tabelle angezeigt.
+        </div>
+      )}
+      {isUnknownViewType && !pluginViewError && activeView && (
+        <div className="bases-view__warning" role="status" aria-live="polite">
+          {`Für den Ansichtstyp „${activeView.type}“ ist kein Plugin installiert — es wird die Tabelle angezeigt.`}
         </div>
       )}
       {loading && tableIsActive && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
