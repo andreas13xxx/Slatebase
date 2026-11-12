@@ -360,4 +360,11 @@ export interface BaseQueryResult {
    * value for such a key as a list, fixing the single-value list ambiguity.
    */
   listKeys?: string[] | undefined
+  /**
+   * Every frontmatter property key observed across the MATCHED notes (after the
+   * structured prefilter, before the limit). Lets the Bases toolbar offer the
+   * properties of the base's own files — as Obsidian does — instead of only the
+   * columns the query happened to request. Not affected by the row limit.
+   */
+  propertyKeys?: string[] | undefined
 }

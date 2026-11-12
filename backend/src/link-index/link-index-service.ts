@@ -679,16 +679,22 @@ export class LinkIndexService implements ILinkIndex {
       this.baseFilterTouchesFileTime(spec.filters)
 
     const rows: BaseQueryRow[] = []
+    // Every property key seen across the matched notes — the toolbar offers
+    // these so a user can pick any property of the base's own files, not only
+    // the columns the query requested (Obsidian's behaviour).
+    const propertyKeys = new Set<string>()
     for (const filePath of candidates) {
       if (spec.filters && !(await this.evaluateBaseNode(spec.filters, filePath, needsStat))) {
         continue
       }
+      const props = this.fileProperties.get(filePath)
+      if (props) for (const key of props.keys()) propertyKeys.add(key)
       rows.push(await this.buildBaseRow(filePath, spec.columns, needsStat))
     }
 
     const total = rows.length
     this.sortBaseRows(rows, spec.sort ?? [])
-    return { rows: rows.slice(0, limit), total, truncated: total > limit, listKeys: this.collectObservedListKeys() }
+    return { rows: rows.slice(0, limit), total, truncated: total > limit, listKeys: this.collectObservedListKeys(), propertyKeys: [...propertyKeys] }
   }
 
   /**

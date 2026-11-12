@@ -42,6 +42,12 @@ export type DocUpdate = (doc: BaseDocument) => BaseDocument
 export interface BasesToolbarProps {
   doc: BaseDocument
   rows: BaseRow[]
+  /**
+   * Every frontmatter property key across the base's matched notes (from the
+   * query result). Offered as pickable columns so the toolbar lists the base's
+   * own properties — Obsidian's behaviour — not only the requested columns.
+   */
+  observedProperties?: string[]
   activeIndex: number
   readOnly: boolean
   /** Owned by the host (the breadcrumb switches it); the panels only show in `view`. */
@@ -484,10 +490,10 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
 // ─── Toolbar ────────────────────────────────────────────────────────────────
 
 export const BasesToolbar = memo(function BasesToolbar({
-  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange,
+  doc, rows, observedProperties, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange,
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
-  const columns = availableColumns(doc, rows, view)
+  const columns = availableColumns(doc, rows, view, observedProperties)
   const handleChange = useCallback((update: DocUpdate) => { if (!readOnly) onChange(update) }, [readOnly, onChange])
   const panelProps: PanelProps = { doc, index: activeIndex, columns, rows, disabled: readOnly, onChange: handleChange }
   const filterCount = countConditions(view?.filters) + countConditions(doc.filters)

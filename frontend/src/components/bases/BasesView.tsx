@@ -11,7 +11,7 @@
  * stale row behind.
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
 import { serializeBase } from '@slatebase/shared-contracts'
@@ -25,7 +25,7 @@ import { requestReveal } from '../../state/revealFileBridge'
 import { setActiveBasesController, clearActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
 import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
-import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
+import { hasBasesViewRegistration, subscribeBasesViewRegistry, getBasesViewRegistryVersion } from '../../plugins/compat/bases-view-registry'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
@@ -82,6 +82,10 @@ export const BasesView = memo(function BasesView({
   const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
+  // Every frontmatter property key across the matched notes, so the toolbar can
+  // offer the base's own properties as columns (Obsidian's behaviour) even when
+  // no view currently requests them.
+  const [observedProperties, setObservedProperties] = useState<string[]>([])
   // Matches before the view's `limit` (Obsidian 1.15: "Showing 10 of 40").
   const [totalMatches, setTotalMatches] = useState(0)
   const [queryError, setQueryError] = useState<string | null>(null)
@@ -105,9 +109,14 @@ export const BasesView = memo(function BasesView({
   // so a `type: map` view mounts the plugin's map when one is installed and
   // otherwise falls back to the table.
   const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'kanban', 'list']), [])
+  // The plugin view registry fills asynchronously as plugins load, so subscribe
+  // to its version: without this a `type: map` view opened before the Maps
+  // plugin registered stays on the table fallback, since the memo below would
+  // never re-read hasBasesViewRegistration (the install tab gets no vault:change).
+  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
   const isPluginView = useMemo(
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
-    [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
+    [activeView, pluginViewError, BUILT_IN_VIEW_TYPES, registryVersion],
   )
   // Both board layouts share BasesKanbanView, differing only in orientation:
   // `kanban` groups into horizontal columns, a grouped `cards` view stacks the
@@ -142,10 +151,11 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, total: resultTotal, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
+      const { rows: resultRows, total: resultTotal, truncated: resultTruncated, propertyKeys } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
       setTotalMatches(resultTotal)
       setTruncated(resultTruncated)
+      setObservedProperties(propertyKeys)
       setQueryError(null)
     } catch (err) {
       setQueryError(extractErrorMessage(err, 'Die Base-Abfrage ist fehlgeschlagen'))
@@ -377,6 +387,7 @@ export const BasesView = memo(function BasesView({
       <BasesToolbar
         doc={doc}
         rows={rows}
+        observedProperties={observedProperties}
         activeIndex={safeIndex}
         readOnly={readOnly}
         mode={mode}
