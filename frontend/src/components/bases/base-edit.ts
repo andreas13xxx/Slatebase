@@ -17,10 +17,10 @@ import type {
 
 // ─── Views ──────────────────────────────────────────────────────────────────
 
-export const VIEW_TYPES = ['table', 'cards', 'kanban', 'list', 'map'] as const
+export const VIEW_TYPES = ['table', 'cards', 'kanban', 'list'] as const
 
 export const VIEW_TYPE_LABELS: Record<string, string> = {
-  table: 'Tabelle', cards: 'Galerie', kanban: 'Kanban', list: 'Liste', map: 'Karte (Map)',
+  table: 'Tabelle', cards: 'Galerie', kanban: 'Kanban', list: 'Liste',
 }
 export type ViewType = (typeof VIEW_TYPES)[number]
 
