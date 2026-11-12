@@ -347,6 +347,35 @@ describe('installObsidianGlobals', () => {
     })
   })
 
+  describe('window.app.isDarkMode', () => {
+    // Regression: the official Maps plugin's Bases map view reads
+    // `this.app.isDarkMode()` (via its QueryController's app) to pick the
+    // light/dark tile style. AppShim has the method, but the global
+    // `window.app` stub a view host drives did not, so the call threw
+    // "isDarkMode is not a function" inside onDataUpdated and the map never
+    // initialized — a blank view with no visible error. The stub must mirror
+    // AppShim.isDarkMode(), resolving `data-theme` on <html> like resolveActiveTheme().
+    const getIsDarkMode = () =>
+      (window as unknown as { app: { isDarkMode?: () => boolean } }).app.isDarkMode
+
+    it('is a function on the window.app stub', () => {
+      expect(getIsDarkMode()).toBeTypeOf('function')
+    })
+
+    it('returns true when data-theme is dark and false when light', () => {
+      const prev = document.documentElement.getAttribute('data-theme')
+      try {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        expect(getIsDarkMode()?.()).toBe(true)
+        document.documentElement.setAttribute('data-theme', 'light')
+        expect(getIsDarkMode()?.()).toBe(false)
+      } finally {
+        if (prev === null) document.documentElement.removeAttribute('data-theme')
+        else document.documentElement.setAttribute('data-theme', prev)
+      }
+    })
+  })
+
   describe('Plugin base class', () => {
     it('stores the manifest passed to the constructor', () => {
       const PluginClass = (window.obsidian as Record<string, unknown>)['Plugin'] as
