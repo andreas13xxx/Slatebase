@@ -130,9 +130,20 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         // Bundle load failed — leave as unknown
       }
 
-      // 2. Settings: always available for installed plugins
-      // Plugins can always be configured (empty {} if no data.json exists yet)
-      update.hasSettings = true
+      // 2. Settings icon: show it only when the plugin actually has something to configure —
+      // either a native settings tab (addSettingTab) or a non-empty data.json to raw-edit.
+      // A plugin with neither (e.g. Base Graph) would otherwise open an empty {} JSON editor.
+      let hasSettings = pluginContext?.settingTabRegistry.has(manifest.id) ?? false
+      if (!hasSettings) {
+        try {
+          const data = await apiClient.loadSettings(vaultId, manifest.id)
+          hasSettings = data !== null && data !== undefined &&
+            !(typeof data === 'object' && Object.keys(data as object).length === 0)
+        } catch {
+          // Settings load failed — leave as no settings
+        }
+      }
+      update.hasSettings = hasSettings
 
       updates.push(update)
     }))
@@ -154,7 +165,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Compatibility analysis is display-only. Persisting a full registry
       // snapshot here can overwrite newer activation state from the loader.
     }
-  }, [apiClient, vaultId])
+  }, [apiClient, vaultId, pluginContext])
 
   // ─── Load plugins ──────────────────────────────────────────────────────
 
@@ -192,7 +203,10 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           compatibilityReasons: [],
           compatibilityApiCalls: [],
           error: regEntry?.error,
-          hasSettings: true, // All installed plugins can be configured
+          // Conservative default: the settings icon is shown only after the background analysis
+          // confirms a native settings tab or a non-empty data.json, so a settings-less plugin
+          // never flashes an icon that opens an empty editor.
+          hasSettings: false,
           hasEvalUsage: regEntry?.hasEvalUsage === true,
         }
       })
