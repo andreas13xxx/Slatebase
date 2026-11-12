@@ -20,8 +20,18 @@ import {
   setDocFilter, setGroupBy, setOrder, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
+import { getBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
 import { BasesFilterEditor, CommitInput } from './BasesFilterEditor'
 import { moveFilterBetweenScopes } from './base-filter-tree'
+
+/**
+ * Display label for a view type: the built-in German label, else the name a
+ * plugin gave when it registered the type via `registerBasesView` (e.g. the
+ * Maps plugin's "Map"), else the raw technical type as a last resort.
+ */
+function viewTypeLabel(type: string): string {
+  return VIEW_TYPE_LABELS[type] ?? getBasesViewRegistration(type)?.name ?? type
+}
 
 export type BasesMode = 'view' | 'source'
 export type DocUpdate = (doc: BaseDocument) => BaseDocument
@@ -381,7 +391,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
                 onClick={() => { setConfirmDelete(false); onSelectView(i) }}
               >
                 <span>{v.name ?? v.type}</span>
-                <span className="bases-tb__type">{VIEW_TYPE_LABELS[v.type] ?? v.type}</span>
+                <span className="bases-tb__type">{viewTypeLabel(v.type)}</span>
               </button>
             </li>
           ))}
@@ -395,7 +405,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
           </div>
           <div className="bases-tb__row">
             <select className="bases-tb__select" aria-label="Typ der Ansicht" value={active.type} disabled={disabled} onChange={(e) => { const type = e.target.value; onChange((d) => setViewType(d, activeIndex, type)) }}>
-              {typeOptions.map((t) => <option key={t} value={t}>{VIEW_TYPE_LABELS[t] ?? t}</option>)}
+              {typeOptions.map((t) => <option key={t} value={t}>{viewTypeLabel(t)}</option>)}
             </select>
           </div>
           {!disabled && (
@@ -430,14 +440,14 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
           <div className="bases-tb__row">
             <input type="text" className="bases-tb__input" aria-label="Name der neuen Ansicht" placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <select className="bases-tb__select" aria-label="Typ der neuen Ansicht" value={newType} onChange={(e) => setNewType(e.target.value)}>
-              {VIEW_TYPES.map((t) => <option key={t} value={t}>{VIEW_TYPE_LABELS[t]}</option>)}
+              {VIEW_TYPES.map((t) => <option key={t} value={t}>{viewTypeLabel(t)}</option>)}
             </select>
           </div>
           <button
             type="button"
             className="bases-tb__btn bases-tb__btn--primary"
             onClick={() => {
-              const name = newName.trim() || VIEW_TYPE_LABELS[newType] || newType
+              const name = newName.trim() || viewTypeLabel(newType)
               onChange((d) => addView(d, newType, name))
               onSelectView(doc.views.length)
               setNewName('')
