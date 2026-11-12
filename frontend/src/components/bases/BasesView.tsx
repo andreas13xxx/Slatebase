@@ -126,12 +126,27 @@ export const BasesView = memo(function BasesView({
   const isGroupedCardsView = !!activeView && !isPluginView && activeView.type === 'cards' && !!activeView.groupBy
   const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
-  // A non-built-in view type with no plugin registered for it (e.g. `type: map`
-  // without the Maps plugin installed) silently falls back to the table below.
-  // Surface that so the user knows the requested view type was not available.
-  const isUnknownViewType = !!activeView
-    && !BUILT_IN_VIEW_TYPES.has(activeView.type)
-    && !hasBasesViewRegistration(activeView.type)
+  // A non-built-in view type whose plugin has not (yet) registered. The plugin
+  // system loads after FCP, so on first open the registration can arrive a beat
+  // late — showing the "no plugin" banner + table fallback immediately would
+  // flash them for ~a frame before the plugin view takes over. Hold a short
+  // grace window per non-built-in type: during it we render a quiet
+  // placeholder instead of the fallback, and only once it elapses (plugin still
+  // absent) do we commit to the banner + table. A built-in type never waits.
+  const isNonBuiltInType = !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type)
+  const pluginRegistered = !!activeView && hasBasesViewRegistration(activeView.type)
+  const [pluginGraceElapsed, setPluginGraceElapsed] = useState(false)
+  useEffect(() => {
+    if (!isNonBuiltInType || pluginRegistered) return
+    setPluginGraceElapsed(false)
+    const t = setTimeout(() => setPluginGraceElapsed(true), 1000)
+    return () => clearTimeout(t)
+    // Re-arm when the active view's type changes or a registration arrives.
+  }, [isNonBuiltInType, pluginRegistered, activeView?.type, registryVersion])
+  // Still waiting on a possible plugin registration — suppress the fallback.
+  const isPluginPending = isNonBuiltInType && !pluginRegistered && !pluginViewError && !pluginGraceElapsed
+  // Confirmed: a non-built-in type with no plugin and the grace window elapsed.
+  const isUnknownViewType = isNonBuiltInType && !pluginRegistered && pluginGraceElapsed
 
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
@@ -425,7 +440,10 @@ export const BasesView = memo(function BasesView({
           {`Für den Ansichtstyp „${activeView.type}“ ist kein Plugin installiert — es wird die Tabelle angezeigt.`}
         </div>
       )}
-      {loading && tableIsActive && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
+      {mode === 'view' && isPluginPending && (
+        <div className="bases-view__loading" role="status" aria-live="polite">Ansicht wird geladen…</div>
+      )}
+      {loading && tableIsActive && !isPluginPending && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
 
       {mode === 'view' && isPluginView && activeView && (
         <ErrorBoundary
@@ -475,7 +493,7 @@ export const BasesView = memo(function BasesView({
         />
       )}
 
-      {mode === 'view' && !isPluginView && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && activeView && (
+      {mode === 'view' && !isPluginView && !isPluginPending && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}
