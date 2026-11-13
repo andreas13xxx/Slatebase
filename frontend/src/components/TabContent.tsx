@@ -27,6 +27,12 @@ import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFi
 import { resolveAttachmentTargetDir } from '../utils/internalLink'
 import { getAppConfigValue, useAppConfigValue } from '../state/vaultAppConfigStore'
 import { inlineTitleFromPath } from '../hooks/useShowInlineTitle'
+import { EditorView } from '@codemirror/view'
+import { getActiveEditorView } from '../editor/plugin-extensions'
+import { useAnchorJump } from '../hooks/useAnchorJump'
+import { findAnchorOffset } from '../utils/findAnchorOffset'
+import { scrollToBlockAnchor, scrollToHeadingAnchor } from '../utils/scrollToAnchor'
+import type { DeepLinkAnchor } from '../deep-link/deepLink'
 import './TabContent.css'
 
 /**
@@ -110,6 +116,29 @@ export function TabContent() {
   // below) gets a new identity per keystroke, which was tearing down and
   // rebuilding the CodeMirror live-preview field mid-edit.
   const activeTabVaultId = activeTab?.vaultId
+
+  // ─── Deep-link anchor (`/open?…&file=Note.md#Heading`) ─────────────────────
+  // Applied once the note is on screen: reading view scrolls to the DOM anchor, the editor moves the
+  // cursor to the heading/block line. Returns false while the note is still rendering (retried).
+  const anchorTabId = activeTab?.id ?? null
+  const anchorMode = activeTab?.mode ?? 'live-preview'
+  const anchorSource = activeTab ? (activeTab.editBuffer ?? activeTab.content) : null
+  const anchorReady = !!activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
+  const applyAnchor = useCallback((anchor: DeepLinkAnchor): boolean => {
+    if (anchorMode === 'reading') {
+      if (anchor.kind === 'block') return scrollToBlockAnchor(anchor.id)
+      const lastSegment = anchor.text.split('#').filter(Boolean).pop() ?? anchor.text
+      return scrollToHeadingAnchor(anchor.text) || (lastSegment !== anchor.text && scrollToHeadingAnchor(lastSegment))
+    }
+    const view = getActiveEditorView()
+    // The view must already show THIS note (a tab switch swaps the editor's state asynchronously).
+    if (!view || !view.dom.isConnected || anchorSource === null || view.state.doc.toString() !== anchorSource) return false
+    const offset = findAnchorOffset(anchorSource, anchor)
+    if (offset === null) return true // the note has no such anchor: stay at the top, nothing to retry
+    view.dispatch({ selection: { anchor: offset }, effects: EditorView.scrollIntoView(offset, { y: 'start', yMargin: 24 }) })
+    return true
+  }, [anchorMode, anchorSource])
+  useAnchorJump(anchorTabId, anchorReady, applyAnchor, anchorMode)
 
   // ─── Property type registry (for the inline frontmatter editor) ──────────
   // Self-contained fetch, same pattern SearchPanel.tsx uses for its own copy

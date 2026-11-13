@@ -52,11 +52,29 @@ Ein leerer/ungültiger Anker macht den ganzen Link ungültig statt die Notiz obe
 
 ## Phase 3 — Link öffnen
 
-- [ ] 3.1 Einlesen von `/open` vor dem ersten Render (Modul-Level in `App.tsx`), Adresse bereinigen
-- [ ] 3.2 `DeepLinkHandler.tsx` (Auth/Restore/Vault-Liste abwarten, Vault wählen, Baum prüfen, `openTab`, Anker)
-- [ ] 3.3 Einheitliche Fehlermeldung (R5.1), kein Existenz-Orakel
-- [ ] 3.4 Login-Überbrückung (Link überlebt Login und erzwungenen Passwortwechsel)
-- [ ] 3.5 Tests inkl. Vault-Wechsel-Race und Restore-Reihenfolge
+- [x] 3.1 Einlesen von `/open` vor dem ersten Render (Modul-Level in `App.tsx`), Adresse bereinigen
+- [x] 3.2 `DeepLinkHandler.tsx` (Auth/Restore/Vault-Liste abwarten, Vault wählen, Baum prüfen, `openTab`, Anker)
+- [x] 3.3 Einheitliche Fehlermeldung (R5.1), kein Existenz-Orakel
+- [x] 3.4 Login-Überbrückung (Link überlebt Login und erzwungenen Passwortwechsel)
+- [x] 3.5 Tests inkl. Vault-Wechsel-Race und Restore-Reihenfolge
+
+### Umsetzung Phase 3 (2026-11-13)
+
+- Einlesen: `deep-link/captureDeepLink.ts`, am Modul-Level von `App.tsx` neben `initializeWorkspace()`; Adresse wird auf `/` bereinigt, ein
+  unbrauchbarer Link wird als Merker gehalten und nach dem Login einmal gemeldet.
+- Öffnen: **Hook** `deep-link/useDeepLink.ts` statt einer Komponente (Abweichung vom Design) — Effekt-Reihenfolge innerhalb von
+  `AppContent` ist die Garantie, dass der Link-Tab NACH dem Vault-Wechsel-Effekt geöffnet wird; eine Kind-Komponente liefe vorher und
+  würde von dessen `CLEAR_ALL_TABS` überschrieben. Aufruf deshalb direkt hinter diesem Effekt, mit Kommentar.
+- Die Datei wird VOR dem Tab geholt (`fetchFileContent`): ein toter Link hinterlässt keinen Fehler-Tab; Fehler/Unbekannt/kein Zugriff →
+  dieselbe Meldung (R5.1). Kein Baum-Abgleich, weil der Baum lazy lädt.
+- Anker: `state/anchorJumpBridge.ts` (geparkte Anforderung je Tab + Listener) und `hooks/useAnchorJump.ts` (wendet an, sobald der Tab fertig
+  geladen ist; begrenzte Wiederholungen alle 50 ms bis ca. 2 s, dann wird die Anforderung verworfen). Angewendet in `TabContent.tsx`:
+  Leseansicht über DOM-Anker (`utils/scrollToAnchor.ts`, aus `ViewMode.tsx` herausgezogen, liefern jetzt `boolean`), Editor über
+  `utils/findAnchorOffset.ts` + `EditorView.scrollIntoView`; der Editor wird erst angefasst, wenn sein Dokument dem Tab-Inhalt entspricht.
+  Fehlt der Anker in der Notiz, bleibt sie oben stehen.
+- Bekannte Grenzen: Der Wikilink-Klick im Editor springt weiterhin nicht zu Überschriften (nur Deep-Links nutzen den neuen Weg); die
+  Wiederholungen sind bewusst begrenzt statt ereignisgesteuert; ein Link auf eine Notiz in einem eingeklappten Abschnitt der Leseansicht
+  scrollt nur, wenn der Anker im DOM existiert.
 
 ## Phase 4 — Abschluss
 

@@ -1080,6 +1080,10 @@ export const de = {
     copied: 'Kopiert',
   },
 
+  deepLink: {
+    notFound: 'Link konnte nicht geöffnet werden: Ziel nicht gefunden oder kein Zugriff',
+    invalid: 'Der Link ist ungültig',
+  },
   quickSwitcher: {
     dialogLabel: 'Schnellwechsler',
     placeholder: 'Datei öffnen oder erstellen …',

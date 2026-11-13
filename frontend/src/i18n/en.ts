@@ -1086,6 +1086,10 @@ export const en: TranslationShape = {
     copied: 'Copied',
   },
 
+  deepLink: {
+    notFound: 'Could not open the link: target not found or no access',
+    invalid: 'The link is invalid',
+  },
   quickSwitcher: {
     dialogLabel: 'Quick Switcher',
     placeholder: 'Open or create a file …',
