@@ -33,6 +33,10 @@ In Vorlagen kannst du dynamische Platzhalter verwenden, die beim Erstellen autom
 | `{{date}}` | Aktuelles Datum (YYYY-MM-DD) | 2025-01-15 |
 | `{{time}}` | Aktuelle Uhrzeit (HH:mm) | 14:30 |
 | `{{title}}` | Name der neuen Datei | Mein Meeting |
+| `{{date:FORMAT}}` | Datum in einem Moment-Format | `{{date:dddd, D. MMMM YYYY}}` → Wednesday, 15. January 2025 |
+| `{{time:FORMAT}}` | Uhrzeit in einem Moment-Format | `{{time:HH:mm:ss}}` → 14:30:05 |
+
+Tag- und Monatsnamen erscheinen beim Einfügen einer Vorlage in der Sprache der Oberfläche; beim Anlegen einer neuen Notiz aus einer Vorlage schreibt der Server sie auf Englisch (das Beispiel oben zeigt diese Form).
 
 ### Beispiel-Vorlage
 

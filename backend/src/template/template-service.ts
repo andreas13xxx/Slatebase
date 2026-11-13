@@ -9,6 +9,7 @@ import { validateFilePath } from '../vault/index.js'
 import type { ITemplateService, TemplateInfo } from './types.js'
 import { TemplateNotFoundError, TemplateConflictError } from './errors.js'
 import type { IVaultConfigService } from '../vault-config/index.js'
+import { renderTemplatePlaceholders } from '@slatebase/shared-contracts'
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
@@ -143,27 +144,13 @@ export class TemplateService implements ITemplateService {
   }
 
   /**
-   * Replaces known placeholders in template content.
-   * `{{date}}` → YYYY-MM-DD (server local time)
-   * `{{time}}` → HH:mm (server local time)
-   * `{{title}}` → fileName without extension
+   * Replaces known placeholders in template content (server local time).
+   * `{{title}}`, `{{date}}`/`{{time}}` and `{{date:FORMAT}}`/`{{time:FORMAT}}` (Moment
+   * formats) -- one shared implementation with the client's "Insert template".
    * Unrecognized `{{...}}` placeholders remain as-is.
    */
   private replacePlaceholders(content: string, title: string): string {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, '0')
-    const day = String(now.getDate()).padStart(2, '0')
-    const hours = String(now.getHours()).padStart(2, '0')
-    const minutes = String(now.getMinutes()).padStart(2, '0')
-
-    const date = `${year}-${month}-${day}`
-    const time = `${hours}:${minutes}`
-
-    return content
-      .replace(/\{\{date\}\}/g, date)
-      .replace(/\{\{time\}\}/g, time)
-      .replace(/\{\{title\}\}/g, title)
+    return renderTemplatePlaceholders(content, title)
   }
 
   /**

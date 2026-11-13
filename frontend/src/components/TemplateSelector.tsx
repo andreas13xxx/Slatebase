@@ -4,6 +4,7 @@ import type { IApiClient } from '../api'
 import { showToast } from './ToastNotification'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { substituteTemplatePlaceholders } from '../utils/templatePlaceholders'
+import { useTranslation } from '../i18n'
 import './TemplateSelector.css'
 import { foldForSearch, foldQuery } from '../utils/searchFold'
 
@@ -66,6 +67,7 @@ export function TemplateSelector({
   onInsertContent,
   insertTitle = '',
 }: TemplateSelectorProps) {
+  const { locale } = useTranslation()
   const [step, setStep] = useState<'loading' | 'select' | 'filename'>('loading')
   const [templates, setTemplates] = useState<TemplateEntry[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateEntry | null>(null)
@@ -157,7 +159,7 @@ export function TemplateSelector({
       const dir = config.templatesDirectory.replace(/\/+$/, '')
       const path = dir ? `${dir}/${template.path}` : template.path
       const file = await apiClient.fetchFileContent(vaultId, path)
-      onInsertContent?.(substituteTemplatePlaceholders(file.content, insertTitle), template.name)
+      onInsertContent?.(substituteTemplatePlaceholders(file.content, insertTitle, new Date(), locale), template.name)
       onClose()
     } catch (err) {
       const message = err && typeof err === 'object' && 'message' in err
@@ -167,7 +169,7 @@ export function TemplateSelector({
     } finally {
       setIsCreating(false)
     }
-  }, [apiClient, vaultId, insertTitle, onInsertContent, onClose, isCreating])
+  }, [apiClient, vaultId, insertTitle, locale, onInsertContent, onClose, isCreating])
 
   const handleSelectTemplate = useCallback((template: TemplateEntry) => {
     if (mode === 'insert') {

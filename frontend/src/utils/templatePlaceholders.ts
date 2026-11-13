@@ -4,27 +4,30 @@
  * The "new note from template" flow goes through the server
  * (`POST /templates/create`), which substitutes these itself. "Vorlage
  * einfügen" never writes a file, so it reads the template's raw text and has
- * to render the placeholders here — kept deliberately in step with
- * `TemplateService.replacePlaceholders` (backend/src/template/template-service.ts).
+ * to render the placeholders here — through the same `renderTemplatePlaceholders`
+ * (`shared-contracts`) that `TemplateService.replacePlaceholders` uses.
  *
  * @module utils/templatePlaceholders
  */
 
+import { renderTemplatePlaceholders, type TemplateLocale } from '@slatebase/shared-contracts'
+
 /**
- * Replaces `{{date}}`, `{{time}}` and `{{title}}` in template text.
- * Unrecognized `{{...}}` placeholders are left as-is, matching the backend.
+ * Replaces `{{title}}`, `{{date}}`/`{{time}}` and `{{date:FORMAT}}`/`{{time:FORMAT}}`
+ * (Moment formats) in template text. Unrecognized `{{...}}` placeholders are left as-is.
+ * The implementation is shared with the backend (`shared-contracts`), so both paths
+ * cannot drift.
  *
  * @param content - Raw template text.
  * @param title - Value for `{{title}}` — usually the target note's name.
- * @param now - Clock to read `{{date}}`/`{{time}}` from (injectable for tests).
+ * @param now - Clock to read the date/time placeholders from (injectable for tests).
+ * @param locale - UI language, used for day and month names; default `'en'`.
  */
-export function substituteTemplatePlaceholders(content: string, title: string, now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`
-
-  return content
-    .replace(/\{\{date\}\}/g, date)
-    .replace(/\{\{time\}\}/g, time)
-    .replace(/\{\{title\}\}/g, title)
+export function substituteTemplatePlaceholders(
+  content: string,
+  title: string,
+  now: Date = new Date(),
+  locale: TemplateLocale = 'en',
+): string {
+  return renderTemplatePlaceholders(content, title, now, locale)
 }

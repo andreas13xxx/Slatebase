@@ -25,6 +25,10 @@ Templates are Markdown files stored in a designated folder (default: `Templates/
 | `{{date}}` | Current date (YYYY-MM-DD) |
 | `{{time}}` | Current time (HH:MM) |
 | `{{title}}` | The filename you chose |
+| `{{date:FORMAT}}` | Date in a Moment format, e.g. `{{date:dddd, D MMMM YYYY}}` |
+| `{{time:FORMAT}}` | Time in a Moment format, e.g. `{{time:HH:mm:ss}}` |
+
+Day and month names follow the interface language when you insert a template, and are written in English when the server creates a new note from a template.
 
 ### Using a Template
 
