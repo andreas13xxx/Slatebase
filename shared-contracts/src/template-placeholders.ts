@@ -37,7 +37,9 @@ export const DEFAULT_TEMPLATE_TIME_FORMAT = 'HH:mm'
 /** Longest accepted `FORMAT`; longer ones stay literal text (a template is not a place for megabyte formats). */
 export const MAX_TEMPLATE_FORMAT_LENGTH = 100
 
-const PLACEHOLDER_RE = /\{\{(title|date|time)(?::((?:[^{}\n[]|\[[^\]\n]*\])*))?\}\}/g
+// Every repetition is bounded (a FORMAT is at most MAX_TEMPLATE_FORMAT_LENGTH chars), so an
+// unterminated `{{date:[[[...` cannot make the scan quadratic (CodeQL js/polynomial-redos).
+const PLACEHOLDER_RE = /\{\{(title|date|time)(?::((?:[^{}\n[]|\[[^\]\n]{0,100}\]){0,100}))?\}\}/g
 
 /**
  * Replaces the supported placeholders in template text.

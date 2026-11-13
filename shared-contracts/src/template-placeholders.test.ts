@@ -36,3 +36,12 @@ describe('renderTemplatePlaceholders', () => {
     expect(renderTemplatePlaceholders('{{date}} {{title}}', 'n', new Date(NaN))).toBe('{{date}} {{title}}')
   })
 })
+
+describe('renderTemplatePlaceholders — pathological input', () => {
+  it('stays fast on many unterminated placeholders', () => {
+    const evil = '{{date:['.repeat(20000)
+    const start = Date.now()
+    expect(renderTemplatePlaceholders(evil, 'n', NOW)).toBe(evil)
+    expect(Date.now() - start).toBeLessThan(1000)
+  })
+})
