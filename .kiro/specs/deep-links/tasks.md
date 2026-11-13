@@ -78,6 +78,6 @@ Ein leerer/ungültiger Anker macht den ganzen Link ungültig statt die Notiz obe
 
 ## Phase 4 — Abschluss
 
-- [ ] 4.1 `product.md` (Navigation & Discovery), `structure.md` (neues Verzeichnis `deep-link/`), `PLUGIN-COMPAT.md`, Welcome-Vault-Guide (DE/EN) ergänzen
-- [ ] 4.2 `implementation-plan.md`: Zeile „Deep-Links“ auf ausgeliefert setzen
-- [ ] 4.3 Manueller Test: abgemeldet → Link → Login → Notiz; falscher Vault; fremder Vault; Datei gelöscht; Reload bleibt auf `/`
+- [x] 4.1 `product.md` (Navigation & Discovery), `structure.md` (neues Verzeichnis `deep-link/`), `PLUGIN-COMPAT.md`, Welcome-Vault-Guide (DE `Features/Links zu Notizen.md`, EN `Features/Links to Notes.md`, beide in der Übersicht verlinkt) ergänzt
+- [x] 4.2 `implementation-plan.md`: Zeile „Deep-Links“ auf umgesetzt gesetzt (Reste vermerkt)
+- [ ] 4.3 **Noch nicht gemacht** (braucht einen echten Browser gegen eine laufende Instanz; Befund 4 des Reviews — späte Tab-Wiederherstellung nach Vault-Wechsel — hängt daran). Manueller Test: abgemeldet → Link → Login → Notiz; falscher Vault; fremder Vault; Datei gelöscht; Reload bleibt auf `/`
