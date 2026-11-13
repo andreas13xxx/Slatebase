@@ -10,6 +10,8 @@ import { createWikilinkRegex, resolveWikilinkMatchTarget } from './link-decorati
 import { DEFAULT_KEYBINDINGS, matchesShortcut } from '../../state/keybindingsStore'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
+import { EmbeddedWebFrame } from '../../components/EmbeddedWebFrame'
+import { getWebEmbedEnabled } from '../../hooks/useWebEmbed'
 import { BasesEmbed, type IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { SearchEmbed, type ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { DirectoryTree } from '../../types'
@@ -1269,6 +1271,56 @@ class ImageWidget extends WidgetType {
 }
 
 /**
+ * Widget for an external `![](https://…)` link that is embedded as a web page.
+ *
+ * Mounts the same `EmbeddedWebFrame` the reading view uses (one sandbox configuration, one place
+ * to tighten it), as a nested React root. Only created while the per-user+vault opt-in
+ * `webEmbedEnabled` is on — see `shouldEmbedWebUrl`.
+ */
+class WebEmbedWidget extends WidgetType {
+  private readonly url: string
+  private reactRoot: Root | null = null
+
+  constructor(url: string) {
+    super()
+    this.url = url
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'cm-lp-web-embed'
+    this.reactRoot = createRoot(container)
+    this.reactRoot.render(createElement(EmbeddedWebFrame, { url: this.url }))
+    return container
+  }
+
+  eq(other: WebEmbedWidget): boolean {
+    return this.url === other.url
+  }
+
+  get estimatedHeight(): number {
+    return 400
+  }
+
+  destroy(): void {
+    if (this.reactRoot) {
+      unmountRootDeferred(this.reactRoot)
+      this.reactRoot = null
+    }
+  }
+}
+
+/**
+ * Whether a standard-image link should render as an embedded web page instead of an `<img>`:
+ * an http(s) URL while the opt-in is on. Same rule as the reading view (`ViewMode`'s `image` case).
+ * The setting is read when the decorations are built, so a toggle takes effect on the next
+ * document change, exactly as in the reading view.
+ */
+export function shouldEmbedWebUrl(url: string, enabled: boolean = getWebEmbedEnabled()): boolean {
+  return enabled && /^https?:\/\//i.test(url)
+}
+
+/**
  * Widget for rendering horizontal rules (---, ***, ___) as <hr> elements.
  */
 class HorizontalRuleWidget extends WidgetType {
@@ -2025,7 +2077,9 @@ export function buildWidgetDecorations(
           const alt = altMatch[1] ?? ''
           const src = altMatch[2] ?? ''
 
-          const widget = new ImageWidget(src, alt, options.vaultId, options.token)
+          const widget = shouldEmbedWebUrl(src)
+            ? new WebEmbedWidget(src)
+            : new ImageWidget(src, alt, options.vaultId, options.token)
           addStandaloneLineTightening(doc, node.from, node.to, decorations, hideableRanges)
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)
