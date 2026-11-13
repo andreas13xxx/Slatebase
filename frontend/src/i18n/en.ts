@@ -618,6 +618,7 @@ export const en: TranslationShape = {
     rename: 'Rename',
     delete: 'Delete',
     copy: 'Copy',
+    copyLink: 'Copy link',
     move: 'Move',
     export: 'Export',
     noActions: 'No actions available',

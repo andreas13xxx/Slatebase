@@ -15,6 +15,7 @@ Mit einem **Link** verweist du von außen auf eine Notiz in Slatebase — in ein
 
 - **Befehl:** Öffne die Command Palette (`Strg+P`) und führe **Link zur aktuellen Datei kopieren** aus.
 - **Tab-Menü:** Rechtsklick auf den Tab → **Link kopieren**.
+- **Datei-Explorer:** Rechtsklick auf eine Datei → **Link kopieren** (auch mit reinem Leserecht).
 
 Ist gerade keine Datei offen (zum Beispiel der Graph), zeigt der Link auf den Vault. Kann der Browser nicht in die Zwischenablage schreiben, blendet Slatebase den Link zum Abschreiben ein.
 

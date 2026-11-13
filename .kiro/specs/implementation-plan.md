@@ -213,7 +213,7 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 | Lücke | Stand |
 |-------|-------|
 | Responsive/Mobile (Prio 3) | Größtes sichtbares Loch; kein `useMediaQuery`, 28 Media-Queries |
-| ~~Deep-Links / URL-Schema~~ | **Umgesetzt** (Spec `.kiro/specs/deep-links/`, PR #369): `/open?vault=…&file=…[#Anker]`, `workspace:copy-url`, Tab-Menü, Öffnen inkl. Login und Anker-Sprung. Offen: Explorer-Kontextmenü „Link kopieren“, manueller Browser-Test |
+| ~~Deep-Links / URL-Schema~~ | **Umgesetzt** (Spec `.kiro/specs/deep-links/`, PR #369): `/open?vault=…&file=…[#Anker]`, `workspace:copy-url`, Tab-Menü, Öffnen inkl. Login und Anker-Sprung. „Link kopieren“ auch im Tab- und Explorer-Kontextmenü. Offen: manueller Browser-Test |
 | Graph-Zeitraffer (`graph:animate`) | Braucht Erstellungsdatum je Knoten + Abspiel-UI |
 | Slides / Präsentationsmodus | Nische (`obsidian-feature-gaps` O2) |
 | Format Converter / Fremdformat-Importer | Prio 6 |

@@ -15,6 +15,7 @@ A **link** points to a note in Slatebase from the outside — in an email, a cha
 
 - **Command:** open the Command Palette (`Ctrl+P`) and run **Copy link to current file**.
 - **Tab menu:** right-click the tab → **Link kopieren**.
+- **File explorer:** right-click a file → **Copy link** (also with read-only access).
 
 If no file is open (for example the graph), the link points to the vault. If the browser cannot write to the clipboard, Slatebase shows the link so you can copy it by hand.
 

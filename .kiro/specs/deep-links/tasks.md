@@ -46,7 +46,7 @@ Ein leerer/ungültiger Anker macht den ganzen Link ungültig statt die Notiz obe
 
 - [x] 2.1 Handler in `core-commands-app.ts` verdrahten, `unsupported: 'url-scheme'` entfernen
 - [x] 2.2 Clipboard + Fallback-Toast, i18n de/en (`deepLink.*`)
-- [ ] 2.3 „Link kopieren“ im Tab-Kontextmenü (`tab-context-menu.ts`, **erledigt**) und Explorer-Kontextmenü (**offen**: das Menü in `FileExplorer.tsx` hat noch keinen Pfad-/Link-Eintrag)
+- [x] 2.3 „Link kopieren“ im Tab-Kontextmenü (`tab-context-menu.ts`) und im Explorer-Kontextmenü (`FileExplorer.tsx`, nur für Dateien; auch für Nutzer mit Leserecht, da das Kopieren nur Lesezugriff braucht)
 - [x] 2.4 `UNSUPPORTED_REASONS`-Eintrag und PLUGIN-COMPAT.md-Tabelle („Geplant, aber noch nicht umgesetzt“) bereinigen
 - [x] 2.5 Tests (Datei-Tab, Sentinel-Tab, kein Vault)
 

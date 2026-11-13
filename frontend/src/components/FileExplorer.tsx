@@ -5,7 +5,8 @@ import { useTranslation } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree, VaultInfo } from '../types'
 import { extractErrorMessage } from '../utils/error'
-import { ChevronRight, ChevronDown, Database, Eye, Pencil, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard, Link2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Database, Eye, Pencil, Users, FilePlus, FolderPlus, Trash2, Copy, Move, Download, Star, FileText, History, LayoutDashboard, Link, Link2 } from 'lucide-react'
+import { copyLinkWithFeedback } from '../deep-link/copyDeepLink'
 import { getValidDropTargets } from '../utils/pathUtils'
 import { MoveTargetDialog } from './MoveTargetDialog'
 import { ContextMenu } from './ContextMenu'
@@ -934,6 +935,9 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
           openPublicShareDialog(contextMenuState.vaultId, node.path)
         }
         break
+      case 'copyLink':
+        void copyLinkWithFeedback(contextMenuState.vaultId, node.path)
+        break
     }
   }
 
@@ -1502,7 +1506,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
         if (isReadOnly) {
           // Read-only users: no write actions, show hint
-          menuItems = [{ id: 'no-actions', label: t('contextMenu.noActions'), disabled: true }]
+          // Copying a link only needs read access, so a file still offers it.
+          menuItems = [
+            ...(isFile ? [{ id: 'copyLink', label: t('contextMenu.copyLink'), icon: <Link size={14} /> }] : []),
+            { id: 'no-actions', label: t('contextMenu.noActions'), disabled: true },
+          ]
         } else if (isFile) {
           // File context menu: Umbenennen, Löschen, Kopieren, Verschieben, Favorit, Versionen
           const fileFavorited = contextMenuState.vaultId
@@ -1521,6 +1529,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'copy', label: t('contextMenu.copy'), icon: <Copy size={14} /> },
             { id: 'move', label: t('contextMenu.move'), icon: <Move size={14} /> },
             { id: 'separator-2', label: '', separator: true },
+            { id: 'copyLink', label: t('contextMenu.copyLink'), icon: <Link size={14} /> },
             { id: 'versions', label: 'Versionen', icon: <History size={14} /> },
             // Public links are for notes only, and only while the admin has enabled the feature.
             ...(publicSharesEnabled && node.name.toLowerCase().endsWith('.md')

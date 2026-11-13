@@ -612,6 +612,7 @@ export const de = {
     rename: 'Umbenennen',
     delete: 'Löschen',
     copy: 'Kopieren',
+    copyLink: 'Link kopieren',
     move: 'Verschieben',
     export: 'Export',
     noActions: 'Keine Aktionen verfügbar',
