@@ -46,3 +46,21 @@ describe('tab context menu: move entries (drag alternative)', () => {
     expect(items.find((i) => i.id === 'move-to-pane-p3')?.label).toBe('In Pane 3')
   })
 })
+
+describe('tab context menu: copy link', () => {
+  it('offers "Link kopieren" for file tabs only', () => {
+    const fileTab = { ...tab, vaultId: 'v1' } as TabEntry
+    expect(buildTabContextMenuItems(fileTab, false, vi.fn()).map((i) => i.id)).toContain('copy-link')
+    const graphTab = { ...tab, filePath: '__graph__' } as TabEntry
+    expect(buildTabContextMenuItems(graphTab, false, vi.fn()).map((i) => i.id)).not.toContain('copy-link')
+  })
+
+  it('copies the deep link of the tab', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    const fileTab = { ...tab, vaultId: 'v1' } as TabEntry
+    buildTabContextMenuItems(fileTab, false, vi.fn()).find((i) => i.id === 'copy-link')?.run?.()
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/open?vault=v1&file=a.md`)
+  })
+})

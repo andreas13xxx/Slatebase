@@ -114,7 +114,7 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'workspace:close-window': { de: 'Fenster schließen', en: 'Close window' },
   'workspace:open-in-new-window': { de: 'Aktuellen Tab in neuem Fenster öffnen', en: 'Open current tab in new window' },
   'workspace:toggle-stacked-tabs': { de: 'Gestapelte Tabs umschalten', en: 'Toggle stacked tabs' },
-  'workspace:copy-url': { de: 'Obsidian-URL der aktuellen Datei kopieren', en: 'Copy Obsidian URL for current file' },
+  'workspace:copy-url': { de: 'Link zur aktuellen Datei kopieren', en: 'Copy link to current file' },
   'workspace:export-pdf': { de: 'Als PDF exportieren …', en: 'Export to PDF...' },
   'workspace:goto-tab-1': { de: 'Zu Tab Nr. 1 wechseln', en: 'Go to tab #1' },
   'workspace:goto-tab-2': { de: 'Zu Tab Nr. 2 wechseln', en: 'Go to tab #2' },
@@ -249,7 +249,6 @@ export type UnsupportedReason =
   | 'stacked-tabs'
   | 'blank-tab'
   | 'native-windows'
-  | 'url-scheme'
   | 'attachments'
   | 'desktop-shell'
   | 'new-tab-defaults'
@@ -267,10 +266,6 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
   'native-windows': {
     de: 'Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster',
     en: 'Slatebase runs in a browser tab and manages no windows of its own',
-  },
-  'url-scheme': {
-    de: 'es gibt kein obsidian://-URL-Schema; nutze stattdessen den Dateipfad',
-    en: 'there is no obsidian:// URL scheme — copy the file path instead',
   },
   attachments: {
     de: 'externe Bild-Links lassen sich nicht automatisch in den Vault herunterladen — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen“ hinein',
