@@ -391,13 +391,16 @@
   height: 100%;
 }
 
-/* `.bases-map` reads its height from `--bases-map-embed-height` (400px, the
-   plugin's embed default). The plugin CSS is injected at plugin-load time —
-   AFTER this bundled app CSS — so a same-specificity `height: 100%` here would
-   lose on source order. Override the variable instead: the plugin's own
-   `.bases-map { height: var(--bases-map-embed-height) }` rule then resolves to
-   the full pane, no specificity fight and no `!important`. */
-.bases-view__plugin-container {
+/* `.bases-map` reads its height from `--bases-map-embed-height` (the plugin's
+   400px embed default, declared on `body`). The variable must be overridden on
+   `.bases-map` itself, NOT on an ancestor: the plugin's injected CSS scopes its
+   `body { --bases-map-embed-height: 400px }` to a host-prefixed selector, which
+   re-declares the variable closer to the element on the cascade than a plain
+   ancestor rule of ours, so a container-level override loses. Setting it on the
+   reading element (higher specificity via our host scope, same element) wins,
+   and the plugin's own `.bases-map { height: var(--bases-map-embed-height) }`
+   then resolves to the full pane — no `!important`, no height fight. */
+.bases-view__plugin-container .bases-map {
   --bases-map-embed-height: 100%;
 }
 
