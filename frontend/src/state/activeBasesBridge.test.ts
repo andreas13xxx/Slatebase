@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   tableToTsv,
+  tableToCsv,
+  csvFileName,
+  neutralizeSpreadsheetFormula,
   setActiveBasesController,
   clearActiveBasesController,
   getActiveBasesController,
@@ -8,7 +11,7 @@ import {
 } from './activeBasesBridge'
 
 function makeController(): ActiveBasesController {
-  return { nextView: () => false, addView: () => false, copyTable: async () => false, addItem: async () => null }
+  return { nextView: () => false, addView: () => false, copyTable: async () => false, exportCsv: () => false, addItem: async () => null }
 }
 
 describe('active bases controller (identity-guarded clear)', () => {
@@ -44,5 +47,60 @@ line</td></tr>
       </table>`
     const table = host.querySelector('table') as HTMLTableElement
     expect(tableToTsv(table)).toBe('Name\tStatus\nIdea\topen\nPlan with tab\tmulti line')
+  })
+})
+
+function tableFrom(rows: string[][]): HTMLTableElement {
+  const table = document.createElement('table')
+  for (const cells of rows) {
+    const tr = table.insertRow()
+    for (const text of cells) tr.insertCell().textContent = text
+  }
+  return table
+}
+
+describe('tableToCsv', () => {
+  it('joins cells with commas and rows with CRLF', () => {
+    expect(tableToCsv(tableFrom([['Name', 'Status'], ['Idea', 'open']]))).toBe('Name,Status\r\nIdea,open')
+  })
+
+  it('quotes fields with commas, quotes and line breaks, doubling the quotes', () => {
+    const csv = tableToCsv(tableFrom([['a,b', 'say "hi"', 'x\ny']]))
+    // Line breaks inside a cell collapse to a space, so only the comma and quote cases need quoting.
+    expect(csv).toBe('"a,b","say ""hi""",x y')
+  })
+
+  it('drops sort markers from the header', () => {
+    expect(tableToCsv(tableFrom([['Name ▲', 'Status']]))).toBe('Name,Status')
+  })
+
+  it('keeps umlauts and empty cells', () => {
+    expect(tableToCsv(tableFrom([['Übung', '', 'ß']]))).toBe('Übung,,ß')
+  })
+})
+
+describe('neutralizeSpreadsheetFormula', () => {
+  it.each(['=1+1', '+SUM(A1)', '@cmd', '-2+3', '-cmd|x', '- list item', '-5a'])('prefixes %j so it is not run as a formula', (text) => {
+    expect(neutralizeSpreadsheetFormula(text)).toBe(`'${text}`)
+  })
+
+  it.each(['-5', '-0.5', '-0,5', '-', 'plain', '2026-11-13', 'a=b', ''])('leaves %j alone', (text) => {
+    expect(neutralizeSpreadsheetFormula(text)).toBe(text)
+  })
+
+  it('is applied while exporting', () => {
+    expect(tableToCsv(tableFrom([['=HYPERLINK("x")']]))).toBe('"\'=HYPERLINK(""x"")"')
+  })
+})
+
+describe('csvFileName', () => {
+  it('uses the base name', () => {
+    expect(csvFileName('Projekte/Aufgaben.base')).toBe('Aufgaben.csv')
+    expect(csvFileName('x.BASE')).toBe('x.csv')
+  })
+  it('falls back to "base"', () => {
+    expect(csvFileName(undefined)).toBe('base.csv')
+    expect(csvFileName('')).toBe('base.csv')
+    expect(csvFileName('.base')).toBe('base.csv')
   })
 })

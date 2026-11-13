@@ -216,6 +216,7 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'bases:add-view': { de: 'Bases: Ansicht hinzufügen', en: 'Bases: Add view' },
   'bases:change-view': { de: 'Bases: Ansicht wechseln', en: 'Bases: Change view' },
   'bases:copy-table': { de: 'Bases: Tabelle in Zwischenablage kopieren', en: 'Bases: Copy table to clipboard' },
+  'bases:export-csv': { de: 'Bases: Tabelle als CSV exportieren', en: 'Bases: Export table as CSV' },
   'bases:insert': { de: 'Bases: Neue Base einfügen', en: 'Bases: Insert new base' },
   'bases:new-file': { de: 'Bases: Neue Base erstellen', en: 'Bases: Create new base' },
   'open-with-default-app:open': { de: 'In Standard-App öffnen', en: 'Open in default app' },

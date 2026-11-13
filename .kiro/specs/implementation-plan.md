@@ -195,7 +195,8 @@ Kappung) + sichtbarem `truncated`-Hinweis; Property-Typ Liste/Skalar (beobachtet
 `summaries`-Aggregation (Tabelle, Kanban-Header, MCP); `file.size`/`file.backlinks`; `![[file.base]]`-Embed + `bases:add-item`; sortierbare Formelspalten (clientseitig); Welcome-Vault-
 Guides + Beispiele DE/EN erweitert. Danach: Inline-```` ```base ````-Codeblock in Notizen (Live Preview + Reading View), `bases:insert` fügt ihn ein. Spec `bases-embed-this-and-views`: `![[x.base#Ansicht]]` (benannte Ansicht, unbekannter Name = sichtbarer Fehler) und `this` (einbettende Notiz) in Filtern/Formeln. Bewusst offen: echte `cards`/`list`/`map`-Ansichten in der Einbettung (nur Tabelle), Aktualisierung der Einbettung bei `vault:change`, `this` in Plugin-Ansichten und im MCP-Werkzeug.
 **Umgesetzt (Spec `bases-obsidian-parity`):** Lambdas (`map`/`filter`/`reduce`), Regexp-Literale, ~50 weitere Funktionen/Methoden, custom `summaries`-Formeln über `values`, `file.embeds` (getrennte Embed-Markierung im Link-Index), `groupOrder`, `type: kanban`, Cards-Raster mit `image`/`imageFit`/`imageAspectRatio`/`cardSize`, Einbettung mit echtem Ansichtstyp (außer `map`) und Live-Update bei `vault:change`.
-**Noch zurückgestellt:** Tabellen-Zeilenhöhe und Listen-Optionen (YAML-Schlüssel nicht belegt), Objekt-Typ, Copy/CSV-Export, `this` im MCP-Tool.
+**Nachgetragen (2026-11-13):** `this` im MCP-Tool `query_base` (optionaler Parameter `thisPath`, Antwort mit `thisPath`/`thisFound`) und CSV-Export der Tabelle (Befehl `bases:export-csv`, RFC 4180, UTF-8 mit BOM, Zellen mit führendem `=`/`+`/`@`/`-` werden gegen Tabellenkalkulations-Formeln entschärft).
+**Noch zurückgestellt:** Tabellen-Zeilenhöhe und Listen-Optionen (YAML-Schlüssel nicht belegt), Objekt-Typ.
 Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).
 
 ---
@@ -220,7 +221,7 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 | Audio Recorder (ohne Transkription) | Aus `editor/dictation/dictation-recorder.ts` ableitbar (O3) |
 | Vim-Modus | Nur gewarnter Stub |
 | `![](url)`-Embed in Live Preview | Nur Lesemodus |
-| Bases-Reste | Objekt-Typ, Zeilenhöhe, Listen-Optionen, CSV-Export, `this` im MCP-Tool, `map` beim Einbetten |
+| Bases-Reste | Objekt-Typ, Zeilenhöhe, Listen-Optionen (Schlüssel nicht belegt), `map` beim Einbetten. Erledigt: CSV-Export, `this` im MCP-Tool |
 | Server-Side Plugins / Semantische Suche / Collaborative Editing / E2E-Suite | Prio 4–8, 39 Tasks `server-side-plugins` offen |
 
 **Seit dem Abgleich erledigt:** Template-Datumsformate `{{date:FORMAT}}`/`{{time:FORMAT}}`

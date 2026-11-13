@@ -12,6 +12,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import {
   parseBase,
   buildQuerySpec,
+  buildHostQuerySpec,
+  wireRowToBaseRow,
   filterRows,
   evaluateFormulaColumn,
   formatFormulaValue,
@@ -77,10 +79,10 @@ function outputColumns(doc: BaseDocument, view: BaseView): string[] {
 }
 
 /** One cell as JSON: formulas evaluated, single-element property lists unwrapped. */
-function cellValue(doc: BaseDocument, row: BaseRow, column: string): unknown {
+function cellValue(doc: BaseDocument, row: BaseRow, column: string, thisRow?: BaseRow): unknown {
   const formulaId = column.startsWith('formula.') ? column.slice('formula.'.length) : column
   if (doc.formulas && formulaId in doc.formulas) {
-    const r = evaluateFormulaColumn(doc, row, formulaId)
+    const r = evaluateFormulaColumn(doc, row, formulaId, thisRow)
     return r.ok ? formatFormulaValue(r.value) : `#ERR: ${r.error}`
   }
   if (column === 'file.name') return row.fileName
@@ -88,6 +90,42 @@ function cellValue(doc: BaseDocument, row: BaseRow, column: string): unknown {
   const v = row.values[key] ?? row.values[column]
   if (Array.isArray(v)) return v.length === 1 ? v[0] : v
   return v ?? null
+}
+
+/** Maps the wire spec the shared engine builds to the link index's own spec type. */
+function toIndexSpec(wireSpec: ReturnType<typeof buildQuerySpec>): BaseQuerySpec {
+  return {
+    columns: wireSpec.columns,
+    sort: wireSpec.sort,
+    filters: wireSpec.filters as BaseQuerySpec['filters'],
+    fileColumns: wireSpec.fileColumns,
+  }
+}
+
+/** A vault-relative note path usable as a lookup key: no traversal, no absolute path, no NUL. */
+function isSafeHostPath(path: string): boolean {
+  return path.length > 0 && path.length <= 4096 && !path.startsWith('/') && !path.includes('\\') && !path.includes('\0')
+    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
+}
+
+/**
+ * Loads the row `this` refers to (the note a base is embedded in). `undefined` when the base never
+ * mentions `this`, or when the note is not in the index.
+ */
+async function fetchHostRow(
+  linkIndex: ILinkIndex,
+  doc: BaseDocument,
+  view: BaseView,
+  hostPath: string,
+): Promise<BaseRow | undefined> {
+  const spec = buildHostQuerySpec(doc, view, hostPath)
+  if (spec === null) return undefined
+  const result = await linkIndex.queryForBase(toIndexSpec(spec))
+  // The path is a backend glob and may match more than the host: take the exact path.
+  const wire = result.rows.find((r) => r.path === hostPath)
+  if (!wire) return undefined
+  const listKeys = result.listKeys && result.listKeys.length > 0 ? new Set(result.listKeys) : undefined
+  return wireRowToBaseRow(wire, listKeys)
 }
 
 export function registerQueryBase(
@@ -111,6 +149,10 @@ export function registerQueryBase(
         .optional()
         .default(DEFAULT_LIMIT)
         .describe('Maximum rows to return (applied on top of the view\'s own limit).'),
+      thisPath: z.string()
+        .max(4096)
+        .optional()
+        .describe('Vault-relative path of a note to use as `this` in the base\'s filters and formulas (as if the base were embedded in that note). Without it, `this` is empty.'),
     },
     async (args) => {
       try {
@@ -178,15 +220,13 @@ export function registerQueryBase(
         // Filters + limit are evaluated here, not by the index (see buildQuerySpec).
         // The wire spec's `filters` is the conservative structured prefilter,
         // structurally a BaseQueryNode (property/tag/path/op/value + and/or).
-        const wireSpec = buildQuerySpec(doc, view)
-        const indexSpec: BaseQuerySpec = {
-          columns: wireSpec.columns,
-          sort: wireSpec.sort,
-          filters: wireSpec.filters as BaseQuerySpec['filters'],
-          fileColumns: wireSpec.fileColumns,
+        if (args.thisPath !== undefined && !isSafeHostPath(args.thisPath)) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid thisPath')
         }
-        const candidates = await linkIndex.queryForBase(indexSpec)
-        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys)
+        const thisRow = args.thisPath !== undefined ? await fetchHostRow(linkIndex, doc, view, args.thisPath) : undefined
+
+        const candidates = await linkIndex.queryForBase(toIndexSpec(buildQuerySpec(doc, view)))
+        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys, thisRow)
 
         const returned = rows.slice(0, args.limit)
         // `filterRows` counts matches before the view's own limit. The view limit
@@ -208,8 +248,10 @@ export function registerQueryBase(
           columns,
           rows: returned.map((row) => ({
             path: row.path,
-            cells: Object.fromEntries(columns.map((c) => [c, cellValue(doc, row, c)])),
+            cells: Object.fromEntries(columns.map((c) => [c, cellValue(doc, row, c, thisRow)])),
           })),
+          // Echo the host so a client can tell "this was empty" from "the note is not indexed".
+          ...(args.thisPath !== undefined ? { thisPath: args.thisPath, thisFound: thisRow !== undefined } : {}),
           total: available,
           matches: total,
           returned: returned.length,

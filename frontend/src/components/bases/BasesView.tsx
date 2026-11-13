@@ -22,7 +22,7 @@ import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { requestVaultTreeRefresh } from '../../state/vaultTreeRefreshBridge'
 import { requestReveal } from '../../state/revealFileBridge'
-import { setActiveBasesController, clearActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
+import { setActiveBasesController, clearActiveBasesController, tableToTsv, tableToCsv, csvFileName } from '../../state/activeBasesBridge'
 import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
 import { hasBasesViewRegistration, subscribeBasesViewRegistry, getBasesViewRegistryVersion } from '../../plugins/compat/bases-view-registry'
@@ -375,11 +375,24 @@ export const BasesView = memo(function BasesView({
           return false
         }
       },
+      exportCsv: () => {
+        const table = rootRef.current?.querySelector<HTMLTableElement>('table.bases-table')
+        if (!table) return false
+        // BOM first: spreadsheets otherwise guess the encoding and mangle umlauts.
+        const blob = new Blob(['﻿', tableToCsv(table)], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = csvFileName(hostPath)
+        link.click()
+        URL.revokeObjectURL(url)
+        return true
+      },
       addItem,
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem, hostPath])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {

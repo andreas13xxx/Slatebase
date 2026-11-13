@@ -18,6 +18,12 @@ export interface ActiveBasesController {
   copyTable(): Promise<boolean>
 
   /**
+   * Download the displayed table as a CSV file (UTF-8 with BOM, so a spreadsheet reads umlauts
+   * correctly). @returns false when no table is displayed.
+   */
+  exportCsv(): boolean
+
+  /**
    * Create a new note in the base's scope (target folder from a `file.inFolder`
    * filter, else vault root; frontmatter keys from the displayed properties,
    * left blank) so it appears as a new row. @returns the new note's path, or
@@ -59,4 +65,40 @@ export function tableToTsv(table: HTMLTableElement): string {
         .join('\t'),
     )
     .join('\n')
+}
+
+/** Cleans one displayed cell: sort markers dropped, whitespace collapsed. */
+function cellText(cell: HTMLTableCellElement): string {
+  return (cell.textContent ?? '').replace(/\s*[▲▼]\s*$/, '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Makes a cell safe to open in a spreadsheet: a text starting with `=`, `+`, `@` (or `-` unless the
+ * whole text is a plain negative number) would be run as a formula, and a note in a shared vault
+ * controls that text. Such cells get a leading apostrophe, which spreadsheets show as plain text.
+ */
+export function neutralizeSpreadsheetFormula(text: string): string {
+  // A leading "-" stays only for a plain negative number ("-5", "-0,5") or a lone dash.
+  if (/^[=+@]/.test(text) || /^-(?!\d[\d.,]*$|$)/.test(text)) return `'${text}`
+  return text
+}
+
+/** One CSV field (RFC 4180): quoted when it holds a comma, quote or line break; quotes are doubled. */
+function csvField(text: string): string {
+  const safe = neutralizeSpreadsheetFormula(text)
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+}
+
+/** Render an HTML table as CSV (RFC 4180, CRLF line ends). Sort markers are dropped. */
+export function tableToCsv(table: HTMLTableElement): string {
+  return Array.from(table.rows)
+    .map((row) => Array.from(row.cells).map((cell) => csvField(cellText(cell))).join(','))
+    .join('\r\n')
+}
+
+/** File name for a base's CSV export: the base's own name with `.csv` (`Tasks.base` becomes `Tasks.csv`). */
+export function csvFileName(hostPath: string | undefined): string {
+  const name = (hostPath ?? '').split('/').pop() ?? ''
+  const base = name.replace(/\.base$/i, '').trim()
+  return `${base || 'base'}.csv`
 }
