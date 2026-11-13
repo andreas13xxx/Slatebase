@@ -91,6 +91,15 @@
      code and tab text did before they were bound. Specificity 0: any theme rule wins. */
   --code-normal: var(--text-normal);
   --tab-text-color: var(--text-muted);
+  --code-background: var(--background-primary-alt);
+  --ribbon-background: var(--background-secondary);
+  --tab-divider-color: var(--background-modifier-border);
+  --default-font: var(--font-interface);
+
+  /* Slatebase's own shadow tokens, recolored by the theme's box-shadow color. In the specificity-0 block so a theme that
+     sets `--shadow-md`/`--shadow-lg` itself still wins. */
+  --shadow-md: 0 4px 6px -1px var(--background-modifier-box-shadow), 0 2px 4px -2px var(--background-modifier-box-shadow);
+  --shadow-lg: 0 10px 15px -3px var(--background-modifier-box-shadow), 0 4px 6px -4px var(--background-modifier-box-shadow);
 }
 
 :root[data-obsidian-theme] body {
@@ -115,6 +124,10 @@
   --accent-hover: var(--interactive-accent-hover);
   --accent-text: var(--text-accent);
   --accent-light: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+
+  /* ─── Status colors (Obsidian: error/success backgrounds) ─── */
+  --danger-bg: var(--background-modifier-error);
+  --success-bg: var(--background-modifier-success);
 
   /* ─── Panels (own tokens in index.css; Obsidian's side panels use the secondary background) ─── */
   --sidebar-bg: var(--background-secondary);
@@ -236,10 +249,11 @@
   background: var(--text-selection);
 }
 
-/* Code text and the task checkbox's accent. */
+/* Code text and background, and the task checkbox's accent. */
 :root[data-obsidian-theme] .cm-lp-inline-code,
 :root[data-obsidian-theme] .cm-lp-code-block-line {
   color: var(--code-normal);
+  background-color: var(--code-background);
 }
 
 :root[data-obsidian-theme] .cm-lp-checkbox {
@@ -254,4 +268,23 @@
 :root[data-obsidian-theme] .tab-bar-tab:hover,
 :root[data-obsidian-theme] .tab-bar-tab--active {
   color: var(--tab-text-color-focused-active);
+}
+
+/* ─── Second round of widely used variables (same top-50 count: 19–44 themes each) ──────────────────────────
+   `--background-primary-alt` reaches code via `--code-background` (specificity-0 default above, a theme's own value
+   wins). Error/success backgrounds and the box-shadow color are bound through tokens in the body block. Not bound,
+   deliberately: `--titlebar-background*` (Slatebase has no title bar), `--ribbon-background-collapsed` (the toolbar is
+   always visible), `--input-shadow`, `--interactive-accent-rgb` and `--color-*-rgb` (only useful inside `rgba(var(...))`
+   in a theme's own rules; Slatebase's CSS does not compose colors that way). */
+:root[data-obsidian-theme] .app-toolbar {
+  background: var(--ribbon-background);
+}
+
+:root[data-obsidian-theme] .tab-bar {
+  border-bottom-color: var(--tab-divider-color);
+}
+
+/* Active search match in the editor. Obsidian's default is a stronger yellow than Slatebase's teal tint. */
+:root[data-obsidian-theme] .cm-editor .cm-searchMatch.cm-searchMatch-selected {
+  background-color: var(--text-highlight-bg-active);
 }

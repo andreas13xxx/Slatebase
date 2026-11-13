@@ -67,13 +67,20 @@ Umsetzung in Phasen; jede Phase einzeln committbar und grün (tsc, Lint, betroff
       Things 0 von 105** geänderte Elemente, d. h. die Klassen verändern nichts, was Phase 1 nicht schon bewirkt hat.
       Ausnahme: `cm-formatting` am Überschriften-Marker erscheint nur, solange der Marker sichtbar ist (Cursor in der
       Zeile); sonst wird er ausgeblendet. Die Klassenzählung (`measure-selectors.py`) wurde nicht wiederholt
-- [ ] 3.2 Themes-Seite im Welcome-Vault (DE + EN), README und `AGENTS.md`: Tabellen und Editorbreite sind angeglichen,
+- [x] 3.2 (2026-11-13: Welcome-Vault DE/EN, README, AGENTS.md aktualisiert) Themes-Seite im Welcome-Vault (DE + EN), README und `AGENTS.md`: Tabellen und Editorbreite sind angeglichen,
       Tab-Leiste, Ribbon, Titelleiste und Style-Settings-Optionen nicht
 - [x] 3.3 Frontend `test:coverage` (2026-10-20): 3478 bestanden, 42 fehlgeschlagen in 19 Dateien; alle 42 waren
       Zeitüberschreitungen, weil parallel die Test-Instanz lief. Einzellauf der 19 Dateien mit `--testTimeout=30000`:
       344 bestanden, 1 fehlgeschlagen (`standalone-block-spacing.test.ts`, vorbestehend und lastabhängig, allein grün).
       Es gab keine Schwellenmeldung im Lauf. Ein sauberer Lauf ohne Parallellast steht noch aus (CI). Lint und `tsc`
       beider Pakete laufen über den Pre-commit-Hook bei jedem Commit. Backend unberührt (Welcome-Vault-Tests grün)
+
+## Phase 4 — Folgerunde (2026-11-13, Branch `feat/theme-compat-variables-and-classes`)
+- [x] 4.1 `cm-strong`/`cm-em`/`cm-strikethrough` an Inhalt, `cm-formatting` + `cm-formatting-strong|em|strikethrough|highlight|quote` an Markern (Live Preview; Listenzeichen bewusst nicht, Slatebase blendet sie nicht aus)
+- [x] 4.2 Bridge: `--danger-bg`/`--success-bg` ← `--background-modifier-error`/`-success`, `--shadow-md/-lg` ← `--background-modifier-box-shadow`, `--code-background` ← `--background-primary-alt` (Spezifität 0), Toolbar ← `--ribbon-background`, Tab-Leiste ← `--tab-divider-color`, aktiver Suchtreffer ← `--text-highlight-bg-active`
+- [x] 4.3 Compat: `--default-font` definiert
+- Bewusst nicht gebunden: `--titlebar-background*` (keine Titelzeile), `--ribbon-background-collapsed`, `--input-shadow`, `--interactive-accent-rgb`/`--color-*-rgb`, `--touch-size-m`/`--checkbox-icon`/`--font-text-override` (Obsidian-Werte nicht belegt)
+- Offen: Sichtprüfung der neuen Bindungen an zwei bis drei Top-Themes (nur per Test belegt, nicht im Bild)
 
 ## Entscheidungen
 - 2026-10-19: Workspace/Tabs/Ribbon/Titelleiste werden nicht angeglichen (Spike, Design §2/§3).

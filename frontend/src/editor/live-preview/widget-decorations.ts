@@ -2329,6 +2329,9 @@ export function buildWidgetDecorations(
               decorations.push(
                 Decoration.replace({}).range(line.from, prefixTo)
               )
+              decorations.push(
+                Decoration.mark({ class: 'cm-formatting cm-formatting-quote' }).range(line.from, prefixTo)
+              )
             }
           }
         }

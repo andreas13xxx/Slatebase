@@ -104,7 +104,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
         if (contentFrom < contentTo) {
           // Mark the content with bold class
           decorations.push(
-            Decoration.mark({ class: 'cm-lp-bold' }).range(contentFrom, contentTo)
+            Decoration.mark({ class: 'cm-lp-bold cm-strong' }).range(contentFrom, contentTo)
           )
 
           // Opening marker
@@ -112,11 +112,17 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
           decorations.push(
             Decoration.replace({}).range(from, contentFrom)
           )
+          decorations.push(
+            Decoration.mark({ class: 'cm-formatting cm-formatting-strong' }).range(from, contentFrom)
+          )
 
           // Closing marker
           hideableRanges.push({ from: contentTo, to, groupFrom: from, groupTo: to })
           decorations.push(
             Decoration.replace({}).range(contentTo, to)
+          )
+          decorations.push(
+            Decoration.mark({ class: 'cm-formatting cm-formatting-strong' }).range(contentTo, to)
           )
         }
       }
@@ -134,7 +140,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
         if (contentFrom < contentTo) {
           // Mark the content with italic class
           decorations.push(
-            Decoration.mark({ class: 'cm-lp-italic' }).range(contentFrom, contentTo)
+            Decoration.mark({ class: 'cm-lp-italic cm-em' }).range(contentFrom, contentTo)
           )
 
           // Opening marker
@@ -142,11 +148,17 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
           decorations.push(
             Decoration.replace({}).range(from, contentFrom)
           )
+          decorations.push(
+            Decoration.mark({ class: 'cm-formatting cm-formatting-em' }).range(from, contentFrom)
+          )
 
           // Closing marker
           hideableRanges.push({ from: contentTo, to, groupFrom: from, groupTo: to })
           decorations.push(
             Decoration.replace({}).range(contentTo, to)
+          )
+          decorations.push(
+            Decoration.mark({ class: 'cm-formatting cm-formatting-em' }).range(contentTo, to)
           )
         }
       }
@@ -164,7 +176,7 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
         if (contentFrom < contentTo) {
           // Mark the content with strikethrough class
           decorations.push(
-            Decoration.mark({ class: 'cm-lp-strikethrough' }).range(contentFrom, contentTo)
+            Decoration.mark({ class: 'cm-lp-strikethrough cm-strikethrough' }).range(contentFrom, contentTo)
           )
 
           // Opening marker
@@ -172,11 +184,17 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
           decorations.push(
             Decoration.replace({}).range(from, contentFrom)
           )
+          decorations.push(
+            Decoration.mark({ class: 'cm-formatting cm-formatting-strikethrough' }).range(from, contentFrom)
+          )
 
           // Closing marker
           hideableRanges.push({ from: contentTo, to, groupFrom: from, groupTo: to })
           decorations.push(
             Decoration.replace({}).range(contentTo, to)
+          )
+          decorations.push(
+            Decoration.mark({ class: 'cm-formatting cm-formatting-strikethrough' }).range(contentTo, to)
           )
         }
       }
@@ -315,11 +333,17 @@ export function buildInlineDecorations(state: EditorState): InlineDecorationResu
       decorations.push(
         Decoration.replace({}).range(from, contentFrom)
       )
+      decorations.push(
+        Decoration.mark({ class: 'cm-formatting cm-formatting-highlight' }).range(from, contentFrom)
+      )
 
       // Closing marker ==
       hideableRanges.push({ from: contentTo, to, groupFrom: from, groupTo: to })
       decorations.push(
         Decoration.replace({}).range(contentTo, to)
+      )
+      decorations.push(
+        Decoration.mark({ class: 'cm-formatting cm-formatting-highlight' }).range(contentTo, to)
       )
     }
   }
