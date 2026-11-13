@@ -853,15 +853,6 @@
   gap: var(--spacing-sm);
 }
 
-/* Sort / group panels hold an openable column dropdown whose list is absolutely
-   positioned; the panel's own scroll box would clip it (both in height and
-   width). These panels are always short, so they don't need to scroll — let the
-   dropdown list overflow the panel freely instead. */
-.bases-tb__panel--dropdown {
-  overflow: visible;
-  max-height: none;
-}
-
 .bases-tb__section {
   display: flex;
   flex-direction: column;
@@ -1218,11 +1209,11 @@
   white-space: nowrap;
 }
 
+/* Rendered into a body-level portal (position:fixed) so no scrolling ancestor
+   — e.g. the Filter panel's scroll box — can clip it. top/left set inline. */
 .bases-tb__col-dd-list {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 40;
   margin: 0;
   padding: 4px;
   list-style: none;

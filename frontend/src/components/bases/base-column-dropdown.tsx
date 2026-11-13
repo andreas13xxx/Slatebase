@@ -9,8 +9,9 @@
  * single-export for react-refresh, and so both consumers import one copy.
  */
 
-import { useEffect, useId, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Check } from 'lucide-react'
 import type { BaseDocument, BaseRow } from '@slatebase/shared-contracts'
 import type { ColumnChoice } from './base-edit'
@@ -44,11 +45,43 @@ export function ColumnDropdown({
 }: ColumnDropdownProps): ReactNode {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const [pos, setPos] = useState<CSSProperties>({})
   const listId = useId()
+
+  // The list is rendered into a body-level portal with position:fixed so no
+  // scrolling/overflow-clipping ancestor (e.g. the Filter panel's scroll box)
+  // can clip it. Position it flush under the button, flipping up when there's
+  // no room below.
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return
+    const reposition = () => {
+      const btn = btnRef.current
+      if (!btn) return
+      const r = btn.getBoundingClientRect()
+      const below = window.innerHeight - r.bottom
+      const flipUp = below < 280 && r.top > below
+      setPos(flipUp
+        ? { bottom: window.innerHeight - r.top + 2, left: r.left, minWidth: r.width }
+        : { top: r.bottom + 2, left: r.left, minWidth: r.width })
+    }
+    reposition()
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (rootRef.current?.contains(t)) return
+      if (listRef.current?.contains(t)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDown)
@@ -65,6 +98,7 @@ export function ColumnDropdown({
   return (
     <div className="bases-tb__col-dd" ref={rootRef}>
       <button
+        ref={btnRef}
         type="button"
         className="bases-tb__select bases-tb__col-dd-btn"
         aria-label={label}
@@ -77,8 +111,8 @@ export function ColumnDropdown({
         {value !== '' && <ColumnTypeIcon doc={doc} col={value} rows={rows} />}
         <span className="bases-tb__col-dd-selected">{selectedLabel}</span>
       </button>
-      {open && (
-        <ul id={listId} role="listbox" aria-label={label} className="bases-tb__col-dd-list">
+      {open && createPortal(
+        <ul ref={listRef} id={listId} role="listbox" aria-label={label} className="bases-tb__col-dd-list" style={pos}>
           {allowEmpty && (
             <li role="option" aria-selected={value === ''}>
               <button type="button" className="bases-tb__col-dd-opt" onClick={() => { onChange(''); setOpen(false) }}>
@@ -106,7 +140,8 @@ export function ColumnDropdown({
               </button>
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   )

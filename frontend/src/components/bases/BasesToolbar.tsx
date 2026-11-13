@@ -54,8 +54,8 @@ export interface BasesToolbarProps {
 // ─── Popover ────────────────────────────────────────────────────────────────
 
 const Popover = memo(function Popover({
-  label, title, badge, panelClassName, children,
-}: { label: ReactNode; title: string; badge?: number; panelClassName?: string; children: ReactNode }) {
+  label, title, badge, children,
+}: { label: ReactNode; title: string; badge?: number; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const panelId = useId()
@@ -63,7 +63,11 @@ const Popover = memo(function Popover({
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const t = e.target as Node
+      if (rootRef.current && !rootRef.current.contains(t)) {
+        // A column dropdown's list is portalled to the body (outside rootRef);
+        // a click inside it must not close the panel.
+        if (t instanceof Element && t.closest('.bases-tb__col-dd-list')) return
         // Blur first so a half-typed field commits before its panel unmounts.
         const active = document.activeElement
         if (active instanceof HTMLElement && rootRef.current.contains(active)) active.blur()
@@ -95,7 +99,7 @@ const Popover = memo(function Popover({
         <span aria-hidden="true" className="bases-tb__caret">▾</span>
       </button>
       {open && (
-        <div id={panelId} role="dialog" aria-label={title} className={panelClassName ? `bases-tb__panel ${panelClassName}` : 'bases-tb__panel'}>
+        <div id={panelId} role="dialog" aria-label={title} className="bases-tb__panel">
           {children}
         </div>
       )}
@@ -496,8 +500,8 @@ export const BasesToolbar = memo(function BasesToolbar({
               <Search aria-hidden="true" className="bases-tb__btn-icon" />
               Suchen
             </button>
-            <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0} panelClassName="bases-tb__panel--dropdown"><SortPanel {...panelProps} /></Popover>
-            <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0} panelClassName="bases-tb__panel--dropdown"><GroupPanel {...panelProps} /></Popover>
+            <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
+            <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
             <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
             <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
           </div>
