@@ -81,7 +81,9 @@ const UploadConfigSchema = z.object({
  * Default allowlist for the Obsidian plugin request proxy (`POST /api/v1/proxy`).
  * GitHub hosts are seeded because the most common proxied requests are plugin
  * update checks and asset/language-pack downloads from GitHub releases and raw
- * content. An admin can edit this list in the UI; the operator can still pin it
+ * content; `tiles.openfreemap.org` is the default map-tile/style backend of the
+ * official Obsidian Maps plugin's Bases map view, which renders blank without
+ * it. An admin can edit this list in the UI; the operator can still pin it
  * from the environment (`SLATEBASE_PROXY_ALLOWED_ORIGINS`), which wins.
  */
 export const DEFAULT_PROXY_ALLOWED_ORIGINS: readonly string[] = [
@@ -89,6 +91,7 @@ export const DEFAULT_PROXY_ALLOWED_ORIGINS: readonly string[] = [
   'github.com',
   'raw.githubusercontent.com',
   '*.githubusercontent.com',
+  'tiles.openfreemap.org',
 ]
 
 /**

@@ -359,6 +359,46 @@
   min-height: 0;
   overflow: auto;
   padding: var(--spacing-md);
+  /* Keep the plugin view (and its internally z-indexed layers, e.g. Leaflet
+     panes/controls) below the toolbar's dropdown panels. */
+  position: relative;
+  z-index: 0;
+  /* A plugin view's own root fills this container. The Maps plugin's
+     `.bases-map-container` is `height: 100%`, so it needs a parent WITH a
+     height — a flex child with `min-height: 0` collapses to content height
+     otherwise. `display: flex` + this child rule hand it the full pane. */
+  display: flex;
+  flex-direction: column;
+}
+
+.bases-view__plugin-container > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The Maps plugin only sets `.bases-map` to full height under its own
+   `.workspace-leaf-content[data-type="bases"]` ancestor, which Slatebase's
+   host does not provide; without this it falls back to its 400px embed
+   height and the map fills only the top portion of the pane. Scope to our
+   host so no other surface is affected, and drop the host padding for a map
+   view so the canvas reaches the pane edges (the plugin itself sets
+   `--bases-view-padding: 0` on an ancestor we do not render). */
+.bases-view__plugin-container:has(.bases-map-container) {
+  padding: 0;
+}
+
+.bases-view__plugin-container .bases-map-container {
+  height: 100%;
+}
+
+/* `.bases-map` reads its height from `--bases-map-embed-height` (400px, the
+   plugin's embed default). The plugin CSS is injected at plugin-load time —
+   AFTER this bundled app CSS — so a same-specificity `height: 100%` here would
+   lose on source order. Override the variable instead: the plugin's own
+   `.bases-map { height: var(--bases-map-embed-height) }` rule then resolves to
+   the full pane, no specificity fight and no `!important`. */
+.bases-view__plugin-container {
+  --bases-map-embed-height: 100%;
 }
 
 /* ─── Kanban (cards) view ──────────────────────────────────────────────── */
@@ -1167,6 +1207,13 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  /* Own stacking context above the view body. A plugin view (e.g. the Maps
+     plugin's Leaflet map) renders with internal z-index up to ~1000; this wrap
+     is the direct sibling of `.bases-view__plugin-container`, so the z-index
+     belongs HERE (not on the inner `.bases-view__toolbar`) or the toolbar's
+     open dropdown panels (sort/group/filter/properties) stay under the map. */
+  position: relative;
+  z-index: 2;
 }
 
 .bases-view__searchbar {

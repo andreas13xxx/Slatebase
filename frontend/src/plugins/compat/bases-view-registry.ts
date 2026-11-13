@@ -82,6 +82,33 @@ interface OwnedRegistration {
 const registrations = new Map<string, OwnedRegistration>()
 
 /**
+ * Registry change signal. The registry is filled asynchronously as plugins
+ * load, so a component that already read `hasBasesViewRegistration(type)` (and
+ * cached the answer in a memo) would otherwise never notice a later
+ * registration — e.g. an open `.base` with `type: map` keeps showing the table
+ * fallback after the Maps plugin registers `map`, because the backend's
+ * `vault:change` excludes the tab that triggered the install. Consumers
+ * subscribe to re-read when this version bumps.
+ */
+const listeners = new Set<() => void>()
+let registryVersion = 0
+function notify(): void {
+  registryVersion++
+  for (const cb of listeners) cb()
+}
+
+/** Subscribe to registry changes (register/clear/reset). Returns an unsubscribe. */
+export function subscribeBasesViewRegistry(callback: () => void): () => void {
+  listeners.add(callback)
+  return () => { listeners.delete(callback) }
+}
+
+/** Monotonic version, bumped on every registry change — a `useSyncExternalStore` snapshot. */
+export function getBasesViewRegistryVersion(): number {
+  return registryVersion
+}
+
+/**
  * Register a Bases view type under `viewId`. Returns `true` if it was stored,
  * `false` if the id was already taken (Obsidian's `registerBasesView` returns
  * a boolean; a duplicate id does not overwrite the earlier registration).
@@ -96,6 +123,7 @@ export function registerBasesView(viewId: string, registration: BasesViewRegistr
     return false
   }
   registrations.set(viewId, { registration, pluginId })
+  notify()
   return true
 }
 
@@ -130,12 +158,16 @@ export function listBasesViewRegistrations(): Array<{ viewId: string; name: stri
 
 /** Remove every registration owned by one plugin (on plugin deactivation). */
 export function clearForPlugin(pluginId: string): void {
+  let changed = false
   for (const [viewId, owned] of registrations) {
-    if (owned.pluginId === pluginId) registrations.delete(viewId)
+    if (owned.pluginId === pluginId) { registrations.delete(viewId); changed = true }
   }
+  if (changed) notify()
 }
 
 /** Clear all registrations (on vault switch / test reset). */
 export function resetForVault(): void {
+  const had = registrations.size > 0
   registrations.clear()
+  if (had) notify()
 }

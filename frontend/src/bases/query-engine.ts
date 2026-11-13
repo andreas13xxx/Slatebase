@@ -45,6 +45,8 @@ async function fetchHostRow(
 /**
  * Runs a base query against the backend and maps + filters the result to `BaseRow[]`.
  * `hostPath` is the vault-relative path `this` refers to; omit it when there is no host.
+ * `extraColumns` are property keys a plugin view needs returned even though they
+ * are not displayed columns (e.g. the Maps plugin's `coordinates` marker property).
  */
 export async function runBaseQuery(
   apiClient: QueryBaseClient,
@@ -52,15 +54,16 @@ export async function runBaseQuery(
   doc: BaseDocument,
   view: BaseView,
   hostPath?: string,
-): Promise<{ rows: BaseRow[]; total: number; truncated: boolean }> {
+  extraColumns?: readonly string[],
+): Promise<{ rows: BaseRow[]; total: number; truncated: boolean; propertyKeys: string[] }> {
   if (hostPath === undefined) {
     // No host: the plain single query, with no extra async hops.
-    const result = await apiClient.queryBase(vaultId, buildQuerySpec(doc, view))
-    return filterRows(result.rows, doc, view, result.truncated, result.listKeys)
+    const result = await apiClient.queryBase(vaultId, buildQuerySpec(doc, view, extraColumns))
+    return { ...filterRows(result.rows, doc, view, result.truncated, result.listKeys), propertyKeys: result.propertyKeys ?? [] }
   }
   const [result, thisRow] = await Promise.all([
-    apiClient.queryBase(vaultId, buildQuerySpec(doc, view)),
+    apiClient.queryBase(vaultId, buildQuerySpec(doc, view, extraColumns)),
     fetchHostRow(apiClient, vaultId, doc, view, hostPath),
   ])
-  return filterRows(result.rows, doc, view, result.truncated, result.listKeys, thisRow)
+  return { ...filterRows(result.rows, doc, view, result.truncated, result.listKeys, thisRow), propertyKeys: result.propertyKeys ?? [] }
 }

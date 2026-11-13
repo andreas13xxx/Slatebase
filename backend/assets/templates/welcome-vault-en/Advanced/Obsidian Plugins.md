@@ -136,6 +136,7 @@ These plugins have been tested and work with Slatebase:
 | Paste URL into Selection | Good | Pasting a URL over a selection wraps it as a Markdown link |
 | Better Word Count | Good | Extended status bar stats (sentences, reading time, page count), manually verified with a real plugin bundle |
 | Style Settings | Partial | Theme settings: variables take full effect, class toggles only where Slatebase has the element |
+| Maps | Good | Adds a map view (`type: map`) to Bases — notes with geo coordinates as pins. Slatebase has no built-in map; this view comes only from this plugin. Demo: [[Features/Example Places (Base)]] |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 

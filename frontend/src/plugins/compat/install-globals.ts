@@ -115,7 +115,7 @@ import { foldForSearch, foldQuery, mapFoldedMatches } from '../../utils/searchFo
 import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions, dispatchKeydownToScopeStack, Scope, renderMatches } from './obsidian-api-extensions'
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
-import { installObsidianBodyClasses } from './body-classes'
+import { installObsidianBodyClasses, resolveActiveTheme } from './body-classes'
 import { installApiGapInspector } from './api-gap-registry'
 import { debugOnce, warnNoOp, warnOnce } from './log'
 import { isOwnedEventRef, offrefAtOwner } from './event-system'
@@ -1215,6 +1215,12 @@ export function installObsidianGlobals(): void {
         const value = getComputedStyle(document.documentElement).getPropertyValue('--interactive-accent').trim()
         return value || '#7c3aed'
       },
+      // Same reason as getAccentColor: AppShim.isDarkMode() exists, but a view
+      // driven through window.app (e.g. the official Maps plugin's Bases map
+      // view, which reads `this.app.isDarkMode()` via its QueryController) got
+      // the bare stub and threw "isDarkMode is not a function" inside
+      // onDataUpdated → the map never rendered. Mirror it here.
+      isDarkMode: (): boolean => resolveActiveTheme() === 'dark',
       // Backed by the same module-level `embedByExtension` record every other
       // embedRegistry consumer (AppShim's `this.app.embedRegistry`, and
       // plugin-context.ts's later `window.app.embedRegistry` overwrite) reads

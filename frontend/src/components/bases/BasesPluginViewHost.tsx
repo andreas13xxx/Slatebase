@@ -77,10 +77,30 @@ export function BasesPluginViewHost({
       const queryController = QueryControllerCtor ? new QueryControllerCtor(app) : { app }
 
       // Create a RenderContext-like config carrier so LinkValues can navigate.
-      const ConfigCtor = window.obsidian?.['BasesViewConfig'] as unknown as (new () => { name: string; setOrder?(o: string[]): void }) | undefined
+      const ConfigCtor = window.obsidian?.['BasesViewConfig'] as unknown as (new () => {
+        name: string
+        setOrder?(o: string[]): void
+        setViewData?(key: string, value: unknown): void
+      }) | undefined
       const config = ConfigCtor ? new ConfigCtor() : { name: view.name ?? 'Base' }
       config.name = view.name ?? view.type
       config.setOrder?.(view.order ?? Object.keys(doc.properties ?? {}))
+      // Feed the plugin view its per-view config. A plugin reads these through
+      // `config.get(key)` / `config.getAsPropertyId(key)` (e.g. the Maps plugin
+      // reads the `coordinates` marker property and its zoom/tile options), so
+      // every known view field plus the `_unknown` passthrough bucket — where
+      // the parser keeps fields it has no typed slot for, like `coordinates` —
+      // must be copied into the config's data map, or the plugin view renders
+      // empty despite mounting.
+      if (typeof config.setViewData === 'function') {
+        const forward: Record<string, unknown> = { ...(view._unknown ?? {}) }
+        if (view.limit !== undefined) forward['limit'] = view.limit
+        if (view.image !== undefined) forward['image'] = view.image
+        if (view.imageFit !== undefined) forward['imageFit'] = view.imageFit
+        if (view.imageAspectRatio !== undefined) forward['imageAspectRatio'] = view.imageAspectRatio
+        if (view.cardSize !== undefined) forward['cardSize'] = view.cardSize
+        for (const [key, value] of Object.entries(forward)) config.setViewData(key, value)
+      }
       ;(queryController as { config?: unknown }).config = config
 
       // Instantiate the plugin view inside the plugin's execution context so

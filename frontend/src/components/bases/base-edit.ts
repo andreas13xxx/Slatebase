@@ -17,10 +17,10 @@ import type {
 
 // ─── Views ──────────────────────────────────────────────────────────────────
 
-export const VIEW_TYPES = ['table', 'cards', 'kanban', 'list', 'map'] as const
+export const VIEW_TYPES = ['table', 'cards', 'kanban', 'list'] as const
 
 export const VIEW_TYPE_LABELS: Record<string, string> = {
-  table: 'Tabelle', cards: 'Galerie', kanban: 'Kanban', list: 'Liste', map: 'Karte (Map)',
+  table: 'Tabelle', cards: 'Galerie', kanban: 'Kanban', list: 'Liste',
 }
 export type ViewType = (typeof VIEW_TYPES)[number]
 
@@ -189,12 +189,19 @@ export function columnLabel(doc: BaseDocument, id: string): string {
   return id
 }
 
-/** Every column the toolbar offers: file fields, formulas, declared and observed properties. */
-export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseView | undefined): ColumnChoice[] {
+/**
+ * Every column the toolbar offers: file fields, formulas, declared and observed
+ * properties. `observedProperties` are the frontmatter keys the backend saw
+ * across the base's matched notes (independent of which columns the query
+ * requested) — so the picker lists the base's own properties like Obsidian,
+ * not just the ones that happened to be fetched into `rows`.
+ */
+export function availableColumns(doc: BaseDocument, rows: BaseRow[], view: BaseView | undefined, observedProperties?: readonly string[]): ColumnChoice[] {
   const ids: string[] = [...FILE_COLUMNS]
   for (const key of Object.keys(doc.formulas ?? {})) ids.push(`formula.${key}`)
   for (const key of Object.keys(doc.properties ?? {})) ids.push(key)
   for (const id of view?.order ?? []) ids.push(id)
+  for (const key of observedProperties ?? []) if (!key.startsWith('file.')) ids.push(key)
   for (const row of rows) {
     for (const key of Object.keys(row.values)) if (!key.startsWith('file.')) ids.push(key)
   }

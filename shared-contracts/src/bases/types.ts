@@ -253,4 +253,11 @@ export interface BaseQueryResultWire {
    * a list. Absent/empty falls back to the static `LIST_KEYS` heuristic.
    */
   listKeys?: string[]
+  /**
+   * Every frontmatter property key observed across the MATCHED notes (after the
+   * base's structured prefilter, independent of the row limit). The toolbar
+   * offers these as pickable columns so a user sees the properties of the
+   * base's own files — Obsidian's behaviour — not just the requested columns.
+   */
+  propertyKeys?: string[]
 }

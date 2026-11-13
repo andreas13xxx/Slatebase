@@ -971,9 +971,6 @@ export interface IApiClient {
   // --- Server Version methods ---
   getVersion(): Promise<{ version: string }>
 
-  // --- Map tile config (operator-set, env-only) ---
-  getMapConfig(): Promise<{ tileUrl: string; attribution: string }>
-
   // --- Preferences methods ---
   /** Get the current user's recent files list. */
   getRecentFiles(): Promise<{ entries: RecentFileEntry[] }>
@@ -2031,14 +2028,6 @@ export class ApiClient implements IApiClient {
       await handleErrorResponse(response)
     }
     return response.json() as Promise<{ version: string }>
-  }
-
-  async getMapConfig(): Promise<{ tileUrl: string; attribution: string }> {
-    const response = await fetch('/api/v1/map-config')
-    if (!response.ok) {
-      await handleErrorResponse(response)
-    }
-    return response.json() as Promise<{ tileUrl: string; attribution: string }>
   }
 
   // --- Preferences methods ---

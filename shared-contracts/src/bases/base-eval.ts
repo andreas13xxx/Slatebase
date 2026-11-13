@@ -36,13 +36,19 @@ function collectFilterRefs(node: BaseFilterNode | undefined, into: Set<string>):
  * - Filters and the view `limit` are NOT pushed to the backend — the backend
  *   would cut candidate rows BEFORE the expression filters ran, so `filterRows`
  *   applies both (filter first, then limit).
+ * - `extraColumns` are property keys a consumer needs returned even though they
+ *   are not a displayed column — a plugin Bases view (e.g. the Maps plugin)
+ *   reads marker properties (`coordinates`, `markerIcon`, …) it names through
+ *   its own view config, which are not in `view.order`. Without them the row
+ *   values are empty and the plugin view renders no markers.
  */
-export function buildQuerySpec(doc: BaseDocument, view: BaseView): BaseQuerySpecWire {
+export function buildQuerySpec(doc: BaseDocument, view: BaseView, extraColumns?: readonly string[]): BaseQuerySpecWire {
   const formulaKeys = new Set(Object.keys(doc.formulas ?? {}))
 
   const wanted = new Set<string>()
   for (const id of view.order ?? Object.keys(doc.properties ?? {})) wanted.add(id)
   if (view.groupBy) wanted.add(view.groupBy.property)
+  for (const id of extraColumns ?? []) wanted.add(id)
   collectFilterRefs(doc.filters, wanted)
   collectFilterRefs(view.filters, wanted)
   // Properties read by formula columns must reach the client too.

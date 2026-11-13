@@ -11,7 +11,7 @@
  * stale row behind.
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
 import { serializeBase } from '@slatebase/shared-contracts'
@@ -25,7 +25,7 @@ import { requestReveal } from '../../state/revealFileBridge'
 import { setActiveBasesController, clearActiveBasesController, tableToTsv } from '../../state/activeBasesBridge'
 import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
-import { hasBasesViewRegistration } from '../../plugins/compat/bases-view-registry'
+import { hasBasesViewRegistration, subscribeBasesViewRegistry, getBasesViewRegistryVersion } from '../../plugins/compat/bases-view-registry'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesTableView } from './BasesTableView'
 import { BasesKanbanView } from './BasesKanbanView'
@@ -40,9 +40,6 @@ import { sortRowsByFormula } from './base-formula-sort'
 import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
 import { filterRowsByText } from './base-row-search'
 import './BasesView.css'
-
-// Lazy so Leaflet (+ its CSS) only loads when a `map` view is actually opened.
-const BasesMapView = lazy(() => import('./BasesMapView').then((m) => ({ default: m.BasesMapView })))
 
 export interface BasesViewProps {
   apiClient: IApiClient
@@ -85,6 +82,10 @@ export const BasesView = memo(function BasesView({
   const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
   const [truncated, setTruncated] = useState(false)
+  // Every frontmatter property key across the matched notes, so the toolbar can
+  // offer the base's own properties as columns (Obsidian's behaviour) even when
+  // no view currently requests them.
+  const [observedProperties, setObservedProperties] = useState<string[]>([])
   // Matches before the view's `limit` (Obsidian 1.15: "Showing 10 of 40").
   const [totalMatches, setTotalMatches] = useState(0)
   const [queryError, setQueryError] = useState<string | null>(null)
@@ -93,8 +94,6 @@ export const BasesView = memo(function BasesView({
   const [actionError, setActionError] = useState<string | null>(null)
   const [pluginViewError, setPluginViewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  // Operator-configured map tile source, fetched lazily when a map view is shown.
-  const [mapConfig, setMapConfig] = useState<{ tileUrl: string; attribution: string } | null>(null)
 
   // Parse the base source. A parse failure keeps the raw source reachable.
   const parseResult = useMemo(() => parseBase(source), [source])
@@ -104,12 +103,20 @@ export const BasesView = memo(function BasesView({
   const activeView: BaseView | undefined = views[safeIndex]
 
   // A view whose `type` a plugin registered renders via the plugin host; the
-  // built-in types (`table`, `cards`) and any other unregistered type render
-  // in-app. An errored plugin view falls back to the built-in table.
-  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'kanban', 'list', 'map']), [])
+  // built-in types render in-app. An errored plugin view falls back to the
+  // built-in table. `map` is deliberately NOT built-in: it is left entirely to
+  // a plugin (Obsidian's Maps plugin registers `registerBasesView("map", …)`),
+  // so a `type: map` view mounts the plugin's map when one is installed and
+  // otherwise falls back to the table.
+  const BUILT_IN_VIEW_TYPES = useMemo(() => new Set(['table', 'cards', 'kanban', 'list']), [])
+  // The plugin view registry fills asynchronously as plugins load, so subscribe
+  // to its version: without this a `type: map` view opened before the Maps
+  // plugin registered stays on the table fallback, since the memo below would
+  // never re-read hasBasesViewRegistration (the install tab gets no vault:change).
+  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
   const isPluginView = useMemo(
     () => !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type) && hasBasesViewRegistration(activeView.type) && !pluginViewError,
-    [activeView, pluginViewError, BUILT_IN_VIEW_TYPES],
+    [activeView, pluginViewError, BUILT_IN_VIEW_TYPES, registryVersion],
   )
   // Both board layouts share BasesKanbanView, differing only in orientation:
   // `kanban` groups into horizontal columns, a grouped `cards` view stacks the
@@ -119,7 +126,27 @@ export const BasesView = memo(function BasesView({
   const isGroupedCardsView = !!activeView && !isPluginView && activeView.type === 'cards' && !!activeView.groupBy
   const isCardsView = !!activeView && activeView.type === 'cards' && !activeView.groupBy && !isPluginView
   const isListView = !!activeView && activeView.type === 'list' && !isPluginView
-  const isMapView = !!activeView && activeView.type === 'map' && !isPluginView
+  // A non-built-in view type whose plugin has not (yet) registered. The plugin
+  // system loads after FCP, so on first open the registration can arrive a beat
+  // late — showing the "no plugin" banner + table fallback immediately would
+  // flash them for ~a frame before the plugin view takes over. Hold a short
+  // grace window per non-built-in type: during it we render a quiet
+  // placeholder instead of the fallback, and only once it elapses (plugin still
+  // absent) do we commit to the banner + table. A built-in type never waits.
+  const isNonBuiltInType = !!activeView && !BUILT_IN_VIEW_TYPES.has(activeView.type)
+  const pluginRegistered = !!activeView && hasBasesViewRegistration(activeView.type)
+  const [pluginGraceElapsed, setPluginGraceElapsed] = useState(false)
+  useEffect(() => {
+    if (!isNonBuiltInType || pluginRegistered) return
+    setPluginGraceElapsed(false)
+    const t = setTimeout(() => setPluginGraceElapsed(true), 1000)
+    return () => clearTimeout(t)
+    // Re-arm when the active view's type changes or a registration arrives.
+  }, [isNonBuiltInType, pluginRegistered, activeView?.type, registryVersion])
+  // Still waiting on a possible plugin registration — suppress the fallback.
+  const isPluginPending = isNonBuiltInType && !pluginRegistered && !pluginViewError && !pluginGraceElapsed
+  // Confirmed: a non-built-in type with no plugin and the grace window elapsed.
+  const isUnknownViewType = isNonBuiltInType && !pluginRegistered && pluginGraceElapsed
 
   // Formula columns are not sortable server-side (buildQuerySpec drops them),
   // so when the active view's first sort clause targets a formula column we
@@ -139,10 +166,11 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, total: resultTotal, truncated: resultTruncated } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
+      const { rows: resultRows, total: resultTotal, truncated: resultTruncated, propertyKeys } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
       setTotalMatches(resultTotal)
       setTruncated(resultTruncated)
+      setObservedProperties(propertyKeys)
       setQueryError(null)
     } catch (err) {
       setQueryError(extractErrorMessage(err, 'Die Base-Abfrage ist fehlgeschlagen'))
@@ -175,18 +203,6 @@ export const BasesView = memo(function BasesView({
       setPluginViewError(null)
     }
   }, [safeIndex])
-
-  // Fetch the operator tile config the first time a map view is shown. It is a
-  // per-instance operator value (not per-vault), so one fetch per BasesView is
-  // enough; a failed read leaves `mapConfig` null and the map shows inactive.
-  useEffect(() => {
-    if (!isMapView || mapConfig !== null) return
-    let cancelled = false
-    void apiClient.getMapConfig()
-      .then((cfg) => { if (!cancelled) setMapConfig(cfg) })
-      .catch(() => { if (!cancelled) setMapConfig({ tileUrl: '', attribution: '' }) })
-    return () => { cancelled = true }
-  }, [isMapView, mapConfig, apiClient])
 
   // Write one note's frontmatter back to disk with optimistic concurrency:
   // read (capturing its ETag), apply `mutate`, save with `If-Match`. If the
@@ -386,6 +402,7 @@ export const BasesView = memo(function BasesView({
       <BasesToolbar
         doc={doc}
         rows={rows}
+        observedProperties={observedProperties}
         activeIndex={safeIndex}
         readOnly={readOnly}
         mode={mode}
@@ -418,7 +435,15 @@ export const BasesView = memo(function BasesView({
           Die Plugin-Ansicht ist fehlgeschlagen ({pluginViewError}) — es wird die Tabelle angezeigt.
         </div>
       )}
-      {loading && tableIsActive && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
+      {isUnknownViewType && !pluginViewError && activeView && (
+        <div className="bases-view__warning" role="status" aria-live="polite">
+          {`Für den Ansichtstyp „${activeView.type}“ ist kein Plugin installiert — es wird die Tabelle angezeigt.`}
+        </div>
+      )}
+      {mode === 'view' && isPluginPending && (
+        <div className="bases-view__loading" role="status" aria-live="polite">Ansicht wird geladen…</div>
+      )}
+      {loading && tableIsActive && !isPluginPending && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
 
       {mode === 'view' && isPluginView && activeView && (
         <ErrorBoundary
@@ -468,20 +493,7 @@ export const BasesView = memo(function BasesView({
         />
       )}
 
-      {mode === 'view' && !isPluginView && isMapView && activeView && (
-        <Suspense fallback={<div className="bases-view__loading" role="status" aria-live="polite">Karte lädt…</div>}>
-          <BasesMapView
-            doc={doc}
-            view={activeView}
-            rows={displayRows}
-            tileUrl={mapConfig?.tileUrl ?? ''}
-            attribution={mapConfig?.attribution ?? ''}
-            onOpenNote={onOpenNote}
-          />
-        </Suspense>
-      )}
-
-      {mode === 'view' && !isPluginView && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && !isMapView && activeView && (
+      {mode === 'view' && !isPluginView && !isPluginPending && !isKanbanView && !isGroupedCardsView && !isCardsView && !isListView && activeView && (
         <BasesTableView
           doc={doc}
           view={activeView}

@@ -8,7 +8,7 @@
  * With `readOnly` the panels still open but every control is disabled.
  */
 
-import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
@@ -20,8 +20,21 @@ import {
   setDocFilter, setGroupBy, setOrder, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
+import {
+  getBasesViewRegistration, listBasesViewRegistrations,
+  subscribeBasesViewRegistry, getBasesViewRegistryVersion,
+} from '../../plugins/compat/bases-view-registry'
 import { BasesFilterEditor, CommitInput } from './BasesFilterEditor'
 import { moveFilterBetweenScopes } from './base-filter-tree'
+
+/**
+ * Display label for a view type: the built-in German label, else the name a
+ * plugin gave when it registered the type via `registerBasesView` (e.g. the
+ * Maps plugin's "Map"), else the raw technical type as a last resort.
+ */
+function viewTypeLabel(type: string): string {
+  return VIEW_TYPE_LABELS[type] ?? getBasesViewRegistration(type)?.name ?? type
+}
 
 export type BasesMode = 'view' | 'source'
 export type DocUpdate = (doc: BaseDocument) => BaseDocument
@@ -29,6 +42,12 @@ export type DocUpdate = (doc: BaseDocument) => BaseDocument
 export interface BasesToolbarProps {
   doc: BaseDocument
   rows: BaseRow[]
+  /**
+   * Every frontmatter property key across the base's matched notes (from the
+   * query result). Offered as pickable columns so the toolbar lists the base's
+   * own properties — Obsidian's behaviour — not only the requested columns.
+   */
+  observedProperties?: string[]
   activeIndex: number
   readOnly: boolean
   /** Owned by the host (the breadcrumb switches it); the panels only show in `view`. */
@@ -365,8 +384,25 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<string>('table')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const typeOptions: string[] = [...VIEW_TYPES]
-  if (active && !typeOptions.includes(active.type)) typeOptions.push(active.type)
+  // The Bases view registry fills asynchronously as plugins (Maps, Base Graph, …)
+  // load, so subscribe to its version — otherwise a plugin-registered type never
+  // appears in the "new view" / "change type" dropdowns until a `.base` already
+  // holds a view of that type.
+  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
+  // Built-in types first, then every plugin-registered type (deduplicated).
+  const allTypeOptions = useMemo<string[]>(() => {
+    void registryVersion
+    const types: string[] = [...VIEW_TYPES]
+    for (const { viewId } of listBasesViewRegistrations()) {
+      if (!types.includes(viewId)) types.push(viewId)
+    }
+    return types
+  }, [registryVersion])
+  // "Change type" dropdown: all options plus the active view's own type as a
+  // fallback (so an unknown/uninstalled type still shows instead of jumping).
+  const typeOptions: string[] = active && !allTypeOptions.includes(active.type)
+    ? [...allTypeOptions, active.type]
+    : allTypeOptions
 
   return (
     <Popover label={<><Table2 aria-hidden="true" className="bases-tb__btn-icon" />{active?.name ?? 'Ansicht'}</>} title="Ansichten">
@@ -381,7 +417,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
                 onClick={() => { setConfirmDelete(false); onSelectView(i) }}
               >
                 <span>{v.name ?? v.type}</span>
-                <span className="bases-tb__type">{VIEW_TYPE_LABELS[v.type] ?? v.type}</span>
+                <span className="bases-tb__type">{viewTypeLabel(v.type)}</span>
               </button>
             </li>
           ))}
@@ -395,7 +431,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
           </div>
           <div className="bases-tb__row">
             <select className="bases-tb__select" aria-label="Typ der Ansicht" value={active.type} disabled={disabled} onChange={(e) => { const type = e.target.value; onChange((d) => setViewType(d, activeIndex, type)) }}>
-              {typeOptions.map((t) => <option key={t} value={t}>{VIEW_TYPE_LABELS[t] ?? t}</option>)}
+              {typeOptions.map((t) => <option key={t} value={t}>{viewTypeLabel(t)}</option>)}
             </select>
           </div>
           {!disabled && (
@@ -430,14 +466,14 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
           <div className="bases-tb__row">
             <input type="text" className="bases-tb__input" aria-label="Name der neuen Ansicht" placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <select className="bases-tb__select" aria-label="Typ der neuen Ansicht" value={newType} onChange={(e) => setNewType(e.target.value)}>
-              {VIEW_TYPES.map((t) => <option key={t} value={t}>{VIEW_TYPE_LABELS[t]}</option>)}
+              {allTypeOptions.map((t) => <option key={t} value={t}>{viewTypeLabel(t)}</option>)}
             </select>
           </div>
           <button
             type="button"
             className="bases-tb__btn bases-tb__btn--primary"
             onClick={() => {
-              const name = newName.trim() || VIEW_TYPE_LABELS[newType] || newType
+              const name = newName.trim() || viewTypeLabel(newType)
               onChange((d) => addView(d, newType, name))
               onSelectView(doc.views.length)
               setNewName('')
@@ -454,10 +490,10 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
 // ─── Toolbar ────────────────────────────────────────────────────────────────
 
 export const BasesToolbar = memo(function BasesToolbar({
-  doc, rows, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange,
+  doc, rows, observedProperties, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange,
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
-  const columns = availableColumns(doc, rows, view)
+  const columns = availableColumns(doc, rows, view, observedProperties)
   const handleChange = useCallback((update: DocUpdate) => { if (!readOnly) onChange(update) }, [readOnly, onChange])
   const panelProps: PanelProps = { doc, index: activeIndex, columns, rows, disabled: readOnly, onChange: handleChange }
   const filterCount = countConditions(view?.filters) + countConditions(doc.filters)

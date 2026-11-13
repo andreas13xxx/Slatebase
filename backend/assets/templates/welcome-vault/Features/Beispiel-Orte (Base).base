@@ -1,0 +1,27 @@
+filters:
+  and:
+    - file.inFolder("Features/Beispiel-Orte")
+    - 'type == "place"'
+properties:
+  file.name:
+    displayName: "Ort"
+  region:
+    displayName: "Region"
+  coordinates:
+    displayName: "Koordinaten"
+views:
+  - type: map
+    name: "Karte"
+    coordinates: coordinates
+    order:
+      - file.name
+      - region
+  - type: table
+    name: "Liste"
+    order:
+      - file.name
+      - region
+      - coordinates
+    sort:
+      - property: file.name
+        direction: ASC
