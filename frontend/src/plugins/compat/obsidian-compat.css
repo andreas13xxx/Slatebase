@@ -68,6 +68,8 @@
   --font-text-theme: var(--font-text);
   --font-monospace-theme: var(--font-monospace);
   --font-text-size: 16px;
+  /* Themes reference this without a fallback (6 of the top 50); Obsidian defines it as its interface font stack. */
+  --default-font: var(--font-interface);
   /* Obsidian 1.14: text that should follow the system text size; on desktop it equals --font-text-size. */
   --font-preferred-size: var(--font-text-size);
   --font-smallest: 0.8em;

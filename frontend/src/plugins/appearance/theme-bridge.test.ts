@@ -55,6 +55,8 @@ const BRIDGE: ReadonlyArray<readonly [string, string]> = [
   ['--status-bar-bg', '--background-secondary'],
   ['--status-bar-border', '--background-modifier-border'],
   ['--status-bar-text', '--text-muted'],
+  ['--danger-bg', '--background-modifier-error'],
+  ['--success-bg', '--background-modifier-success'],
   ['--font-sans', '--font-interface'],
   ['--font-mono', '--font-monospace'],
 ]
@@ -132,6 +134,35 @@ describe('theme bridge', () => {
     expect(bridge).toMatch(/\.cm-selectionBackground\s*\{\s*background: var\(--text-selection\)/)
     expect(bridge).toMatch(/\.cm-lp-code-block-line\s*\{\s*color: var\(--code-normal\)/)
     expect(compat).toMatch(/\n\s*--code-normal:/)
+  })
+
+  it('binds the second round of variables (code background, ribbon, tab divider, active search match) to compat-defined ones', () => {
+    const bound: ReadonlyArray<readonly [string, string, string]> = [
+      [':root[data-obsidian-theme] .cm-lp-inline-code,\n:root[data-obsidian-theme] .cm-lp-code-block-line {', 'background-color', '--code-background'],
+      [':root[data-obsidian-theme] .app-toolbar {', 'background', '--ribbon-background'],
+      [':root[data-obsidian-theme] .tab-bar {', 'border-bottom-color', '--tab-divider-color'],
+      [':root[data-obsidian-theme] .cm-editor .cm-searchMatch.cm-searchMatch-selected {', 'background-color', '--text-highlight-bg-active'],
+    ]
+    for (const [selector, property, variable] of bound) {
+      expect(ruleBody(bridge, selector), selector).toContain(`${property}: var(${variable})`)
+      expect(compat, `${variable} missing in obsidian-compat.css`).toMatch(new RegExp(`\\n\\s*${variable}:`))
+    }
+  })
+
+  it('derives --code-background, ribbon, tab divider, default font and the shadow tokens on body at specificity 0', () => {
+    const whereBlocks = [...bridge.matchAll(/:where\(:root\[data-obsidian-theme\] body\) \{([^}]*)\}/g)].map((m) => declarations(m[1] as string))
+    const merged = new Map(whereBlocks.flatMap((block) => [...block]))
+    expect(merged.get('--code-background')).toBe('var(--background-primary-alt)')
+    expect(merged.get('--shadow-md')).toContain('var(--background-modifier-box-shadow)')
+    expect(merged.get('--shadow-lg')).toContain('var(--background-modifier-box-shadow)')
+    // Resolved on body, not copied from the compat `:root` values, so the theme's palette flows through.
+    expect(merged.get('--ribbon-background')).toBe('var(--background-secondary)')
+    expect(merged.get('--tab-divider-color')).toBe('var(--background-modifier-border)')
+    expect(merged.get('--default-font')).toBe('var(--font-interface)')
+  })
+
+  it('defines --default-font, which themes reference without a fallback', () => {
+    expect(compat).toMatch(/\n\s*--default-font:/)
   })
 
   it('gives code and tab text a default that follows the theme palette, at specificity 0 so any theme wins', () => {

@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { EditorState } from '@codemirror/state'
+import { EditorState, EditorSelection } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { buildInlineDecorations } from './inline-decorations'
 import { buildWidgetDecorations } from './widget-decorations'
+import { createLivePreviewField } from './live-preview-extension'
 
 /**
  * Obsidian parity classes (`HyperMD-*`, `cm-*`) next to Slatebase's own `cm-lp-*` classes.
@@ -47,6 +49,48 @@ describe('Obsidian parity classes in Live Preview', () => {
     const cls = classesOn(state, buildInlineDecorations(state).decorations, line)
     for (const c of ['cm-lp-inline-code', 'cm-inline-code', 'cm-formatting-code', 'cm-lp-highlight', 'cm-highlight', 'cm-lp-tag', 'cm-hashtag']) {
       expect(cls, c).toContain(c)
+    }
+  })
+
+  it('bold, italic, strikethrough and highlight: content carries cm-strong/cm-em/..., markers carry cm-formatting-*', () => {
+    const state = makeState('**b** *i* ~~s~~ ==h==')
+    const decos = buildInlineDecorations(state).decorations
+    const withClass = (cls: string) =>
+      decos
+        .filter((d) => ((d.value.spec as { class?: string }).class ?? '').split(' ').includes(cls))
+        .map((d) => state.doc.sliceString(d.from, d.to))
+    expect(withClass('cm-strong')).toEqual(['b'])
+    expect(withClass('cm-em')).toEqual(['i'])
+    expect(withClass('cm-strikethrough')).toEqual(['s'])
+    expect(withClass('cm-formatting-strong')).toEqual(['**', '**'])
+    expect(withClass('cm-formatting-em')).toEqual(['*', '*'])
+    expect(withClass('cm-formatting-strikethrough')).toEqual(['~~', '~~'])
+    expect(withClass('cm-formatting-highlight')).toEqual(['==', '=='])
+  })
+
+  it('revealed markers (cursor inside **bold**) keep cm-formatting-strong while the hiding replace is dropped', () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: '**bold** x',
+        extensions: [markdown({ extensions: GFM }), createLivePreviewField({} as never)],
+      }),
+    })
+    try {
+      view.dispatch({ selection: EditorSelection.cursor(4) })
+      const marked: string[] = []
+      let replaced = 0
+      const field = view.state.facet(EditorView.decorations)
+      for (const f of field) {
+        const set = typeof f === 'function' ? f(view) : f
+        set.between(0, view.state.doc.length, (from, to, value) => {
+          if (value.point) replaced += 1
+          else if (((value.spec as { class?: string }).class ?? '').includes('cm-formatting-strong')) marked.push(view.state.doc.sliceString(from, to))
+        })
+      }
+      expect(marked).toEqual(['**', '**'])
+      expect(replaced).toBe(0)
+    } finally {
+      view.destroy()
     }
   })
 

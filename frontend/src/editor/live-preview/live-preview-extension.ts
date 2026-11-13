@@ -216,7 +216,8 @@ function filterDecorationsForCursor(
   // Filter out decorations that match revealed ranges
   const filtered: Range<Decoration>[] = []
   for (const deco of decorations) {
-    if (revealedSet.has(`${deco.from}:${deco.to}`)) {
+    // Only the hiding (replace) decorations go; marks on the same range (`cm-formatting*`) stay, so revealed markers keep their class.
+    if (deco.value.point && revealedSet.has(`${deco.from}:${deco.to}`)) {
       continue
     }
     filtered.push(deco)
