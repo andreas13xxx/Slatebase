@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.83.0](https://github.com/andreas13xxx/Slatebase/compare/v0.82.0...v0.83.0) (2026-11-13)
+
+
+### Features
+
+* **templates:** {{date:FORMAT}}/{{time:FORMAT}} + deep-links spec ([#365](https://github.com/andreas13xxx/Slatebase/issues/365)) ([4729815](https://github.com/andreas13xxx/Slatebase/commit/4729815bcc9b3a86d36354ccebe8ff0d737fc678))
+* **themes:** bind more Obsidian variables, add cm-strong/em/formatting classes ([#364](https://github.com/andreas13xxx/Slatebase/issues/364)) ([6e7fb95](https://github.com/andreas13xxx/Slatebase/commit/6e7fb9529c0170fcb2c1938120161d22ae069206))
+
+
+### Bugfixes
+
+* **bases:** adapt sort/group dropdown size, show technical names, rename cards view to Galerie ([#357](https://github.com/andreas13xxx/Slatebase/issues/357)) ([4c5ffa7](https://github.com/andreas13xxx/Slatebase/commit/4c5ffa78af7ca0faad9040c79c8ae080b58c1b85))
+* **bases:** Befunde aus dem Review des Master-Standes ([#359](https://github.com/andreas13xxx/Slatebase/issues/359)) ([d0e2f12](https://github.com/andreas13xxx/Slatebase/commit/d0e2f124fcf521fd0eb6c6ecbbdf4474c91d22df))
+* **bases:** portal column dropdown so the filter panel can't clip it ([#363](https://github.com/andreas13xxx/Slatebase/issues/363)) ([e76cdf4](https://github.com/andreas13xxx/Slatebase/commit/e76cdf4adece9a53f176f2d83c0359a970a346da))
+
+
+### Sonstige Änderungen
+
+* bump jsdom from 30.1.3 to 31.0.0 in /frontend ([#362](https://github.com/andreas13xxx/Slatebase/issues/362)) ([1bebd0a](https://github.com/andreas13xxx/Slatebase/commit/1bebd0afacc4fb705e5d253916be1e28add99f5b))
+* bump the minor-patch group in /backend with 7 updates ([#360](https://github.com/andreas13xxx/Slatebase/issues/360)) ([6f48e1a](https://github.com/andreas13xxx/Slatebase/commit/6f48e1adab3c8bb6e45855e794814f027cfe719f))
+* bump the minor-patch group in /frontend with 6 updates ([#361](https://github.com/andreas13xxx/Slatebase/issues/361)) ([7f2db07](https://github.com/andreas13xxx/Slatebase/commit/7f2db07f82fcc4ec921adabf601ce2a75f7d01df))
+
 ## [0.82.0](https://github.com/andreas13xxx/Slatebase/compare/v0.81.0...v0.82.0) (2026-11-10)
 
 
