@@ -18,9 +18,9 @@ Specs gebündelt statt einzeln spezifiziert.
 
 | Prio | Feature | Track | Aufwand | Spec-Stand |
 |------|---------|-------|---------|------------|
-| 1 | Obsidian Themes | B | ~15–20h | Keine Spec |
-| 2 | Public Sharing | C | ~19–24h | Keine Spec |
-| 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks) |
+| 1 | Obsidian Themes | B | ✅ ausgeliefert | Specs `obsidian-themes*`, `obsidian-builtin-theme`, `obsidian-style-settings` |
+| 2 | Public Sharing | C | ✅ ausgeliefert | Spec `public-share-links` (Toggle `public-shares`) |
+| 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks); **Kern offen** (25/25 Tasks offen, nur PWA-Manifest, Touch-Kontextmenüs und iPad-Teilspec vorhanden) |
 | 4 | Echte E2E-Test-Suite | F | ~30–45h | Req + Design vollständig |
 | 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
 | 6 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
@@ -197,6 +197,35 @@ Guides + Beispiele DE/EN erweitert. Danach: Inline-```` ```base ````-Codeblock i
 **Umgesetzt (Spec `bases-obsidian-parity`):** Lambdas (`map`/`filter`/`reduce`), Regexp-Literale, ~50 weitere Funktionen/Methoden, custom `summaries`-Formeln über `values`, `file.embeds` (getrennte Embed-Markierung im Link-Index), `groupOrder`, `type: kanban`, Cards-Raster mit `image`/`imageFit`/`imageAspectRatio`/`cardSize`, Einbettung mit echtem Ansichtstyp (außer `map`) und Live-Update bei `vault:change`.
 **Noch zurückgestellt:** Tabellen-Zeilenhöhe und Listen-Optionen (YAML-Schlüssel nicht belegt), Objekt-Typ, Copy/CSV-Export, `this` im MCP-Tool.
 Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).
+
+---
+
+## Stand des Obsidian-Abgleichs (2026-11-13, gegen den Code geprüft)
+
+Ergebnis eines Abgleichs von Doku, Specs und Code (nicht nur der Doku). Erledigt, obwohl
+früher als offen geführt: Aliases, Workspaces, Unique Note, Random Note, Outgoing Links,
+Web Viewer (Tab + Lesemodus-Embed), Bases `list`/`map`, Multi-Cursor, Query-Embeds,
+Themes + Theme-Store, Public Shares, Passkeys. `obsidian.d.ts` (Paket 1.14.4) enthält keine
+API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
+
+**Tatsächlich offen:**
+
+| Lücke | Stand |
+|-------|-------|
+| Responsive/Mobile (Prio 3) | Größtes sichtbares Loch; kein `useMediaQuery`, 28 Media-Queries |
+| Deep-Links / URL-Schema | Spec: `.kiro/specs/deep-links/` (`workspace:copy-url` ist bisher ein Stub) |
+| Graph-Zeitraffer (`graph:animate`) | Braucht Erstellungsdatum je Knoten + Abspiel-UI |
+| Slides / Präsentationsmodus | Nische (`obsidian-feature-gaps` O2) |
+| Format Converter / Fremdformat-Importer | Prio 6 |
+| Audio Recorder (ohne Transkription) | Aus `editor/dictation/dictation-recorder.ts` ableitbar (O3) |
+| Vim-Modus | Nur gewarnter Stub |
+| `![](url)`-Embed in Live Preview | Nur Lesemodus |
+| Bases-Reste | Objekt-Typ, Zeilenhöhe, Listen-Optionen, CSV-Export, `this` im MCP-Tool, `map` beim Einbetten |
+| Server-Side Plugins / Semantische Suche / Collaborative Editing / E2E-Suite | Prio 4–8, 39 Tasks `server-side-plugins` offen |
+
+**Seit dem Abgleich erledigt:** Template-Datumsformate `{{date:FORMAT}}`/`{{time:FORMAT}}`
+(Moment-Formate wie in Obsidian), eine gemeinsame Implementierung in
+`shared-contracts/src/template-placeholders.ts` für `TemplateService` und „Vorlage einfügen".
 
 ---
 
