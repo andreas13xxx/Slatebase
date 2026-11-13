@@ -7,7 +7,8 @@
 import type { DeepLinkAnchor } from '../deep-link/deepLink'
 
 const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/
-const HEADING_RE = /^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/
+// Closing hashes (`## Title ##`) only count when separated by whitespace: `# C#` is the heading "C#".
+const HEADING_RE = /^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$/
 
 function normalizeHeading(text: string): string {
   return text.trim().replace(/\s+/g, ' ').toLowerCase()

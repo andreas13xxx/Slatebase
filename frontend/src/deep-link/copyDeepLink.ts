@@ -5,6 +5,7 @@
  */
 import { buildDeepLink, isSafeVaultPath } from './deepLink'
 import { showToast } from '../components/ToastNotification'
+import { translateNow } from '../i18n'
 
 /** Tab paths that stand for a view, not a file in the vault (graph, plugin view, web page, local graph). */
 const NON_FILE_TAB_PREFIXES = ['__graph__', '__view::', '__webview::', '__local-graph::']
@@ -52,13 +53,13 @@ const FALLBACK_TOAST_MS = 15000
 export async function copyLinkWithFeedback(vaultId: string | null, activeFilePath: string | null): Promise<void> {
   const link = buildActiveTabLink(window.location.origin, vaultId, activeFilePath)
   if (!link) {
-    showToast('error', 'Kein Vault geöffnet')
+    showToast('error', translateNow('deepLink.noVault'))
     return
   }
   if (await writeToClipboard(link)) {
-    showToast('success', 'Link kopiert')
+    showToast('success', translateNow('deepLink.copied'))
   } else {
     // No Clipboard API (insecure context) or refused: show the link so it can be copied by hand.
-    showToast('info', `Link: ${link}`, FALLBACK_TOAST_MS)
+    showToast('info', translateNow('deepLink.shown', { link }), FALLBACK_TOAST_MS)
   }
 }

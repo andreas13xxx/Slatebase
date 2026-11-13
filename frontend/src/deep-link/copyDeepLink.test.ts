@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { buildActiveTabLink, isVaultFileTabPath, writeToClipboard } from './copyDeepLink'
+import { buildActiveTabLink, copyLinkWithFeedback, isVaultFileTabPath, writeToClipboard } from './copyDeepLink'
+import * as Toast from '../components/ToastNotification'
 
 describe('isVaultFileTabPath', () => {
   it.each(['__graph__', '__view::activity', '__webview::https://x.test', '__local-graph::a.md'])(
@@ -28,6 +29,32 @@ describe('buildActiveTabLink', () => {
 
   it('returns null without a vault', () => {
     expect(buildActiveTabLink(origin, null, 'a.md')).toBeNull()
+  })
+})
+
+describe('copyLinkWithFeedback', () => {
+  afterEach(() => {
+    Object.assign(navigator, { clipboard: undefined })
+    vi.restoreAllMocks()
+  })
+
+  it('speaks the active locale, not hard-coded German', async () => {
+    const { I18nProvider } = await import('../i18n')
+    const { render } = await import('@testing-library/react')
+    const { createElement } = await import('react')
+    render(createElement(I18nProvider, { initialLocale: 'en' }, null))
+    // The provider mirrors its locale for hook-free callers in an effect.
+    await vi.waitFor(async () => {
+      const { translateNow } = await import('../i18n')
+      expect(translateNow('deepLink.copied')).toBe('Link copied')
+    })
+
+    const toast = vi.spyOn(Toast, 'showToast').mockReturnValue('t')
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    await copyLinkWithFeedback('v1', 'a.md')
+    expect(toast).toHaveBeenCalledWith('success', 'Link copied')
+    await copyLinkWithFeedback(null, null)
+    expect(toast).toHaveBeenCalledWith('error', 'No vault open')
   })
 })
 

@@ -11,6 +11,9 @@ import { resolveVaultRef, type DeepLinkTarget } from './deepLink'
 import { consumeInvalidDeepLink } from './captureDeepLink'
 import { consumePendingDeepLink } from './pendingDeepLink'
 
+/** How long a link waits for the vault list before it is dropped. */
+export const DEEP_LINK_VAULTS_WAIT_MS = 30_000
+
 interface UseDeepLinkOptions {
   vaults: ReadonlyArray<{ id: string; name: string }>
   selectedVaultId: string | null
@@ -50,6 +53,18 @@ export function useDeepLink({ vaults, selectedVaultId, dispatch, tabDispatch, ap
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (pending) setTarget(pending)
   }, [])
+
+  // The vault list may never arrive (no vaults, failed request). Give up after a while instead of
+  // keeping the link armed: a vault created later must not trigger a stale link.
+  const waitingForVaults = target !== null && vaults.length === 0
+  useEffect(() => {
+    if (!waitingForVaults) return
+    const timer = setTimeout(() => {
+      showToast('error', tRef.current('deepLink.notFound'))
+      setTarget(null)
+    }, DEEP_LINK_VAULTS_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [waitingForVaults])
 
   useEffect(() => {
     if (!target || vaults.length === 0) return

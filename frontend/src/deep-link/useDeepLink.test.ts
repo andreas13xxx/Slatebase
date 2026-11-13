@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
-import { useDeepLink } from './useDeepLink'
+import { renderHook, waitFor, act } from '@testing-library/react'
+import { useDeepLink, DEEP_LINK_VAULTS_WAIT_MS } from './useDeepLink'
 import { storePendingDeepLink } from './pendingDeepLink'
 import { consumeInvalidDeepLink } from './captureDeepLink'
 import { clearAnchorJumps, peekAnchorJump } from '../state/anchorJumpBridge'
@@ -105,6 +105,51 @@ describe('useDeepLink', () => {
       setup()
       expect(toast).toHaveBeenCalledWith('error', 'Der Link ist ungültig')
     })
+  })
+
+  it('drops the link when the vault list never arrives, so a later vault cannot trigger it', () => {
+    vi.useFakeTimers()
+    try {
+      storePendingDeepLink({ vault: 'v1', path: 'n.md', anchor: null })
+      const dispatch = vi.fn()
+      const tabDispatch = vi.fn()
+      const apiClient = { fetchFileContent: vi.fn() } as unknown as IApiClient
+      const { rerender } = renderHook(
+        (props: { list: Array<{ id: string; name: string }> }) =>
+          useDeepLink({ vaults: props.list, selectedVaultId: null, dispatch, tabDispatch, apiClient }),
+        { initialProps: { list: [] as Array<{ id: string; name: string }> } },
+      )
+      expect(toast).not.toHaveBeenCalled()
+      act(() => { vi.advanceTimersByTime(DEEP_LINK_VAULTS_WAIT_MS) })
+      expect(toast).toHaveBeenCalledWith('error', NOT_FOUND)
+
+      rerender({ list: vaults })
+      expect(dispatch).not.toHaveBeenCalled()
+      expect(tabDispatch).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps waiting when the vault list arrives in time', async () => {
+    vi.useFakeTimers()
+    try {
+      storePendingDeepLink({ vault: 'v1', path: null, anchor: null })
+      const dispatch = vi.fn()
+      const apiClient = { fetchFileContent: vi.fn() } as unknown as IApiClient
+      const { rerender } = renderHook(
+        (props: { list: Array<{ id: string; name: string }> }) =>
+          useDeepLink({ vaults: props.list, selectedVaultId: null, dispatch, tabDispatch: vi.fn(), apiClient }),
+        { initialProps: { list: [] as Array<{ id: string; name: string }> } },
+      )
+      act(() => { vi.advanceTimersByTime(DEEP_LINK_VAULTS_WAIT_MS - 1000) })
+      rerender({ list: vaults })
+      expect(dispatch).toHaveBeenCalledWith({ type: 'VAULT_SELECTED', payload: 'v1' })
+      act(() => { vi.advanceTimersByTime(5000) })
+      expect(toast).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('handles a link exactly once', async () => {

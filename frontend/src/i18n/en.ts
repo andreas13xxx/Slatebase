@@ -1087,6 +1087,9 @@ export const en: TranslationShape = {
   },
 
   deepLink: {
+    copied: 'Link copied',
+    noVault: 'No vault open',
+    shown: 'Link: {link}',
     notFound: 'Could not open the link: target not found or no access',
     invalid: 'The link is invalid',
   },

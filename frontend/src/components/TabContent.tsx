@@ -132,8 +132,12 @@ export function TabContent() {
     }
     const view = getActiveEditorView()
     // The view must already show THIS note (a tab switch swaps the editor's state asynchronously).
-    if (!view || !view.dom.isConnected || anchorSource === null || view.state.doc.toString() !== anchorSource) return false
-    const offset = findAnchorOffset(anchorSource, anchor)
+    if (!view || !view.dom.isConnected || anchorSource === null) return false
+    // CodeMirror holds line breaks as "\n" whatever the file uses, so compare (and search) in that form;
+    // the length check keeps the retries cheap on large notes while the old document is still shown.
+    const source = anchorSource.replace(/\r\n?/g, '\n')
+    if (view.state.doc.length !== source.length || view.state.doc.toString() !== source) return false
+    const offset = findAnchorOffset(source, anchor)
     if (offset === null) return true // the note has no such anchor: stay at the top, nothing to retry
     view.dispatch({ selection: { anchor: offset }, effects: EditorView.scrollIntoView(offset, { y: 'start', yMargin: 24 }) })
     return true

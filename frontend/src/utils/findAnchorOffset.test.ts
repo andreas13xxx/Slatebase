@@ -42,6 +42,12 @@ describe('findAnchorOffset — headings', () => {
     expect(findAnchorOffset(d, heading('Yes'))).toBe(d.indexOf('# Yes'))
   })
 
+  it('keeps hashes that are part of the heading text, strips only closing ones', () => {
+    const d = '# C#\n\n## Learning C# ##\n'
+    expect(findAnchorOffset(d, heading('C#'))).toBe(0)
+    expect(findAnchorOffset(d, heading('Learning C#'))).toBe(d.indexOf('## Learning'))
+  })
+
   it('does not treat a #tag as a heading', () => {
     expect(findAnchorOffset('#tag\n', heading('tag'))).toBeNull()
   })

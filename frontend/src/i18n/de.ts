@@ -1081,6 +1081,9 @@ export const de = {
   },
 
   deepLink: {
+    copied: 'Link kopiert',
+    noVault: 'Kein Vault geöffnet',
+    shown: 'Link: {link}',
     notFound: 'Link konnte nicht geöffnet werden: Ziel nicht gefunden oder kein Zugriff',
     invalid: 'Der Link ist ungültig',
   },
