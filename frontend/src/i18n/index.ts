@@ -100,6 +100,28 @@ interface I18nProviderProps {
   initialLocale?: Locale
 }
 
+/** Looks a key up in a locale, falling back to German when the key is missing there. */
+function translateWith(locale: Locale, key: TranslationKey, params?: Record<string, string | number>): string {
+  const value = resolve(translations[locale] as unknown as Record<string, unknown>, key)
+  if (value === undefined) {
+    const fallback = resolve(translations.de as unknown as Record<string, unknown>, key)
+    if (fallback === undefined) return key
+    return interpolate(fallback, params)
+  }
+  return interpolate(value, params)
+}
+
+/** Locale last set by the provider; German before one is mounted. */
+let activeLocale: Locale = 'de'
+
+/**
+ * Translates with the app's current locale WITHOUT a hook, for code that has no React context
+ * (command handlers, context-menu builders). Inside components prefer `useTranslation()`.
+ */
+export function translateNow(key: TranslationKey, params?: Record<string, string | number>): string {
+  return translateWith(activeLocale, key, params)
+}
+
 /**
  * Provider component that wraps the app with i18n capabilities.
  * Locale is determined by the user's profile setting (preferredLanguage).
@@ -122,15 +144,11 @@ export function I18nProvider({ children, userLocale, initialLocale }: I18nProvid
     setLocaleState(newLocale)
   }, [])
 
-  const t = useCallback((key: TranslationKey, params?: Record<string, string | number>): string => {
-    const value = resolve(translations[locale] as unknown as Record<string, unknown>, key)
-    if (value === undefined) {
-      // Fallback to German if key not found in current locale
-      const fallback = resolve(translations.de as unknown as Record<string, unknown>, key)
-      if (fallback === undefined) return key
-      return interpolate(fallback, params)
-    }
-    return interpolate(value, params)
+  const t = useCallback((key: TranslationKey, params?: Record<string, string | number>): string => translateWith(locale, key, params), [locale])
+
+  // Mirror the active locale for code that runs outside React (command handlers, menu builders).
+  useEffect(() => {
+    activeLocale = locale
   }, [locale])
 
   return React.createElement(

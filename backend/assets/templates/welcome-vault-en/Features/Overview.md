@@ -56,6 +56,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Canvas]] — Visual whiteboards with nodes and connections
 - [[Features/Command Palette]] — Quick access to all commands via keyboard
 - [[Features/Bookmarks]] — Reorder and rename favorites, heading/block/search bookmarks
+- [[Features/Links to Notes]] — Copy and open a link to a note or heading
 - [[Features/Status Bar]] — Word count, cursor position, go to line, plugin items
 - [[Features/Vault Management]] — Create, share, and manage vaults
 - [[Features/Settings]] — All configuration options

@@ -55,6 +55,7 @@ Neben den hier aufgelisteten Kern-Features findest du in den folgenden Guides we
 - [[Features/Canvas]] — Visuelle Whiteboards mit Nodes und Verbindungen
 - [[Features/Command Palette]] — Schnellzugriff auf alle Befehle per Tastatur
 - [[Features/Lesezeichen]] — Favoriten sortieren, umbenennen, Überschriften-/Block-/Such-Lesezeichen
+- [[Features/Links zu Notizen]] — Link auf eine Notiz oder Überschrift kopieren und öffnen
 - [[Features/Statusleiste]] — Wortanzahl, Cursor-Position, Gehe zu Zeile, Plugin-Items
 - [[Features/Vault-Verwaltung]] — Vaults erstellen, teilen und verwalten
 - [[Features/Einstellungen]] — Alle Konfigurationsmöglichkeiten

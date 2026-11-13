@@ -39,6 +39,7 @@ import { favoritesStore } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { showToast } from '../../components/ToastNotification'
+import { copyLinkWithFeedback } from '../../deep-link/copyDeepLink'
 import type { Locale } from '../../i18n'
 import { translateCoreCommandName, unsupportedCommandMessage, type UnsupportedReason } from './core-command-i18n'
 import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
@@ -221,6 +222,11 @@ function setPanelView(h: CoreAppCommandHandlers, viewId: PanelViewId): void {
     ensureSidebarVisible(h)
     h.leftPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: leftSection.id, viewId })
   }
+}
+
+/** `workspace:copy-url`: copies a deep link to the active file (or the vault when the tab is no file). */
+function copyActiveLink(h: CoreAppCommandHandlers): Promise<void> {
+  return copyLinkWithFeedback(h.vaultId, getActiveTab(h)?.filePath ?? null)
 }
 
 function revealActiveFile(h: CoreAppCommandHandlers): void {
@@ -748,7 +754,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'workspace:close-window', name: 'Close window', unsupported: 'native-windows' },
     { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', unsupported: 'native-windows' },
     { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', unsupported: 'stacked-tabs' },
-    { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', unsupported: 'url-scheme' },
+    { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', run: copyActiveLink },
     { id: 'workspace:export-pdf', name: 'Export to PDF...', run: exportActiveFileToPdf },
 
     // ── file-explorer:* ──

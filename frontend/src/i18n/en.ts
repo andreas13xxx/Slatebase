@@ -618,6 +618,7 @@ export const en: TranslationShape = {
     rename: 'Rename',
     delete: 'Delete',
     copy: 'Copy',
+    copyLink: 'Copy link',
     move: 'Move',
     export: 'Export',
     noActions: 'No actions available',
@@ -1086,6 +1087,13 @@ export const en: TranslationShape = {
     copied: 'Copied',
   },
 
+  deepLink: {
+    copied: 'Link copied',
+    noVault: 'No vault open',
+    shown: 'Link: {link}',
+    notFound: 'Could not open the link: target not found or no access',
+    invalid: 'The link is invalid',
+  },
   quickSwitcher: {
     dialogLabel: 'Quick Switcher',
     placeholder: 'Open or create a file …',

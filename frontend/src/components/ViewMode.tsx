@@ -1,4 +1,5 @@
 import { type ReactNode, type PointerEvent as ReactPointerEvent, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
+import { scrollToHeadingAnchor, scrollToBlockAnchor } from '../utils/scrollToAnchor'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
@@ -1768,24 +1769,6 @@ function renderWikilinkNode(
 }
 
 /**
- * Scrolls to a heading anchor element on the current page.
- * Generates the normalized anchor from the heading text and scrolls to the matching element.
- * Validates: Requirements 2.4, 2.5
- */
-function scrollToHeadingAnchor(heading: string): void {
-  // Generate the anchor ID using the same normalization as createAnchorTracker
-  const anchorId = heading
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9äöüß\-_]/g, '')
-
-  const element = document.getElementById(anchorId)
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-}
-
-/**
  * Scrolls to an element by its exact DOM id, expanding any collapsed heading
  * sections (`<details>`) on the way — a footnote marker inside a folded section
  * cannot be scrolled to while its section is shut.
@@ -1803,18 +1786,6 @@ function scrollToAnchorId(id: string): void {
   // element drops on its own, and a re-render in between simply drops it early.
   element.classList.add('view-mode-anchor-flash')
   window.setTimeout(() => element.classList.remove('view-mode-anchor-flash'), 1200)
-}
-
-/**
- * Scrolls to a block anchor element on the current page.
- * Block anchors have IDs in the format `^{block-id}`.
- * Validates: Requirements 20.1, 20.5
- */
-function scrollToBlockAnchor(blockId: string): void {
-  const element = document.getElementById(`^${blockId}`)
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
 }
 
 /**

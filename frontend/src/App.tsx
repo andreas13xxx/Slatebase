@@ -122,6 +122,8 @@ import { useKeyboardViewport } from './hooks/useKeyboardViewport'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useWorkspaceRestore, LAST_VAULT_KEY, getInitialPaneTree } from './hooks/useWorkspaceRestore'
+import { captureDeepLinkFromLocation } from './deep-link/captureDeepLink'
+import { useDeepLink } from './deep-link/useDeepLink'
 import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import { requestReveal } from './state/revealFileBridge'
 import {
@@ -140,6 +142,8 @@ const dailyNoteService = createDailyNoteService(apiClient)
 // Synchronous workspace state restore from localStorage — must run before
 // any component reads getWorkspaceState() in their useState initializers.
 initializeWorkspace()
+// A deep link (`/open?vault=…&file=…`) is read before the first render, while the address still holds it.
+captureDeepLinkFromLocation()
 
 // Compute the restored/migrated pane-tree layout once, synchronously, so
 // PaneTreeProvider is seeded with it before the first render (no post-mount
@@ -551,6 +555,10 @@ function AppContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedVaultId, dispatch, tabDispatch])
+
+  // Must stay AFTER the vault-switch effect above (it clears/restores tabs on a vault change; the
+  // link's tab has to be opened after that so it wins).
+  useDeepLink({ vaults: state.vaults, selectedVaultId: state.selectedVaultId, dispatch, tabDispatch, apiClient })
 
   const handleLogout = useCallback(async () => {
     try { await apiClient.logout() } catch { /* ignore */ }

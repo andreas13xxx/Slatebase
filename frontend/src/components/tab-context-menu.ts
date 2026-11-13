@@ -8,12 +8,13 @@
  * @module tab-context-menu
  */
 import { createElement } from 'react'
-import { X, CopyX, PanelRightClose, FolderOpen, Pencil, Trash2, Pin, PinOff, ArrowLeft, ArrowRight, PanelRight } from 'lucide-react'
+import { X, CopyX, PanelRightClose, FolderOpen, Link, Pencil, Trash2, Pin, PinOff, ArrowLeft, ArrowRight, PanelRight } from 'lucide-react'
 import type { ContextMenuItem } from './ContextMenu'
 import type { TabEntry } from '../state/tabState'
 import type { TabAction } from '../state/tabState'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
+import { copyLinkWithFeedback } from '../deep-link/copyDeepLink'
 import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../state/fileNavigation'
 
 const VIEW_PATH_PREFIX = '__view::'
@@ -89,6 +90,7 @@ export function buildTabContextMenuItems(
   items.push(
     { id: 'sep-file-ops', label: '', separator: true },
     { id: 'reveal', label: 'Im Explorer zeigen', icon: createElement(FolderOpen, { size: ICON_SIZE }), run: () => revealInExplorer(tab.filePath) },
+    { id: 'copy-link', label: 'Link kopieren', icon: createElement(Link, { size: ICON_SIZE }), run: () => { void copyLinkWithFeedback(tab.vaultId, tab.filePath) } },
     { id: 'rename', label: 'Umbenennen', icon: createElement(Pencil, { size: ICON_SIZE }), run: () => renameInExplorer(tab.filePath) },
     { id: 'delete', label: 'Löschen', icon: createElement(Trash2, { size: ICON_SIZE }), run: () => deleteInExplorer(tab.filePath) },
   )

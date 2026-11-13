@@ -257,6 +257,47 @@ describe('registerCoreAppCommands', () => {
     expect(writeText).toHaveBeenCalledWith('note.md')
   })
 
+  it('workspace:copy-url copies a deep link to the active file', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+
+    registry.executeCommand('workspace:copy-url')
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled())
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/open?vault=vault-1&file=note.md`)
+  })
+
+  it('workspace:copy-url links the vault alone when the active tab is not a file', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    handlers.tabState = { tabs: [makeTab({ filePath: '__graph__' })], activeTabId: 'vault-1::__graph__' }
+
+    registry.executeCommand('workspace:copy-url')
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled())
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/open?vault=vault-1`)
+  })
+
+  it('workspace:copy-url shows the link when the clipboard is unavailable', async () => {
+    Object.assign(navigator, { clipboard: undefined })
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockReturnValue('t')
+
+    registry.executeCommand('workspace:copy-url')
+    await vi.waitFor(() => expect(toastSpy).toHaveBeenCalled())
+
+    expect(toastSpy).toHaveBeenCalledWith('info', expect.stringContaining('/open?vault=vault-1&file=note.md'), expect.any(Number))
+    toastSpy.mockRestore()
+  })
+
+  it('workspace:copy-url reports a missing vault', async () => {
+    handlers.vaultId = null
+    const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockReturnValue('t')
+
+    registry.executeCommand('workspace:copy-url')
+    await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('error', 'Kein Vault geöffnet'))
+    toastSpy.mockRestore()
+  })
+
   it('workspace:export-pdf switches an edit-mode tab to reading mode, then prints', () => {
     handlers.tabState = { tabs: [makeTab({ mode: 'live-preview' })], activeTabId: 'vault-1::note.md' }
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})

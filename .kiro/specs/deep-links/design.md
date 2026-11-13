@@ -33,7 +33,7 @@ buildDeepLink(origin: string, vaultId: string, path?: string, anchor?: DeepLinkA
 isSafeVaultPath(path: string): boolean                    // R5.3
 resolveVaultRef(ref: string, vaults: {id,name}[]): string | null   // ID zuerst, dann eindeutiger Name
 ```
-`parseDeepLink` zerlegt `file` am **ersten** `#`; beginnt der Rest mit `^`, ist es ein Block-Anker. Der Anker wird
+`parseDeepLink` trennt den Anker am ersten `#` ab, das direkt auf `.md` folgt (sonst gehört `#` zum Dateinamen, `C#.md`); beginnt der Rest mit `^`, ist es ein Block-Anker (`[A-Za-z0-9-]+`). Ein leerer oder ungültiger Anker verwirft den ganzen Link. Der Anker wird
 nicht normalisiert (Auflösung übernimmt die Heading-Sprunglogik).
 
 ### `DeepLinkHandler`
