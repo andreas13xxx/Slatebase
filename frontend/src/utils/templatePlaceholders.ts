@@ -10,7 +10,7 @@
  * @module utils/templatePlaceholders
  */
 
-import { renderTemplatePlaceholders } from '@slatebase/shared-contracts'
+import { renderTemplatePlaceholders, type TemplateLocale } from '@slatebase/shared-contracts'
 
 /**
  * Replaces `{{title}}`, `{{date}}`/`{{time}}` and `{{date:FORMAT}}`/`{{time:FORMAT}}`
@@ -21,7 +21,13 @@ import { renderTemplatePlaceholders } from '@slatebase/shared-contracts'
  * @param content - Raw template text.
  * @param title - Value for `{{title}}` — usually the target note's name.
  * @param now - Clock to read the date/time placeholders from (injectable for tests).
+ * @param locale - UI language, used for day and month names; default `'en'`.
  */
-export function substituteTemplatePlaceholders(content: string, title: string, now: Date = new Date()): string {
-  return renderTemplatePlaceholders(content, title, now)
+export function substituteTemplatePlaceholders(
+  content: string,
+  title: string,
+  now: Date = new Date(),
+  locale: TemplateLocale = 'en',
+): string {
+  return renderTemplatePlaceholders(content, title, now, locale)
 }

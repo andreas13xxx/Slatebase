@@ -1,6 +1,6 @@
 // TemplateService unit tests
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
@@ -262,28 +262,27 @@ describe('TemplateService', () => {
     })
 
     it('should use server local time for date and time placeholders', async () => {
-      await fs.writeFile(path.join(templateDir, 'time.md'), '{{date}} {{time}}')
-
-      const now = new Date()
-      const result = await service.createFromTemplate(
-        'testvault123',
-        'time',
-        '',
-        'timetest',
-      )
-
-      const expectedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-      expect(result.content).toContain(expectedDate)
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 10, 13, 9, 5, 7))
+      try {
+        await fs.writeFile(path.join(templateDir, 'time.md'), '{{date}} {{time}}')
+        const result = await service.createFromTemplate('testvault123', 'time', '', 'timetest')
+        expect(result.content).toBe('2026-11-13 09:05')
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('should render {{date:FORMAT}} and {{time:FORMAT}} as Moment formats', async () => {
-      await fs.writeFile(path.join(templateDir, 'fmt.md'), '{{date:YYYYMMDD}}|{{time:HH-mm}}|{{date:}}')
-
-      const now = new Date()
-      const result = await service.createFromTemplate('testvault123', 'fmt', '', 'fmttest')
-
-      const pad = (n: number) => String(n).padStart(2, '0')
-      expect(result.content).toMatch(new RegExp(`^${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}\\|\\d{2}-\\d{2}\\|\\{\\{date:\\}\\}$`))
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 10, 13, 9, 5, 7))
+      try {
+        await fs.writeFile(path.join(templateDir, 'fmt.md'), '{{date:YYYYMMDD}}|{{time:HH-mm}}|{{date:}}')
+        const result = await service.createFromTemplate('testvault123', 'fmt', '', 'fmttest')
+        expect(result.content).toBe('20261113|09-05|{{date:}}')
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 })

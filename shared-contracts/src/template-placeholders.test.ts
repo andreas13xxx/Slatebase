@@ -22,4 +22,17 @@ describe('renderTemplatePlaceholders', () => {
   it('does not expand placeholders contained in the title, nor treat $ specially', () => {
     expect(renderTemplatePlaceholders('# {{title}}', '{{date}} $& $1', NOW)).toBe('# {{date}} $& $1')
   })
+
+  it('accepts bracket-escaped literals containing braces', () => {
+    expect(renderTemplatePlaceholders('{{date:[Week }]W}}', 'n', NOW)).toBe('Week }46')
+  })
+
+  it('renders day and month names in the requested locale without leaking it globally', () => {
+    expect(renderTemplatePlaceholders('{{date:dddd, D. MMMM YYYY}}', 'n', NOW, 'de')).toBe('Freitag, 13. November 2026')
+    expect(renderTemplatePlaceholders('{{date:dddd}}', 'n', NOW)).toBe('Friday')
+  })
+
+  it('leaves the text untouched for an invalid clock', () => {
+    expect(renderTemplatePlaceholders('{{date}} {{title}}', 'n', new Date(NaN))).toBe('{{date}} {{title}}')
+  })
 })

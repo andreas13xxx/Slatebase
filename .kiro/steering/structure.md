@@ -1037,7 +1037,7 @@ data/vaults/<vaultId>/
 - **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC).
 - **Link-Index**: Derived index rebuilt from vault content.
 - **Config**: Vault configuration (templates dir, daily notes dir, daily note template name, attachments dir).
-- **Templates**: Regular vault directory (visible). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}` plus Moment formats `{{date:FORMAT}}`/`{{time:FORMAT}}` (e.g. `{{date:dddd, D. MMMM YYYY}}`; English month/day names).
+- **Templates**: Regular vault directory (visible). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}` plus Moment formats `{{date:FORMAT}}`/`{{time:FORMAT}}` (e.g. `{{date:dddd, D. MMMM YYYY}}`; bracket literals `[...]` may contain braces; month/day names English on the server, UI language for "Insert template").
 - **Cleanup Job**: Periodic (default 24h interval). Purges expired trash + prunes excess versions. Per-file error isolation.
 
 ### File Visibility Rules (like Obsidian)
