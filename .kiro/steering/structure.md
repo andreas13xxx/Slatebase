@@ -386,7 +386,7 @@ src/
 │   ├── pluginIcon.ts     — Single resolution path for plugin icon names (addRibbonIcon, ItemView.getIcon, context-panel tabs): checks the plugin's own `addIcon()` SVGs first, then falls back to the shared Lucide resolver in `plugins/compat/lucide-icons.ts`. Centralized so a new render site cannot skip the custom-icon check
 │   ├── frontmatterWriter.ts — YAML frontmatter serialization + editing (locateFrontmatterBlock, serializeFrontmatter, applyFrontmatterChange) — custom line-builder for Obsidian-compatible output, no yaml lib for serialization. `null` writes a bare `key:` (a deliberately blank property survives round-trip); only `undefined` omits the key. Dates serialize via `toISOString()` and stay unquoted when bare (`ISO_DATE_RE`); other strings needing quotes escape `\n`/`\r`/`\t` too, not just backslash/quote — see lessons-learned.md
 │   ├── frontmatterWriter.test.ts — Unit tests for frontmatter writer
-│   ├── templatePlaceholders.ts — substituteTemplatePlaceholders(): client-side `{{date}}`/`{{time}}`/`{{title}}` rendering for "Insert template" (`insert-template`, never writes a file, so the server's own substitution in `POST /templates/create` doesn't apply) — kept in step with `TemplateService.replacePlaceholders` by hand
+│   ├── templatePlaceholders.ts — substituteTemplatePlaceholders(): client-side `{{title}}`/`{{date}}`/`{{time}}`/`{{date:FORMAT}}`/`{{time:FORMAT}}` rendering for "Insert template" (`insert-template`, never writes a file, so the server's own substitution in `POST /templates/create` doesn't apply) — a thin wrapper over `renderTemplatePlaceholders` in `shared-contracts/src/template-placeholders.ts`, the same function `TemplateService.replacePlaceholders` calls (Moment formats, single pass, unknown `{{...}}` kept, oversized formats kept literal)
 │   ├── templatePlaceholders.test.ts — Unit tests for templatePlaceholders
 │   ├── simpleMarkdownToHtml.ts — Regex-based Markdown→HTML for external, untrusted Markdown (plugin READMEs, GitHub release notes) — headings/bold/italic/code/links/images/lists/blockquotes/hr; sanitizes URLs (http(s)/mailto/relative only, others → `#`) and escapes attribute quotes before interpolation. Extracted from PluginDetailPanel.tsx so ReleaseNotesModal.tsx can reuse it
 │   ├── simpleMarkdownToHtml.test.ts — Unit tests for simpleMarkdownToHtml
@@ -1037,7 +1037,7 @@ data/vaults/<vaultId>/
 - **Versions**: Previous file content saved before each write. Configurable max per file (0–100, default 20). Timestamp format: `YYYYMMDDTHHmmssSSS` (UTC).
 - **Link-Index**: Derived index rebuilt from vault content.
 - **Config**: Vault configuration (templates dir, daily notes dir, daily note template name, attachments dir).
-- **Templates**: Regular vault directory (visible). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}`.
+- **Templates**: Regular vault directory (visible). `.md` files used for "New from template" feature. Placeholder replacement: `{{date}}`, `{{time}}`, `{{title}}` plus Moment formats `{{date:FORMAT}}`/`{{time:FORMAT}}` (e.g. `{{date:dddd, D. MMMM YYYY}}`; English month/day names).
 - **Cleanup Job**: Periodic (default 24h interval). Purges expired trash + prunes excess versions. Per-file error isolation.
 
 ### File Visibility Rules (like Obsidian)

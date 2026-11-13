@@ -275,5 +275,15 @@ describe('TemplateService', () => {
       const expectedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       expect(result.content).toContain(expectedDate)
     })
+
+    it('should render {{date:FORMAT}} and {{time:FORMAT}} as Moment formats', async () => {
+      await fs.writeFile(path.join(templateDir, 'fmt.md'), '{{date:YYYYMMDD}}|{{time:HH-mm}}|{{date:}}')
+
+      const now = new Date()
+      const result = await service.createFromTemplate('testvault123', 'fmt', '', 'fmttest')
+
+      const pad = (n: number) => String(n).padStart(2, '0')
+      expect(result.content).toMatch(new RegExp(`^${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}\\|\\d{2}-\\d{2}\\|\\{\\{date:\\}\\}$`))
+    })
   })
 })
