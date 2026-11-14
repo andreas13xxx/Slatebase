@@ -2,9 +2,29 @@
 
 ## Phase 1: Breakpoint-Grundlagen
 
-- [ ] Task 1: `useMediaQuery`/`useBreakpoint`-Hook implementieren (`frontend/src/hooks/useMediaQuery.ts`)
-- [ ] Task 2: Breakpoint-Konstanten (768px/1024px) in CSS als Referenz-Kommentar in `App.css` dokumentieren, um JS/CSS-Drift zu vermeiden
-- [ ] Task 3: Device-Test-Matrix festlegen (375px/768px/1024px/1440px) für spätere Prüfungen
+- [x] Task 1: `useMediaQuery`/`useBreakpoint`-Hook implementieren (`frontend/src/hooks/useMediaQuery.ts`)
+- [x] Task 2: Breakpoint-Konstanten (768px/1024px) in CSS als Referenz-Kommentar in `App.css` dokumentieren, um JS/CSS-Drift zu vermeiden
+- [x] Task 3: Device-Test-Matrix festlegen (375px/768px/1024px/1440px) für spätere Prüfungen
+
+### Umsetzung Phase 1 (2026-11-14)
+
+- Task 1: `frontend/src/hooks/useMediaQuery.ts` (`BREAKPOINTS`, `BREAKPOINT_QUERIES`, `useMediaQuery`, `useBreakpoint`) per `useSyncExternalStore`; ohne
+  `matchMedia` (jsdom) immer `false`/`desktop`. 11 Tests.
+- Task 2: Referenzkommentar mit den Zahlen am Anfang von `frontend/src/App.css`. Es gibt noch keine Breakpoint-Regeln im Projekt außer vereinzelten
+  Media-Queries; neue Regeln verwenden genau diese Literale.
+- Task 3: Test-Matrix unten.
+- Bekannt: Der Hook ist noch von nichts konsumiert (Task 4); die Phase ändert kein sichtbares Verhalten.
+
+#### Device-Test-Matrix (Task 3)
+
+| Breite | Bereich | Repräsentant | Prüfen (R8.1) |
+|-------:|---------|--------------|----------------|
+| 375 px | mobile | iPhone SE/Mini (DevTools-Emulation, Touch) | Datei öffnen/bearbeiten, Sidebar als Drawer, Canvas pannen/zoomen, Settings öffnen |
+| 768 px | tablet | iPad hochkant | dasselbe; Right-Panel-Standardverhalten, Split-Panes |
+| 1024 px | tablet (Obergrenze) | iPad quer | Übergang zum Desktop-Layout, kein Drawer |
+| 1440 px | desktop | Laptop | Regressionsprüfung: Layout unverändert |
+
+Randwerte beim Prüfen: 767/768 und 1024/1025 px (Hook-Test deckt die Logik, die Matrix das Aussehen). Pro Breite einmal Hell- und Dunkelmodus.
 
 ## Phase 2: App-Shell Mobile-Layout
 
