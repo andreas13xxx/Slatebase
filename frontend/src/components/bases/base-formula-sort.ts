@@ -7,7 +7,7 @@
  * Kept out of BasesView so it is unit-testable without the component.
  */
 
-import { evaluateFormulaColumn } from '@slatebase/shared-contracts'
+import { evaluateFormulaColumn, formatFormulaValue } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 
 /**
@@ -31,7 +31,8 @@ export function sortRowsByFormula(rows: BaseRow[], doc: BaseDocument, view: Base
     const v = r.value
     if (typeof v === 'number') return v
     if (v instanceof Date) return v.getTime()
-    return String(v)
+    // An object has no useful String() ('[object Object]'): sort by the same text the cell shows.
+    return typeof v === 'object' && !Array.isArray(v) && v.kind === 'object' ? formatFormulaValue(v) : String(v)
   }
 
   return rows

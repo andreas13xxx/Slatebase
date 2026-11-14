@@ -7,8 +7,8 @@ Stand 2026-11-03. Quelle: Abgleich von Code gegen die Obsidian-Hilfe (obsidian.m
 P1, P2, P3, P5 umgesetzt. P4 teilweise: `groupOrder`, Cards-Raster und -Optionen, `type: kanban` umgesetzt; Tabellen-`rowHeight` und
 Listen-Optionen **nicht** (YAML-Schlüssel in der Obsidian-Doku nicht belegt; Raten würde das Dateiformat verbiegen); Copy/CSV offen.
 Nachprüfung 2026-11-14: Die Doku nennt die Optionen (Zeilenhöhe: short/medium/tall/extra tall; Liste: Markierung, Einrücken, Trennzeichen),
-aber weiterhin keinen YAML-Schlüssel — offen, bis eine in Obsidian erzeugte `.base` vorliegt. Objekt-Typ: eigene Spec `bases-object-type/`.
-Abweichungen: Objekt-Methoden (`keys`/`values`) entfallen mangels Objekt-Typ; `file()`/`image()` liefern einen Link, `icon()`/`html()` Text;
+aber weiterhin keinen YAML-Schlüssel — offen, bis eine in Obsidian erzeugte `.base` vorliegt. Objekt-Typ: umgesetzt in `bases-object-type/` (`file.properties`, `keys`/`values`/`isEmpty`).
+Abweichungen: `file()`/`image()` liefern einen Link, `icon()`/`html()` Text;
 `map`-Ansicht bleibt in der Einbettung eine Tabelle (Kacheln sind Operator-Konfiguration). Ein `cards`-View ohne `groupBy` ist jetzt das
 Obsidian-Kartenraster, mit `groupBy` bleibt es das Kanban-Board.
 Cards-Schlüssel (`image`, `imageFit`, `imageAspectRatio`, `cardSize`) stammen aus einem Forenbeispiel, `groupOrder` aus `obsidian.d.ts` (1.14.3).
