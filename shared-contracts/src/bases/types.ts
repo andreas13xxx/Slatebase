@@ -210,6 +210,12 @@ export interface BaseQuerySpecWire {
    * needs it. Cheap fields (`file.backlinks`) are always populated regardless.
    */
   fileColumns?: string[]
+  /**
+   * Return EVERY property of each note (up to a backend cap), not only the requested columns. Set
+   * when an expression reads `file.properties` / `this.file.properties`, which are objects of all of
+   * a note's properties.
+   */
+  allProperties?: boolean
 }
 
 /** A single row returned by the backend query. */

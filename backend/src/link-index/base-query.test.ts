@@ -55,6 +55,37 @@ describe('LinkIndexService.queryForBase', () => {
     await service.rebuild()
   }
 
+  describe('allProperties (the file.properties object)', () => {
+    it('returns only the requested columns by default', async () => {
+      await setupVault()
+      const result = await service.queryForBase({ filters: { path: 'Tasks/a.md' }, columns: ['status'] })
+      expect(Object.keys(result.rows[0]!.values)).toEqual(['status'])
+    })
+
+    it('returns every property of each note, the requested columns first', async () => {
+      await setupVault()
+      const result = await service.queryForBase({ filters: { path: 'Tasks/a.md' }, columns: ['status'], allProperties: true })
+      const keys = Object.keys(result.rows[0]!.values)
+      expect(keys[0]).toBe('status')
+      expect(keys.sort()).toEqual(['priority', 'status', 'tags', 'type'])
+    })
+
+    it('caps the properties of one note so a huge frontmatter cannot blow up the answer', async () => {
+      const fm = Array.from({ length: 300 }, (_, i) => `k${String(i).padStart(3, '0')}: v${i}`).join('\n')
+      await fs.writeFile(path.join(tempDir, 'wide.md'), `---\n${fm}\n---\n# Wide`)
+      await service.rebuild()
+      const result = await service.queryForBase({ filters: { path: 'wide.md' }, columns: [], allProperties: true })
+      expect(Object.keys(result.rows[0]!.values)).toHaveLength(200)
+    })
+
+    it('keeps requested columns even when they exceed what the note has', async () => {
+      await setupVault()
+      const result = await service.queryForBase({ filters: { path: 'note.md' }, columns: ['type', 'missing'], allProperties: true })
+      expect(result.rows[0]!.values['type']).toEqual(['note'])
+      expect(result.rows[0]!.values).not.toHaveProperty('missing')
+    })
+  })
+
   it('filters by a single property equality', async () => {
     await setupVault()
     const spec: BaseQuerySpec = {

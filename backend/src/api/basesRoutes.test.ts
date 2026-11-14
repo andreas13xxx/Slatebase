@@ -79,6 +79,21 @@ describe('Bases Query Route', () => {
     expect(seen?.filters).toEqual({ and: [{ property: 'status', op: 'eq', value: 'open' }] })
   })
 
+  it('forwards allProperties and rejects a non-boolean value', async () => {
+    let seen: BaseQuerySpec | undefined
+    const linkIndex = createMockLinkIndex({
+      queryForBase: async (spec) => {
+        seen = spec
+        return { rows: [], total: 0 }
+      },
+    })
+    const app = createTestApp({ linkIndex })
+
+    expect((await postQuery(app, { columns: [], allProperties: true })).status).toBe(200)
+    expect(seen?.allProperties).toBe(true)
+    expect((await postQuery(app, { columns: [], allProperties: 'yes' })).status).toBe(400)
+  })
+
   it('accepts a query without filters (whole-vault base)', async () => {
     const app = createTestApp()
     const res = await postQuery(app, { columns: ['status'] })

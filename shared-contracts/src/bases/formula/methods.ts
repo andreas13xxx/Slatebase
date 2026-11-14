@@ -8,7 +8,7 @@
  */
 
 import moment from 'moment'
-import { toDate, toNumber, stringify, isLink, isRegex, isTruthy, toRegExp, type FormulaValue } from './functions.js'
+import { toDate, toNumber, stringify, isLink, isRegex, isObject, isTruthy, toRegExp, type FormulaValue } from './functions.js'
 
 /** A method implementation: receiver + evaluated args → value. */
 export type MethodFn = (receiver: FormulaValue, args: FormulaValue[]) => FormulaValue
@@ -178,13 +178,24 @@ function typeName(v: FormulaValue): string {
   if (v instanceof Date) return 'date'
   if (isLink(v)) return 'link'
   if (isRegex(v)) return 'regexp'
+  if (isObject(v)) return 'object'
   return typeof v
 }
 
 const universalMethods: Record<string, MethodFn> = {
-  isEmpty: (r) => r === null || r === '' || (Array.isArray(r) && r.length === 0),
+  isEmpty: (r) => r === null || r === '' || (Array.isArray(r) && r.length === 0) || (isObject(r) && r.entries.size === 0),
   isTruthy: (r) => isTruthy(r),
   isType: (r, a) => typeName(r) === stringify(a[0] ?? null).toLowerCase(),
+}
+
+/**
+ * Methods only objects have (Obsidian docs: `keys()`, `values()`; `isEmpty()` is the shared one in
+ * `universalMethods`, which knows objects too), plus the generic `toString()`.
+ */
+const objectMethods: Record<string, MethodFn> = {
+  keys: (r) => (isObject(r) ? [...r.entries.keys()] : null),
+  values: (r) => (isObject(r) ? [...r.entries.values()] : null),
+  toString: (r: FormulaValue) => stringify(r),
 }
 
 const linkMethods: Record<string, MethodFn> = {
@@ -242,6 +253,10 @@ export function callMethod(receiver: FormulaValue, method: string, args: Formula
   } else if (isLink(receiver)) {
     const fn = linkMethods[method] ?? stringMethods[method]
     if (fn) return fn(receiver, args)
+  } else if (isObject(receiver)) {
+    // No string/list fallback: `obj.contains(...)` must be a visible error, not a silent text match.
+    const fn = objectMethods[method]
+    if (fn) return fn(receiver, args)
   } else if (typeof receiver === 'number' || typeof receiver === 'boolean') {
     const fn = numberMethods[method] ?? stringMethods[method]
     if (fn) return fn(receiver, args)
@@ -266,5 +281,6 @@ function describeType(v: FormulaValue): string {
   if (Array.isArray(v)) return 'list'
   if (v instanceof Date) return 'date'
   if (isLink(v)) return 'link'
+  if (isObject(v)) return 'object'
   return typeof v
 }
