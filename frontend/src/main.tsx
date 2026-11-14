@@ -26,3 +26,13 @@ if (shareToken === null) {
     )
   })
 }
+
+// Offline fallback only (public/sw.js): the worker answers a failed page navigation with
+// /offline.html and touches nothing else, so no signed-in content is ever cached.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* Not installable here (e.g. plain HTTP): the app works the same without it. */
+    })
+  })
+}
