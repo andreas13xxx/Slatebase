@@ -25,8 +25,14 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request
-  // Only top-level page loads. API calls, assets and the event stream go straight to the network.
+  // Only top-level page loads of the app itself. API calls, assets and the event stream go straight to
+  // the network, and so do navigations that are not HTML pages (downloads, redirects, backend URLs
+  // opened in a tab): their own browser error is the honest answer there.
   if (request.mode !== 'navigate' || request.method !== 'GET') return
+  const url = new URL(request.url)
+  if (url.origin !== self.location.origin) return
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.well-known/')) return
+  if (!(request.headers.get('accept') ?? '').includes('text/html')) return
   event.respondWith(
     fetch(request).catch(() => caches.open(CACHE).then((cache) => cache.match(OFFLINE_URL)).then((r) => r ?? Response.error())),
   )

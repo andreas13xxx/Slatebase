@@ -26,9 +26,8 @@ export const GroupNodeRenderer = memo(function GroupNodeRenderer({
   const { onDragStart } = useNodeDrag(node.id, readOnly)
   const { onResizeStart } = useNodeResize(node.id, readOnly)
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleNodePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
-    e.stopPropagation()
     onSelect(e.shiftKey)
     onDragStart(e)
   }, [onSelect, onDragStart])
@@ -50,7 +49,7 @@ export const GroupNodeRenderer = memo(function GroupNodeRenderer({
         height: node.height,
       }}
       data-node-id={node.id}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handleNodePointerDown}
       onKeyDown={handleNodeKeyDown}
       tabIndex={0}
       role="group"

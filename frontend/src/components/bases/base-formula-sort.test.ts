@@ -45,4 +45,11 @@ describe('sortRowsByFormula', () => {
     const view: BaseView = { type: 'table', sort: [{ column: 'formula.k', direction: 'asc' }] }
     expect(sortRowsByFormula(r, d, view).map((e) => e.fileName)).toEqual(['ok', 'bad'])
   })
+
+  it('sorts object values by their text form, not "[object Object]"', () => {
+    const d: BaseDocument = { formulas: { props: 'file.properties' }, views: [] }
+    const r = [row('x', { n: 'b' }), row('y', { n: 'a' }), row('z', { n: 'c' })]
+    const view: BaseView = { type: 'table', sort: [{ column: 'formula.props', direction: 'asc' }] }
+    expect(sortRowsByFormula(r, d, view).map((e) => e.fileName)).toEqual(['y', 'x', 'z'])
+  })
 })

@@ -7,7 +7,7 @@ import type { ResizeHandle } from './useNodeResize'
 
 interface ResizeHandlesProps {
   visible: boolean
-  onResizeStart: (e: React.MouseEvent, handle: ResizeHandle) => void
+  onResizeStart: (e: React.PointerEvent, handle: ResizeHandle) => void
 }
 
 const HANDLES: Array<{ handle: ResizeHandle; style: React.CSSProperties; cursor: string }> = [
@@ -31,7 +31,7 @@ export const ResizeHandles = memo(function ResizeHandles({ visible, onResizeStar
           key={handle}
           className="canvas-node__resize-handle"
           style={{ ...style, cursor, position: 'absolute' }}
-          onMouseDown={(e) => onResizeStart(e, handle)}
+          onPointerDown={(e) => onResizeStart(e, handle)}
           role="separator"
           aria-label={`Größe ändern ${handle}`}
         />

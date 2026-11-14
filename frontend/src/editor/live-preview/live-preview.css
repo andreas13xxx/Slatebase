@@ -246,6 +246,15 @@
   vertical-align: middle;
 }
 
+/* Touch: a 13px box is hard to hit; 24px is the WCAG 2.2 minimum target size. */
+@media (pointer: coarse) {
+  .cm-lp-checkbox {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+  }
+}
+
 /* --- Blockquotes --- */
 .cm-lp-blockquote {
   border-left: 3px solid var(--border-default);

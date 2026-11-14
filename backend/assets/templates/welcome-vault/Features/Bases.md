@@ -233,6 +233,22 @@ Wird die Base als **eigene `.base`-Datei** geöffnet, ist `this` die Base-Datei 
 
 ---
 
+## Objekte: `file.properties`
+
+`file.properties` ist ein **Objekt** mit allen Properties einer Notiz (Name → Wert). Du erreichst einen Eintrag mit Punkt oder Klammer, auch verschachtelt:
+
+- `file.properties.status` oder `file.properties["status"]`
+- `file.properties.keys()` — die Namen als Liste, in der Reihenfolge der Frontmatter
+- `file.properties.values()` — die Werte als Liste
+- `file.properties.isEmpty()` — `true`, wenn die Notiz keine Properties hat
+
+Ein fehlender Eintrag ergibt einen leeren Wert, keinen Fehler. In einer Zelle erscheint ein Objekt als kompakter Text (JSON), und eine Sortierung nach einer solchen Formel nutzt genau diesen Text.
+
+> [!note] Slatebase-Wahlen
+> Obsidian beschreibt nur `file.properties` und die drei Methoden. Textform (kompaktes JSON), Gleichheit (zwei Objekte sind gleich, wenn Namen und Werte gleich sind) und Reihenfolge sind Entscheidungen von Slatebase. Objekt-Literale gibt es nicht, und verschachtelte Frontmatter-Objekte werden noch nicht als Objekt gelesen. Pro Notiz liefert der Index höchstens 200 Properties.
+
+---
+
 ## Grenzen und Lücken
 
 Damit du nicht überrascht wirst:
@@ -242,7 +258,7 @@ Damit du nicht überrascht wirst:
 
 **Ausdruckssprache**
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
-- Es gibt keinen Objekt-Typ: `keys()`/`values()` auf Objekten fehlen. `html()`, `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
+- Objekte gibt es nur als `file.properties` (siehe oben), nicht als Literal. `html()`, `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
 - `file.embeds`, `file.size` und `file.backlinks` werden unterstützt. `file.embeds` enthält nur `![[…]]`-Einbettungen; beim ersten Start nach dem Update baut Slatebase den Link-Index einmal neu auf.
 - Nicht umgesetzt: Zeilenhöhe der Tabelle und die Listen-Optionen (Marker, Einrückung, Trennzeichen) — ihre YAML-Schlüssel sind nicht belegt.
 
@@ -253,7 +269,7 @@ Damit du nicht überrascht wirst:
 - Eingebaut sind **Tabelle**, **Karten**, **Liste** und **Karte** (Map); andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
 - Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützt). Eingebettet zeigt sie **eine** Ansicht — die erste oder die per `#Ansichtsname` gewählte — in ihrem eigenen Typ: Tabelle, Karten, Kanban oder Liste. Nur eine **Karte** (Map) und Plugin-Ansichten erscheinen eingebettet als Tabelle.
 - Eine eingebettete Base aktualisiert sich bei Änderungen im Vault von selbst (auch wenn sich die einbettende Notiz und damit `this` ändert); die alte Anzeige bleibt stehen, bis die neue Abfrage fertig ist.
-- `this` gilt in der eingebauten Tabelle, nicht in Ansichten, die ein Plugin liefert, und nicht im MCP-Werkzeug `query_base` (dort ergibt `this.…` einen leeren Wert).
+- `this` gilt in der eingebauten Tabelle, nicht in Ansichten, die ein Plugin liefert. Im MCP-Werkzeug `query_base` gilt es nur mit dem Parameter `thisPath`, sonst ergibt `this.…` einen leeren Wert.
 
 **KI-Zugriff über MCP**
 - Das Werkzeug `query_base` wertet eine `.base` serverseitig mit derselben Engine aus ([[Fortgeschritten/MCP Context Server|MCP-Schnittstelle]] für KI-Clients), inklusive der `summaries`. Es liefert standardmäßig 100 Zeilen (maximal 1000) und gibt Formelwerte als Text zurück.

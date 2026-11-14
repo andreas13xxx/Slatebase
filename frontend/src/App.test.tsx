@@ -47,6 +47,7 @@ vi.mock('./api', () => {
 
 // Import App after mock is set up
 import { App } from './App'
+import { getState as getWorkspaceState } from './state/workspaceStore'
 
 describe('App', () => {
   beforeEach(() => {
@@ -350,6 +351,17 @@ describe('App', () => {
       expect(sidebar).not.toHaveClass('app-sidebar--open')
       expect(container.querySelector('.resize-handle')).toBeNull()
       expect(screen.queryByTestId('drawer-backdrop')).toBeNull()
+    })
+
+    it('does not touch the persisted desktop panel visibility', async () => {
+      stubPhoneWindow()
+      const user = userEvent.setup()
+      const { container } = render(<App />)
+      await loginAndWait(user)
+      await user.click(container.querySelector('.left-panel-toggle') as HTMLElement)
+      await user.click(screen.getByTestId('drawer-backdrop'))
+      // Opening and closing a drawer is its own state: the desktop layout stays as the user left it.
+      expect(getWorkspaceState().sidebarVisible).toBe(true)
     })
 
     it('opens a drawer with a backdrop and closes it on a tap outside', async () => {

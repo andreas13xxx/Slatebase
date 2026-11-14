@@ -40,9 +40,9 @@ Jede Phase wird einzeln grün (tsc, `npm run lint`, betroffene Tests, `npm run b
 
 ## Phase 3 — Anzeige und Doku
 
-- [ ] 3.1 Zelltext in Tabelle/Karten/Liste/Kanban über `formatFormulaValue`, Sortierung nach Textform
-- [ ] 3.2 Welcome-Vault `Features/Bases.md` DE/EN: Abschnitt „Objekte“, Slatebase-Wahlen kenntlich machen
-- [ ] 3.3 `product.md`, `structure.md`, `implementation-plan.md` (Objekt-Typ erledigt), `bases-obsidian-parity/spec.md`
+- [x] 3.1 Zelltext in Tabelle/Karten/Liste/Kanban über `formatFormulaValue`, Sortierung nach Textform
+- [x] 3.2 Welcome-Vault `Features/Bases.md` DE/EN: Abschnitt „Objekte“, Slatebase-Wahlen kenntlich machen
+- [x] 3.3 `product.md`, `structure.md`, `implementation-plan.md` (Objekt-Typ erledigt), `bases-obsidian-parity/spec.md`
 
 ## Nicht in dieser Spec
 - Objekt-Literal/`object()` (nicht dokumentiert), verschachtelte Frontmatter-Maps (hängt an 0.1, eigene Spec mit Index-Migration).

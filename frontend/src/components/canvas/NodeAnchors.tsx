@@ -27,17 +27,27 @@ export const NodeAnchors = memo(function NodeAnchors({ nodeId, visible }: NodeAn
   const { state, dispatch } = useCanvasContext()
   const dragStateRef = useRef<{ fromSide: EdgeSide } | null>(null)
 
-  const handleAnchorMouseDown = useCallback((e: React.MouseEvent, side: EdgeSide) => {
+  const handleAnchorPointerDown = useCallback((e: React.PointerEvent, side: EdgeSide) => {
     e.stopPropagation()
     e.preventDefault()
     dragStateRef.current = { fromSide: side }
 
-    const handleMouseUp = (ev: MouseEvent) => {
-      window.removeEventListener('mouseup', handleMouseUp)
+    const pointerId = e.pointerId
+    const handleCancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handleCancel)
+      dragStateRef.current = null
+    }
+    const handlePointerUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handleCancel)
       if (!dragStateRef.current) return
 
-      // Find if we dropped on another node
-      const target = ev.target as HTMLElement
+      // Find if we dropped on another node. A touch pointer is captured by the anchor it started on,
+      // so ev.target would always be the anchor: ask what is under the finger instead.
+      const target = (document.elementFromPoint?.(ev.clientX, ev.clientY) ?? ev.target) as HTMLElement
       const targetNode = target.closest('[data-node-id]') as HTMLElement | null
       if (targetNode && targetNode.dataset['nodeId'] !== nodeId) {
         const toNodeId = targetNode.dataset['nodeId']!
@@ -64,7 +74,8 @@ export const NodeAnchors = memo(function NodeAnchors({ nodeId, visible }: NodeAn
       dragStateRef.current = null
     }
 
-    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handleCancel)
   }, [nodeId, state, dispatch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!visible) return null
@@ -76,7 +87,7 @@ export const NodeAnchors = memo(function NodeAnchors({ nodeId, visible }: NodeAn
           key={side}
           className="canvas-node__anchor"
           style={{ ...style, position: 'absolute' }}
-          onMouseDown={(e) => handleAnchorMouseDown(e, side)}
+          onPointerDown={(e) => handleAnchorPointerDown(e, side)}
           title={`Verbindung von ${side}`}
           role="button"
           aria-label={`Verbindungsanker ${side}`}

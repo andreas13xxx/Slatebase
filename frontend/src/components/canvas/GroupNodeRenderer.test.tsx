@@ -43,7 +43,7 @@ describe('GroupNodeRenderer', () => {
 
   it('calls onSelect with additive=true on shift-click', () => {
     const { onSelect } = renderGroup(makeGroup())
-    fireEvent.mouseDown(screen.getByRole('group'), { button: 0, shiftKey: true })
+    fireEvent.pointerDown(screen.getByRole('group'), { button: 0, shiftKey: true })
     expect(onSelect).toHaveBeenCalledWith(true)
   })
 

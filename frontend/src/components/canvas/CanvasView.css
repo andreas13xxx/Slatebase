@@ -1375,3 +1375,27 @@
     user-select: text;
   }
 }
+
+/* Touch gestures (responsive-mobile, phase 3): the canvas handles pan, pinch and node drag itself via
+   pointer events, so the browser must not scroll or zoom the page for them. Text fields keep native
+   scrolling and selection. */
+.canvas-view,
+.canvas-node,
+.canvas-node__resize-handle,
+.canvas-node__anchor {
+  touch-action: none;
+}
+
+.canvas-view textarea,
+.canvas-view input {
+  touch-action: auto;
+}
+
+/* Bigger touch targets for the resize handles; the visible handle keeps its size. */
+@media (pointer: coarse) {
+  .canvas-node__resize-handle::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+}
