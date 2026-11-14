@@ -108,24 +108,38 @@ function isSafeHostPath(path: string): boolean {
     && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
 }
 
+/** Outcome of the host lookup: whether the base reads `this` at all, and the row when it was found. */
+interface HostLookup {
+  /** False when no expression of the base references `this` (then nothing was looked up). */
+  used: boolean
+  row?: BaseRow
+}
+
 /**
- * Loads the row `this` refers to (the note a base is embedded in). `undefined` when the base never
- * mentions `this`, or when the note is not in the index.
+ * Loads the row `this` refers to (the note a base is embedded in). A failing lookup degrades to
+ * "not found" (logged) instead of failing the whole call: the base is still evaluable, `this` is
+ * just empty, and the response says so.
  */
 async function fetchHostRow(
   linkIndex: ILinkIndex,
+  logger: ToolHandlerDeps['logger'],
   doc: BaseDocument,
   view: BaseView,
   hostPath: string,
-): Promise<BaseRow | undefined> {
+): Promise<HostLookup> {
   const spec = buildHostQuerySpec(doc, view, hostPath)
-  if (spec === null) return undefined
-  const result = await linkIndex.queryForBase(toIndexSpec(spec))
-  // The path is a backend glob and may match more than the host: take the exact path.
-  const wire = result.rows.find((r) => r.path === hostPath)
-  if (!wire) return undefined
-  const listKeys = result.listKeys && result.listKeys.length > 0 ? new Set(result.listKeys) : undefined
-  return wireRowToBaseRow(wire, listKeys)
+  if (spec === null) return { used: false }
+  try {
+    const result = await linkIndex.queryForBase(toIndexSpec(spec))
+    // The path is a backend glob and may match more than the host: take the exact path.
+    const wire = result.rows.find((r) => r.path === hostPath)
+    if (!wire) return { used: true }
+    const listKeys = result.listKeys && result.listKeys.length > 0 ? new Set(result.listKeys) : undefined
+    return { used: true, row: wireRowToBaseRow(wire, listKeys) }
+  } catch (error) {
+    logger.warn('query_base could not load the this-note', { error: error instanceof Error ? error.message : String(error) })
+    return { used: true }
+  }
 }
 
 export function registerQueryBase(
@@ -223,9 +237,12 @@ export function registerQueryBase(
         if (args.thisPath !== undefined && !isSafeHostPath(args.thisPath)) {
           return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid thisPath')
         }
-        const thisRow = args.thisPath !== undefined ? await fetchHostRow(linkIndex, doc, view, args.thisPath) : undefined
-
-        const candidates = await linkIndex.queryForBase(toIndexSpec(buildQuerySpec(doc, view)))
+        // The host lookup and the candidate query are independent: run them together.
+        const [host, candidates] = await Promise.all([
+          args.thisPath !== undefined ? fetchHostRow(linkIndex, deps.logger, doc, view, args.thisPath) : Promise.resolve(undefined),
+          linkIndex.queryForBase(toIndexSpec(buildQuerySpec(doc, view))),
+        ])
+        const thisRow = host?.row
         const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys, thisRow)
 
         const returned = rows.slice(0, args.limit)
@@ -251,7 +268,11 @@ export function registerQueryBase(
             cells: Object.fromEntries(columns.map((c) => [c, cellValue(doc, row, c, thisRow)])),
           })),
           // Echo the host so a client can tell "this was empty" from "the note is not indexed".
-          ...(args.thisPath !== undefined ? { thisPath: args.thisPath, thisFound: thisRow !== undefined } : {}),
+          // `thisUsed` is false for a base that never mentions `this` (then `thisFound` is omitted:
+          // nothing was looked up, so "not found" would be a claim about a lookup that never ran).
+          ...(args.thisPath !== undefined
+            ? { thisPath: args.thisPath, thisUsed: host?.used ?? false, ...(host?.used ? { thisFound: thisRow !== undefined } : {}) }
+            : {}),
           total: available,
           matches: total,
           returned: returned.length,

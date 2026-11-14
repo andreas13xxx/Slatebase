@@ -61,7 +61,7 @@ export function tableToTsv(table: HTMLTableElement): string {
   return Array.from(table.rows)
     .map((row) =>
       Array.from(row.cells)
-        .map((cell) => (cell.textContent ?? '').replace(/\s*[▲▼]\s*$/, '').replace(/[\t\n]+/g, ' ').trim())
+        .map(cellText)
         .join('\t'),
     )
     .join('\n')

@@ -39,6 +39,7 @@ import { setGroupOrder } from './base-edit'
 import { sortRowsByFormula } from './base-formula-sort'
 import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
 import { filterRowsByText } from './base-row-search'
+import { showToast } from '../ToastNotification'
 import './BasesView.css'
 
 export interface BasesViewProps {
@@ -384,15 +385,22 @@ export const BasesView = memo(function BasesView({
         const link = document.createElement('a')
         link.href = url
         link.download = csvFileName(hostPath)
+        // Attached while clicking, and revoked later: some browsers start the download asynchronously
+        // and would otherwise read an already-revoked URL.
+        document.body.appendChild(link)
         link.click()
-        URL.revokeObjectURL(url)
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+        // The file holds what the table shows. If the result was cut short, say so instead of
+        // letting a success toast pass for a complete export.
+        if (truncated) showToast('warning', 'Die Tabelle war gekürzt — die CSV enthält nur die angezeigten Zeilen')
         return true
       },
       addItem,
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem, hostPath])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem, hostPath, truncated])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {

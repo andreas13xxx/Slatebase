@@ -277,6 +277,26 @@ views:
       wireIndex(linkIndex, null)
       const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' }))
       expect(out['thisFound']).toBe(false)
+      expect(out['thisUsed']).toBe(true)
+    })
+
+    it('does not claim "not found" for a base that never mentions `this`', async () => {
+      const { call, linkIndex } = await setup()
+      wireIndex(linkIndex, null)
+      const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' }))
+      expect(out['thisUsed']).toBe(false)
+      expect(out).not.toHaveProperty('thisFound')
+    })
+
+    it('still answers when the this-note lookup fails, reporting it as not found', async () => {
+      const { call, linkIndex } = await setup({ content: THIS_BASE })
+      vi.mocked(linkIndex.queryForBase).mockImplementation(async (spec) => {
+        if ((spec.filters as { path?: string } | undefined)?.path === 'Notes/home.md') throw new Error('index busy')
+        return { rows: PROJECT_ROWS, total: PROJECT_ROWS.length } as never
+      })
+      const result = await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' })
+      expect(result.isError).toBeFalsy()
+      expect(parse(result)['thisFound']).toBe(false)
     })
 
     it.each(['../secret.md', '/etc/passwd', 'a//b.md', 'a\\b.md'])('rejects the unsafe thisPath %j', async (thisPath) => {
