@@ -644,6 +644,8 @@ src/
 │   ├── useDropZone.ts    — External-file drag-and-drop hook (drag counter, size/count validation, toast errors). Only reacts to drags carrying OS files (`dataTransfer.types` contains `'Files'`) — internal drags (explorer node, tab, toolbar button) carry custom MIME types only and must not light up the drop overlay. A capture-phase `drop`/`dragend` listener on `window` clears a stuck highlight when the drop never reaches this hook's handler (an inner handler stopped propagation, or the user released outside the zone)
 │   ├── useStatusBar.ts   — Status bar visibility toggle — global on/off, gates everything below; thin wrapper over `userSettingsStore` (account-wide, was a flat localStorage value)
 │   ├── useStatusBarItemVisibility.ts — Per-built-in-item visibility toggle, keyed by item id in `userSettingsStore`'s `statusBarItems` map (was `slatebase:statusBarItem:<itemId>` localStorage entries)
+│   ├── useMediaQuery.ts  — `useMediaQuery(query)` and `useBreakpoint()` (`mobile` < 768 px, `tablet` 768–1024 px, `desktop`) via `useSyncExternalStore`; `BREAKPOINTS`/`BREAKPOINT_QUERIES` are the one JS reference for the numbers documented at the top of `App.css`. `AppContent` uses it for the drawer layout; the settings panel and tables use CSS container/media queries instead
+│   ├── useKeyboardViewport.ts — publishes the on-screen keyboard height as `--keyboard-inset` on `<html>` (padding of `.app`) and keeps the editor caret visible
 │   ├── useWordStats.ts   — Word/character count (+ selection) for the active file. Polls `getActiveEditorView()` (300ms) rather than subscribing to CM6 transactions directly — no reactive content/selection stream exists without extending the core editor's extension pipeline
 │   ├── useCursorPosition.ts — Cursor line/column (100ms poll, same rationale as useWordStats.ts) + `goToLine()` helper
 │   ├── useLinkCounts.ts       — Subscribes to the counts published via `state/linkCountsBridge.ts`
@@ -766,6 +768,7 @@ src/
 │   │   ├── useNodeDrag.ts        — Node drag hook (single + multi-select, stopPropagation)
 │   │   ├── useNodeResize.ts      — Node resize hook (min size enforcement)
 │   │   ├── useViewportCulling.ts — Viewport culling for off-screen nodes
+│   │   ├── touch-gestures.ts     — Pure geometry for pinch-zoom and two-finger pan (`startPinch`/`pinchViewport`, same zoom clamps as the wheel); `CanvasView` tracks touch pointers that start on the background, nodes/handles/anchors drag via pointer events (`touch-action: none`)
 │   │   ├── canvas-utils.ts       — generateCanvasId, getCanvasColorClass
 │   │   └── markdown-render.tsx   — renderSimpleMarkdown for node previews
 │   ├── bases/                    — Bases table UI (feature `bases`); routed from `TabContent.tsx` for `.base` files
