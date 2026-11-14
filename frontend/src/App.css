@@ -6943,3 +6943,67 @@
     opacity: 1;
   }
 }
+
+/* ===== Responsive: side panels as drawers (responsive-mobile, phase 2) =====
+ * Below 768px the sidebar and the right panel are overlay drawers: out of the flow, off-screen
+ * until opened, with a backdrop that closes them on tap. 768-1024px keeps the panels in the flow
+ * as before (a tablet is not narrowed: the resize handle and the saved width keep working). Widths are fixed here (no drag handles on mobile), so the inline width the desktop
+ * layout sets is not applied. */
+.app-drawer-backdrop {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .app-sidebar--overlay,
+  .app-right-panel--overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(85vw, 320px);
+    min-width: 0;
+    max-width: none;
+    box-shadow: var(--shadow-md);
+    visibility: hidden;
+    transition: transform var(--transition-fast), visibility 0s linear 100ms;
+  }
+
+  .app-sidebar--overlay {
+    left: 0;
+    transform: translateX(-100%);
+  }
+
+  .app-right-panel--overlay {
+    right: 0;
+    transform: translateX(100%);
+  }
+
+  .app-sidebar--overlay.app-sidebar--open,
+  .app-right-panel--overlay.app-right-panel--open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform var(--transition-fast), visibility 0s;
+  }
+
+  .app-drawer-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .resize-handle {
+    display: none;
+  }
+
+  /* An open drawer and its backdrop cover the toggles (z-index 30/20 > 10): closing is the backdrop's
+     job, the toggles are only the way to OPEN a drawer. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar--overlay,
+  .app-right-panel--overlay {
+    transition: none;
+  }
+}

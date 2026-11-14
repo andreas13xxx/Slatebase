@@ -118,6 +118,7 @@ import { BASE_BREADCRUMB_MODES } from './components/breadcrumbModes'
 import { PaneHeader } from './components/panes/PaneHeader'
 import { isBreadcrumbPath } from './components/panes/breadcrumbPath'
 import { useResize } from './hooks/useResize'
+import { useBreakpoint } from './hooks/useMediaQuery'
 import { useKeyboardViewport } from './hooks/useKeyboardViewport'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
@@ -217,14 +218,42 @@ function AppContent() {
   const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
   const { goBack, goForward } = useNavigationHistory()
   const { t } = useTranslation()
+  // Below 768 px the side panels are overlay drawers (see App.css, responsive-mobile spec).
+  const isMobileLayout = useBreakpoint() === 'mobile'
   const prevVaultId = useRef<string | null>(null)
   // Per-vault tab memory: saves tabs when switching away, restores when switching back
   const vaultTabsCacheRef = useRef<Map<string, { tabs: Array<{ filePath: string; fileName: string }>; activeTabId: string | null }>>(new Map())
   // Navigation tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(() => getWorkspaceState().activeSettingsPage)
-  const [showRightPanel, setShowRightPanel] = useState(() => getWorkspaceState().rightPanelVisible)
-  const [showSidebar, setShowSidebar] = useState(() => getWorkspaceState().sidebarVisible)
+  // Desktop panel visibility is what gets persisted. On a narrow window the panels are drawers
+  // with their own, never persisted open state, so narrowing the window cannot overwrite the
+  // desktop layout (and the persisted "open" does not cover the note on a phone).
+  const [showRightPanelDesktop, setShowRightPanelDesktop] = useState(() => getWorkspaceState().rightPanelVisible)
+  const [showSidebarDesktop, setShowSidebarDesktop] = useState(() => getWorkspaceState().sidebarVisible)
+  const [mobileDrawer, setMobileDrawer] = useState<'left' | 'right' | null>(null)
+  const showSidebar = isMobileLayout ? mobileDrawer === 'left' : showSidebarDesktop
+  const showRightPanel = isMobileLayout ? mobileDrawer === 'right' : showRightPanelDesktop
+  const setShowSidebar = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    if (!isMobileLayout) {
+      setShowSidebarDesktop(value)
+      return
+    }
+    setMobileDrawer((prev) => {
+      const next = typeof value === 'function' ? value(prev === 'left') : value
+      return next ? 'left' : prev === 'left' ? null : prev
+    })
+  }, [isMobileLayout])
+  const setShowRightPanel = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    if (!isMobileLayout) {
+      setShowRightPanelDesktop(value)
+      return
+    }
+    setMobileDrawer((prev) => {
+      const next = typeof value === 'function' ? value(prev === 'right') : value
+      return next ? 'right' : prev === 'right' ? null : prev
+    })
+  }, [isMobileLayout])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const createFileTriggerRef = useRef<(() => void) | null>(null)
@@ -275,6 +304,13 @@ function AppContent() {
   useKeyboardViewport()
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
+
+  // A drawer covers the content, so opening another note closes it.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close the drawer once a note was opened
+    if (isMobileLayout) setMobileDrawer(null)
+  }, [isMobileLayout, tabState.activeTabId])
+  const closeDrawers = useCallback(() => setMobileDrawer(null), [])
   const versionInfo = useVersionInfo()
 
   // Refresh key for sidebar panel views (favorites, recent files)
@@ -435,8 +471,8 @@ function AppContent() {
     paneTree,
     paneTreeDispatch,
     activeSettingsPage,
-    showSidebar,
-    showRightPanel,
+    showSidebar: showSidebarDesktop,
+    showRightPanel: showRightPanelDesktop,
     apiClient,
   })
 
@@ -986,6 +1022,8 @@ function AppContent() {
   // where FileExplorer hasn't finished (re)mounting yet when we dispatch.
   useEffect(() => {
     if (!explorerFollowActiveFile || !activeTab) return
+    // A drawer must not pop open by itself on every tab change.
+    if (isMobileLayout) return
     if (activeTab.filePath === '__graph__' || activeTab.filePath.startsWith('__view::')) return
     const rightSection = rightPanelState.sections.find((s) => s.viewIds.includes('explorer'))
     if (rightSection) {
@@ -1241,8 +1279,12 @@ function AppContent() {
         <div className={`app-vault-layout mod-vertical mod-root workspace-split${toolbarPrefs.visible && toolbarPrefs.position === 'right' ? ' app-vault-layout--toolbar-right' : ''}`}>
 
           {/* ── Sidebar ── */}
-          {showSidebar && (
-            <aside className="app-sidebar" style={{ width: sidebar.width }}>
+          {(showSidebar || isMobileLayout) && (
+            <aside
+              className={`app-sidebar${isMobileLayout ? ` app-sidebar--overlay${showSidebar ? ' app-sidebar--open' : ''}` : ''}`}
+              style={isMobileLayout ? undefined : { width: sidebar.width }}
+              inert={isMobileLayout && !showSidebar}
+            >
               <div className="app-sidebar-header">
                 <div className="app-logo">
                   <SlatebaseLogo size={26} className="app-logo-icon" />
@@ -1308,8 +1350,8 @@ function AppContent() {
             </aside>
           )}
 
-          {/* ── Sidebar Resize Handle ── */}
-          {showSidebar && (
+          {/* ── Sidebar Resize Handle (drawers have a fixed width) ── */}
+          {showSidebar && !isMobileLayout && (
             <div
               className="resize-handle"
               onPointerDown={sidebar.onPointerDown}
@@ -1421,8 +1463,9 @@ function AppContent() {
           </section>
 
           {/* ── Right Panel + Resize ── */}
-          {showRightPanel && (
+          {(showRightPanel || isMobileLayout) && (
             <>
+              {!isMobileLayout && (
               <div
                 className="resize-handle"
                 onPointerDown={rightPanel.onPointerDown}
@@ -1436,7 +1479,12 @@ function AppContent() {
                 aria-label={t('resize.adjustWidth')}
                 tabIndex={0}
               />
-              <aside className="app-right-panel" style={{ width: rightPanel.width }}>
+              )}
+              <aside
+                className={`app-right-panel${isMobileLayout ? ` app-right-panel--overlay${showRightPanel ? ' app-right-panel--open' : ''}` : ''}`}
+                style={isMobileLayout ? undefined : { width: rightPanel.width }}
+                inert={isMobileLayout && !showRightPanel}
+              >
                 <PluginViewPanel />
                 <SidePanel
                   side="right"
@@ -1462,6 +1510,11 @@ function AppContent() {
           )}
 
           {toolbarPrefs.visible && toolbarPrefs.position === 'right' && toolbarElement}
+
+          {/* Backdrop behind an open drawer: a tap outside closes it */}
+          {isMobileLayout && (showSidebar || showRightPanel) && (
+            <div className="app-drawer-backdrop" onClick={closeDrawers} data-testid="drawer-backdrop" aria-hidden="true" />
+          )}
 
           {/* Toggle right panel */}
           <button
