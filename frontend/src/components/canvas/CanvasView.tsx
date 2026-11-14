@@ -24,6 +24,8 @@ import { CanvasToolbar } from './CanvasToolbar'
 import type { CanvasViewMode } from './CanvasToolbar'
 import { CanvasSourceView } from './CanvasSourceView'
 import { useViewportCulling } from './useViewportCulling'
+import { startPinch, pinchViewport } from './touch-gestures'
+import type { PinchStart, Point } from './touch-gestures'
 import { generateCanvasId, computeFitViewport, computeContentBounds } from './canvas-utils'
 import { setActiveCanvasController, clearActiveCanvasController } from '../../state/activeCanvasBridge'
 import './CanvasView.css'
@@ -82,10 +84,6 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
   const longPress = useLongPress({ dispatchOnTarget: true })
   // Edges run their own long-press, and text fields keep the native selection/paste menu.
   const { onPointerDown: longPressPointerDown } = longPress
-  const onCanvasPointerDown = useCallback((e: React.PointerEvent<Element>) => {
-    if (e.target instanceof Element && e.target.closest('.canvas-edge-hit, textarea, input, [contenteditable="true"]')) return
-    longPressPointerDown(e)
-  }, [longPressPointerDown])
   const transformLayerRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
@@ -282,19 +280,69 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
   // ─── Pan ──────────────────────────────────────────────────────────────────
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Middle mouse button or space+left click for panning
-    if (e.button === 1 || (spaceHeld && e.button === 0)) {
-      e.preventDefault()
-      setIsPanning(true)
-      panStartRef.current = { x: e.clientX, y: e.clientY, viewX: viewport.x, viewY: viewport.y }
-    }
-    // Left click on background → deselect
+    // Left click on background → deselect (panning itself runs on pointer events below)
     if (e.button === 0 && !spaceHeld && e.target === e.currentTarget) {
       dispatch({ type: 'DESELECT_ALL' })
     }
-  }, [spaceHeld, viewport, dispatch])
+  }, [spaceHeld, dispatch])
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  /** Touch pointers that went down on the background: one pans, two pinch. */
+  const touchPointersRef = useRef(new Map<number, Point>())
+  const pinchRef = useRef<PinchStart | null>(null)
+
+  const stopPanning = useCallback(() => {
+    setIsPanning(false)
+    panStartRef.current = null
+    pinchRef.current = null
+  }, [])
+
+  const handlePanPointerDown = useCallback((e: React.PointerEvent<Element>): boolean => {
+    const target = e.target as Element
+    const capture = () => {
+      try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* not supported (jsdom) */ }
+    }
+    if (e.pointerType === 'touch') {
+      // Nodes drag themselves; edges and text fields keep their own gestures.
+      if (target.closest('.canvas-node, .canvas-edge-hit, textarea, input, [contenteditable="true"]')) return false
+      touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      capture()
+      const pts = [...touchPointersRef.current.values()]
+      const rect = containerRef.current?.getBoundingClientRect()
+      const [a, b] = pts
+      if (a && b && rect) {
+        pinchRef.current = startPinch(a, b, { x: viewport.x, y: viewport.y }, viewport.zoom, { x: rect.left, y: rect.top })
+        panStartRef.current = null
+      } else {
+        panStartRef.current = { x: e.clientX, y: e.clientY, viewX: viewport.x, viewY: viewport.y }
+      }
+      setIsPanning(true)
+      return true
+    }
+    // Mouse/pen: middle button or space + left button
+    if (e.button === 1 || (spaceHeld && e.button === 0)) {
+      e.preventDefault()
+      capture()
+      setIsPanning(true)
+      panStartRef.current = { x: e.clientX, y: e.clientY, viewX: viewport.x, viewY: viewport.y }
+    }
+    return false
+  }, [spaceHeld, viewport])
+
+  const handlePanPointerMove = useCallback((e: React.PointerEvent<Element>) => {
+    if (e.pointerType === 'touch') {
+      const pointers = touchPointersRef.current
+      if (!pointers.has(e.pointerId)) return
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const [a, b] = [...pointers.values()]
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (a && b && pinchRef.current && rect) {
+        dispatch({
+          type: 'SET_VIEWPORT',
+          payload: pinchViewport(pinchRef.current, a, b, { x: rect.left, y: rect.top }, MIN_ZOOM, MAX_ZOOM),
+        })
+        return
+      }
+    }
     if (!isPanning || !panStartRef.current) return
     const dx = e.clientX - panStartRef.current.x
     const dy = e.clientY - panStartRef.current.y
@@ -308,10 +356,42 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
     })
   }, [isPanning, viewport, dispatch])
 
-  const handleMouseUp = useCallback(() => {
-    setIsPanning(false)
-    panStartRef.current = null
-  }, [])
+  const handlePanPointerEnd = useCallback((e: React.PointerEvent<Element>) => {
+    if (e.pointerType !== 'touch') {
+      stopPanning()
+      return
+    }
+    const pointers = touchPointersRef.current
+    if (!pointers.delete(e.pointerId)) return
+    pinchRef.current = null
+    const rest = [...pointers.values()][0]
+    if (rest) {
+      // One finger left after a pinch: continue as a one-finger pan from where it is now.
+      panStartRef.current = { x: rest.x, y: rest.y, viewX: viewport.x, viewY: viewport.y }
+    } else {
+      stopPanning()
+    }
+  }, [stopPanning, viewport])
+
+  const onCanvasPointerDown = useCallback((e: React.PointerEvent<Element>) => {
+    handlePanPointerDown(e)
+    // A second finger means pinch, not a long press.
+    if (touchPointersRef.current.size > 1) return
+    if (e.target instanceof Element && e.target.closest('.canvas-edge-hit, textarea, input, [contenteditable="true"]')) return
+    longPressPointerDown(e)
+  }, [handlePanPointerDown, longPressPointerDown])
+  const onCanvasPointerMove = useCallback((e: React.PointerEvent<Element>) => {
+    handlePanPointerMove(e)
+    longPress.onPointerMove(e)
+  }, [handlePanPointerMove, longPress])
+  const onCanvasPointerUp = useCallback((e: React.PointerEvent<Element>) => {
+    handlePanPointerEnd(e)
+    longPress.onPointerUp()
+  }, [handlePanPointerEnd, longPress])
+  const onCanvasPointerCancel = useCallback((e: React.PointerEvent<Element>) => {
+    handlePanPointerEnd(e)
+    longPress.onPointerCancel()
+  }, [handlePanPointerEnd, longPress])
 
   // ─── Double-click → Create new TextNode ───────────────────────────────────
 
@@ -784,13 +864,13 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
             className={`canvas-view ${cursorClass} ${isDragOver ? 'canvas-view--drag-over' : ''}`}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
             onDoubleClick={handleDoubleClick}
             onContextMenu={handleContextMenu}
             {...longPress}
             onPointerDown={onCanvasPointerDown}
+            onPointerMove={onCanvasPointerMove}
+            onPointerUp={onCanvasPointerUp}
+            onPointerCancel={onCanvasPointerCancel}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}

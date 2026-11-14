@@ -186,7 +186,7 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
     setEditValue(node.file)
   }, [node.file])
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleNodePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 || editing) return
     onSelect(e.shiftKey)
     onDragStart(e)
@@ -394,7 +394,7 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
         height: node.height,
       }}
       data-node-id={node.id}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handleNodePointerDown}
       onDoubleClick={() => {
         if (exists && !editing) onFileOpen(node.file)
       }}

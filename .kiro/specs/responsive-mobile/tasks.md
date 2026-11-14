@@ -37,12 +37,14 @@ Randwerte beim Prüfen: 767/768 und 1024/1025 px (Hook-Test deckt die Logik, die
 
 ## Phase 3: Canvas Touch-Interaktion
 
-- [ ] Task 10: `CanvasView.tsx` Pan/Zoom von Mouse- auf Pointer-Events migrieren (`setPointerCapture`)
-- [ ] Task 11: Pinch-to-Zoom implementieren (Zwei-Pointer-Abstandstracking, gleiche `MIN_ZOOM`/`MAX_ZOOM`-Clamps wie Wheel-Zoom)
-- [ ] Task 12: Ein-Finger-Touch-Pan (unterschieden von Maus-Pan über `pointerType`)
-- [ ] Task 13: `useNodeDrag.ts` auf Pointer-Events migrieren
-- [ ] Task 14: `useNodeResize.ts` auf Pointer-Events migrieren
-- [ ] Task 15: Regressionstest bestehender Maus-Interaktion (Mitteltaste-Pan, Wheel-Zoom, Rechtsklick-Kontextmenü, Node-Drag/Resize mit Maus)
+Umgesetzt: Pan, Pinch (reine Geometrie in `touch-gestures.ts`, gleiche Zoom-Grenzen wie das Mausrad, zwei Finger schwenken auch), Knoten-Drag, Resize und Kanten-Anker laufen über Pointer-Events (`touch-action: none` auf Canvas, Knoten, Handles; Textfelder scrollen weiter). Die Maus (Mitteltaste/Leertaste-Pan, Mausrad, Rechtsklick) bleibt, durch Tests belegt. Nicht auf einem echten Gerät geprüft (Task 24).
+
+- [x] Task 10: `CanvasView.tsx` Pan/Zoom von Mouse- auf Pointer-Events migrieren (`setPointerCapture`)
+- [x] Task 11: Pinch-to-Zoom implementieren (Zwei-Pointer-Abstandstracking, gleiche `MIN_ZOOM`/`MAX_ZOOM`-Clamps wie Wheel-Zoom)
+- [x] Task 12: Ein-Finger-Touch-Pan (unterschieden von Maus-Pan über `pointerType`)
+- [x] Task 13: `useNodeDrag.ts` auf Pointer-Events migrieren
+- [x] Task 14: `useNodeResize.ts` auf Pointer-Events migrieren
+- [x] Task 15: Regressionstest bestehender Maus-Interaktion (Mitteltaste-Pan, Wheel-Zoom, Rechtsklick-Kontextmenü, Node-Drag/Resize mit Maus)
 
 ## Phase 4: Touch-freundliche Resize-Handles
 

@@ -59,7 +59,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
     if (!editing) setEditUrl(node.url)
   }, [node.url, editing])
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleNodePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 || editing) return
     onSelect(e.shiftKey)
     onDragStart(e)
@@ -138,7 +138,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
       className={`canvas-node canvas-node--link ${colorClass} ${selected ? 'canvas-node--selected' : ''}`}
       style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
       data-node-id={node.id}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handleNodePointerDown}
       onDoubleClick={() => {
         openExternalUrl(node.url)
       }}
@@ -149,7 +149,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
     >
       {showIframe ? (
         <div className="canvas-node__link-preview">
-          <div className="canvas-node__link-preview-header" onMouseDown={handleMouseDown}>
+          <div className="canvas-node__link-preview-header" onPointerDown={handleNodePointerDown}>
             <Globe size={12} />
             <span className="canvas-node__link-preview-url" title={node.url}>{displayUrl}</span>
             <ExternalLink size={12} className="canvas-node__link-preview-external" />

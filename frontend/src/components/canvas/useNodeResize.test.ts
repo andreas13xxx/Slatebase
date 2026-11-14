@@ -4,6 +4,11 @@ import React from 'react'
 import { useNodeResize } from './useNodeResize'
 import { useCanvasContext, CanvasProvider } from '../../state/canvasContext'
 
+/** A pointer event for window listeners (jsdom's PointerEvent support varies): a MouseEvent with a pointerId. */
+function pointerEvt(type: string, init: MouseEventInit = {}): Event {
+  return Object.assign(new MouseEvent(type, init), { pointerId: 1 })
+}
+
 function makeContent(x: number, y: number, width: number, height: number) {
   return JSON.stringify({
     nodes: [{ id: 'n1', type: 'text', x, y, width, height, text: 'n1' }],
@@ -24,12 +29,13 @@ function renderHarness(readOnly: boolean, content: string) {
   })
 }
 
-function fakeMouseDown(clientX: number, clientY: number): React.MouseEvent {
-  return { clientX, clientY, stopPropagation: () => {}, preventDefault: () => {} } as unknown as React.MouseEvent
+function fakeMouseDown(clientX: number, clientY: number): React.PointerEvent {
+  return { clientX, clientY, pointerId: 1,
+    stopPropagation: () => {}, preventDefault: () => {} } as unknown as React.PointerEvent
 }
 
 afterEach(() => {
-  window.dispatchEvent(new MouseEvent('mouseup'))
+  window.dispatchEvent(pointerEvt('pointerup'))
 })
 
 describe('useNodeResize', () => {
@@ -38,7 +44,7 @@ describe('useNodeResize', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => { result.current.resize.onResizeStart(fakeMouseDown(0, 0), 'e') })
-    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 0 })) })
+    act(() => { window.dispatchEvent(pointerEvt('pointermove', { clientX: 50, clientY: 0 })) })
 
     const node = result.current.ctx.state.document!.nodes[0]!
     expect(node.width).toBe(250)
@@ -50,7 +56,7 @@ describe('useNodeResize', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => { result.current.resize.onResizeStart(fakeMouseDown(0, 0), 'w') })
-    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: -50, clientY: 0 })) })
+    act(() => { window.dispatchEvent(pointerEvt('pointermove', { clientX: -50, clientY: 0 })) })
 
     const node = result.current.ctx.state.document!.nodes[0]!
     expect(node.width).toBe(250)
@@ -62,7 +68,7 @@ describe('useNodeResize', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => { result.current.resize.onResizeStart(fakeMouseDown(0, 0), 'e') })
-    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: -500, clientY: 0 })) })
+    act(() => { window.dispatchEvent(pointerEvt('pointermove', { clientX: -500, clientY: 0 })) })
 
     const node = result.current.ctx.state.document!.nodes[0]!
     expect(node.width).toBe(100)
@@ -73,7 +79,7 @@ describe('useNodeResize', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => { result.current.resize.onResizeStart(fakeMouseDown(0, 0), 's') })
-    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: -500 })) })
+    act(() => { window.dispatchEvent(pointerEvt('pointermove', { clientX: 0, clientY: -500 })) })
 
     const node = result.current.ctx.state.document!.nodes[0]!
     expect(node.height).toBe(60)
@@ -84,7 +90,7 @@ describe('useNodeResize', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => { result.current.resize.onResizeStart(fakeMouseDown(0, 0), 'se') })
-    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: 30, clientY: 40 })) })
+    act(() => { window.dispatchEvent(pointerEvt('pointermove', { clientX: 30, clientY: 40 })) })
 
     const node = result.current.ctx.state.document!.nodes[0]!
     expect(node.width).toBe(230)
@@ -96,7 +102,7 @@ describe('useNodeResize', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => { result.current.resize.onResizeStart(fakeMouseDown(0, 0), 'e') })
-    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 0 })) })
+    act(() => { window.dispatchEvent(pointerEvt('pointermove', { clientX: 100, clientY: 0 })) })
 
     const node = result.current.ctx.state.document!.nodes[0]!
     expect(node.width).toBe(200)

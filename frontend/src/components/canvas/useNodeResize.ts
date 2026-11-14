@@ -29,7 +29,7 @@ export function useNodeResize(nodeId: string, readOnly: boolean) {
   const { state, dispatch } = useCanvasContext()
   const resizeRef = useRef<ResizeState | null>(null)
 
-  const onResizeStart = useCallback((e: React.MouseEvent, handle: ResizeHandle) => {
+  const onResizeStart = useCallback((e: React.PointerEvent, handle: ResizeHandle) => {
     if (readOnly) return
     e.stopPropagation()
     e.preventDefault()
@@ -47,8 +47,10 @@ export function useNodeResize(nodeId: string, readOnly: boolean) {
       handle,
     }
 
-    const handleMove = (ev: MouseEvent) => {
-      if (!resizeRef.current) return
+    const pointerId = e.pointerId
+
+    const handleMove = (ev: PointerEvent) => {
+      if (!resizeRef.current || ev.pointerId !== pointerId) return
       const { startX, startY, nodeX, nodeY, nodeWidth, nodeHeight, handle: h } = resizeRef.current
       const dx = (ev.clientX - startX) / state.viewport.zoom
       const dy = (ev.clientY - startY) / state.viewport.zoom
@@ -78,14 +80,17 @@ export function useNodeResize(nodeId: string, readOnly: boolean) {
       })
     }
 
-    const handleUp = () => {
+    const handleUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return
       resizeRef.current = null
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
     }
 
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
   }, [nodeId, readOnly, state.document, state.viewport.zoom, dispatch])
 
   return { onResizeStart }
