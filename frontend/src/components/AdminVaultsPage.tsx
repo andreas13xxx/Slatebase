@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y-x/no-interactive-element-to-noninteractive-role -- the card layout (display: block) drops native table semantics, so the cells carry explicit roles; a <td> is not interactive here */
 import { useState, useCallback } from 'react'
 import type { IApiClient } from '../api'
 import type { VaultInfo } from '../types'
@@ -115,33 +116,33 @@ export function AdminVaultsPage({ apiClient }: AdminVaultsPageProps) {
         <p style={{ color: 'var(--text-subtle)', fontSize: 13 }}>{t('admin.vaults.empty')}</p>
       ) : (
         <div className="admin-users-table-wrapper">
-          <table className="admin-users-table">
+          <table className="admin-users-table data-table data-table--cards" role="table">
             <thead>
-              <tr>
-                <th>{t('admin.vaults.tableName')}</th>
-                <th>{t('admin.vaults.tableOwner')}</th>
-                <th><FileText size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableFiles')}</th>
-                <th><HardDrive size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableSize')}</th>
-                <th><Users size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableShares')}</th>
-                <th>{t('admin.vaults.tableActions')}</th>
+              <tr role="row">
+                <th role="columnheader">{t('admin.vaults.tableName')}</th>
+                <th role="columnheader">{t('admin.vaults.tableOwner')}</th>
+                <th role="columnheader"><FileText size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableFiles')}</th>
+                <th role="columnheader"><HardDrive size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableSize')}</th>
+                <th role="columnheader"><Users size={12} style={{ verticalAlign: 'middle' }} /> {t('admin.vaults.tableShares')}</th>
+                <th role="columnheader">{t('admin.vaults.tableActions')}</th>
               </tr>
             </thead>
             <tbody>
               {vaults.map((vault) => (
-                <tr key={vault.id}>
-                  <td style={{ fontWeight: 600 }}>{vault.name}</td>
-                  <td style={{ color: vault.ownerName ? 'var(--text-primary)' : 'var(--text-subtle)' }}>
+                <tr role="row" key={vault.id}>
+                  <td role="cell" data-label={t('admin.vaults.tableName')} style={{ fontWeight: 600 }}>{vault.name}</td>
+                  <td role="cell" data-label={t('admin.vaults.tableOwner')} style={{ color: vault.ownerName ? 'var(--text-primary)' : 'var(--text-subtle)' }}>
                     {vault.ownerName ?? vault.ownerId ?? '—'}
                   </td>
-                  <td>{vault.fileCount ?? '—'}</td>
-                  <td>{vault.sizeBytes !== undefined ? formatBytes(vault.sizeBytes) : '—'}</td>
-                  <td>
+                  <td role="cell" data-label={t('admin.vaults.tableFiles')}>{vault.fileCount ?? '—'}</td>
+                  <td role="cell" data-label={t('admin.vaults.tableSize')}>{vault.sizeBytes !== undefined ? formatBytes(vault.sizeBytes) : '—'}</td>
+                  <td role="cell" data-label={t('admin.vaults.tableShares')}>
                     {vault.shareCount !== undefined && vault.shareCount > 0
                       ? <span style={{ fontWeight: 500 }}>{vault.shareCount}</span>
                       : <span style={{ color: 'var(--text-subtle)' }}>—</span>
                     }
                   </td>
-                  <td>
+                  <td role="cell">
                     <Button
                       variant="danger"
                       size="sm"

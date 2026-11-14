@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y-x/no-interactive-element-to-noninteractive-role -- the card layout (display: block) drops native table semantics, so the cells carry explicit roles; a <td> is not interactive here */
 import { useState, useCallback, type FormEvent } from 'react'
 import { UserCog, KeyRound, Fingerprint, Ban, Unlock, Trash2 } from 'lucide-react'
 import type { IApiClient } from '../api'
@@ -379,24 +380,24 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
 
         {users.length > 0 && (
           <div className="admin-users-table-wrapper">
-            <table className="admin-users-table">
+            <table className="admin-users-table data-table data-table--cards" role="table">
               <thead>
-                <tr>
-                  <th>{t('admin.users.tableUsername')}</th>
-                  <th>{t('admin.users.tableDisplayName')}</th>
-                  <th>{t('admin.users.tableEmail')}</th>
-                  <th>{t('admin.users.tableRole')}</th>
-                  <th>{t('admin.users.tableStatus')}</th>
-                  <th>{t('admin.users.tableCreated')}</th>
-                  <th>{t('admin.users.tableActions')}</th>
+                <tr role="row">
+                  <th role="columnheader">{t('admin.users.tableUsername')}</th>
+                  <th role="columnheader">{t('admin.users.tableDisplayName')}</th>
+                  <th role="columnheader">{t('admin.users.tableEmail')}</th>
+                  <th role="columnheader">{t('admin.users.tableRole')}</th>
+                  <th role="columnheader">{t('admin.users.tableStatus')}</th>
+                  <th role="columnheader">{t('admin.users.tableCreated')}</th>
+                  <th role="columnheader">{t('admin.users.tableActions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.userId} className={user.suspended ? 'admin-users-row--suspended' : ''}>
-                    <td>{user.username}</td>
-                    <td>{user.displayName}</td>
-                    <td>
+                  <tr role="row" key={user.userId} className={user.suspended ? 'admin-users-row--suspended' : ''}>
+                    <td role="cell" data-label={t('admin.users.tableUsername')}>{user.username}</td>
+                    <td role="cell" data-label={t('admin.users.tableDisplayName')}>{user.displayName}</td>
+                    <td role="cell" data-label={t('admin.users.tableEmail')}>
                       {user.email || '—'}
                       {user.email !== '' && (
                         <span className={`account-badge ${user.emailVerified === true ? 'account-badge--ok' : 'account-badge--warn'}`}>
@@ -404,10 +405,10 @@ export function AdminUsersPage({ apiClient }: AdminUsersPageProps) {
                         </span>
                       )}
                     </td>
-                    <td>{user.role === 'admin' ? t('admin.users.roleAdmin') : t('admin.users.roleUser')}</td>
-                    <td>{user.suspended ? t('admin.users.statusSuspended') : t('admin.users.statusActive')}</td>
-                    <td>{formatDate(user.createdAt)}</td>
-                    <td className="admin-users-actions">
+                    <td role="cell" data-label={t('admin.users.tableRole')}>{user.role === 'admin' ? t('admin.users.roleAdmin') : t('admin.users.roleUser')}</td>
+                    <td role="cell" data-label={t('admin.users.tableStatus')}>{user.suspended ? t('admin.users.statusSuspended') : t('admin.users.statusActive')}</td>
+                    <td role="cell" data-label={t('admin.users.tableCreated')}>{formatDate(user.createdAt)}</td>
+                    <td role="cell" className="admin-users-actions">
                       <Button
                         variant="ghost"
                         size="sm"

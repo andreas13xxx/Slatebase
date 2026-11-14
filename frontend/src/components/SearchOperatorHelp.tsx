@@ -46,7 +46,8 @@ export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
         aria-label={t('search.operatorHelp.ariaLabel')}
       >
         <h3 className="search-operator-help__title">{t('search.operatorHelp.title')}</h3>
-        <table className="search-operator-help__table">
+        <div className="table-scroll">
+        <table className="search-operator-help__table data-table">
           <thead>
             <tr>
               <th>{t('search.operatorHelp.columnOperator')}</th>
@@ -64,6 +65,7 @@ export function SearchOperatorHelp({ open, onClose }: SearchOperatorHelpProps) {
             ))}
           </tbody>
         </table>
+        </div>
         <p className="search-operator-help__note">
           {t('search.operatorHelp.note')} <code>path:&quot;Mein Ordner/**&quot;</code>
         </p>

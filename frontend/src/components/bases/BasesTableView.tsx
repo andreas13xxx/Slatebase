@@ -129,7 +129,7 @@ export const BasesTableView = memo(function BasesTableView({
 
   return (
     <div className="bases-table-view">
-      <table className="bases-table">
+      <table className="bases-table data-table">
         <thead>
           <tr>
             {columns.map((col) => {

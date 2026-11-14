@@ -245,26 +245,37 @@ describe('SettingsPanel', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('has a mobile navigation toggle button', () => {
-    render(
-      React.createElement(SettingsPanel, { open: true, onClose }),
-      { wrapper: createAuthWrapper() },
-    )
-    const toggleBtn = screen.getByRole('button', { name: /Navigation/i })
-    expect(toggleBtn).toBeInTheDocument()
-    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
-  })
+  describe('narrow layout (master-detail)', () => {
+    const renderPanel = (extra: Record<string, unknown> = {}) =>
+      render(React.createElement(SettingsPanel, { open: true, onClose, ...extra }), { wrapper: createAuthWrapper() })
 
-  it('toggles mobile nav open state on button click', () => {
-    render(
-      React.createElement(SettingsPanel, { open: true, onClose }),
-      { wrapper: createAuthWrapper() },
-    )
-    const toggleBtn = screen.getByRole('button', { name: /Navigation/i })
-    fireEvent.click(toggleBtn)
-    expect(toggleBtn).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(toggleBtn)
-    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+    it('starts on the navigation; the back button is its toggle', () => {
+      renderPanel()
+      const toggleBtn = screen.getByRole('button', { name: /Navigation/i, hidden: true })
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('main')).toHaveAttribute('data-mobile-nav-open', 'true')
+    })
+
+    it('picking a section shows it, the back button returns to the navigation', async () => {
+      renderPanel()
+      fireEvent.click(screen.getByRole('button', { name: 'Sitzungen' }))
+      const main = screen.getByRole('main')
+      expect(main).toHaveAttribute('data-mobile-nav-open', 'false')
+      const toggleBtn = screen.getByRole('button', { name: /Navigation/i })
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+
+      fireEvent.click(toggleBtn)
+      expect(main).toHaveAttribute('data-mobile-nav-open', 'true')
+      // The back button disappears with the section: focus must land in the navigation, not on <body>.
+      await waitFor(() => {
+        expect(screen.getByRole('navigation').contains(document.activeElement)).toBe(true)
+      })
+    })
+
+    it('a deep link opens straight on its section', () => {
+      renderPanel({ initialNav: { category: 'account', section: 'sessions' } })
+      expect(screen.getByRole('main')).toHaveAttribute('data-mobile-nav-open', 'false')
+    })
   })
 
   describe('section navigation', () => {
