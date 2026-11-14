@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -314,5 +314,56 @@ describe('App', () => {
       expect(screen.getByTitle('work-file.md')).toBeInTheDocument()
     })
     expect(screen.queryByTitle('personal-file.md')).not.toBeInTheDocument()
+  })
+
+  describe('mobile layout (< 768 px)', () => {
+    const original = window.matchMedia
+    afterEach(() => {
+      window.matchMedia = original
+    })
+
+    /** Pretends the window is 400 px wide: only `max-width` queries match. */
+    function stubPhoneWindow(): void {
+      window.matchMedia = ((query: string) => ({
+        matches: /max-width/.test(query),
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })) as unknown as typeof window.matchMedia
+    }
+
+    async function loginAndWait(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+      await user.type(await screen.findByLabelText('Benutzername'), 'admin')
+      await user.type(screen.getByLabelText('Passwort'), 'admin123')
+      await user.click(screen.getByRole('button', { name: 'Anmelden' }))
+      await waitFor(() => expect(document.querySelector('.left-panel-toggle')).toBeInTheDocument())
+    }
+
+    it('renders the panels as closed drawers without resize handles', async () => {
+      stubPhoneWindow()
+      const user = userEvent.setup()
+      const { container } = render(<App />)
+      await loginAndWait(user)
+
+      const sidebar = container.querySelector('.app-sidebar')
+      expect(sidebar).toHaveClass('app-sidebar--overlay')
+      expect(sidebar).not.toHaveClass('app-sidebar--open')
+      expect(container.querySelector('.resize-handle')).toBeNull()
+      expect(screen.queryByTestId('drawer-backdrop')).toBeNull()
+    })
+
+    it('opens a drawer with a backdrop and closes it on a tap outside', async () => {
+      stubPhoneWindow()
+      const user = userEvent.setup()
+      const { container } = render(<App />)
+      await loginAndWait(user)
+
+      await user.click(container.querySelector('.left-panel-toggle') as HTMLElement)
+      expect(container.querySelector('.app-sidebar')).toHaveClass('app-sidebar--open')
+
+      await user.click(screen.getByTestId('drawer-backdrop'))
+      expect(container.querySelector('.app-sidebar')).not.toHaveClass('app-sidebar--open')
+      expect(screen.queryByTestId('drawer-backdrop')).toBeNull()
+    })
   })
 })

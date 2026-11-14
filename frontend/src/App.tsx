@@ -118,6 +118,7 @@ import { BASE_BREADCRUMB_MODES } from './components/breadcrumbModes'
 import { PaneHeader } from './components/panes/PaneHeader'
 import { isBreadcrumbPath } from './components/panes/breadcrumbPath'
 import { useResize } from './hooks/useResize'
+import { useBreakpoint } from './hooks/useMediaQuery'
 import { useKeyboardViewport } from './hooks/useKeyboardViewport'
 import { useStatusBar } from './hooks/useStatusBar'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
@@ -217,6 +218,8 @@ function AppContent() {
   const { state: rightPanelState, dispatch: rightPanelDispatch } = useRightPanelContext()
   const { goBack, goForward } = useNavigationHistory()
   const { t } = useTranslation()
+  // Below 768 px the side panels are overlay drawers (see App.css, responsive-mobile spec).
+  const isMobileLayout = useBreakpoint() === 'mobile'
   const prevVaultId = useRef<string | null>(null)
   // Per-vault tab memory: saves tabs when switching away, restores when switching back
   const vaultTabsCacheRef = useRef<Map<string, { tabs: Array<{ filePath: string; fileName: string }>; activeTabId: string | null }>>(new Map())
@@ -275,6 +278,24 @@ function AppContent() {
   useKeyboardViewport()
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
+
+  // A drawer covers the content: entering the mobile layout starts with both closed (the persisted
+  // desktop visibility must not hide the note behind a drawer), and opening another note closes it.
+  useEffect(() => {
+    if (!isMobileLayout) return
+    // Reacting to a media-query change (external system): one-shot reset on entering the layout.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowSidebar(false)
+    setShowRightPanel(false)
+  }, [isMobileLayout])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close the drawer once a note was opened
+    if (isMobileLayout) setShowSidebar(false)
+  }, [isMobileLayout, tabState.activeTabId])
+  const closeDrawers = useCallback(() => {
+    setShowSidebar(false)
+    setShowRightPanel(false)
+  }, [])
   const versionInfo = useVersionInfo()
 
   // Refresh key for sidebar panel views (favorites, recent files)
@@ -1241,8 +1262,12 @@ function AppContent() {
         <div className={`app-vault-layout mod-vertical mod-root workspace-split${toolbarPrefs.visible && toolbarPrefs.position === 'right' ? ' app-vault-layout--toolbar-right' : ''}`}>
 
           {/* ── Sidebar ── */}
-          {showSidebar && (
-            <aside className="app-sidebar" style={{ width: sidebar.width }}>
+          {(showSidebar || isMobileLayout) && (
+            <aside
+              className={`app-sidebar${isMobileLayout ? ` app-sidebar--overlay${showSidebar ? ' app-sidebar--open' : ''}` : ''}`}
+              style={isMobileLayout ? undefined : { width: sidebar.width }}
+              aria-hidden={isMobileLayout && !showSidebar ? true : undefined}
+            >
               <div className="app-sidebar-header">
                 <div className="app-logo">
                   <SlatebaseLogo size={26} className="app-logo-icon" />
@@ -1308,8 +1333,8 @@ function AppContent() {
             </aside>
           )}
 
-          {/* ── Sidebar Resize Handle ── */}
-          {showSidebar && (
+          {/* ── Sidebar Resize Handle (drawers have a fixed width) ── */}
+          {showSidebar && !isMobileLayout && (
             <div
               className="resize-handle"
               onPointerDown={sidebar.onPointerDown}
@@ -1421,8 +1446,9 @@ function AppContent() {
           </section>
 
           {/* ── Right Panel + Resize ── */}
-          {showRightPanel && (
+          {(showRightPanel || isMobileLayout) && (
             <>
+              {!isMobileLayout && (
               <div
                 className="resize-handle"
                 onPointerDown={rightPanel.onPointerDown}
@@ -1436,7 +1462,12 @@ function AppContent() {
                 aria-label={t('resize.adjustWidth')}
                 tabIndex={0}
               />
-              <aside className="app-right-panel" style={{ width: rightPanel.width }}>
+              )}
+              <aside
+                className={`app-right-panel${isMobileLayout ? ` app-right-panel--overlay${showRightPanel ? ' app-right-panel--open' : ''}` : ''}`}
+                style={isMobileLayout ? undefined : { width: rightPanel.width }}
+                aria-hidden={isMobileLayout && !showRightPanel ? true : undefined}
+              >
                 <PluginViewPanel />
                 <SidePanel
                   side="right"
@@ -1462,6 +1493,11 @@ function AppContent() {
           )}
 
           {toolbarPrefs.visible && toolbarPrefs.position === 'right' && toolbarElement}
+
+          {/* Backdrop behind an open drawer: a tap outside closes it */}
+          {isMobileLayout && (showSidebar || showRightPanel) && (
+            <div className="app-drawer-backdrop" onClick={closeDrawers} data-testid="drawer-backdrop" aria-hidden="true" />
+          )}
 
           {/* Toggle right panel */}
           <button
