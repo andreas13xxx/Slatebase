@@ -28,12 +28,14 @@ Randwerte beim Prüfen: 767/768 und 1024/1025 px (Hook-Test deckt die Logik, die
 
 ## Phase 2: App-Shell Mobile-Layout
 
-- [ ] Task 4: `useBreakpoint()` in `AppContent` (`App.tsx`) konsumieren
-- [ ] Task 5: Sidebar als Overlay/Drawer unter 768px (`app-sidebar--overlay`-Klasse, `transform`-Transition)
-- [ ] Task 6: Right-Panel analog als Overlay unter 768px
-- [ ] Task 7: Backdrop-Element bei offenem Overlay, schließt bei Klick/Tap außerhalb
-- [ ] Task 8: `useResize`-Drag-Handles bei Mobile-Breakpoint deaktivieren/ausblenden
-- [ ] Task 9: Tablet-Breakpoint (768–1024px): reduzierte Default-Breiten per CSS, Right-Panel-Default-Verhalten festlegen
+Umgesetzt: `isMobileLayout` in `AppContent`; beide Panels sind unter 768px immer gerendert, aber per `transform` + `visibility` außerhalb (`--overlay`/`--open`), feste Breite `min(85vw, 320px)`, Backdrop (`app-drawer-backdrop`) schließt beide, Resize-Handles entfallen, beim Eintritt in den Mobile-Layout und beim Öffnen einer Notiz schließen die Drawer (das überschreibt die gespeicherte Desktop-Sichtbarkeit). Tablet: nur schmalere `max-width` per CSS, Right-Panel bleibt in der Spalte. Nicht im echten Browser geprüft (Task 24).
+
+- [x] Task 4: `useBreakpoint()` in `AppContent` (`App.tsx`) konsumieren
+- [x] Task 5: Sidebar als Overlay/Drawer unter 768px (`app-sidebar--overlay`-Klasse, `transform`-Transition)
+- [x] Task 6: Right-Panel analog als Overlay unter 768px
+- [x] Task 7: Backdrop-Element bei offenem Overlay, schließt bei Klick/Tap außerhalb
+- [x] Task 8: `useResize`-Drag-Handles bei Mobile-Breakpoint deaktivieren/ausblenden
+- [x] Task 9: Tablet-Breakpoint (768–1024px): reduzierte Default-Breiten per CSS, Right-Panel-Default-Verhalten festlegen
 
 ## Phase 3: Canvas Touch-Interaktion
 
