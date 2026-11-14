@@ -59,7 +59,8 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
       {shares === null && error === null && <p role="status">Wird geladen…</p>}
       {shares !== null && shares.length === 0 && <p>Du hast noch keine öffentlichen Links erzeugt.</p>}
       {shares !== null && shares.length > 0 && (
-        <table className="public-shares-table">
+        <div className="table-scroll">
+        <table className="public-shares-table data-table">
           <caption className="sr-only">Deine öffentlichen Links</caption>
           <thead>
             <tr>
@@ -90,6 +91,7 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <ConfirmModal
         open={pendingRevoke !== null}

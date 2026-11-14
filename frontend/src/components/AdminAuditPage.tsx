@@ -199,8 +199,8 @@ export function AdminAuditPage() {
         <>
           <p className="audit-summary">{t('admin.audit.summary', { total: String(total) })}</p>
 
-          <div className="audit-table-container">
-            <table className="audit-table">
+          <div className="audit-table-container table-scroll">
+            <table className="audit-table data-table">
               <thead>
                 <tr>
                   <th>{t('admin.audit.tableTimestamp')}</th>

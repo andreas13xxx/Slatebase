@@ -6943,3 +6943,120 @@
     opacity: 1;
   }
 }
+
+/* ===== Responsive tables (responsive-mobile-content, phase 1) =====
+ * Two patterns, both for < 768px:
+ *  - .table-scroll: the wrapper scrolls sideways, the first column stays put and an edge shadow
+ *    shows that there is more (no JS: the shadows are `background-attachment: local` gradients).
+ *  - .data-table--cards: each row becomes a card, every cell prints its column name from
+ *    `data-label`. The header stays in the DOM for screen readers; the tables carry explicit ARIA
+ *    roles because `display: block` drops the native table semantics in some browsers. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  --table-sticky-bg: var(--bg-base);
+}
+
+.settings-panel .table-scroll {
+  --table-sticky-bg: var(--bg-elevated);
+}
+
+@media (max-width: 767px) {
+  .table-scroll {
+    background:
+      linear-gradient(to right, var(--table-sticky-bg) 30%, transparent) left center / 24px 100% no-repeat local,
+      linear-gradient(to left, var(--table-sticky-bg) 30%, transparent) right center / 24px 100% no-repeat local,
+      linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent) left center / 10px 100% no-repeat scroll,
+      linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent) right center / 10px 100% no-repeat scroll;
+  }
+
+  .table-scroll .data-table th:first-child,
+  .table-scroll .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--table-sticky-bg);
+  }
+
+  .data-table--cards,
+  .data-table--cards tbody,
+  .data-table--cards tr,
+  .data-table--cards td {
+    display: block;
+  }
+
+  .data-table--cards {
+    min-width: 0;
+  }
+
+  /* Visually hidden, still announced. */
+  .data-table--cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .data-table--cards tr {
+    margin: 0 0 10px;
+    padding: 4px 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+  }
+
+  .admin-users-table-wrapper,
+  .mcp-tokens-table-wrapper {
+    border: none;
+    overflow-x: visible;
+  }
+
+  .data-table--cards td,
+  .admin-users-table.data-table--cards td,
+  .mcp-tokens-table.data-table--cards td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    border-bottom: none;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table--cards tr:hover td {
+    background: transparent;
+  }
+
+  .data-table--cards td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: left;
+  }
+
+  /* The cell without a label holds the actions: left-aligned row of buttons. */
+  .data-table--cards td:not([data-label]) {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .mcp-tokens-name-cell {
+    text-align: left;
+    flex-wrap: wrap;
+  }
+}
+
+/* Touch: row actions are finger-sized, the desktop row height is untouched. */
+@media (pointer: coarse) {
+  .data-table .st-btn {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+}

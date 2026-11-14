@@ -9,10 +9,12 @@
 
 ## Phase 1 — Tabellen
 
-- [ ] 1.1 Gemeinsames CSS für „Scroll mit fixierter Kopfspalte" und Schatten; auf die sechs Scroll-Tabellen anwenden
-- [ ] 1.2 Kartenmuster (`data-label`, Header visuell versteckt) für `AdminUsersPage`, `AdminVaultsPage`, `McpTokensPage`
-- [ ] 1.3 Zeilenaktionen: 44 px Trefferfläche unter `pointer: coarse`, Hover-Aktionen unter `hover: none` sichtbar
-- [ ] 1.4 axe-Tests für die drei Kartentabellen, Regressionstests der bestehenden Tabellentests
+Umgesetzt ohne vorherige Phase 0 (kein Browser-Durchlauf): Der Code zeigte zwei echte Lücken. `AdminAuditPage`/`AdminLogsPage` hatten `overflow: hidden` am Container (eine breite Tabelle wurde abgeschnitten, nicht gescrollt), und `KeybindingsSection`, `PublicSharesSection` und `SearchOperatorHelp` hatten gar keinen Wrapper. Jetzt: Klasse `table-scroll` (seitlich scrollen, erste Spalte `sticky`, Kantenschatten per CSS) für diese fünf, `data-table--cards` für Benutzer/Vaults/Token (`data-label` je Zelle, explizite ARIA-Rollen, Kopf visuell versteckt; die Rollen-Lint-Regel ist in den drei Dateien mit Begründung abgeschaltet). Aktionen sind unter `pointer: coarse` 44 px. `BasesTableView` behält sein Scrollen (R2.5). **Offen:** Das Aussehen wurde nicht angesehen, und ob Screenreader die Kartenform mit den Rollen tragen (0.3), ist nur mit axe, nicht mit einem Screenreader geprüft.
+
+- [x] 1.1 Gemeinsames CSS für „Scroll mit fixierter Kopfspalte" und Schatten; auf die sechs Scroll-Tabellen anwenden
+- [x] 1.2 Kartenmuster (`data-label`, Header visuell versteckt) für `AdminUsersPage`, `AdminVaultsPage`, `McpTokensPage`
+- [x] 1.3 Zeilenaktionen: 44 px Trefferfläche unter `pointer: coarse`, Hover-Aktionen unter `hover: none` sichtbar
+- [x] 1.4 axe-Tests für die drei Kartentabellen, Regressionstests der bestehenden Tabellentests
 
 ## Phase 2 — Einstellungen
 

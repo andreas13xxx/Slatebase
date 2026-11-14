@@ -224,7 +224,8 @@ export function KeybindingsSection() {
 
       {grouped.map(group => (
         <SettingSection key={group.category} title={group.label}>
-          <table className="keybindings-table">
+          <div className="table-scroll">
+          <table className="keybindings-table data-table">
             <thead>
               <tr>
                 <th className="keybindings-col-command">Befehl</th>
@@ -331,6 +332,7 @@ export function KeybindingsSection() {
               ))}
             </tbody>
           </table>
+          </div>
         </SettingSection>
       ))}
 

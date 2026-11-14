@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y-x/no-interactive-element-to-noninteractive-role -- the card layout (display: block) drops native table semantics, so the cells carry explicit roles; a <td> is not interactive here */
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from '../i18n'
 import type { IApiClient, McpTokenInfo, McpTokenCreateResult } from '../api'
@@ -216,34 +217,34 @@ export function McpTokensPage({ apiClient }: McpTokensPageProps) {
         )}
         {!loading && tokens.length > 0 && (
           <div className="mcp-tokens-table-wrapper">
-            <table className="mcp-tokens-table">
+            <table className="mcp-tokens-table data-table data-table--cards" role="table">
               <thead>
-                <tr>
-                  <th>{t('mcpTokens.tableNameHeader')}</th>
-                  <th>{t('mcpTokens.tableStatusHeader')}</th>
-                  <th>{t('mcpTokens.tableCreatedHeader')}</th>
-                  <th>{t('mcpTokens.tableExpiresHeader')}</th>
-                  <th>{t('mcpTokens.tableLastUsedHeader')}</th>
-                  <th>{t('mcpTokens.tableActionsHeader')}</th>
+                <tr role="row">
+                  <th role="columnheader">{t('mcpTokens.tableNameHeader')}</th>
+                  <th role="columnheader">{t('mcpTokens.tableStatusHeader')}</th>
+                  <th role="columnheader">{t('mcpTokens.tableCreatedHeader')}</th>
+                  <th role="columnheader">{t('mcpTokens.tableExpiresHeader')}</th>
+                  <th role="columnheader">{t('mcpTokens.tableLastUsedHeader')}</th>
+                  <th role="columnheader">{t('mcpTokens.tableActionsHeader')}</th>
                 </tr>
               </thead>
               <tbody>
                 {tokens.map(token => (
-                  <tr key={token.tokenId} className={token.status !== 'active' ? 'mcp-tokens-inactive' : ''}>
-                    <td className="mcp-tokens-name-cell">
+                  <tr role="row" key={token.tokenId} className={token.status !== 'active' ? 'mcp-tokens-inactive' : ''}>
+                    <td role="cell" className="mcp-tokens-name-cell">
                       <Key size={12} />
                       <span>{token.name}</span>
                       <code className="mcp-tokens-masked">{token.maskedToken}</code>
                     </td>
-                    <td>
+                    <td role="cell" data-label={t('mcpTokens.tableStatusHeader')}>
                       <span className={`mcp-tokens-status mcp-tokens-status-${token.status}`}>
                         {t(`mcpTokens.status${token.status.charAt(0).toUpperCase() + token.status.slice(1)}` as 'mcpTokens.statusActive')}
                       </span>
                     </td>
-                    <td>{formatDate(token.createdAt)}</td>
-                    <td>{formatDate(token.expiresAt)}</td>
-                    <td>{token.lastUsedAt ? formatDate(token.lastUsedAt) : t('mcpTokens.neverUsed')}</td>
-                    <td>
+                    <td role="cell" data-label={t('mcpTokens.tableCreatedHeader')}>{formatDate(token.createdAt)}</td>
+                    <td role="cell" data-label={t('mcpTokens.tableExpiresHeader')}>{formatDate(token.expiresAt)}</td>
+                    <td role="cell" data-label={t('mcpTokens.tableLastUsedHeader')}>{token.lastUsedAt ? formatDate(token.lastUsedAt) : t('mcpTokens.neverUsed')}</td>
+                    <td role="cell">
                       {token.status === 'active' && (
                         <Button
                           variant="danger"
