@@ -21,6 +21,7 @@
  * @module core-commands-app
  */
 
+import { requestGraphTimelapse } from '../../components/graph-timelapse'
 import type { Dispatch } from 'react'
 import { openSearchPanel } from '@codemirror/search'
 import { EditorView } from '@codemirror/view'
@@ -112,6 +113,8 @@ export interface CoreAppCommandHandlers {
   onToggleToolbar: () => void
   onOpenReleaseNotes: () => void
   onOpenDebugInfo: () => void
+  /** Starts the full-screen presentation of the active note (`slides:start`). */
+  onStartSlides: () => void
   onNavigateBack: () => void
   onNavigateForward: () => void
   onOpenQuickSwitcher: () => void
@@ -784,6 +787,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'app:go-forward', name: 'Navigate forward', run: (h) => h.onNavigateForward() },
     { id: 'app:open-sandbox-vault', name: 'Open sandbox vault', run: (h) => h.onCreateWelcomeVault() },
     { id: 'app:open-help', name: 'Open help', run: (h) => h.onOpenHelp() },
+    { id: 'slides:start', name: 'Start presentation', run: (h) => h.onStartSlides() },
     { id: 'app:show-debug-info', name: 'Show debug info', run: (h) => h.onOpenDebugInfo() },
     { id: 'app:show-release-notes', name: 'Show release notes', run: (h) => h.onOpenReleaseNotes() },
     { id: 'app:toggle-default-new-pane-mode', name: 'Toggle default mode for new tabs', unsupported: 'new-tab-defaults' },
@@ -804,7 +808,7 @@ function buildSpecs(): CoreAppCommandSpec[] {
     // ── Graph / Canvas / Daily Notes ──
     { id: 'graph:open', name: 'Graph view: Open graph view', run: (h) => h.onOpenGraph() },
     { id: 'graph:open-local', name: 'Graph view: Open local graph', run: (h) => { const t = getActiveTab(h); if (t && !t.filePath.startsWith('__')) h.onOpenLocalGraph(t.filePath) } },
-    { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', unsupported: 'graph-animation' },
+    { id: 'graph:animate', name: 'Graph view: Start graph time-lapse animation', run: (h) => { h.onOpenGraph(); requestGraphTimelapse() } },
     { id: 'canvas:new-file', name: 'Canvas: Create new canvas', run: (h) => h.onCreateCanvas() },
     { id: 'bases:new-file', name: 'Bases: Create new base', run: (h) => h.onCreateBase() },
     {

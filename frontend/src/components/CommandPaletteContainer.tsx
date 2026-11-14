@@ -28,6 +28,7 @@ import { fetchPaneTreeContent } from '../state/paneTreeRestore'
 import { loadPanelLayout, savePanelLayout } from './side-panel/utils/persistence'
 import { ReleaseNotesModal } from './ReleaseNotesModal'
 import { DebugInfoModal } from './DebugInfoModal'
+import { SlidesPresentation } from './SlidesPresentation'
 import { matchesShortcut } from '../state/keybindingsStore'
 import { useTranslation } from '../i18n'
 import { buildSettingsNavCommands } from './settingsNavCommands'
@@ -209,6 +210,7 @@ export function CommandPaletteContainer({
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
+  const [slides, setSlides] = useState<{ content: string; vaultId: string; sourcePath: string } | null>(null)
   const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
   const [workspacesModal, setWorkspacesModal] = useState<{ open: boolean; mode: 'save' | 'load' }>({ open: false, mode: 'load' })
   // The saved layouts are the vault's workspaces.json: they change when it is read, written or changed elsewhere
@@ -468,6 +470,11 @@ export function CommandPaletteContainer({
     onToggleToolbar: toggleToolbarVisible,
     onOpenReleaseNotes: () => setReleaseNotesOpen(true),
     onOpenDebugInfo: () => setDebugInfoOpen(true),
+    onStartSlides: () => {
+      const tab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
+      if (!tab || tab.isBinary || tab.filePath.startsWith('__') || !tab.fileName.toLowerCase().endsWith('.md')) return
+      setSlides({ content: tab.editBuffer ?? tab.content, vaultId: tab.vaultId, sourcePath: tab.filePath })
+    },
     onNavigateBack: goBack,
     onNavigateForward: goForward,
     onOpenQuickSwitcher: () => { if (state.selectedVaultId) setQuickSwitcherOpen(true) },
@@ -1350,6 +1357,15 @@ export function CommandPaletteContainer({
         open={releaseNotesOpen}
         onClose={() => setReleaseNotesOpen(false)}
       />
+      {slides && (
+        <SlidesPresentation
+          content={slides.content}
+          vaultId={slides.vaultId}
+          directoryTree={state.vaultTrees[slides.vaultId] ?? null}
+          sourcePath={slides.sourcePath}
+          onClose={() => setSlides(null)}
+        />
+      )}
       <DebugInfoModal
         open={debugInfoOpen}
         onClose={() => setDebugInfoOpen(false)}

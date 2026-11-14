@@ -708,6 +708,14 @@ export const de = {
     showProperties: 'Properties anzeigen',
     reset: 'Zurücksetzen',
     ariaLabel: 'Graph mit {nodeCount} Knoten und {edgeCount} Kanten',
+    timelapse: {
+      start: 'Zeitraffer starten',
+      play: 'Abspielen',
+      pause: 'Pause',
+      close: 'Zeitraffer beenden',
+      position: 'Zeitpunkt',
+      error: 'Keine Erstellungsdaten gefunden.',
+    },
     localGraph: {
       tabPrefix: 'Lokaler Graph:',
       hopsLabel: 'Nachbarschaft',
@@ -1067,6 +1075,14 @@ export const de = {
     loading: 'Versionshinweise werden geladen …',
     error: 'Versionshinweise konnten nicht geladen werden.',
     empty: 'Keine Versionshinweise verfügbar.',
+  },
+
+  slides: {
+    title: 'Präsentation',
+    close: 'Präsentation beenden',
+    previous: 'Vorherige Folie',
+    next: 'Nächste Folie',
+    empty: 'Keine Folien. Trenne Folien mit --- auf einer eigenen Zeile.',
   },
 
   debugInfo: {

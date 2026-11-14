@@ -8,6 +8,10 @@ import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { useTranslation } from '../i18n'
 import type { GraphData, GraphNode, GraphMeta } from '../types'
 import { truncateLabel, clampZoom, computeNodeSize, filterNodes } from './graph-utils'
+import {
+  TIMELAPSE_STEPS, collectCreationTimes, computeVisibleNodeIds, consumeGraphTimelapseRequest,
+  getTimelapseRange, onGraphTimelapseRequest,
+} from './graph-timelapse'
 import { filterToNeighborhood } from './local-graph-utils'
 import { loadGraphConfig, saveGraphConfig, resetGraphConfig } from './graph-config'
 import { onGraphChange } from '../state/vaultGraphStore'
@@ -17,7 +21,7 @@ import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTFileFromPath } from '../plugins/compat/plugin-event-bridge'
 import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer, renameInExplorer, deleteInExplorer } from '../state/fileNavigation'
-import { RefreshCw, Search, Minus, Plus, FileText, FolderOpen, Pencil, Trash2 } from 'lucide-react'
+import { RefreshCw, Search, Minus, Plus, FileText, FolderOpen, Pencil, Trash2, Play, Pause, X } from 'lucide-react'
 import { useLongPress } from '../hooks/useLongPress'
 
 /** Debounce delay for local-graph refetch triggered by remote vault changes. */
@@ -207,6 +211,56 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       edges: [],
     }
   }, [graphData, isLocalGraph, centerPath, config.localGraph.hops])
+
+  // Time-lapse: replays the vault-wide graph by file creation date. Nodes stay in
+  // the simulation and are only hidden, so the layout does not jump on every step.
+  const [timelapse, setTimelapse] = useState<{
+    times: Map<string, number>; start: number; end: number; cutoff: number; playing: boolean
+  } | null>(null)
+  const [timelapseError, setTimelapseError] = useState(false)
+
+  const startTimelapse = useCallback(async () => {
+    if (!apiClient || isLocalGraph) return
+    setTimelapseError(false)
+    try {
+      const times = collectCreationTimes(await apiClient.fetchVaultTree(vaultId))
+      const range = getTimelapseRange(times)
+      if (!range) { setTimelapseError(true); return }
+      setTimelapse({ times, start: range.start, end: range.end, cutoff: range.start, playing: true })
+    } catch {
+      setTimelapseError(true)
+    }
+  }, [apiClient, vaultId, isLocalGraph])
+
+  // A time-lapse belongs to one vault's creation dates and to the vault-wide graph.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTimelapse(null)
+  }, [vaultId, isLocalGraph])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (consumeGraphTimelapseRequest()) void startTimelapse()
+    return onGraphTimelapseRequest(() => { if (consumeGraphTimelapseRequest()) void startTimelapse() })
+  }, [startTimelapse])
+
+  useEffect(() => {
+    if (!timelapse?.playing) return
+    const step = Math.max(1, (timelapse.end - timelapse.start) / TIMELAPSE_STEPS)
+    const timer = setInterval(() => {
+      setTimelapse((prev) => {
+        if (!prev?.playing) return prev
+        const cutoff = Math.min(prev.end, prev.cutoff + step)
+        return { ...prev, cutoff, playing: cutoff < prev.end }
+      })
+    }, 120)
+    return () => clearInterval(timer)
+  }, [timelapse?.playing, timelapse?.start, timelapse?.end])
+
+  const timelapseVisible = useMemo(
+    () => (timelapse && displayData ? computeVisibleNodeIds(displayData, timelapse.times, timelapse.cutoff) : null),
+    [timelapse, displayData],
+  )
 
   // Lokaler_Graph: live-update on remote vault changes (Requirement 1.11) and
   // detect deletion of the Zentrums-Notiz itself (Requirement 1.12).
@@ -679,11 +733,16 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
    */
   const getEdgeOpacity = useCallback(
     (link: SimLink): number => {
+      if (timelapseVisible) {
+        const sourceId = typeof link.source === 'string' ? link.source : link.source.id
+        const targetId = typeof link.target === 'string' ? link.target : link.target.id
+        if (!timelapseVisible.has(sourceId) || !timelapseVisible.has(targetId)) return 0
+      }
       const focusId = clickedHighlightId ?? hoveredNodeId
       if (!focusId) return 0.6 // default opacity
       return isEdgeConnectedToFocused(link, focusId) ? 1 : 0.2
     },
-    [hoveredNodeId, clickedHighlightId, isEdgeConnectedToFocused],
+    [hoveredNodeId, clickedHighlightId, isEdgeConnectedToFocused, timelapseVisible],
   )
 
   /**
@@ -816,11 +875,12 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
    */
   const getNodeOpacity = useCallback(
     (nodeId: string): number => {
+      if (timelapseVisible && !timelapseVisible.has(nodeId)) return 0
       const focusId = clickedHighlightId ?? hoveredNodeId
       if (!focusId) return 1
       return isNodeConnectedToFocused(nodeId) ? 1 : 0.2
     },
-    [hoveredNodeId, clickedHighlightId, isNodeConnectedToFocused],
+    [hoveredNodeId, clickedHighlightId, isNodeConnectedToFocused, timelapseVisible],
   )
 
   /**
@@ -965,6 +1025,51 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
         </div>
       )}
 
+      {/* Time-lapse controls */}
+      {!isLocalGraph && (
+        <div className="graph-timelapse">
+          {timelapse ? (
+            <>
+              <button
+                type="button"
+                className="graph-local-toolbar-button"
+                onClick={() => setTimelapse((prev) => prev && (prev.playing
+                  ? { ...prev, playing: false }
+                  : { ...prev, cutoff: prev.cutoff >= prev.end ? prev.start : prev.cutoff, playing: true }))}
+                aria-label={timelapse.playing ? t('graph.timelapse.pause') : t('graph.timelapse.play')}
+              >
+                {timelapse.playing ? <Pause size={12} /> : <Play size={12} />}
+              </button>
+              <input
+                type="range"
+                className="graph-timelapse-slider"
+                min={timelapse.start}
+                max={timelapse.end}
+                step={Math.max(1, (timelapse.end - timelapse.start) / TIMELAPSE_STEPS)}
+                value={timelapse.cutoff}
+                onChange={(e) => setTimelapse((prev) => prev && { ...prev, cutoff: Number(e.target.value), playing: false })}
+                aria-label={t('graph.timelapse.position')}
+              />
+              <span className="graph-timelapse-date">{new Date(timelapse.cutoff).toLocaleDateString()}</span>
+              <button
+                type="button"
+                className="graph-local-toolbar-button"
+                onClick={() => setTimelapse(null)}
+                aria-label={t('graph.timelapse.close')}
+              >
+                <X size={12} />
+              </button>
+            </>
+          ) : (
+            <button type="button" className="graph-timelapse-start" onClick={() => void startTimelapse()}>
+              <Play size={12} />
+              <span>{t('graph.timelapse.start')}</span>
+            </button>
+          )}
+          {timelapseError && <span role="alert" className="graph-timelapse-error">{t('graph.timelapse.error')}</span>}
+        </div>
+      )}
+
       {/* Search UI — positioned absolutely over the SVG */}
       <div className="graph-search-container" ref={searchContainerRef}>
         <div className="graph-search-input-wrapper">
@@ -1061,7 +1166,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
                   {...longPress}
                   onMouseEnter={() => handleNodeHoverEnter(node.id)}
                   onMouseLeave={handleNodeHoverLeave}
-                  style={{ cursor: node.exists ? 'pointer' : 'default', opacity: nodeOpacity }}
+                  style={{ cursor: node.exists ? 'pointer' : 'default', opacity: nodeOpacity, ...(nodeOpacity === 0 ? { pointerEvents: 'none' as const } : {}) }}
                 >
                   <circle
                     cx={node.x}

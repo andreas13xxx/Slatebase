@@ -217,8 +217,8 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 |-------|-------|
 | ~~Responsive/Mobile (Prio 3)~~ | **Gebaut, nicht auf Geräten geprüft** (`useBreakpoint`, Drawer, Touch-Canvas, Tabellen/Einstellungen/Chat/Graph/Bases schmal, PWA mit Offline-Seite). Offen: Task 24, Details in `responsive-mobile/known-limitations.md` |
 | ~~Deep-Links / URL-Schema~~ | **Umgesetzt** (Spec `.kiro/specs/deep-links/`, PR #369): `/open?vault=…&file=…[#Anker]`, `workspace:copy-url`, Tab-Menü, Öffnen inkl. Login und Anker-Sprung. „Link kopieren“ auch im Tab- und Explorer-Kontextmenü. Offen: manueller Browser-Test |
-| Graph-Zeitraffer (`graph:animate`) | Braucht Erstellungsdatum je Knoten + Abspiel-UI |
-| Slides / Präsentationsmodus | Nische (`obsidian-feature-gaps` O2) |
+| ~~Graph-Zeitraffer (`graph:animate`)~~ | **Umgesetzt**: Abspielleiste im Vollgraph (Erstellungsdatum aus dem Verzeichnisbaum, Knoten werden nur ausgeblendet, Layout bleibt). Nicht im Browser geprüft |
+| ~~Slides / Präsentationsmodus~~ | **Umgesetzt** (`slides:start`): `---` trennt Folien, Vollbild, Pfeiltasten/Leertaste, Esc. Nicht im Browser geprüft |
 | Format Converter / Fremdformat-Importer | Prio 6 |
 | Audio Recorder (ohne Transkription) | Aus `editor/dictation/dictation-recorder.ts` ableitbar (O3) |
 | Vim-Modus | Nur gewarnter Stub |
