@@ -11,7 +11,7 @@ import { DEFAULT_KEYBINDINGS, matchesShortcut } from '../../state/keybindingsSto
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
 import { EmbeddedWebFrame } from '../../components/EmbeddedWebFrame'
-import { getWebEmbedEnabled } from '../../hooks/useWebEmbed'
+import { shouldEmbedWebUrl } from '../../hooks/useWebEmbed'
 import { BasesEmbed, type IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { SearchEmbed, type ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { DirectoryTree } from '../../types'
@@ -1286,11 +1286,16 @@ class WebEmbedWidget extends WidgetType {
     this.url = url
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view?: EditorView): HTMLElement {
+    // A widget instance is normally built once; if CM6 ever rebuilds its DOM, drop the old root first.
+    this.destroy()
     const container = document.createElement('div')
     container.className = 'cm-lp-web-embed'
     this.reactRoot = createRoot(container)
     this.reactRoot.render(createElement(EmbeddedWebFrame, { url: this.url }))
+    // React renders after toDOM returns, so CM6 first measures an empty container. The frame has a
+    // fixed height; ask for one re-measure once it is in, or scroll and cursor positions stay off.
+    if (view) requestAnimationFrame(() => view.requestMeasure())
     return container
   }
 
@@ -1310,14 +1315,15 @@ class WebEmbedWidget extends WidgetType {
   }
 }
 
+/** A Markdown link title after the URL: `![a](https://x "title")` or `'title'`. */
+const TRAILING_LINK_TITLE_RE = /\s+("[^"]*"|'[^']*')\s*$/
+
 /**
- * Whether a standard-image link should render as an embedded web page instead of an `<img>`:
- * an http(s) URL while the opt-in is on. Same rule as the reading view (`ViewMode`'s `image` case).
- * The setting is read when the decorations are built, so a toggle takes effect on the next
- * document change, exactly as in the reading view.
+ * The URL part of a `![alt](…)` target without a trailing title, so `https://x "t"` embeds `https://x`
+ * (the reading view gets this from the parsed `node.url`; here the raw text is split by hand).
  */
-export function shouldEmbedWebUrl(url: string, enabled: boolean = getWebEmbedEnabled()): boolean {
-  return enabled && /^https?:\/\//i.test(url)
+export function stripLinkTitle(target: string): string {
+  return target.replace(TRAILING_LINK_TITLE_RE, '').trim()
 }
 
 /**
@@ -2077,8 +2083,9 @@ export function buildWidgetDecorations(
           const alt = altMatch[1] ?? ''
           const src = altMatch[2] ?? ''
 
-          const widget = shouldEmbedWebUrl(src)
-            ? new WebEmbedWidget(src)
+          const webUrl = stripLinkTitle(src)
+          const widget = shouldEmbedWebUrl(webUrl)
+            ? new WebEmbedWidget(webUrl)
             : new ImageWidget(src, alt, options.vaultId, options.token)
           addStandaloneLineTightening(doc, node.from, node.to, decorations, hideableRanges)
           decorations.push(
