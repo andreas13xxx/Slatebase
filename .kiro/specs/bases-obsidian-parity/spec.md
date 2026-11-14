@@ -35,7 +35,7 @@ Cards-Schlüssel (`image`, `imageFit`, `imageAspectRatio`, `cardSize`) stammen a
 - R4.1 `groupOrder` (Liste, leere Liste blendet alle Gruppen aus, `null` = Elemente ohne Wert) in Parser, Serializer, Tabelle/Karten/Liste/Kanban.
 - R4.2 Tabelle: `rowHeight` (`medium`/`tall`/`extra`; kurz = Schlüssel fehlt) — umgesetzt.
 - R4.3 Karten: `image`, `imageFit` (cover/contain), `imageAspectRatio`, `cardSize`.
-- R4.4 Liste: `markers` (`number`/`none`; Aufzählung = Schlüssel fehlt), `indentProperties`, `separator` — umgesetzt. Mit Trennzeichen läuft eine Zeile aus Werten ohne Bezeichner; ohne es bleiben die beschrifteten Chips (Slatebase-Wahl, in Obsidian nicht belegt).
+- R4.4 Liste: `markers` (`number`/`none`; Aufzählung = Schlüssel fehlt), `indentProperties`, `separator` — umgesetzt. Standard laut Doku: Trennzeichen ein Komma, nur ohne „Eigenschaften einrücken"; mit Einrücken steht jede Eigenschaft in einer eigenen Zeile (Slatebase zeigt dabei die Bezeichner). Ein Leerzeichen nach dem Trennzeichen ist Slatebase-Wahl. Nicht belegt: Standard von Markierung (Aufzählung angenommen) und Einrücken (aus angenommen), Zeilenhöhe (kurz angenommen).
 - R4.5 Toolbar: Ergebnisse kopieren und CSV exportieren.
 - Unbekannte Schlüssel bleiben im Round-Trip erhalten (Passthrough).
 

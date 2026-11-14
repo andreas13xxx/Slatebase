@@ -696,10 +696,12 @@
 }
 
 .bases-list__details--indent {
+  flex-direction: column;
+  gap: 2px;
   padding-left: 1.5em;
 }
 
-/* With a `separator` the values run on as one line of text, without labels. */
+/* Without "indent properties" the values run on as one line of text, divided by the separator. */
 .bases-list__details--joined {
   display: block;
   font-size: 0.78em;

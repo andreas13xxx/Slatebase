@@ -84,8 +84,11 @@ export const BasesListView = memo(function BasesListView({
   // Markers: Obsidian writes `number` or `none`; absent (or anything else) is a bullet.
   const markerKind = view.markers === 'number' || view.markers === 'none' ? view.markers : 'bullet'
   const listClass = `bases-list bases-list--${markerKind}`
-  const detailsClass = view.indentProperties ? 'bases-list__details bases-list__details--indent' : 'bases-list__details'
-  const separator = view.separator
+  // Obsidian: with "indent properties" off the values run on in one line, divided by the separator
+  // (default a comma); with it on each property is its own indented item and the separator is not used.
+  const indent = view.indentProperties === true
+  const separator = view.separator ?? ','
+  const joiner = /\s$/.test(separator) ? separator : `${separator} `
 
   const renderItem = (row: BaseRow) => (
           <li key={row.path} className="bases-list__item">
@@ -96,20 +99,24 @@ export const BasesListView = memo(function BasesListView({
             >
               <span className="bases-list__title">{row.fileName}</span>
               {detailColumns.length > 0 && (
-                <span className={separator !== undefined ? `${detailsClass} bases-list__details--joined` : detailsClass}>
-                  {separator !== undefined
-                    ? detailColumns.map((col) => cellText(row, col)).filter((t) => t !== '').join(separator)
-                    : detailColumns.map((col) => {
-                    const text = cellText(row, col)
-                    if (!text) return null
-                    return (
-                      <span key={col} className="bases-list__chip">
-                        <span className="bases-list__chip-key">{columnLabel(col)}</span>
-                        <span className="bases-list__chip-val">{text}</span>
-                      </span>
-                    )
-                  })}
-                </span>
+                indent ? (
+                  <span className="bases-list__details bases-list__details--indent">
+                    {detailColumns.map((col) => {
+                      const text = cellText(row, col)
+                      if (!text) return null
+                      return (
+                        <span key={col} className="bases-list__chip">
+                          <span className="bases-list__chip-key">{columnLabel(col)}</span>
+                          <span className="bases-list__chip-val">{text}</span>
+                        </span>
+                      )
+                    })}
+                  </span>
+                ) : (
+                  <span className="bases-list__details bases-list__details--joined">
+                    {detailColumns.map((col) => cellText(row, col)).filter((t) => t !== '').join(joiner)}
+                  </span>
+                )
               )}
             </button>
           </li>

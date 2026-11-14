@@ -72,18 +72,22 @@ describe('list options', () => {
     expect(c.container.querySelector('.bases-list--none')).not.toBeNull()
   })
 
-  it('indents the properties on request', () => {
-    expect(renderList({ indentProperties: true }).container.querySelector('.bases-list__details--indent')).not.toBeNull()
-  })
-
-  it('joins the values with the separator, without labels', () => {
-    const { container } = renderList({ separator: ';' })
-    expect(container.querySelector('.bases-list__details--joined')?.textContent).toBe('open;1')
+  it('runs the values on in one line with a comma by default', () => {
+    const { container } = renderList({})
+    expect(container.querySelector('.bases-list__details--joined')?.textContent).toBe('open, 1')
     expect(container.querySelector('.bases-list__chip')).toBeNull()
   })
 
-  it('keeps the labelled chips without a separator', () => {
-    expect(renderList({}).container.querySelectorAll('.bases-list__chip')).toHaveLength(2)
+  it('uses the separator from the file', () => {
+    const { container } = renderList({ separator: ';' })
+    expect(container.querySelector('.bases-list__details--joined')?.textContent).toBe('open; 1')
+  })
+
+  it('shows each property on its own indented line instead, ignoring the separator', () => {
+    const { container } = renderList({ indentProperties: true, separator: ';' })
+    expect(container.querySelector('.bases-list__details--indent')).not.toBeNull()
+    expect(container.querySelector('.bases-list__details--joined')).toBeNull()
+    expect(container.querySelectorAll('.bases-list__chip')).toHaveLength(2)
   })
 })
 
@@ -125,6 +129,16 @@ describe('Anzeige panel', () => {
     fireEvent.change(sep, { target: { value: ';' } })
     fireEvent.blur(sep)
     expect(apply().views[1]!.separator).toBe(';')
+  })
+
+  it('hides the separator while properties are indented', () => {
+    const d = doc()
+    d.views[1] = { type: 'list', name: 'L', indentProperties: true }
+    render(
+      <BasesToolbar doc={d} rows={[]} activeIndex={1} readOnly={false} mode="view" onSelectView={() => {}} onChange={() => {}} searchQuery="" onSearchQueryChange={() => {}} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Anzeige/ }))
+    expect(screen.queryByLabelText('Trennzeichen')).toBeNull()
   })
 
   it('disables the controls for a read-only base', () => {

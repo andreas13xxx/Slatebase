@@ -234,7 +234,7 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 - *Zeilenhöhe* (Tabelle: short/medium/tall/extra tall) und *Listen-Optionen* (Markierung Aufzählung/Nummern/keine, Eigenschaften einrücken,
   Trennzeichen): Die Doku nennt die Optionen, aber keinen YAML-Schlüssel. Belegt durch zwei in Obsidian erzeugte `.base`-Dateien und
   umgesetzt: `rowHeight` (`medium`/`tall`/`extra`, ohne Schlüssel = kurz), `markers` (`number`/`none`, ohne Schlüssel = Aufzählungszeichen),
-  `indentProperties: true`, `separator` (Text). Nicht belegt: ein Wert für kurz oder Aufzählungszeichen — die schreibt Slatebase nie, es
+  `indentProperties: true`, `separator` (Text). Doku-Standards: Trennzeichen Komma, Seitenverhältnis 1:1. Nicht belegt: die Standardwerte von Zeilenhöhe, Markierung, Einrücken, Kartengröße, Bild-Eigenschaft und Bildanpassung — Slatebase nimmt kurz/Aufzählung/aus an und schreibt diese Werte nie, es
   entfernt den Schlüssel.
 - *Objekt-Typ*: Spec `.kiro/specs/bases-object-type/` (nur dokumentierte Teile: `file.properties`, `keys()`/`values()`/`isEmpty()`, Punkt-/Klammerzugriff).
 

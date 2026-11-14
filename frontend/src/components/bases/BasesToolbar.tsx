@@ -233,16 +233,18 @@ const DisplayPanel = memo(function DisplayPanel({ doc, index, disabled, onChange
         />
         <span>Eigenschaften einrücken</span>
       </label>
+      {view.indentProperties !== true && (
       <div className="bases-tb__row">
         <span>Trennzeichen</span>
         <CommitInput
           value={view.separator ?? ''}
           label="Trennzeichen"
-          placeholder="Standard"
+          placeholder=","
           disabled={disabled}
           onCommit={(value) => onChange((d) => setListSeparator(d, index, value))}
         />
       </div>
+      )}
     </div>
   )
 })
