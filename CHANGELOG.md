@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.85.0](https://github.com/andreas13xxx/Slatebase/compare/v0.84.0...v0.85.0) (2026-11-14)
+
+
+### Features
+
+* **ui:** add graph time-lapse and slides presentation ([177d4d9](https://github.com/andreas13xxx/Slatebase/commit/177d4d927945180594e64a150262d8f6e3da7734))
+* **ui:** graph time-lapse and slides presentation ([f2dcaba](https://github.com/andreas13xxx/Slatebase/commit/f2dcabae1858a36ea26b5ec5d76615bb821a2405))
+
 ## [0.84.0](https://github.com/andreas13xxx/Slatebase/compare/v0.83.0...v0.84.0) (2026-11-14)
 
 
