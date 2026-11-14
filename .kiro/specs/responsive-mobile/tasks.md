@@ -46,14 +46,18 @@ Randwerte beim Prüfen: 767/768 und 1024/1025 px (Hook-Test deckt die Logik, die
 
 ## Phase 4: Touch-freundliche Resize-Handles
 
-- [ ] Task 16: `useResize.ts` auf Pointer-Events erweitern (Maus bleibt funktional)
-- [ ] Task 17: Vergrößerte Touch-Trefferfläche für Resize-Handles per CSS (≥44px effektiv, visuelle Breite unverändert)
+Task 16 war durch die iPad-Arbeit schon erledigt (`useResize`, `PaneSplitHandle` laufen über Pointer-Events). Task 17: Trefferfläche aller drei Handle-Arten jetzt 44px (4px sichtbar plus 20px je Seite).
+
+- [x] Task 16: `useResize.ts` auf Pointer-Events erweitern (Maus bleibt funktional)
+- [x] Task 17: Vergrößerte Touch-Trefferfläche für Resize-Handles per CSS (≥44px effektiv, visuelle Breite unverändert)
 
 ## Phase 5: Editor Mobile-Kompatibilität
 
-- [ ] Task 18: `useVisualViewport`-Hook implementieren (`frontend/src/editor/live-preview/`)
-- [ ] Task 19: Editor-Container passt sich bei virtueller Tastatur an (Cursor bleibt sichtbar)
-- [ ] Task 20: Touch-Zielgrößen für interaktive Editor-Elemente (Checkbox-Toggles etc.) prüfen/anpassen
+Task 18/19 bestehen als `hooks/useKeyboardViewport.ts` (Visual-Viewport, `--keyboard-inset`, Caret wird sichtbar gehalten; in `App.tsx` eingebunden) und wurden nicht neu gebaut. Der Pfad in der Aufgabe (`editor/live-preview/useVisualViewport`) gilt damit nicht mehr. Task 20: Checkbox-Toggles im Editor sind auf Touch-Geräten 24px (WCAG-2.2-Minimum, nicht 44px). Nicht auf einem echten Gerät geprüft.
+
+- [x] Task 18: `useVisualViewport`-Hook implementieren (`frontend/src/editor/live-preview/`)
+- [x] Task 19: Editor-Container passt sich bei virtueller Tastatur an (Cursor bleibt sichtbar)
+- [x] Task 20: Touch-Zielgrößen für interaktive Editor-Elemente (Checkbox-Toggles etc.) prüfen/anpassen
 
 ## Phase 6: Optionales PWA-Manifest
 

@@ -6879,10 +6879,11 @@
 
 /* Touch: a 4px handle is impossible to hit with a finger; widen the hit area without changing the layout. */
 @media (pointer: coarse) {
+  /* 4px visible + 2 x 20px = 44px hit area (WCAG target size, responsive-mobile task 17). */
   .resize-handle::before {
     content: '';
     position: absolute;
-    inset: 0 -8px;
+    inset: 0 -20px;
   }
 }
 
