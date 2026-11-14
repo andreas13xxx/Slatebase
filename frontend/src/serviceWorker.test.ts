@@ -17,6 +17,7 @@ function loadWorker(fetchImpl: (req: unknown) => Promise<unknown>, cached: unkno
     addEventListener: (type: string, fn: Listener) => { listeners[type] = fn },
     skipWaiting: vi.fn(),
     clients: { claim: vi.fn() },
+    location: { origin: 'https://app.example' },
   }
   class FakeRequest { constructor(public url: string) {} }
   const source = readFileSync(resolve(process.cwd(), 'public/sw.js'), 'utf8')
@@ -26,9 +27,10 @@ function loadWorker(fetchImpl: (req: unknown) => Promise<unknown>, cached: unkno
   return { listeners, caches, cache }
 }
 
-function fetchEvent(mode: string, method = 'GET') {
+function fetchEvent(mode: string, method = 'GET', url = 'https://app.example/', accept = 'text/html,application/xhtml+xml') {
   const respondWith = vi.fn()
-  return { event: { request: { mode, method }, respondWith }, respondWith }
+  const request = { mode, method, url, headers: { get: (name: string) => (name === 'accept' ? accept : null) } }
+  return { event: { request, respondWith }, respondWith }
 }
 
 describe('public/sw.js', () => {
@@ -52,6 +54,21 @@ describe('public/sw.js', () => {
     const { listeners } = loadWorker(() => Promise.reject(new Error('down')), null)
     for (const [mode, method] of [['cors', 'GET'], ['no-cors', 'GET'], ['same-origin', 'GET'], ['navigate', 'POST']] as const) {
       const { event, respondWith } = fetchEvent(mode, method)
+      listeners['fetch']!(event)
+      expect(respondWith).not.toHaveBeenCalled()
+    }
+  })
+
+  it('leaves backend URLs, other origins and non-HTML navigations to the browser', () => {
+    const { listeners } = loadWorker(() => Promise.reject(new Error('down')), null)
+    const cases: Array<[string, string]> = [
+      ['https://app.example/api/v1/vaults/x/files?raw=true', 'text/html'],
+      ['https://app.example/.well-known/mcp.json', 'text/html'],
+      ['https://elsewhere.example/', 'text/html'],
+      ['https://app.example/export.zip', '*/*'],
+    ]
+    for (const [url, accept] of cases) {
+      const { event, respondWith } = fetchEvent('navigate', 'GET', url, accept)
       listeners['fetch']!(event)
       expect(respondWith).not.toHaveBeenCalled()
     }
