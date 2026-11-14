@@ -18,10 +18,12 @@ Umgesetzt ohne vorherige Phase 0 (kein Browser-Durchlauf): Der Code zeigte zwei 
 
 ## Phase 2 — Einstellungen
 
-- [ ] 2.1 `mobileView` in `settingsState` (Aktionen, Reducer, Tests); `mobileNavOpen` und `settings-panel-mobile-toggle` entfernen
-- [ ] 2.2 `SettingsPanel` Master-Detail unter `useBreakpoint() === 'mobile'`, Zurück-Knopf, Fokusverwaltung
-- [ ] 2.3 Vollbild-CSS (`100dvh`, Safe-Area), `SettingRow` stapelt, 44-px-Controls unter `pointer: coarse`
-- [ ] 2.4 i18n (`de.ts`/`en.ts`), axe-Test für den Master-Detail-Fluss, Tests: Auswahl zeigt Inhalt, Zurück zeigt Navigation, Neuladen startet in `nav`
+Umgesetzt mit zwei Abweichungen vom Design: (1) Der Master-Detail-Modus hängt an der **Containerbreite** (< 700 px, die bestehende Container-Query), nicht an `useBreakpoint()`: so gibt es keinen Zwischenbereich 700–767 px mit zwei Regeln (0.2 erledigt sich damit). (2) Der Zustand bleibt lokal in `SettingsPanelLayout` (`mobileNavOpen`, jetzt `true` = Navigation sichtbar) statt im Reducer; der Reducer-Wert `mobileNavOpen` wird weiter von nichts gelesen. Der Hamburger-Knopf ist der Zurück-Knopf (nur sichtbar, solange ein Abschnitt gezeigt wird); nach „Zurück“ fokussiert die Navigation; ein Deep-Link (`initialNav`) startet direkt im Abschnitt. Unter 768 px Fenster-Breite füllt der Dialog den Bildschirm (`100dvh`, Safe-Area), `SettingRow` stapelt in der schmalen Ansicht, Controls sind unter `pointer: coarse` 44 px. **Nicht geprüft:** Aussehen im Browser; es gibt keinen eigenen axe-Test für den Master-Detail-Fluss (die bestehenden Panel-Tests sind angepasst und grün).
+
+- [x] 2.1 `mobileView` in `settingsState` (Aktionen, Reducer, Tests); `mobileNavOpen` und `settings-panel-mobile-toggle` entfernen
+- [x] 2.2 `SettingsPanel` Master-Detail unter `useBreakpoint() === 'mobile'`, Zurück-Knopf, Fokusverwaltung
+- [x] 2.3 Vollbild-CSS (`100dvh`, Safe-Area), `SettingRow` stapelt, 44-px-Controls unter `pointer: coarse`
+- [x] 2.4 i18n (`de.ts`/`en.ts`), axe-Test für den Master-Detail-Fluss, Tests: Auswahl zeigt Inhalt, Zurück zeigt Navigation, Neuladen startet in `nav`
 
 ## Phase 3 — Abschluss
 

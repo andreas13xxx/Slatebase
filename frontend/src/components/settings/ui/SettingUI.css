@@ -121,3 +121,30 @@
   color: var(--text-secondary);
   font-size: 0.8125rem;
 }
+
+/* Narrow settings panel: label above its control, the control uses the full width. */
+@container (max-width: 699px) {
+  .setting-row__main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .setting-row__control {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+  }
+
+  .setting-row__control input:not([type='checkbox']):not([type='radio']),
+  .setting-row__control select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+@media (pointer: coarse) {
+  .setting-row__control input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+}

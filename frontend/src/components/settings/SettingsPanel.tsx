@@ -154,11 +154,27 @@ interface SettingsPanelLayoutProps {
  * Separated so it can access SettingsContext via hooks.
  */
 function SettingsPanelLayout({ initialNav }: SettingsPanelLayoutProps) {
-  const [mobileNavOpen, setMobileNavOpen] = React.useState(false)
+  // Narrow layout (panel < 700px) is master-detail: the navigation first, then the chosen section
+  // with a back button. `true` = navigation shown. The wide layout shows both and ignores this.
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(initialNav === undefined)
 
   const handleMobileToggle = useCallback(() => {
     setMobileNavOpen((prev) => !prev)
   }, [])
+
+  // Back from a section: the button that had focus is gone, so put focus on the navigation.
+  const sawContent = React.useRef(false)
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      sawContent.current = true
+      return
+    }
+    if (!sawContent.current) return
+    sawContent.current = false
+    const sidebar = document.getElementById('settings-sidebar')
+    const target = sidebar?.querySelector<HTMLElement>('[aria-current="page"], [aria-current="true"], button')
+    target?.focus()
+  }, [mobileNavOpen])
 
   const handleNavSelect = useCallback(() => {
     setMobileNavOpen(false)
@@ -184,9 +200,7 @@ function SettingsPanelLayout({ initialNav }: SettingsPanelLayoutProps) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
+          <polyline points="15 18 9 12 15 6" />
         </svg>
         Navigation
       </button>
@@ -203,6 +217,7 @@ function SettingsPanelLayout({ initialNav }: SettingsPanelLayoutProps) {
 
       <section
         className="settings-panel-content"
+        data-mobile-nav-open={String(mobileNavOpen)}
         role="main"
         aria-label="Einstellungen-Inhalt"
       >

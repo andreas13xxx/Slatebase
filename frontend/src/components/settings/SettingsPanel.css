@@ -148,6 +148,34 @@
   background: var(--bg-elevated);
 }
 
+/* ===== Narrow layout (< 700px panel width): master-detail =====
+ * Navigation OR the chosen section, never both: the navigation fills the panel, a section gets the
+ * whole width and a back button (the former hamburger toggle). Touch targets are finger-sized. */
+@container (max-width: 699px) {
+  .settings-panel-sidebar[data-mobile-open="true"] {
+    flex: 1;
+    max-height: none;
+    border-bottom: none;
+  }
+
+  .settings-panel-content[data-mobile-nav-open="true"] {
+    display: none;
+  }
+
+  .settings-panel-mobile-toggle {
+    min-height: 44px;
+  }
+
+  /* Only a section has a back button; the navigation itself has nothing to go back to. */
+  .settings-panel-mobile-toggle[aria-expanded="true"] {
+    display: none;
+  }
+
+  .settings-panel-content {
+    padding: 16px;
+  }
+}
+
 /* ===== Container Query: wide layout (>= 700px) ===== */
 @container (min-width: 700px) {
   .settings-panel-layout {
@@ -480,4 +508,26 @@
 /* Plugin-Management needs full width for the Store Browser */
 .settings-panel-content:has(.plugin-management-page) {
   max-width: none;
+}
+
+/* A phone-sized window: the dialog is the screen, not a card floating on it. `dvh` follows the
+   address bar and the on-screen keyboard (see useKeyboardViewport). */
+@media (max-width: 767px) {
+  .settings-panel {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}
+
+@media (pointer: coarse) {
+  .settings-panel .st-btn,
+  .settings-panel input:not([type='checkbox']):not([type='radio']),
+  .settings-panel select {
+    min-height: 44px;
+  }
 }

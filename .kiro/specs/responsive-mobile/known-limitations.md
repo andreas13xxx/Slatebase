@@ -7,7 +7,8 @@ Stand 2026-11-14. Alles hier ist **nur in Tests und CI geprüft, nicht auf einem
 - Die Drawer haben eine feste Breite (`min(85vw, 320px)`). Die gespeicherten Desktop-Breiten gelten dort nicht.
 - Ein Drawer hat keine Wischgeste zum Schließen. Es schließt der Backdrop oder das Öffnen einer Notiz.
 - Tabellen unter 768 px: sechs scrollen seitlich mit fixierter erster Spalte, drei (Benutzer, Vaults, MCP-Token) werden zu Karten (Spec `responsive-mobile-content/`, Phase 1). Das Aussehen ist nur im CSS gebaut, nicht in einem Browser angesehen. `BasesTableView` scrollte schon vorher und hat keine fixierte Spalte.
-- Nicht geprüft und nicht angepasst: Einstellungs-Dialog (Phase 2 der Folgespec), Graph-Ansicht, Chat und Bases-Ansichten unter 768 px.
+- Einstellungs-Dialog: Unter 700 px Panelbreite zeigt er erst die Navigation, dann den gewählten Abschnitt mit Zurück-Knopf; unter 768 px Fensterbreite füllt er den Bildschirm. Nur im CSS gebaut, nicht angesehen.
+- Nicht geprüft und nicht angepasst: Graph-Ansicht, Chat und Bases-Ansichten unter 768 px.
 - Das Layout richtet sich nach der **Fensterbreite**, nicht nach dem Gerät. Ein schmales Desktop-Fenster zeigt die Drawer ebenfalls.
 
 ## Touch
