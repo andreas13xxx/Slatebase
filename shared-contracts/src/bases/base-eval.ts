@@ -11,6 +11,7 @@ import type { BaseDocument, BaseFilterNode, BaseRow, BaseView, BaseQuerySpecWire
 import { evaluateCondition, evaluateFormula, collectExpressionRefs } from './formula/evaluator.js'
 import type { FormulaContext, FormulaResult } from './formula/evaluator.js'
 import type { FormulaValue } from './formula/functions.js'
+import { makeObject } from './formula/functions.js'
 import { buildCombinedPrefilter } from './prefilter.js'
 
 // ─── Filter column collection ──────────────────────────────────────────────────
@@ -167,6 +168,20 @@ function toExprValue(key: string, v: unknown, extraListKeys?: ReadonlySet<string
 }
 
 /**
+ * `file.properties`: the note's properties as an object, each value read like `note.<key>` (same
+ * single-value/list rule). Holds the properties the row carries — which are the requested columns until
+ * the query asks for all of them (spec `bases-object-type`, phase 2) — and never the `file.*` metadata.
+ */
+function propertiesObject(row: BaseRow): FormulaValue {
+  const entries: Array<[string, FormulaValue]> = []
+  for (const [key, raw] of Object.entries(row.values)) {
+    if (key.startsWith('file.')) continue
+    entries.push([key, toExprValue(key, raw, row.listKeys)])
+  }
+  return makeObject(entries)
+}
+
+/**
  * Builds the expression `FormulaContext` for one row, resolving the Obsidian
  * property prefixes: `file.*` → file metadata, `note.`/bare → frontmatter.
  * With `doc`, `formula.x` (or a bare formula id) resolves to that formula of
@@ -188,6 +203,7 @@ function resolveThis(name: string, thisRow: BaseRow | undefined): FormulaValue {
   if (name === 'this.file') return thisRow.path
   if (name === 'this.file.name' || name === 'this.file.basename') return thisRow.fileName
   if (name === 'this.file.path') return thisRow.path
+  if (name === 'this.file.properties') return propertiesObject(thisRow)
   if (name.startsWith('this.file.')) {
     const key = name.slice('this.'.length)
     return toExprValue(key, thisRow.values[key], thisRow.listKeys)
@@ -219,6 +235,7 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
       }
       if (name === 'file.name' || name === 'file.basename') return row.fileName
       if (name === 'file.path') return row.path
+      if (name === 'file.properties') return propertiesObject(row)
       if (name.startsWith('file.')) return toExprValue(name, values[name], listKeys)
       const key = name.startsWith('note.') ? name.slice('note.'.length) : name
       return toExprValue(key, values[key] ?? values[name], listKeys)

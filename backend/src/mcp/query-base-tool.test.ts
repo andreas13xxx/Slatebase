@@ -228,6 +228,29 @@ views:
     expect(parse(result)['code']).toBe(-32006)
   })
 
+  describe('file.properties (object type)', () => {
+    const OBJ_BASE = `formulas:
+  keys: file.properties.keys().join(",")
+  status: file.properties.status
+views:
+  - type: table
+    order:
+      - file.name
+      - formula.keys
+      - formula.status
+`
+    it('evaluates file.properties on the properties the row carries, without crashing the query', async () => {
+      const { call, linkIndex } = await setup({ content: OBJ_BASE })
+      const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100 }))
+      expect(out['rows']).toBeDefined()
+      const first = (out['rows'] as Array<{ cells: Record<string, unknown> }>)[0]
+      expect(first?.cells['formula.status']).toBe('open')
+      // The spec the index received must stay a valid column request (no made-up property column).
+      const spec = vi.mocked(linkIndex.queryForBase).mock.calls[0]![0]
+      expect(spec.columns).not.toContain('file.properties')
+    })
+  })
+
   describe('thisPath (`this` = the embedding note)', () => {
     const THIS_BASE = `filters:
   and:

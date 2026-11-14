@@ -28,8 +28,18 @@ export interface RegexValue {
   flags: string
 }
 
+/**
+ * An object value: named entries in insertion order (`file.properties`). A `Map`, not a plain object,
+ * so a key like `__proto__` or `constructor` is an ordinary key and never reaches `Object.prototype`.
+ * Immutable: no expression changes one.
+ */
+export interface ObjectValue {
+  readonly kind: 'object'
+  readonly entries: ReadonlyMap<string, FormulaValue>
+}
+
 /** A formula/expression value. */
-export type FormulaValue = string | number | boolean | Date | FormulaValue[] | LinkValue | RegexValue | null
+export type FormulaValue = string | number | boolean | Date | FormulaValue[] | LinkValue | RegexValue | ObjectValue | null
 
 /** Signature shared by every built-in global function. */
 export type FormulaFn = (args: FormulaValue[]) => FormulaValue
@@ -39,6 +49,51 @@ const MS_PER_DAY = 86_400_000
 /** True when a value is a link object. */
 export function isLink(value: FormulaValue): value is LinkValue {
   return typeof value === 'object' && value !== null && !(value instanceof Date) && !Array.isArray(value) && value.kind === 'link'
+}
+
+/** True when a value is an object. */
+export function isObject(value: FormulaValue): value is ObjectValue {
+  return typeof value === 'object' && value !== null && !(value instanceof Date) && !Array.isArray(value) && value.kind === 'object'
+}
+
+/** Builds an object value from `[key, value]` pairs (later duplicates win, order is first insertion). */
+export function makeObject(entries: Iterable<readonly [string, FormulaValue]>): ObjectValue {
+  return { kind: 'object', entries: new Map(entries) }
+}
+
+/** Nesting deeper than this is cut off when an object is rendered or compared (a guard, not a feature). */
+const MAX_OBJECT_DEPTH = 16
+
+/** The JSON-shaped form of a value, used for the text form of an object. */
+function toJsonShape(v: FormulaValue, depth: number): unknown {
+  if (v === null) return null
+  if (depth > MAX_OBJECT_DEPTH) return '…'
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.toISOString()
+  if (Array.isArray(v)) return v.map((item) => toJsonShape(item, depth + 1))
+  if (isObject(v)) {
+    const out: Array<[string, unknown]> = []
+    for (const [key, value] of v.entries) out.push([key, toJsonShape(value, depth + 1)])
+    return Object.fromEntries(out)
+  }
+  if (isLink(v)) return v.display ?? v.path
+  if (isRegex(v)) return `/${v.source}/${v.flags}`
+  return v
+}
+
+/** Structural equality of two objects: same keys, equal values (order does not matter). */
+export function objectsEqual(a: ObjectValue, b: ObjectValue, depth = 0): boolean {
+  if (a.entries.size !== b.entries.size) return false
+  if (depth > MAX_OBJECT_DEPTH) return false
+  for (const [key, value] of a.entries) {
+    if (!b.entries.has(key)) return false
+    const other = b.entries.get(key) ?? null
+    if (isObject(value) && isObject(other)) {
+      if (!objectsEqual(value, other, depth + 1)) return false
+    } else if (isObject(value) !== isObject(other) || stringify(value) !== stringify(other)) {
+      return false
+    }
+  }
+  return true
 }
 
 /** True when a value is a regular expression. */
@@ -109,6 +164,8 @@ export function stringify(v: FormulaValue): string {
   if (Array.isArray(v)) return v.map(stringify).join(', ')
   if (isLink(v)) return v.display ?? v.path
   if (isRegex(v)) return `/${v.source}/${v.flags}`
+  // Slatebase's own choice: Obsidian's docs do not say how an object prints. Compact JSON is unambiguous.
+  if (isObject(v)) return JSON.stringify(toJsonShape(v, 0))
   return String(v)
 }
 
@@ -122,6 +179,7 @@ export function isTruthy(value: FormulaValue): boolean {
   if (Array.isArray(value)) return value.length > 0
   if (isLink(value)) return value.path.length > 0
   if (isRegex(value)) return true
+  if (isObject(value)) return value.entries.size > 0
   return false
 }
 

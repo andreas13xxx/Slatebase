@@ -11,7 +11,7 @@
 
 import { parseFormula } from './parser.js'
 import type { ExprNode, BinaryOp } from './ast.js'
-import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, parseDurationMs } from './functions.js'
+import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, isObject, objectsEqual, parseDurationMs } from './functions.js'
 import type { FormulaValue } from './functions.js'
 import { callMethod, DATE_MEMBERS, DURATION_MEMBERS } from './methods.js'
 
@@ -48,6 +48,8 @@ const MEMBER_NAMES: ReadonlySet<string> = new Set(['length', 'path', ...Object.k
 
 /** Member access on an evaluated value. Throws on an unknown member. */
 function memberOf(obj: FormulaValue, property: string): FormulaValue {
+  // Object entries win over every built-in member name: `obj.length` is the entry "length" if there is one.
+  if (isObject(obj)) return obj.entries.get(property) ?? null
   if (property === 'length') {
     if (Array.isArray(obj)) return obj.length
     if (typeof obj === 'string') return obj.length
@@ -76,9 +78,13 @@ function evalProperty(name: string, ctx: FormulaContext): FormulaValue {
   const direct = ctx.resolve(name)
   if (direct !== null) return direct
   const dot = name.lastIndexOf('.')
-  if (dot > 0 && MEMBER_NAMES.has(name.slice(dot + 1))) {
+  if (dot > 0) {
+    const member = name.slice(dot + 1)
+    // `file.properties.status`: the tokenizer keeps the dotted name whole, so look at what the shorter
+    // path is. An object accepts ANY key; everything else only the built-in member names.
     const base = evalProperty(name.slice(0, dot), ctx)
-    return base === null ? null : memberOf(base, name.slice(dot + 1))
+    if (base === null) return null
+    if (isObject(base) || MEMBER_NAMES.has(member)) return memberOf(base, member)
   }
   return null
 }
@@ -151,6 +157,7 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
         return ctx.resolve(`${node.object.name}.${idx}`)
       }
       const obj = evalNode(node.object, ctx)
+      if (isObject(obj)) return typeof idx === 'string' ? (obj.entries.get(idx) ?? null) : null
       if (Array.isArray(obj)) {
         const n = toNumber(idx)
         if (n === null) return null
@@ -255,6 +262,8 @@ function evalBinary(op: BinaryOp, leftNode: ExprNode, rightNode: ExprNode, ctx: 
 }
 
 function looseEquals(a: FormulaValue, b: FormulaValue): boolean {
+  // Objects are equal when structurally equal (Slatebase's choice, the docs are silent); never equal to a non-object.
+  if (isObject(a) || isObject(b)) return isObject(a) && isObject(b) && objectsEqual(a, b)
   // Link equality: same path.
   if (isLink(a) && isLink(b)) return a.path === b.path
   if (isLink(a)) return a.path.toLowerCase() === stringify(b).toLowerCase()
@@ -270,6 +279,8 @@ function compare(a: FormulaValue, b: FormulaValue): number | null {
   // A missing (empty) value is not ordered against anything: `price < 10` is
   // false for a note without `price`, never an accident of string ordering.
   if (a === null || b === null) return null
+  // An object has no order: `<`/`>` on one is "not comparable", like a missing value.
+  if (isObject(a) || isObject(b)) return null
   const ad = a instanceof Date ? a : toDate(a)
   const bd = b instanceof Date ? b : toDate(b)
   if (ad && bd && (a instanceof Date || b instanceof Date)) {
