@@ -226,8 +226,34 @@ function AppContent() {
   // Navigation tabs: list of open pages + which is active
   const [openSettingsPages, setOpenSettingsPages] = useState<AppPage[]>([])
   const [activeSettingsPage, setActiveSettingsPage] = useState<AppPage | null>(() => getWorkspaceState().activeSettingsPage)
-  const [showRightPanel, setShowRightPanel] = useState(() => getWorkspaceState().rightPanelVisible)
-  const [showSidebar, setShowSidebar] = useState(() => getWorkspaceState().sidebarVisible)
+  // Desktop panel visibility is what gets persisted. On a narrow window the panels are drawers
+  // with their own, never persisted open state, so narrowing the window cannot overwrite the
+  // desktop layout (and the persisted "open" does not cover the note on a phone).
+  const [showRightPanelDesktop, setShowRightPanelDesktop] = useState(() => getWorkspaceState().rightPanelVisible)
+  const [showSidebarDesktop, setShowSidebarDesktop] = useState(() => getWorkspaceState().sidebarVisible)
+  const [mobileDrawer, setMobileDrawer] = useState<'left' | 'right' | null>(null)
+  const showSidebar = isMobileLayout ? mobileDrawer === 'left' : showSidebarDesktop
+  const showRightPanel = isMobileLayout ? mobileDrawer === 'right' : showRightPanelDesktop
+  const setShowSidebar = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    if (!isMobileLayout) {
+      setShowSidebarDesktop(value)
+      return
+    }
+    setMobileDrawer((prev) => {
+      const next = typeof value === 'function' ? value(prev === 'left') : value
+      return next ? 'left' : prev === 'left' ? null : prev
+    })
+  }, [isMobileLayout])
+  const setShowRightPanel = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    if (!isMobileLayout) {
+      setShowRightPanelDesktop(value)
+      return
+    }
+    setMobileDrawer((prev) => {
+      const next = typeof value === 'function' ? value(prev === 'right') : value
+      return next ? 'right' : prev === 'right' ? null : prev
+    })
+  }, [isMobileLayout])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const createFileTriggerRef = useRef<(() => void) | null>(null)
@@ -279,23 +305,12 @@ function AppContent() {
   const sidebar = useResize(260, 180, 400, 'left', 'sidebarWidth')
   const rightPanel = useResize(240, 160, 500, 'right', 'rightPanelWidth')
 
-  // A drawer covers the content: entering the mobile layout starts with both closed (the persisted
-  // desktop visibility must not hide the note behind a drawer), and opening another note closes it.
-  useEffect(() => {
-    if (!isMobileLayout) return
-    // Reacting to a media-query change (external system): one-shot reset on entering the layout.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setShowSidebar(false)
-    setShowRightPanel(false)
-  }, [isMobileLayout])
+  // A drawer covers the content, so opening another note closes it.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- close the drawer once a note was opened
-    if (isMobileLayout) setShowSidebar(false)
+    if (isMobileLayout) setMobileDrawer(null)
   }, [isMobileLayout, tabState.activeTabId])
-  const closeDrawers = useCallback(() => {
-    setShowSidebar(false)
-    setShowRightPanel(false)
-  }, [])
+  const closeDrawers = useCallback(() => setMobileDrawer(null), [])
   const versionInfo = useVersionInfo()
 
   // Refresh key for sidebar panel views (favorites, recent files)
@@ -456,8 +471,8 @@ function AppContent() {
     paneTree,
     paneTreeDispatch,
     activeSettingsPage,
-    showSidebar,
-    showRightPanel,
+    showSidebar: showSidebarDesktop,
+    showRightPanel: showRightPanelDesktop,
     apiClient,
   })
 
@@ -1007,6 +1022,8 @@ function AppContent() {
   // where FileExplorer hasn't finished (re)mounting yet when we dispatch.
   useEffect(() => {
     if (!explorerFollowActiveFile || !activeTab) return
+    // A drawer must not pop open by itself on every tab change.
+    if (isMobileLayout) return
     if (activeTab.filePath === '__graph__' || activeTab.filePath.startsWith('__view::')) return
     const rightSection = rightPanelState.sections.find((s) => s.viewIds.includes('explorer'))
     if (rightSection) {
@@ -1266,7 +1283,7 @@ function AppContent() {
             <aside
               className={`app-sidebar${isMobileLayout ? ` app-sidebar--overlay${showSidebar ? ' app-sidebar--open' : ''}` : ''}`}
               style={isMobileLayout ? undefined : { width: sidebar.width }}
-              aria-hidden={isMobileLayout && !showSidebar ? true : undefined}
+              inert={isMobileLayout && !showSidebar}
             >
               <div className="app-sidebar-header">
                 <div className="app-logo">
@@ -1466,7 +1483,7 @@ function AppContent() {
               <aside
                 className={`app-right-panel${isMobileLayout ? ` app-right-panel--overlay${showRightPanel ? ' app-right-panel--open' : ''}` : ''}`}
                 style={isMobileLayout ? undefined : { width: rightPanel.width }}
-                aria-hidden={isMobileLayout && !showRightPanel ? true : undefined}
+                inert={isMobileLayout && !showRightPanel}
               >
                 <PluginViewPanel />
                 <SidePanel
