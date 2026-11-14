@@ -258,7 +258,7 @@ So nothing surprises you:
 
 **Expression language**
 - This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
-- Objects exist only as `file.properties` (see above), not as literals. `html(), `icon()` and `image()` return text or a link; raw HTML is never inserted.
+- Objects exist only as `file.properties` (see above), not as literals. `html()`, `icon()` and `image()` return text or a link; raw HTML is never inserted.
 - `file.embeds`, `file.size` and `file.backlinks` ARE supported. `file.embeds` holds `![[…]]` embeds only; on the first start after the update Slatebase rebuilds the link index once.
 - Not implemented: table row height and the list options (markers, indent, separator) — their YAML keys are not documented.
 
@@ -269,7 +269,7 @@ So nothing surprises you:
 - **Table**, **cards**, **list** and **map** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
 - A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (read-only each). Embedded, it shows **one** view — the first, or the one chosen with `#View name` — in its own type: table, cards, Kanban or list. Only a **map** and plugin views appear as a table when embedded.
 - An embedded base refreshes itself on vault changes (including a change to the embedding note, and so to `this`); the old display stays until the new query is done.
-- `this` works in the built-in table, not in views a plugin provides, In the MCP `query_base` tool it applies only with the `thisPath` parameter, otherwise `this.…` is empty.
+- `this` works in the built-in table, not in views a plugin provides. In the MCP `query_base` tool it applies only with the `thisPath` parameter, otherwise `this.…` is empty.
 
 **AI access via MCP**
 - The `query_base` tool evaluates a `.base` server-side with the same engine ([[Advanced/MCP Context Server|MCP interface]] for AI clients), including its `summaries`. It returns 100 rows by default (maximum 1000) and returns formula values as text.

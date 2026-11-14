@@ -258,7 +258,7 @@ Damit du nicht überrascht wirst:
 
 **Ausdruckssprache**
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
-- Objekte gibt es nur als `file.properties` (siehe oben), nicht als Literal. `html(), `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
+- Objekte gibt es nur als `file.properties` (siehe oben), nicht als Literal. `html()`, `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
 - `file.embeds`, `file.size` und `file.backlinks` werden unterstützt. `file.embeds` enthält nur `![[…]]`-Einbettungen; beim ersten Start nach dem Update baut Slatebase den Link-Index einmal neu auf.
 - Nicht umgesetzt: Zeilenhöhe der Tabelle und die Listen-Optionen (Marker, Einrückung, Trennzeichen) — ihre YAML-Schlüssel sind nicht belegt.
 
