@@ -289,6 +289,13 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
   /** Touch pointers that went down on the background: one pans, two pinch. */
   const touchPointersRef = useRef(new Map<number, Point>())
   const pinchRef = useRef<PinchStart | null>(null)
+  /** Touch pointers that went down on a node: while one is dragging, background touches must not pan or pinch. */
+  const nodeTouchIdsRef = useRef(new Set<number>())
+  /** The latest viewport, for pointer handlers whose closure may predate the last dispatch. */
+  const viewportRef = useRef(viewport)
+  useEffect(() => {
+    viewportRef.current = viewport
+  }, [viewport])
 
   const stopPanning = useCallback(() => {
     setIsPanning(false)
@@ -303,7 +310,10 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
     }
     if (e.pointerType === 'touch') {
       // Nodes drag themselves; edges and text fields keep their own gestures.
+      if (target.closest('.canvas-node')) nodeTouchIdsRef.current.add(e.pointerId)
       if (target.closest('.canvas-node, .canvas-edge-hit, textarea, input, [contenteditable="true"]')) return false
+      // A finger is dragging a node: a second one on the background must not move the viewport under it.
+      if (nodeTouchIdsRef.current.size > 0) return false
       touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       capture()
       const pts = [...touchPointersRef.current.values()]
@@ -318,8 +328,8 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
       setIsPanning(true)
       return true
     }
-    // Mouse/pen: middle button or space + left button
-    if (e.button === 1 || (spaceHeld && e.button === 0)) {
+    // Mouse/pen: middle button or space + left button (not over a node: that drags the node, as before)
+    if (!target.closest('.canvas-node') && (e.button === 1 || (spaceHeld && e.button === 0))) {
       e.preventDefault()
       capture()
       setIsPanning(true)
@@ -361,17 +371,20 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
       stopPanning()
       return
     }
+    nodeTouchIdsRef.current.delete(e.pointerId)
     const pointers = touchPointersRef.current
     if (!pointers.delete(e.pointerId)) return
     pinchRef.current = null
     const rest = [...pointers.values()][0]
     if (rest) {
-      // One finger left after a pinch: continue as a one-finger pan from where it is now.
-      panStartRef.current = { x: rest.x, y: rest.y, viewX: viewport.x, viewY: viewport.y }
+      // One finger left after a pinch: continue as a one-finger pan from where it is now. Read the
+      // viewport from the ref: this closure may predate the last pinch dispatch.
+      const latest = viewportRef.current
+      panStartRef.current = { x: rest.x, y: rest.y, viewX: latest.x, viewY: latest.y }
     } else {
       stopPanning()
     }
-  }, [stopPanning, viewport])
+  }, [stopPanning])
 
   const onCanvasPointerDown = useCallback((e: React.PointerEvent<Element>) => {
     handlePanPointerDown(e)

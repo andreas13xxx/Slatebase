@@ -83,4 +83,35 @@ describe('CanvasView touch gestures', () => {
     fireEvent.wheel(root, { deltaY: -100 })
     expect(viewportOf(layer).zoom).toBeGreaterThan(before.zoom)
   })
+
+  it('does not pan the viewport with a second finger while a node is being dragged', () => {
+    const { root, layer, container } = renderCanvas()
+    const node = container.querySelector('[data-node-id="n1"]') as HTMLElement
+    const before = viewportOf(layer)
+    fireEvent.pointerDown(node, touch(1, 100, 50))
+    fireEvent.pointerDown(root, touch(2, 300, 300))
+    fireEvent.pointerMove(root, touch(2, 360, 340))
+    expect(viewportOf(layer)).toEqual(before)
+  })
+
+  it('pans again once the node finger is lifted', () => {
+    const { root, layer, container } = renderCanvas()
+    const node = container.querySelector('[data-node-id="n1"]') as HTMLElement
+    fireEvent.pointerDown(node, touch(1, 100, 50))
+    fireEvent.pointerUp(node, touch(1, 100, 50))
+    const before = viewportOf(layer)
+    fireEvent.pointerDown(root, touch(2, 300, 300))
+    fireEvent.pointerMove(root, touch(2, 340, 300))
+    expect(viewportOf(layer).x).not.toBe(before.x)
+  })
+
+  it('does not pan the canvas when space + left button goes down on a node', () => {
+    const { root, layer, container } = renderCanvas()
+    const node = container.querySelector('[data-node-id="n1"]') as HTMLElement
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' })
+    const before = viewportOf(layer)
+    fireEvent.pointerDown(node, { pointerType: 'mouse', pointerId: 1, button: 0, clientX: 50, clientY: 50 })
+    fireEvent.pointerMove(root, { pointerType: 'mouse', pointerId: 1, clientX: 90, clientY: 50 })
+    expect(viewportOf(layer)).toEqual(before)
+  })
 })
