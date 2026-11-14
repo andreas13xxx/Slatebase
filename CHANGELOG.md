@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.84.0](https://github.com/andreas13xxx/Slatebase/compare/v0.83.0...v0.84.0) (2026-11-14)
+
+
+### Features
+
+* **bases:** object display and docs (object type phase 3) ([#375](https://github.com/andreas13xxx/Slatebase/issues/375)) ([de888f8](https://github.com/andreas13xxx/Slatebase/commit/de888f804775c3a8c582110d62cd0db6fd0eeca5))
+* **bases:** object type in the expression engine (phase 1) ([#373](https://github.com/andreas13xxx/Slatebase/issues/373)) ([2f5127c](https://github.com/andreas13xxx/Slatebase/commit/2f5127cdf0710f5ecad2b15bace65c0307cf6c91))
+* **bases:** this in MCP query_base + CSV export ([#371](https://github.com/andreas13xxx/Slatebase/issues/371)) ([db841f9](https://github.com/andreas13xxx/Slatebase/commit/db841f9e64546c8497c568b99d5c98f4a1dc536f))
+* **deep-links:** /open links with copy-url and anchor jump ([#369](https://github.com/andreas13xxx/Slatebase/issues/369)) ([7cb50fa](https://github.com/andreas13xxx/Slatebase/commit/7cb50faacccb63a2e299915280c9361dcdf1b2f1))
+* **editor:** embed ![](url) web pages in Live Preview ([#370](https://github.com/andreas13xxx/Slatebase/issues/370)) ([f5eb041](https://github.com/andreas13xxx/Slatebase/commit/f5eb0419a69d12be000d621e7931ad63ba76913a))
+* **mobile:** 44px resize-handle hit areas, larger editor checkboxes (phases 4-5) ([#378](https://github.com/andreas13xxx/Slatebase/issues/378)) ([531d809](https://github.com/andreas13xxx/Slatebase/commit/531d8092bd1a7b22f1ece372aa7a825d645b4634))
+* **mobile:** breakpoint hook and constants (responsive-mobile phase 1) ([#374](https://github.com/andreas13xxx/Slatebase/issues/374)) ([8ad1907](https://github.com/andreas13xxx/Slatebase/commit/8ad19075cdee31bfa9c29d5015ba3fda5bf7c4f7))
+* **mobile:** canvas touch gestures via pointer events (phase 3) ([#377](https://github.com/andreas13xxx/Slatebase/issues/377)) ([5d9a41e](https://github.com/andreas13xxx/Slatebase/commit/5d9a41e5d8e6db46f2a9f49ca754506927864007))
+* **mobile:** chat master-detail, graph and bases fit narrow screens ([#386](https://github.com/andreas13xxx/Slatebase/issues/386)) ([01a85ba](https://github.com/andreas13xxx/Slatebase/commit/01a85bacc372655f02b4e41dec53bfb7e51237a8))
+* **mobile:** responsive tables and settings below 768px (content spec 1-2) ([#381](https://github.com/andreas13xxx/Slatebase/issues/381)) ([41c5937](https://github.com/andreas13xxx/Slatebase/commit/41c59372f50320fd3ccb10d5bf7d19fcb27d3004))
+* **mobile:** side panels as drawers with backdrop (phase 2) ([#376](https://github.com/andreas13xxx/Slatebase/issues/376)) ([a478368](https://github.com/andreas13xxx/Slatebase/commit/a4783688580c5f4d8b8c46002af14d23d57771a7))
+* **pwa:** maskable icon, offline service worker, mobile content spec ([#380](https://github.com/andreas13xxx/Slatebase/issues/380)) ([f2d5aa8](https://github.com/andreas13xxx/Slatebase/commit/f2d5aa8a1250f0519154aeb1cc676753a6c767eb))
+
+
+### Bugfixes
+
+* align welcome vault release versions ([#385](https://github.com/andreas13xxx/Slatebase/issues/385)) ([50a020c](https://github.com/andreas13xxx/Slatebase/commit/50a020c07aa08b4d4b25c52819a2755d7c54f34f))
+* **bases:** map fills pane by overriding embed-height on .bases-map ([#367](https://github.com/andreas13xxx/Slatebase/issues/367)) ([02ad5e4](https://github.com/andreas13xxx/Slatebase/commit/02ad5e4d50fcf4dded43ed564df21997215fccc8))
+
+
+### Sonstige Änderungen
+
+* **bases:** spec for the object type, record the row-height/list-option check ([#372](https://github.com/andreas13xxx/Slatebase/issues/372)) ([15491e9](https://github.com/andreas13xxx/Slatebase/commit/15491e9aae06189dccf42e9c394a42f1f875a535))
+* close the mobile spec, update plan and steering ([#387](https://github.com/andreas13xxx/Slatebase/issues/387)) ([f4e00ce](https://github.com/andreas13xxx/Slatebase/commit/f4e00ce33bbce2a47ef4127778fc5189ca715c49))
+* **mobile:** record PWA state and known limitations (phases 6-7) ([#379](https://github.com/andreas13xxx/Slatebase/issues/379)) ([e839329](https://github.com/andreas13xxx/Slatebase/commit/e8393297404267808a57ef21c06aef37c6342151))
+
 ## [0.83.0](https://github.com/andreas13xxx/Slatebase/compare/v0.82.0...v0.83.0) (2026-11-13)
 
 
