@@ -4,6 +4,11 @@ import React from 'react'
 import { useNodeDrag } from './useNodeDrag'
 import { useCanvasContext, CanvasProvider } from '../../state/canvasContext'
 
+/** A pointer event for window listeners (jsdom's PointerEvent support varies): a MouseEvent with a pointerId. */
+function pointerEvt(type: string, init: MouseEventInit = {}): Event {
+  return Object.assign(new MouseEvent(type, init), { pointerId: 1 })
+}
+
 function makeContent(nodes: Array<{ id: string; x: number; y: number }>) {
   return JSON.stringify({
     nodes: nodes.map((n) => ({ id: n.id, type: 'text', x: n.x, y: n.y, width: 100, height: 100, text: n.id })),
@@ -24,20 +29,21 @@ function renderHarness(nodeId: string, readOnly: boolean, content: string) {
   })
 }
 
-function fakeMouseDown(clientX: number, clientY: number): React.MouseEvent {
+function fakeMouseDown(clientX: number, clientY: number): React.PointerEvent {
   return {
     button: 0,
     clientX,
     clientY,
+    pointerId: 1,
     stopPropagation: () => {},
     preventDefault: () => {},
-  } as unknown as React.MouseEvent
+  } as unknown as React.PointerEvent
 }
 
 afterEach(() => {
   // useNodeDrag adds window listeners that are only removed on mouseup;
   // clear them between tests in case a test didn't reach mouseup.
-  const dummyUp = new MouseEvent('mouseup')
+  const dummyUp = pointerEvt('pointerup')
   window.dispatchEvent(dummyUp)
 })
 
@@ -50,10 +56,10 @@ describe('useNodeDrag', () => {
       result.current.drag.onDragStart(fakeMouseDown(100, 100))
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 110, clientY: 105 }))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 110, clientY: 105 }))
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mouseup'))
+      window.dispatchEvent(pointerEvt('pointerup'))
     })
 
     const node = result.current.ctx.state.document!.nodes.find(n => n.id === 'n1')!
@@ -69,7 +75,7 @@ describe('useNodeDrag', () => {
       result.current.drag.onDragStart(fakeMouseDown(100, 100))
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 200 }))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 200, clientY: 200 }))
     })
 
     const node = result.current.ctx.state.document!.nodes.find(n => n.id === 'n1')!
@@ -82,10 +88,10 @@ describe('useNodeDrag', () => {
     await waitFor(() => expect(result.current.ctx.state.document).not.toBeNull())
 
     act(() => {
-      result.current.drag.onDragStart({ ...fakeMouseDown(100, 100), button: 2 } as React.MouseEvent)
+      result.current.drag.onDragStart({ ...fakeMouseDown(100, 100), button: 2 } as React.PointerEvent)
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 200 }))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 200, clientY: 200 }))
     })
 
     const node = result.current.ctx.state.document!.nodes.find(n => n.id === 'n1')!
@@ -100,7 +106,7 @@ describe('useNodeDrag', () => {
       result.current.drag.onDragStart(fakeMouseDown(100, 100))
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 101, clientY: 101 }))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 101, clientY: 101 }))
     })
 
     const node = result.current.ctx.state.document!.nodes.find(n => n.id === 'n1')!
@@ -120,7 +126,7 @@ describe('useNodeDrag', () => {
       result.current.drag.onDragStart(fakeMouseDown(0, 0))
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 20, clientY: 20 }))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 20, clientY: 20 }))
     })
 
     const n1 = result.current.ctx.state.document!.nodes.find(n => n.id === 'n1')!
@@ -139,12 +145,12 @@ describe('useNodeDrag', () => {
       result.current.drag.onDragStart(fakeMouseDown(0, 0))
     })
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 20, clientY: 20 }))
-      window.dispatchEvent(new MouseEvent('mouseup'))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 20, clientY: 20 }))
+      window.dispatchEvent(pointerEvt('pointerup'))
     })
     // A further move after mouseup should not move the node any more.
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 500, clientY: 500 }))
+      window.dispatchEvent(pointerEvt('pointermove', { clientX: 500, clientY: 500 }))
     })
 
     const node = result.current.ctx.state.document!.nodes.find(n => n.id === 'n1')!

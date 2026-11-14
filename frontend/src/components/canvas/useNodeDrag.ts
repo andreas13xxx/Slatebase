@@ -16,17 +16,17 @@ interface DragState {
 }
 
 /**
- * Returns mouse event handlers for dragging a node.
- * Call onDragStart on mouseDown, and the hook handles move/up globally.
+ * Returns pointer event handlers (mouse, pen, touch) for dragging a node.
+ * Call onDragStart on pointerDown, and the hook handles move/up globally.
  */
 export function useNodeDrag(nodeId: string, readOnly: boolean) {
   const { state, dispatch } = useCanvasContext()
   const dragRef = useRef<DragState | null>(null)
   const hasDraggedRef = useRef(false)
 
-  const onDragStart = useCallback((e: React.MouseEvent) => {
+  const onDragStart = useCallback((e: React.PointerEvent) => {
     if (readOnly || e.button !== 0) return
-    e.stopPropagation()
+    // No stopPropagation: the canvas still needs this pointerdown for its touch long-press.
     e.preventDefault()
 
     const node = state.document?.nodes.find((n) => n.id === nodeId)
@@ -51,9 +51,11 @@ export function useNodeDrag(nodeId: string, readOnly: boolean) {
       otherStarts,
     }
     hasDraggedRef.current = false
+    const pointerId = e.pointerId
 
-    const handleMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return
+    const handleMove = (ev: PointerEvent) => {
+      // Only the finger/pointer that started the drag moves the node (a second finger is ignored).
+      if (!dragRef.current || ev.pointerId !== pointerId) return
       const dx = (ev.clientX - dragRef.current.startX) / state.viewport.zoom
       const dy = (ev.clientY - dragRef.current.startY) / state.viewport.zoom
 
@@ -82,14 +84,17 @@ export function useNodeDrag(nodeId: string, readOnly: boolean) {
       }
     }
 
-    const handleUp = () => {
+    const handleUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return
       dragRef.current = null
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
     }
 
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
   }, [nodeId, readOnly, state.document, state.selectedNodeIds, state.viewport.zoom, dispatch])
 
   return { onDragStart, hasDraggedRef }
