@@ -19,11 +19,11 @@ function renderCanvas() {
   return { ...utils, root, layer }
 }
 
-/** Reads `scale(z) translate(xpx, ypx)` from the transform layer. */
+/** Reads `scale(z) translate(xpx, ypx)` from the transform layer (some CSSOMs drop a zero y). */
 function viewportOf(layer: HTMLElement): { zoom: number; x: number; y: number } {
-  const m = /scale\(([-\d.e]+)\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/.exec(layer.style.transform)
+  const m = /scale\(([-\d.e]+)\) translate\(([-\d.e]+)px(?:, ([-\d.e]+)px)?\)/.exec(layer.style.transform)
   if (!m) throw new Error(`unexpected transform: ${layer.style.transform}`)
-  return { zoom: Number(m[1]), x: Number(m[2]), y: Number(m[3]) }
+  return { zoom: Number(m[1]), x: Number(m[2]), y: Number(m[3] ?? 0) }
 }
 
 const touch = (id: number, x: number, y: number) => ({ pointerType: 'touch', pointerId: id, isPrimary: id === 1, clientX: x, clientY: y })
