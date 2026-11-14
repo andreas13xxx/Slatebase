@@ -20,7 +20,7 @@ Specs gebündelt statt einzeln spezifiziert.
 |------|---------|-------|---------|------------|
 | 1 | Obsidian Themes | B | ✅ ausgeliefert | Specs `obsidian-themes*`, `obsidian-builtin-theme`, `obsidian-style-settings` |
 | 2 | Public Sharing | C | ✅ ausgeliefert | Spec `public-share-links` (Toggle `public-shares`) |
-| 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks); **Kern offen** (25/25 Tasks offen, nur PWA-Manifest, Touch-Kontextmenüs und iPad-Teilspec vorhanden) |
+| 3 | Responsive/Mobile | F/G | ~24–34h | Vollständig (Req + Design + Tasks); **Umgesetzt, Geräteprüfung offen** (Phasen 1–6 gebaut, Abschluss in `responsive-mobile/status.md`; Task 24 nicht erledigt; Folgespec `responsive-mobile-content/` für Tabellen, Einstellungen, Chat, Graph, Bases) |
 | 4 | Echte E2E-Test-Suite | F | ~30–45h | Req + Design vollständig |
 | 5 | Server-Side Plugins | B | ~48–68h | Tasks vorhanden |
 | 6 | Fremdformat-Importer | I | ~20–30h | Keine Spec |
@@ -82,6 +82,8 @@ Scope: ~4h Design + ~20–30h Implementierung. **Spec:** `.kiro/specs/responsive
 - Breakpoints: Mobile (<768px), Tablet (768–1024px), Desktop (>1024px)
 - Sidebar als Overlay/Drawer, Touch-Interaktionen, Canvas Pinch-to-Zoom
 - Optional: PWA-Manifest (nur Installation, kein Offline-Anspruch)
+
+**Stand 2026-11-14:** Phasen 1–6 sind umgesetzt (Drawer, Canvas-Touch, 44-px-Handles, Manifest samt maskierbarem Icon, Service Worker nur für eine Offline-Seite) und die Folgespec `responsive-mobile-content/` (Tabellen als Scroll oder Karten, Einstellungen und Chat als Master-Detail, Graph, Bases). **Nichts davon wurde auf einem Gerät oder in einer Geräteemulation angesehen** (Task 24). Auflistung der PRs und Grenzen: `.kiro/specs/responsive-mobile/status.md` und `known-limitations.md`.
 
 **Sequenzierung:** Split-Panes (Workspaces, Track G) sind bereits ausgeliefert. Das macht
 Responsive/Mobile anspruchsvoller, weil ein bestehendes Split-Pane-Layout responsive zu machen
@@ -213,7 +215,7 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 
 | Lücke | Stand |
 |-------|-------|
-| Responsive/Mobile (Prio 3) | Größtes sichtbares Loch; kein `useMediaQuery`, 28 Media-Queries |
+| ~~Responsive/Mobile (Prio 3)~~ | **Gebaut, nicht auf Geräten geprüft** (`useBreakpoint`, Drawer, Touch-Canvas, Tabellen/Einstellungen/Chat/Graph/Bases schmal, PWA mit Offline-Seite). Offen: Task 24, Details in `responsive-mobile/known-limitations.md` |
 | ~~Deep-Links / URL-Schema~~ | **Umgesetzt** (Spec `.kiro/specs/deep-links/`, PR #369): `/open?vault=…&file=…[#Anker]`, `workspace:copy-url`, Tab-Menü, Öffnen inkl. Login und Anker-Sprung. „Link kopieren“ auch im Tab- und Explorer-Kontextmenü. Offen: manueller Browser-Test |
 | Graph-Zeitraffer (`graph:animate`) | Braucht Erstellungsdatum je Knoten + Abspiel-UI |
 | Slides / Präsentationsmodus | Nische (`obsidian-feature-gaps` O2) |
