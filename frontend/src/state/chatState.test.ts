@@ -188,4 +188,29 @@ describe('chatReducer', () => {
       expect(result).toEqual(initialChatState)
     })
   })
+
+  describe('CONVERSATION_DESELECTED', () => {
+    it('leaves the open conversation but keeps the list and unread counts', () => {
+      const conv = { id: 'c1', unreadCount: 2 } as unknown as ConversationListItem
+      const state: ChatState = {
+        ...initialChatState,
+        conversations: [conv],
+        globalUnreadCount: 2,
+        currentConversation: 'c1',
+        messages: [{ id: 'm1' } as unknown as Message],
+        totalMessages: 1,
+        currentPage: 3,
+        hasMoreMessages: true,
+      }
+      const result = chatReducer(state, { type: 'CONVERSATION_DESELECTED' })
+
+      expect(result.currentConversation).toBeNull()
+      expect(result.messages).toEqual([])
+      expect(result.totalMessages).toBe(0)
+      expect(result.currentPage).toBe(1)
+      expect(result.hasMoreMessages).toBe(false)
+      expect(result.conversations).toEqual([conv])
+      expect(result.globalUnreadCount).toBe(2)
+    })
+  })
 })

@@ -167,6 +167,7 @@ export const en: TranslationShape = {
     newConversation: 'New Conversation',
     noConversations: 'No conversations yet',
     noMessages: 'No messages yet',
+    backToList: 'Back to the conversation list',
     sendPlaceholder: 'Write a message…',
     send: 'Send',
     participants: 'Participants',

@@ -101,6 +101,8 @@ export type ChatAction =
   | { type: 'CONVERSATION_CREATED'; payload: ConversationListItem }
   | { type: 'CHAT_ERROR_OCCURRED'; payload: string }
   | { type: 'CHAT_CLEARED' }
+  /** Leaves the open conversation (narrow layout: back to the list); the list itself is kept. */
+  | { type: 'CONVERSATION_DESELECTED' }
   | { type: 'CONVERSATION_LEFT'; payload: { conversationId: string; unreadCount: number } }
   | { type: 'GLOBAL_UNREAD_UPDATED'; payload: number }
   | { type: 'CONVERSATION_UNREAD_RESET'; payload: string }
@@ -194,6 +196,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
     case 'CHAT_CLEARED':
       return initialChatState
+
+    case 'CONVERSATION_DESELECTED':
+      return { ...state, currentConversation: null, messages: [], totalMessages: 0, currentPage: 1, hasMoreMessages: false }
 
     case 'CONVERSATION_LEFT': {
       const { conversationId, unreadCount } = action.payload

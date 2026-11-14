@@ -202,3 +202,20 @@
   background: var(--bg-surface);
   color: var(--text-primary);
 }
+
+/* Narrow screens: the panel never wider than the graph area; finger-sized toggle on touch. */
+.graph-settings-panel {
+  max-width: calc(100% - 16px);
+}
+
+@media (pointer: coarse) {
+  .graph-settings-toggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .graph-settings-panel {
+    top: 60px;
+    max-height: calc(100% - 72px);
+  }
+}
