@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>Slatebase – offline</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; align-items: center; justify-content: center; padding: 24px;
+        font-family: system-ui, sans-serif; background: #f6f8f8; color: #1f2933; text-align: center;
+      }
+      @media (prefers-color-scheme: dark) { body { background: #10181a; color: #e6eded; } }
+      main { max-width: 28rem; }
+      h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
+      p { margin: .25rem 0; line-height: 1.5; }
+      button {
+        margin-top: 1.25rem; padding: .7rem 1.4rem; font: inherit; color: #fff; background: #0f766e;
+        border: 0; border-radius: 8px; cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Keine Verbindung / No connection</h1>
+      <p>Slatebase kann den Server gerade nicht erreichen. Deine Notizen liegen dort, nicht auf diesem Gerät.</p>
+      <p>Slatebase cannot reach the server. Your notes live there, not on this device.</p>
+      <button type="button" onclick="location.reload()">Erneut versuchen / Retry</button>
+    </main>
+  </body>
+</html>
