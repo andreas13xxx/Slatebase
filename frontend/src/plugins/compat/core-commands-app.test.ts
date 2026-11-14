@@ -145,6 +145,7 @@ describe('registerCoreAppCommands', () => {
       onOpenTemplateSelector: vi.fn(),
       onOpenReleaseNotes: vi.fn(),
       onOpenDebugInfo: vi.fn(),
+      onStartSlides: vi.fn(),
       onNavigateBack: vi.fn(),
       onNavigateForward: vi.fn(),
       onOpenQuickSwitcher: vi.fn(),
@@ -428,6 +429,11 @@ describe('registerCoreAppCommands', () => {
 
     registry.executeCommand('daily-notes:goto-prev')
     expect(handlers.onDailyNoteOffset).toHaveBeenCalledWith(-1)
+  })
+
+  it('slides:start delegates to onStartSlides', () => {
+    registry.executeCommand('slides:start')
+    expect(handlers.onStartSlides).toHaveBeenCalled()
   })
 
   it('app:show-release-notes and app:show-debug-info delegate to their open handlers', () => {

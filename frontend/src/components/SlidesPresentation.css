@@ -1,0 +1,71 @@
+.slides-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.slides-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 48px 64px;
+}
+
+.slides-slide {
+  width: 100%;
+  max-width: 1100px;
+  font-size: 1.5rem;
+}
+
+.slides-empty {
+  color: var(--text-subtle);
+}
+
+.slides-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  padding: 6px;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.slides-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px;
+}
+
+.slides-controls button {
+  display: flex;
+  padding: 6px;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.slides-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.slides-counter {
+  min-width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

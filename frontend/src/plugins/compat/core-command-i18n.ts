@@ -149,6 +149,7 @@ const NAMES: Record<string, { de: string; en: string }> = {
   'app:go-forward': { de: 'Vorwärts navigieren', en: 'Navigate forward' },
   'app:open-sandbox-vault': { de: 'Sandbox-Vault öffnen', en: 'Open sandbox vault' },
   'app:open-help': { de: 'Hilfe öffnen', en: 'Open help' },
+  'slides:start': { de: 'Präsentation starten', en: 'Start presentation' },
   'app:show-debug-info': { de: 'Debug-Informationen anzeigen', en: 'Show debug info' },
   'app:show-release-notes': { de: 'Versionshinweise anzeigen', en: 'Show release notes' },
   'app:toggle-default-new-pane-mode': { de: 'Standardmodus für neue Tabs umschalten', en: 'Toggle default mode for new tabs' },
@@ -253,7 +254,6 @@ export type UnsupportedReason =
   | 'attachments'
   | 'desktop-shell'
   | 'new-tab-defaults'
-  | 'graph-animation'
 
 const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }> = {
   'stacked-tabs': {
@@ -279,10 +279,6 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
   'new-tab-defaults': {
     de: 'neue Tabs öffnen immer im zuletzt genutzten Modus',
     en: 'new tabs always open in the mode you last used',
-  },
-  'graph-animation': {
-    de: 'der Graph hat keine Zeitraffer-Animation',
-    en: 'the graph has no time-lapse animation',
   },
 }
 

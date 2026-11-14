@@ -714,6 +714,14 @@ export const en: TranslationShape = {
     showProperties: 'Show properties',
     reset: 'Reset',
     ariaLabel: 'Graph with {nodeCount} nodes and {edgeCount} edges',
+    timelapse: {
+      start: 'Start time-lapse',
+      play: 'Play',
+      pause: 'Pause',
+      close: 'Close time-lapse',
+      position: 'Position',
+      error: 'No creation dates found.',
+    },
     localGraph: {
       tabPrefix: 'Local graph:',
       hopsLabel: 'Neighborhood',
@@ -1073,6 +1081,14 @@ export const en: TranslationShape = {
     loading: 'Loading release notes …',
     error: 'Could not load release notes.',
     empty: 'No release notes available.',
+  },
+
+  slides: {
+    title: 'Presentation',
+    close: 'Close presentation',
+    previous: 'Previous slide',
+    next: 'Next slide',
+    empty: 'No slides. Separate slides with --- on its own line.',
   },
 
   debugInfo: {
