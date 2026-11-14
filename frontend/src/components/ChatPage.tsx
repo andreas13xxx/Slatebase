@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import { ChatProvider, useChatContext } from '../state/chatContext'
 import { useAppContext } from '../state'
 import { useRealtimeContext } from '../state/realtimeContext'
@@ -121,13 +122,23 @@ function ChatPageContent() {
   const isArchived = currentConv?.archived === true
 
   return (
-    <div className="chat-page">
+    <div className={`chat-page${state.currentConversation ? ' chat-page--detail' : ''}`}>
       <div className="chat-sidebar">
         <ConversationList onlineUserIds={onlineUserIds} />
       </div>
       <div className="chat-main">
         {state.currentConversation ? (
           <>
+            {/* Narrow layout only (CSS hides it above 768px): list and conversation alternate. */}
+            <button
+              type="button"
+              className="chat-back-btn"
+              onClick={() => dispatch({ type: 'CONVERSATION_DESELECTED' })}
+              aria-label={t('chat.backToList')}
+            >
+              <ChevronLeft size={18} aria-hidden="true" />
+              {t('chat.title')}
+            </button>
             <MessageView />
             {isArchived ? (
               <div className="chat-archived-notice">
