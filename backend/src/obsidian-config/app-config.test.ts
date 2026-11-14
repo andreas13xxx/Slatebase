@@ -87,4 +87,12 @@ describe('appConfigRequestSchema', () => {
     expect(appConfigRequestSchema.safeParse({ newLinkFormat: 'whatever' }).success).toBe(false)
     expect(appConfigRequestSchema.safeParse({ attachmentFolderPath: 'x'.repeat(1025) }).success).toBe(false)
   })
+
+  it('accepts the editing keys and bounds the tab size', () => {
+    expect(appConfigRequestSchema.safeParse({ useTab: false, tabSize: 4, autoPairBrackets: true, autoPairMarkdown: null }).success).toBe(true)
+    expect(appConfigRequestSchema.safeParse({ tabSize: 0 }).success).toBe(false)
+    expect(appConfigRequestSchema.safeParse({ tabSize: 17 }).success).toBe(false)
+    expect(appConfigRequestSchema.safeParse({ tabSize: 2.5 }).success).toBe(false)
+    expect(appConfigRequestSchema.safeParse({ useTab: 'no' }).success).toBe(false)
+  })
 })

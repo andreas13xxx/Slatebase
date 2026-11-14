@@ -35,6 +35,10 @@ export interface AppConfigValues {
   foldIndent: boolean
   spellcheck: boolean
   showLineNumber: boolean
+  useTab: boolean
+  tabSize: number
+  autoPairBrackets: boolean
+  autoPairMarkdown: boolean
 }
 
 export type AppConfigKey = keyof AppConfigValues
@@ -60,6 +64,11 @@ export const DEFAULT_APP_CONFIG: AppConfigValues = {
   foldIndent: true,
   spellcheck: true,
   showLineNumber: false,
+  // Typing behavior: Slatebase's earlier editor (spaces, no auto-pairing), with Obsidian's tab width.
+  useTab: false,
+  tabSize: 4,
+  autoPairBrackets: false,
+  autoPairMarkdown: false,
 }
 
 const KNOWN_KEYS = Object.keys(DEFAULT_APP_CONFIG) as AppConfigKey[]

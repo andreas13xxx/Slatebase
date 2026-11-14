@@ -27,6 +27,7 @@ import { search, selectNextOccurrence } from '@codemirror/search'
 import { undo as cmUndo, redo as cmRedo, defaultKeymap, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { highlightColorCompletions } from './live-preview/highlight-color-complete'
+import { editingBehaviorExtension, DEFAULT_EDITING_BEHAVIOR, type EditingBehavior } from './editing-behavior'
 import type { IEditorHandle, EditorFormattingAction } from './types'
 import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
@@ -101,8 +102,8 @@ export interface CodeMirrorEditorProps {
   spellcheckLanguage?: SpellcheckLanguage
   /** Whether Vim mode is enabled. */
   vimMode?: boolean
-  /** Whether bracket auto-close is enabled. */
-  bracketAutoClose?: boolean
+  /** Tab/indent and auto-pair behavior (the vault's `app.json`). Defaults to {@link DEFAULT_EDITING_BEHAVIOR}. */
+  editingBehavior?: EditingBehavior
   /** Plugin extensions to apply (from registerEditorExtension). */
   pluginExtensions?: Extension[]
   /** Plugin autocomplete providers (from registerEditorSuggest). */
@@ -131,7 +132,7 @@ export function CodeMirrorEditor({
   spellcheck = true,
   spellcheckLanguage = DEFAULT_SPELLCHECK_LANGUAGE,
   vimMode: _vimMode,
-  bracketAutoClose: _bracketAutoClose,
+  editingBehavior = DEFAULT_EDITING_BEHAVIOR,
   pluginExtensions: _pluginExtensions,
   pluginCompletions: _pluginCompletions,
   editorRef,
@@ -167,6 +168,7 @@ export function CodeMirrorEditor({
   const lineNumbersCompartment = useRef(new Compartment())
   const livePreviewCompartment = useRef(new Compartment())
   const spellcheckCompartment = useRef(new Compartment())
+  const editingCompartment = useRef(new Compartment())
 
   // Keep onContentChange ref up to date without recreating extensions
   useEffect(() => {
@@ -407,6 +409,8 @@ export function CodeMirrorEditor({
       spellcheckCompartment.current.of(
         spellcheck ? spellcheckExtension() : []
       ),
+      // Before the core keymap below, so the bracket pairing sees Backspace first.
+      editingCompartment.current.of(editingBehaviorExtension(editingBehavior)),
       createLivePreviewCompartmentExtension(
         livePreviewCompartment.current,
         buildLivePreviewOptionsWithMenu(),
@@ -433,7 +437,7 @@ export function CodeMirrorEditor({
     extensions.push(autocompletion({ override: [highlightColorCompletions, ...pluginCompletionSources] }))
 
     return extensions
-  }, [readOnly, showLineNumbers, spellcheck, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
+  }, [readOnly, showLineNumbers, spellcheck, editingBehavior, livePreview, livePreviewOptions, content, buildLivePreviewOptionsWithMenu])
 
   /**
    * Save the current editor state to the store.
@@ -639,6 +643,15 @@ export function CodeMirrorEditor({
       ),
     })
   }, [showLineNumbers])
+
+  // Swap tab/indent and auto-pair behavior when the vault's app.json changes.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: editingCompartment.current.reconfigure(editingBehaviorExtension(editingBehavior)),
+    })
+  }, [editingBehavior])
 
   // Add/remove the spellcheck extension on prop change.
   //

@@ -28,6 +28,10 @@ export const appConfigRequestSchema = z.object({
   foldIndent: z.boolean().nullable(),
   spellcheck: z.boolean().nullable(),
   showLineNumber: z.boolean().nullable(),
+  useTab: z.boolean().nullable(),
+  tabSize: z.number().int().min(1).max(16).nullable(),
+  autoPairBrackets: z.boolean().nullable(),
+  autoPairMarkdown: z.boolean().nullable(),
 }).partial().strict()
 
 export type AppConfigRequest = z.infer<typeof appConfigRequestSchema>

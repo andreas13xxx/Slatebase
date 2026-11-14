@@ -92,6 +92,30 @@ describe('EditorFilesSection', () => {
     expect(client.state.file).toEqual({ vimMode: true, showLineNumber: true })
   })
 
+  it('shows the typing and link values of an Obsidian file', async () => {
+    await renderSection(createClient({ useTab: false, autoPairBrackets: false, autoPairMarkdown: true, tabSize: 6, alwaysUpdateLinks: false }))
+
+    expect(screen.getByLabelText('Mit Tabulatoren einrücken')).not.toBeChecked()
+    expect(screen.getByLabelText('Tab-Breite')).toHaveValue('6')
+    expect(screen.getByLabelText('Klammern automatisch schließen')).not.toBeChecked()
+    expect(screen.getByLabelText('Markdown-Zeichen automatisch schließen')).toBeChecked()
+    expect(screen.getByLabelText('Links beim Umbenennen und Verschieben aktualisieren')).not.toBeChecked()
+  })
+
+  it('saves the typing and link settings at once', async () => {
+    const client = createClient()
+    await renderSection(client)
+
+    fireEvent.click(screen.getByLabelText('Mit Tabulatoren einrücken'))
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { useTab: true }))
+    fireEvent.change(screen.getByLabelText('Tab-Breite'), { target: { value: '2' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { tabSize: 2 }))
+    fireEvent.click(screen.getByLabelText('Klammern automatisch schließen'))
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { autoPairBrackets: true }))
+    fireEvent.click(screen.getByLabelText('Links beim Umbenennen und Verschieben aktualisieren'))
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { alwaysUpdateLinks: false }))
+  })
+
   it('saves the attachment location only after pressing Speichern', async () => {
     const client = createClient()
     await renderSection(client)

@@ -61,9 +61,17 @@ export class LinkMigrationService implements ILinkMigrationService {
     private readonly searchService: ISearchService,
     private readonly getLinkIndex: (vaultId: string) => ILinkIndex | undefined,
     private readonly logger: ILogger,
+    /**
+     * Whether the vault wants its links updated after a rename/move (Obsidian's `alwaysUpdateLinks`
+     * in `app.json`). Absent = always. A failed lookup must not skip the update: unknown is "yes".
+     */
+    private readonly isMigrationEnabled?: (vaultId: string) => Promise<boolean>,
   ) {}
 
   async migrateLinks(vaultId: string, oldPath: string, newPath: string, oldTree: DirectoryTree): Promise<LinkMigrationResult> {
+    if (this.isMigrationEnabled && !(await this.isMigrationEnabled(vaultId))) {
+      return { migratedFiles: [], failedFiles: [] }
+    }
     const linkIndex = this.getLinkIndex(vaultId)
     const candidatePaths = await this.gatherCandidates(vaultId, oldPath, linkIndex)
     candidatePaths.delete(oldPath)

@@ -159,7 +159,7 @@ src/
 │   ├── index.ts              — Barrel export for property-type module
 │   ├── types.ts              — IPropertyTypeService, PropertyType, PropertyTypeEntry, PropertyTypeRegistry, RESERVED_PROPERTY_KEYS
 │   ├── validation.ts         — Zod schemas (propertyTypeSchema, propertyTypeEntrySchema, propertyTypeRegistrySchema)
-│   ├── property-type-store.ts — PropertyTypeStore (KeyedJsonFileStore in .slatebase/property-types.json, max 200 entries, reserved key enforcement for tags/aliases)
+│   ├── property-type-store.ts — PropertyTypeStore (types in the vault's `.obsidian/types.json` via `shared/obsidian-config-file.ts`, `list` ↔ `multitext`, unknown Obsidian types preserved; Slatebase-only `options` in `.slatebase/property-types.json` via KeyedJsonFileStore; max 200 entries, reserved key enforcement for tags/aliases; `migratePropertyTypesToObsidianFile` moves the old registry types once at startup)
 │   └── property-type-store.test.ts — Unit tests for PropertyTypeStore
 ├── plugin/                   — Installed-plugin management (per vault). Not to be confused with `plugin-store/` (the marketplace).
 │   ├── index.ts              — Barrel export for plugin module
@@ -960,7 +960,7 @@ data/plugins/
 data/vaults/<vaultId>/
 ├── .slatebase/
 │   ├── config.json           — Per-vault configuration (templatesDirectory, dailyNotesDirectory, dailyNoteTemplateName, attachmentsDirectory)
-│   ├── property-types.json   — Per-vault property type registry (PropertyTypeEntry[], max 200 — declared types for frontmatter keys)
+│   ├── property-types.json   — Per-vault Slatebase-only property options (allowed values, date format); the types themselves are in `<vault>/.obsidian/types.json`
 │   ├── link-index.json       — Persistent link index (v2: forwardLinks, tags, properties)
 │   ├── trash/
 │   │   ├── _index.json       — Trash index (entries with id, originalPath, deletedAt, isDirectory)

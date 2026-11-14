@@ -181,6 +181,29 @@ describe('LinkMigrationService', () => {
     expect(linkIndex.updateFile).toHaveBeenCalledWith('other/Referrer.md', 'See [[Renamed]].')
   })
 
+  it('does nothing when the vault turned off automatic link updates', async () => {
+    const files = { 'other/Referrer.md': 'See [[Hello]].' }
+    const vaultService = createMockVaultService(files)
+    const linkIndex = createMockLinkIndex(['other/Referrer.md'])
+    const service = new LinkMigrationService(vaultService, createMockSearchService({}), () => linkIndex, createMockLogger(), async () => false)
+
+    const result = await service.migrateLinks('vault-1', 'Hello.md', 'Renamed.md', tree)
+
+    expect(result).toEqual({ migratedFiles: [], failedFiles: [] })
+    expect(files['other/Referrer.md']).toBe('See [[Hello]].')
+  })
+
+  it('still rewrites when the vault keeps automatic link updates on', async () => {
+    const files = { 'other/Referrer.md': 'See [[Hello]].' }
+    const vaultService = createMockVaultService(files)
+    const linkIndex = createMockLinkIndex(['other/Referrer.md'])
+    const service = new LinkMigrationService(vaultService, createMockSearchService({}), () => linkIndex, createMockLogger(), async () => true)
+
+    const result = await service.migrateLinks('vault-1', 'Hello.md', 'Renamed.md', tree)
+
+    expect(result.migratedFiles).toHaveLength(1)
+  })
+
   it('rewrites a file found only via the filename search fallback (bare-name link the index misses)', async () => {
     const files = { 'Search-only.md': 'Mentions [[Hello]] too.' }
     const vaultService = createMockVaultService(files)

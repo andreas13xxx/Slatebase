@@ -257,16 +257,40 @@ describe('Property Type Routes', () => {
       expect(res.status).toBe(404)
     })
 
-    it('returns 400 for invalid key format in URL', async () => {
+    it('returns 400 for a key with leading whitespace in URL', async () => {
       const app = createTestApp()
 
-      const res = await app.request('/api/v1/vaults/vault-1/property-types/invalid key!', {
+      const res = await app.request('/api/v1/vaults/vault-1/property-types/%20padded', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'text' }),
       })
 
       expect(res.status).toBe(400)
+    })
+
+    it('returns 400 for a prototype key in URL', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/api/v1/vaults/vault-1/property-types/__proto__', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'text' }),
+      })
+
+      expect(res.status).toBe(400)
+    })
+
+    it('accepts keys with spaces and umlauts like Obsidian does', async () => {
+      const app = createTestApp()
+
+      const res = await app.request('/api/v1/vaults/vault-1/property-types/zuletzt%20Kontakt%20%C3%BC', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'date' }),
+      })
+
+      expect(res.status).toBe(200)
     })
   })
 })

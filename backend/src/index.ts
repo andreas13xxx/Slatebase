@@ -88,7 +88,7 @@ import { PreferencesStore } from './preferences/index.js'
 import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
-import { PropertyTypeStore } from './property-type/index.js'
+import { PropertyTypeStore, migratePropertyTypesToObsidianFile } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { SpellcheckDictionaryStore } from './spellcheck-dictionary/index.js'
 import { createSpellcheckDictionaryRoutes } from './api/spellcheckDictionaryRoutes.js'
@@ -473,7 +473,16 @@ const searchService = new SearchService(vaultService, vaultAccessControl, logger
 const replaceService = new ReplaceService(vaultService, logger)
 
 // 4g2. Link Migration Module (getLinkIndex is a hoisted function declaration, defined below)
-const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger)
+const linkMigrationService = new LinkMigrationService(vaultService, searchService, getLinkIndex, logger, async (vaultId) => {
+  // Obsidian's "Automatically update internal links" (app.json `alwaysUpdateLinks`, on unless set to false).
+  const storagePath = vaultRegistry.findById(vaultId)?.storagePath
+  if (!storagePath) return true
+  try {
+    return (await appConfigService.get(storagePath))['alwaysUpdateLinks'] !== false
+  } catch {
+    return true
+  }
+})
 
 // 4h. Realtime Services (SSE)
 const sseConfig = config.getSseConfig()
@@ -1150,6 +1159,8 @@ await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snip
 await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
 // Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
 // Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
+// Property types used to live in .slatebase/property-types.json; Obsidian's .obsidian/types.json owns them now.
+await migratePropertyTypesToObsidianFile({ vaultRegistry, store: propertyTypeStore, logger })
 await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
 // Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.
 await migrateUserVaultSettingsToAppConfig({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })

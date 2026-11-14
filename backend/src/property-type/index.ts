@@ -2,7 +2,12 @@
  * Property-type module barrel export.
  */
 
-export { PropertyTypeStore, PropertyTypeReservedKeyError, PropertyTypeMaxEntriesError } from './property-type-store.js'
+export {
+  PropertyTypeStore,
+  PropertyTypeReservedKeyError,
+  PropertyTypeMaxEntriesError,
+  migratePropertyTypesToObsidianFile,
+} from './property-type-store.js'
 export type { VaultPathResolver } from './property-type-store.js'
 export { DEFAULT_PROPERTY_TYPE_REGISTRY, RESERVED_PROPERTY_KEYS } from './types.js'
 export type {

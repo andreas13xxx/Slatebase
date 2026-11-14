@@ -33,7 +33,10 @@ export const propertyTypeEntrySchema = z.object({
     .string()
     .min(1, 'Property key must be at least 1 character')
     .max(100, 'Property key must be at most 100 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Property key must contain only letters, digits, hyphens, and underscores'),
+    // Obsidian allows any name here (spaces, umlauts, ...), so a vault's types.json can hold them.
+    .regex(/^[^\u0000-\u001f\u007f]+$/, 'Property key must not contain control characters')
+    .refine((key) => key.trim() === key, 'Property key must not start or end with whitespace')
+    .refine((key) => !['__proto__', 'constructor', 'prototype'].includes(key), 'Property key is reserved'),
   type: propertyTypeSchema,
   options: propertyTypeOptionsSchema,
 })

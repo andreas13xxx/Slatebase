@@ -3,6 +3,7 @@ import { useTranslation } from '../i18n'
 import { useLineNumbers } from '../hooks/useLineNumbers'
 import { useReadableLineLength } from '../hooks/useReadableLineLength'
 import { useSpellcheck } from '../hooks/useSpellcheck'
+import { useEditingBehavior } from '../hooks/useEditingBehavior'
 import { isSpellcheckLanguage } from '../editor/spellcheck'
 import { DropZone } from './DropZone'
 import { showToast } from './ToastNotification'
@@ -72,6 +73,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
     language: spellcheckLanguage,
     setLanguage: setSpellcheckLanguage,
   } = useSpellcheck()
+  const editingBehavior = useEditingBehavior()
 
   // Compute the effective tabId — the prop when given, else the file path.
   // Declared up here because the auto-save flush effect keys on it.
@@ -376,6 +378,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
             readableLineLength={readableLineLengthEnabled}
             spellcheck={spellcheckEnabled}
             spellcheckLanguage={spellcheckLanguage}
+            editingBehavior={editingBehavior}
             editorRef={editorRef}
             onImagePaste={onImagePaste}
           />

@@ -18,8 +18,11 @@ import {
   type AppConfigKey,
   type AppConfigValues,
 } from '../../state/vaultAppConfigStore'
+import { normalizeTabSize } from '../../editor/editing-behavior'
 import { SettingSection, SettingRow, Button } from './ui'
 import { buildAttachmentPath, parseAttachmentPath, type AttachmentMode } from './attachmentPath'
+
+const TAB_SIZES = [1, 2, 3, 4, 6, 8]
 
 const MODE_LABELS: Record<AttachmentMode, string> = {
   note: 'Im Ordner der Notiz',
@@ -106,6 +109,11 @@ export function EditorFilesSection() {
   const readable = useAppConfigValue('readableLineLength')
   const lineNumbers = useAppConfigValue('showLineNumber')
   const spellcheck = useAppConfigValue('spellcheck')
+  const useTab = useAppConfigValue('useTab')
+  const tabSize = useAppConfigValue('tabSize')
+  const autoPairBrackets = useAppConfigValue('autoPairBrackets')
+  const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
+  const alwaysUpdateLinks = useAppConfigValue('alwaysUpdateLinks')
 
   if (!vaultId) {
     return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
@@ -164,6 +172,65 @@ export function EditorFilesSection() {
             checked={spellcheck}
             disabled={disabled}
             onChange={(e) => void save({ spellcheck: e.target.checked })}
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection title="Eingabe" description="Wie sich die Tab-Taste und das Tippen von Klammern und Markdown-Zeichen verhalten.">
+        <SettingRow label="Mit Tabulatoren einrücken" htmlFor="editor-use-tab" hint="Aus: Die Tab-Taste fügt Leerzeichen ein.">
+          <input
+            id="editor-use-tab"
+            type="checkbox"
+            checked={useTab}
+            disabled={disabled}
+            onChange={(e) => void save({ useTab: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label="Tab-Breite" htmlFor="editor-tab-size" hint="Anzahl der Leerzeichen pro Einrückung, bei Tabulatoren die angezeigte Breite.">
+          <select
+            id="editor-tab-size"
+            className="settings-field-input"
+            value={normalizeTabSize(tabSize)}
+            disabled={disabled}
+            onChange={(e) => void save({ tabSize: Number(e.target.value) })}
+          >
+            {[...new Set([...TAB_SIZES, normalizeTabSize(tabSize)])].sort((a, b) => a - b).map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </SettingRow>
+        <SettingRow label="Klammern automatisch schließen" htmlFor="editor-auto-pair-brackets" hint="Tippst du ( [ { oder &quot;, kommt das Gegenstück dazu.">
+          <input
+            id="editor-auto-pair-brackets"
+            type="checkbox"
+            checked={autoPairBrackets}
+            disabled={disabled}
+            onChange={(e) => void save({ autoPairBrackets: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label="Markdown-Zeichen automatisch schließen" htmlFor="editor-auto-pair-markdown" hint="Tippst du * _ ` oder ~, kommt das Gegenstück dazu.">
+          <input
+            id="editor-auto-pair-markdown"
+            type="checkbox"
+            checked={autoPairMarkdown}
+            disabled={disabled}
+            onChange={(e) => void save({ autoPairMarkdown: e.target.checked })}
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection title="Links">
+        <SettingRow
+          label="Links beim Umbenennen und Verschieben aktualisieren"
+          htmlFor="editor-always-update-links"
+          hint="Aus: Wikilinks auf eine umbenannte oder verschobene Datei bleiben unverändert und zeigen dann ins Leere."
+        >
+          <input
+            id="editor-always-update-links"
+            type="checkbox"
+            checked={alwaysUpdateLinks}
+            disabled={disabled}
+            onChange={(e) => void save({ alwaysUpdateLinks: e.target.checked })}
           />
         </SettingRow>
       </SettingSection>
