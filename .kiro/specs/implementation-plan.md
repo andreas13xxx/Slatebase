@@ -32,7 +32,7 @@ Specs gebündelt statt einzeln spezifiziert.
 
 > **Zurückgestellte Reste ausgelieferter Features** (nicht in der Summe oben, siehe eigenen
 > Abschnitt unten): Split-Panes — gespeicherte, benannte Workspace-Layouts + Workspace-Switcher;
-> Bases — nur noch kleine Reste (Tabellen-Zeilenhöhe und Listen-Optionen, deren YAML-Schlüssel nicht belegt sind; Objekt-Typ ist erledigt); Lambdas, Regexp, custom `summaries`, `file.embeds`, Cards-Optionen, `groupOrder` und Einbettung mit eigenem Ansichtstyp + Live-Update sind in `bases-obsidian-parity` umgesetzt.
+> Bases — nur noch kleine Reste (`map` beim Einbetten; Tabellen-Zeilenhöhe und Listen-Optionen sind seit 2026-11-14 umgesetzt, Objekt-Typ ebenfalls); Lambdas, Regexp, custom `summaries`, `file.embeds`, Cards-Optionen, `groupOrder` und Einbettung mit eigenem Ansichtstyp + Live-Update sind in `bases-obsidian-parity` umgesetzt.
 
 ## Abhängigkeiten
 
@@ -198,7 +198,7 @@ Kappung) + sichtbarem `truncated`-Hinweis; Property-Typ Liste/Skalar (beobachtet
 Guides + Beispiele DE/EN erweitert. Danach: Inline-```` ```base ````-Codeblock in Notizen (Live Preview + Reading View), `bases:insert` fügt ihn ein. Spec `bases-embed-this-and-views`: `![[x.base#Ansicht]]` (benannte Ansicht, unbekannter Name = sichtbarer Fehler) und `this` (einbettende Notiz) in Filtern/Formeln. Bewusst offen: echte `cards`/`list`/`map`-Ansichten in der Einbettung (nur Tabelle), Aktualisierung der Einbettung bei `vault:change`, `this` in Plugin-Ansichten und im MCP-Werkzeug.
 **Umgesetzt (Spec `bases-obsidian-parity`):** Lambdas (`map`/`filter`/`reduce`), Regexp-Literale, ~50 weitere Funktionen/Methoden, custom `summaries`-Formeln über `values`, `file.embeds` (getrennte Embed-Markierung im Link-Index), `groupOrder`, `type: kanban`, Cards-Raster mit `image`/`imageFit`/`imageAspectRatio`/`cardSize`, Einbettung mit echtem Ansichtstyp (außer `map`) und Live-Update bei `vault:change`.
 **Nachgetragen (2026-11-13):** `this` im MCP-Tool `query_base` (optionaler Parameter `thisPath`, Antwort mit `thisPath`/`thisFound`) und CSV-Export der Tabelle (Befehl `bases:export-csv`, RFC 4180, UTF-8 mit BOM, Zellen mit führendem `=`/`+`/`@`/`-` werden gegen Tabellenkalkulations-Formeln entschärft).
-**Noch zurückgestellt:** Tabellen-Zeilenhöhe und Listen-Optionen (YAML-Schlüssel nicht belegt). Der Objekt-Typ (`file.properties`) ist umgesetzt.
+**Umgesetzt (2026-11-14):** Tabellen-Zeilenhöhe und Listen-Optionen, nach zwei in Obsidian erzeugten `.base`-Dateien. Der Objekt-Typ (`file.properties`) ist umgesetzt.
 Plugin-Views laufen nur im Browser (Architekturgrenze, kein Serverpfad).
 
 ---
@@ -223,7 +223,7 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 | Audio Recorder (ohne Transkription) | Aus `editor/dictation/dictation-recorder.ts` ableitbar (O3) |
 | Vim-Modus | Nur gewarnter Stub |
 | ~~`![](url)`-Embed in Live Preview~~ | **Umgesetzt**: `WebEmbedWidget` in `widget-decorations.ts` (gleicher `EmbeddedWebFrame`, gleiches Opt-in `webEmbedEnabled`) |
-| Bases-Reste | Zeilenhöhe, Listen-Optionen (Schlüssel nicht belegt), `map` beim Einbetten. Erledigt: CSV-Export, `this` im MCP-Tool |
+| Bases-Reste | `map` beim Einbetten. Erledigt: Zeilenhöhe, Listen-Optionen, CSV-Export, `this` im MCP-Tool |
 | Server-Side Plugins / Semantische Suche / Collaborative Editing / E2E-Suite | Prio 4–8, 39 Tasks `server-side-plugins` offen |
 
 **Seit dem Abgleich erledigt:** Template-Datumsformate `{{date:FORMAT}}`/`{{time:FORMAT}}`
@@ -232,9 +232,10 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 
 **Bases-Reste, Stand der Prüfung (2026-11-14, gegen `obsidian.md/help/bases/*` gelesen):**
 - *Zeilenhöhe* (Tabelle: short/medium/tall/extra tall) und *Listen-Optionen* (Markierung Aufzählung/Nummern/keine, Eigenschaften einrücken,
-  Trennzeichen): Die Doku nennt die Optionen, aber **keinen YAML-Schlüssel** (weder Tabellen- noch Listen-Seite noch Syntax-Seite). Bleiben
-  zurückgestellt; entscheidend ist eine in echtem Obsidian erzeugte `.base` mit diesen Einstellungen — damit lassen sich die Schlüssel
-  belegen, statt zu raten.
+  Trennzeichen): Die Doku nennt die Optionen, aber keinen YAML-Schlüssel. Belegt durch zwei in Obsidian erzeugte `.base`-Dateien und
+  umgesetzt: `rowHeight` (`medium`/`tall`/`extra`, ohne Schlüssel = kurz), `markers` (`number`/`none`, ohne Schlüssel = Aufzählungszeichen),
+  `indentProperties: true`, `separator` (Text). Nicht belegt: ein Wert für kurz oder Aufzählungszeichen — die schreibt Slatebase nie, es
+  entfernt den Schlüssel.
 - *Objekt-Typ*: Spec `.kiro/specs/bases-object-type/` (nur dokumentierte Teile: `file.properties`, `keys()`/`values()`/`isEmpty()`, Punkt-/Klammerzugriff).
 
 ---

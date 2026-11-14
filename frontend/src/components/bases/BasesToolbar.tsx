@@ -10,14 +10,14 @@
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowUpDown, Rows3, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
+import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
 import { ColumnTypeIcon } from './base-column-icon'
 import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
   addFormula, addView, availableColumns, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
   removeFormula, renameView, rootGroup,
-  setDocFilter, setGroupBy, setOrder, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
+  setDocFilter, setGroupBy, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
 import {
@@ -180,6 +180,73 @@ const SortPanel = memo(function SortPanel({ doc, index, columns, rows, disabled,
     </div>
   )
 })
+
+/** Display options that exist for one view type only: row height (table) and marker/indent/separator (list). */
+const DisplayPanel = memo(function DisplayPanel({ doc, index, disabled, onChange }: PanelProps) {
+  const view = doc.views[index]
+  if (!view) return null
+  if (view.type === 'table') {
+    return (
+      <div className="bases-tb__section">
+        <label className="bases-tb__row">
+          <span>Zeilenhöhe</span>
+          <select
+            className="bases-tb__select"
+            aria-label="Zeilenhöhe"
+            value={view.rowHeight ?? ''}
+            disabled={disabled}
+            onChange={(e) => { const value = e.target.value || undefined; onChange((d) => setRowHeight(d, index, value)) }}
+          >
+            <option value="">Kurz</option>
+            <option value="medium">Mittel</option>
+            <option value="tall">Hoch</option>
+            <option value="extra">Extra hoch</option>
+            {view.rowHeight && !['medium', 'tall', 'extra'].includes(view.rowHeight) && <option value={view.rowHeight}>{view.rowHeight}</option>}
+          </select>
+        </label>
+      </div>
+    )
+  }
+  return (
+    <div className="bases-tb__section">
+      <label className="bases-tb__row">
+        <span>Markierung</span>
+        <select
+          className="bases-tb__select"
+          aria-label="Markierung"
+          value={view.markers ?? ''}
+          disabled={disabled}
+          onChange={(e) => { const value = e.target.value || undefined; onChange((d) => setListMarkers(d, index, value)) }}
+        >
+          <option value="">Aufzählungszeichen</option>
+          <option value="number">Nummern</option>
+          <option value="none">Keine</option>
+          {view.markers && !['number', 'none'].includes(view.markers) && <option value={view.markers}>{view.markers}</option>}
+        </select>
+      </label>
+      <label className="bases-tb__row">
+        <input
+          type="checkbox"
+          checked={view.indentProperties === true}
+          disabled={disabled}
+          onChange={(e) => { const checked = e.target.checked; onChange((d) => setListIndentProperties(d, index, checked)) }}
+        />
+        <span>Eigenschaften einrücken</span>
+      </label>
+      <div className="bases-tb__row">
+        <span>Trennzeichen</span>
+        <CommitInput
+          value={view.separator ?? ''}
+          label="Trennzeichen"
+          placeholder="Standard"
+          disabled={disabled}
+          onCommit={(value) => onChange((d) => setListSeparator(d, index, value))}
+        />
+      </div>
+    </div>
+  )
+})
+
 
 const GroupPanel = memo(function GroupPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const groupBy = doc.views[index]?.groupBy
@@ -539,6 +606,9 @@ export const BasesToolbar = memo(function BasesToolbar({
             <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
             <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
             <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
+            {(view.type === 'table' || view.type === 'list') && (
+              <Popover label={<><SlidersHorizontal aria-hidden="true" className="bases-tb__btn-icon" />Anzeige</>} title="Anzeige"><DisplayPanel {...panelProps} /></Popover>
+            )}
             <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
           </div>
         )}

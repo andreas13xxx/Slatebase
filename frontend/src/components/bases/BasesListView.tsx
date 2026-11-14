@@ -81,6 +81,12 @@ export const BasesListView = memo(function BasesListView({
   const [collapsed, toggleGroup] = useCollapsedGroups()
   const groupPropertyLabel = columnLabel(view.groupBy?.property ?? '')
 
+  // Markers: Obsidian writes `number` or `none`; absent (or anything else) is a bullet.
+  const markerKind = view.markers === 'number' || view.markers === 'none' ? view.markers : 'bullet'
+  const listClass = `bases-list bases-list--${markerKind}`
+  const detailsClass = view.indentProperties ? 'bases-list__details bases-list__details--indent' : 'bases-list__details'
+  const separator = view.separator
+
   const renderItem = (row: BaseRow) => (
           <li key={row.path} className="bases-list__item">
             <button
@@ -90,8 +96,10 @@ export const BasesListView = memo(function BasesListView({
             >
               <span className="bases-list__title">{row.fileName}</span>
               {detailColumns.length > 0 && (
-                <span className="bases-list__details">
-                  {detailColumns.map((col) => {
+                <span className={separator !== undefined ? `${detailsClass} bases-list__details--joined` : detailsClass}>
+                  {separator !== undefined
+                    ? detailColumns.map((col) => cellText(row, col)).filter((t) => t !== '').join(separator)
+                    : detailColumns.map((col) => {
                     const text = cellText(row, col)
                     if (!text) return null
                     return (
@@ -138,12 +146,12 @@ export const BasesListView = memo(function BasesListView({
                 {groupLabel(g.key, groupPropertyLabel)}
                 <span className="bases-list__group-count"> ({g.rows.length})</span>
               </button>
-              {!collapsed[g.key] && <ul className="bases-list">{g.rows.map(renderItem)}</ul>}
+              {!collapsed[g.key] && <ul className={listClass}>{g.rows.map(renderItem)}</ul>}
             </section>
           ))}
         </div>
       ) : (
-        <ul className="bases-list" role="list" aria-label="Listen-Ansicht">
+        <ul className={listClass} role="list" aria-label="Listen-Ansicht">
           {rows.map(renderItem)}
         </ul>
       )}

@@ -89,6 +89,43 @@ export function setGroupBy(doc: BaseDocument, index: number, groupBy: BaseGroupB
   })
 }
 
+/** Row heights Obsidian writes; absent (short) is the default and is never written. */
+export const ROW_HEIGHTS = ['medium', 'tall', 'extra'] as const
+
+/** `undefined` (or the default) removes the key instead of writing it. */
+export function setRowHeight(doc: BaseDocument, index: number, rowHeight: string | undefined): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { rowHeight: _old, ...rest } = v
+    return rowHeight ? { ...rest, rowHeight } : rest
+  })
+}
+
+/** List markers Obsidian writes; absent (bullet) is the default and is never written. */
+export const LIST_MARKERS = ['number', 'none'] as const
+
+export function setListMarkers(doc: BaseDocument, index: number, markers: string | undefined): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { markers: _old, ...rest } = v
+    return markers ? { ...rest, markers } : rest
+  })
+}
+
+/** `false` removes the key (Obsidian only writes `indentProperties: true`). */
+export function setListIndentProperties(doc: BaseDocument, index: number, indent: boolean): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { indentProperties: _old, ...rest } = v
+    return indent ? { ...rest, indentProperties: true } : rest
+  })
+}
+
+/** An empty separator removes the key. */
+export function setListSeparator(doc: BaseDocument, index: number, separator: string): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { separator: _old, ...rest } = v
+    return separator !== '' ? { ...rest, separator } : rest
+  })
+}
+
 export function setOrder(doc: BaseDocument, index: number, order: string[]): BaseDocument {
   return withView(doc, index, (v) => ({ ...v, order }))
 }

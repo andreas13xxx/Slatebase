@@ -136,6 +136,18 @@
   white-space: nowrap;
 }
 
+/* Row height (view `rowHeight`): short is the default above. Taller rows wrap the text. */
+.bases-table-view--row-medium .bases-table__cell,
+.bases-table-view--row-tall .bases-table__cell,
+.bases-table-view--row-extra .bases-table__cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.bases-table-view--row-medium .bases-table__cell { height: 56px; }
+.bases-table-view--row-tall .bases-table__cell { height: 84px; }
+.bases-table-view--row-extra .bases-table__cell { height: 120px; }
+
 /* Numbers: right-aligned, with the editor controls following the column. */
 .bases-table__cell--num .base-cell,
 .bases-table__cell--num .property-control {
@@ -666,6 +678,32 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Markers (view `markers`): bullet is the default, `number` and `none` come from the file. */
+.bases-list--bullet,
+.bases-list--number {
+  padding-left: 28px;
+}
+
+.bases-list--bullet { list-style: disc; }
+.bases-list--number { list-style: decimal; }
+.bases-list--none { list-style: none; }
+
+.bases-list--bullet > .bases-list__item,
+.bases-list--number > .bases-list__item {
+  display: list-item;
+}
+
+.bases-list__details--indent {
+  padding-left: 1.5em;
+}
+
+/* With a `separator` the values run on as one line of text, without labels. */
+.bases-list__details--joined {
+  display: block;
+  font-size: 0.78em;
+  color: var(--text-subtle);
 }
 
 .bases-list__empty {

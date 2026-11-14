@@ -65,6 +65,8 @@ export const BasesTableView = memo(function BasesTableView({
     [rows, view, doc],
   )
   const groups = useMemo(() => groupRows(rows, view), [rows, view])
+  // Only the heights Obsidian writes get a class; anything else renders as the default (short).
+  const rowHeightClass = view.rowHeight && ['medium', 'tall', 'extra'].includes(view.rowHeight) ? `bases-table-view--row-${view.rowHeight}` : ''
   const [collapsed, toggleGroup] = useCollapsedGroups()
   const groupPropertyLabel = headerLabel(view.groupBy?.property ?? '')
   const hasSummaries = Object.keys(summaries).length > 0
@@ -128,7 +130,7 @@ export const BasesTableView = memo(function BasesTableView({
   )
 
   return (
-    <div className="bases-table-view">
+    <div className={rowHeightClass ? `bases-table-view ${rowHeightClass}` : 'bases-table-view'}>
       <table className="bases-table data-table">
         <thead>
           <tr>
