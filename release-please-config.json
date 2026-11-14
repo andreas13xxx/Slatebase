@@ -16,7 +16,11 @@
       "bump-minor-pre-major": true,
       "initial-version": "0.1.0",
       "extra-files": [
-        "backend/version.json"
+        "backend/version.json",
+        {
+          "type": "generic",
+          "path": "backend/assets/templates/welcome-vault/_meta.md"
+        }
       ]
     }
   }
