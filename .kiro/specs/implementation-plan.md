@@ -227,6 +227,13 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 (Moment-Formate wie in Obsidian), eine gemeinsame Implementierung in
 `shared-contracts/src/template-placeholders.ts` für `TemplateService` und „Vorlage einfügen".
 
+**Bases-Reste, Stand der Prüfung (2026-11-14, gegen `obsidian.md/help/bases/*` gelesen):**
+- *Zeilenhöhe* (Tabelle: short/medium/tall/extra tall) und *Listen-Optionen* (Markierung Aufzählung/Nummern/keine, Eigenschaften einrücken,
+  Trennzeichen): Die Doku nennt die Optionen, aber **keinen YAML-Schlüssel** (weder Tabellen- noch Listen-Seite noch Syntax-Seite). Bleiben
+  zurückgestellt; entscheidend ist eine in echtem Obsidian erzeugte `.base` mit diesen Einstellungen — damit lassen sich die Schlüssel
+  belegen, statt zu raten.
+- *Objekt-Typ*: Spec `.kiro/specs/bases-object-type/` (nur dokumentierte Teile: `file.properties`, `keys()`/`values()`/`isEmpty()`, Punkt-/Klammerzugriff).
+
 ---
 
 ## Bewusst nicht implementierte Features
