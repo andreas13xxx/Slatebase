@@ -161,6 +161,7 @@ export const de = {
     newConversation: 'Neue Konversation',
     noConversations: 'Noch keine Konversationen',
     noMessages: 'Noch keine Nachrichten',
+    backToList: 'Zurück zur Konversationsliste',
     sendPlaceholder: 'Nachricht schreiben…',
     send: 'Senden',
     participants: 'Teilnehmer',

@@ -7060,3 +7060,57 @@
     justify-content: center;
   }
 }
+
+/* ===== Responsive chat and graph (responsive-mobile-content, phase 4) ===== */
+.chat-back-btn {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* Master-detail: the conversation list OR one conversation, never both. */
+  .chat-sidebar {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border-right: none;
+    flex: 1;
+  }
+
+  .chat-page--detail .chat-sidebar,
+  .chat-page:not(.chat-page--detail) .chat-main {
+    display: none;
+  }
+
+  .chat-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: none;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* The search box takes the room left of the settings toggle instead of a fixed 220px. */
+  .graph-search-container {
+    left: 8px;
+    right: 48px;
+    top: 8px;
+    width: auto;
+  }
+}
+
+@media (pointer: coarse) {
+  .graph-search-input,
+  .message-input textarea,
+  .chat-page textarea {
+    /* 16px stops iOS Safari from zooming the page when the field is focused. */
+    font-size: 16px;
+  }
+}

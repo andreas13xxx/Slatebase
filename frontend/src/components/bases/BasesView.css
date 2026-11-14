@@ -1387,3 +1387,39 @@
   cursor: pointer;
   font-size: 0.85em;
 }
+
+/* ── Narrow screens (responsive-mobile-content, phase 4) ──────────────────
+   The toolbar wraps instead of overflowing, popovers stay inside the window, Kanban columns snap
+   so one swipe moves one column, the card grid never needs more than the view's width. */
+@media (max-width: 767px) {
+  .bases-view__toolbar,
+  .bases-tb__group-left,
+  .bases-tb__group-right {
+    flex-wrap: wrap;
+  }
+
+  .bases-tb__panel {
+    max-width: calc(100vw - 16px);
+  }
+
+  .bases-kanban:not(.bases-kanban--rows) {
+    scroll-snap-type: x mandatory;
+  }
+
+  .bases-kanban:not(.bases-kanban--rows) .bases-kanban__column {
+    min-width: min(82vw, 300px);
+    scroll-snap-align: start;
+  }
+
+  .bases-cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--bases-card-size), 100%), 1fr));
+  }
+}
+
+@media (pointer: coarse) {
+  .bases-tb__btn,
+  .bases-tb__select,
+  .bases-view__mode {
+    min-height: 44px;
+  }
+}
