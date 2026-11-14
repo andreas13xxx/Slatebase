@@ -10,6 +10,8 @@ import { createWikilinkRegex, resolveWikilinkMatchTarget } from './link-decorati
 import { DEFAULT_KEYBINDINGS, matchesShortcut } from '../../state/keybindingsStore'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { ViewMode } from '../../components/ViewMode'
+import { EmbeddedWebFrame } from '../../components/EmbeddedWebFrame'
+import { shouldEmbedWebUrl } from '../../hooks/useWebEmbed'
 import { BasesEmbed, type IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { SearchEmbed, type ISearchEmbedApiClient } from '../../components/SearchEmbed'
 import type { DirectoryTree } from '../../types'
@@ -1269,6 +1271,62 @@ class ImageWidget extends WidgetType {
 }
 
 /**
+ * Widget for an external `![](https://…)` link that is embedded as a web page.
+ *
+ * Mounts the same `EmbeddedWebFrame` the reading view uses (one sandbox configuration, one place
+ * to tighten it), as a nested React root. Only created while the per-user+vault opt-in
+ * `webEmbedEnabled` is on — see `shouldEmbedWebUrl`.
+ */
+class WebEmbedWidget extends WidgetType {
+  private readonly url: string
+  private reactRoot: Root | null = null
+
+  constructor(url: string) {
+    super()
+    this.url = url
+  }
+
+  toDOM(view?: EditorView): HTMLElement {
+    // A widget instance is normally built once; if CM6 ever rebuilds its DOM, drop the old root first.
+    this.destroy()
+    const container = document.createElement('div')
+    container.className = 'cm-lp-web-embed'
+    this.reactRoot = createRoot(container)
+    this.reactRoot.render(createElement(EmbeddedWebFrame, { url: this.url }))
+    // React renders after toDOM returns, so CM6 first measures an empty container. The frame has a
+    // fixed height; ask for one re-measure once it is in, or scroll and cursor positions stay off.
+    if (view) requestAnimationFrame(() => view.requestMeasure())
+    return container
+  }
+
+  eq(other: WebEmbedWidget): boolean {
+    return this.url === other.url
+  }
+
+  get estimatedHeight(): number {
+    return 400
+  }
+
+  destroy(): void {
+    if (this.reactRoot) {
+      unmountRootDeferred(this.reactRoot)
+      this.reactRoot = null
+    }
+  }
+}
+
+/** A Markdown link title after the URL: `![a](https://x "title")` or `'title'`. */
+const TRAILING_LINK_TITLE_RE = /\s+("[^"]*"|'[^']*')\s*$/
+
+/**
+ * The URL part of a `![alt](…)` target without a trailing title, so `https://x "t"` embeds `https://x`
+ * (the reading view gets this from the parsed `node.url`; here the raw text is split by hand).
+ */
+export function stripLinkTitle(target: string): string {
+  return target.replace(TRAILING_LINK_TITLE_RE, '').trim()
+}
+
+/**
  * Widget for rendering horizontal rules (---, ***, ___) as <hr> elements.
  */
 class HorizontalRuleWidget extends WidgetType {
@@ -2025,7 +2083,10 @@ export function buildWidgetDecorations(
           const alt = altMatch[1] ?? ''
           const src = altMatch[2] ?? ''
 
-          const widget = new ImageWidget(src, alt, options.vaultId, options.token)
+          const webUrl = stripLinkTitle(src)
+          const widget = shouldEmbedWebUrl(webUrl)
+            ? new WebEmbedWidget(webUrl)
+            : new ImageWidget(src, alt, options.vaultId, options.token)
           addStandaloneLineTightening(doc, node.from, node.to, decorations, hideableRanges)
           decorations.push(
             Decoration.replace({ widget }).range(node.from, node.to)

@@ -648,6 +648,11 @@
   margin: 4px 0;
 }
 
+/* --- Embedded web pages: ![](https://…) with the per-vault opt-in (see EmbeddedWebFrame) --- */
+.cm-lp-web-embed {
+  margin: 4px 0;
+}
+
 /* --- Horizontal Rules --- */
 .cm-lp-hr {
   border: none;

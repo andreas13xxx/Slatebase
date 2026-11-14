@@ -20,7 +20,7 @@ import { FeatureContext } from '../state/featureContext'
 import { requestHoverPreview, dismissHoverPreview } from '../plugins/compat/hover-link-bus'
 import { resolveWikilinkTargetWithAlternatives } from '../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../state/aliasStore'
-import { getWebEmbedEnabled } from '../hooks/useWebEmbed'
+import { shouldEmbedWebUrl } from '../hooks/useWebEmbed'
 import { useLongPress } from '../hooks/useLongPress'
 import { EmbeddedWebFrame } from './EmbeddedWebFrame'
 import { warnOnce } from '../plugins/compat/log'
@@ -1352,7 +1352,7 @@ function renderPhrasingNode(
       // sandboxed iframe, but only when the per-vault opt-in is enabled;
       // otherwise fall through to the normal image handling (which shows a
       // "not found" notice for a non-vault path).
-      if (/^https?:\/\//i.test(node.url) && getWebEmbedEnabled()) {
+      if (shouldEmbedWebUrl(node.url)) {
         return createElement(EmbeddedWebFrame, { key, url: node.url })
       }
       return renderImage(node.url, node.alt, vaultId, directoryTree, key)

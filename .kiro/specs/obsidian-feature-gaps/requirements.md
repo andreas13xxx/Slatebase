@@ -66,7 +66,7 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
   der Leser ungefragt fremde Seiten.
 - Verifiziert: Backend/Frontend `tsc` sauber, `parseWebUrl`-Tests (http(s) akzeptiert,
   javascript:/data:/file: abgelehnt) + preferences-Tests grün, ESLint 0 Errors.
-- Offener Folgeschritt (bewusst außerhalb Scope): `![](url)`-Auto-Embed auch in Live Preview (CM6
+- **Nachgetragen (2026-11-13):** Der Live-Preview-Embed ist umgesetzt (`WebEmbedWidget`). Ursprünglicher Folgeschritt: `![](url)`-Auto-Embed auch in Live Preview (CM6
   Widget-Decoration) — aktuell nur Lesemodus; der Web-Viewer-Tab + Lesemodus-Embed liefern den
   Use-Case, das CM6-iframe-Widget ist deutlich aufwändiger/riskanter und folgt separat.
 

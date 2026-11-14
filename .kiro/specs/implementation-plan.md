@@ -219,7 +219,7 @@ API, die Slatebase (Emulation 1.15.1) nicht abdeckt.
 | Format Converter / Fremdformat-Importer | Prio 6 |
 | Audio Recorder (ohne Transkription) | Aus `editor/dictation/dictation-recorder.ts` ableitbar (O3) |
 | Vim-Modus | Nur gewarnter Stub |
-| `![](url)`-Embed in Live Preview | Nur Lesemodus |
+| ~~`![](url)`-Embed in Live Preview~~ | **Umgesetzt**: `WebEmbedWidget` in `widget-decorations.ts` (gleicher `EmbeddedWebFrame`, gleiches Opt-in `webEmbedEnabled`) |
 | Bases-Reste | Objekt-Typ, Zeilenhöhe, Listen-Optionen, CSV-Export, `this` im MCP-Tool, `map` beim Einbetten |
 | Server-Side Plugins / Semantische Suche / Collaborative Editing / E2E-Suite | Prio 4–8, 39 Tasks `server-side-plugins` offen |
 

@@ -18,6 +18,18 @@ export function getWebEmbedEnabled(): boolean {
   return getVaultSettings().webEmbedEnabled
 }
 
+/**
+ * Whether a standard-image link should render as an embedded web page instead of an image or
+ * plain link: an http(s) URL while the opt-in is on. ONE rule for the reading view (`ViewMode`) and
+ * Live Preview, so they cannot drift (for example if a host allow-list is ever added here).
+ *
+ * @param url - The link target of `![](url)`.
+ * @param enabled - The opt-in; defaults to the active vault's stored setting.
+ */
+export function shouldEmbedWebUrl(url: string, enabled: boolean = getWebEmbedEnabled()): boolean {
+  return enabled && /^https?:\/\//i.test(url)
+}
+
 /** Sets the web-embed opt-in for the active vault (from React or outside it). */
 export function setWebEmbedEnabled(enabled: boolean): void {
   updateVaultSettings({ webEmbedEnabled: enabled })
