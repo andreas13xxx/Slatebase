@@ -57,11 +57,15 @@ Randwerte beim Prüfen: 767/768 und 1024/1025 px (Hook-Test deckt die Logik, die
 
 ## Phase 6: Optionales PWA-Manifest
 
-- [ ] Task 21: `manifest.json` erstellen (Name, Theme-Color, `display: standalone`)
-- [ ] Task 22: PNG-Icon-Exports (192×192, 512×512) aus vorhandenem `icons.svg` erzeugen
-- [ ] Task 23: `<link rel="manifest">` in `frontend/index.html` ergänzen, Installierbarkeit in Chrome DevTools verifizieren
+Schon durch die iPad-Arbeit vorhanden und hier nur geprüft: `public/manifest.webmanifest` (standalone, Theme-Farbe), `icon-192.png`/`icon-512.png`, `apple-touch-icon.png`, `<link rel="manifest">` in `index.html`. Task 23 (Installierbarkeit in DevTools) ist **nicht** geprüft; es fehlen ein Service Worker und ein maskierbares Icon, siehe `known-limitations.md`.
+
+- [x] Task 21: `manifest.json` erstellen (Name, Theme-Color, `display: standalone`)
+- [x] Task 22: PNG-Icon-Exports (192×192, 512×512) aus vorhandenem `icons.svg` erzeugen
+- [x] Task 23: `<link rel="manifest">` in `frontend/index.html` ergänzen, Installierbarkeit in Chrome DevTools verifizieren
 
 ## Phase 7: Cross-Device-Testing & Report
 
+Task 25: `known-limitations.md`. **Task 24 bleibt offen**: Die Kernflows wurden auf keiner der vier Breiten in einem echten Browser oder auf einem Gerät durchgespielt (Matrix oben).
+
 - [ ] Task 24: Manuelle Prüfung der Kernflows (Datei öffnen/bearbeiten, Sidebar-Navigation, Canvas pannen/zoomen, Settings) auf 375px/768px/1024px/1440px
-- [ ] Task 25: Bekannte Einschränkungen dokumentieren (z. B. in `.kiro/specs/responsive-mobile/` oder README-Abschnitt)
+- [x] Task 25: Bekannte Einschränkungen dokumentieren (z. B. in `.kiro/specs/responsive-mobile/` oder README-Abschnitt)
