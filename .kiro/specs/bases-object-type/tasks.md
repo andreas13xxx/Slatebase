@@ -16,8 +16,13 @@ Jede Phase wird einzeln grün (tsc, `npm run lint`, betroffene Tests, `npm run b
   `isEmpty`/`toString`; **kein** Fallback auf Text-/Listenmethoden); `evaluator.ts` (Zugriff per Punkt/Klammer, Gleichheit, `<`/`>` nicht vergleichbar).
 - Abweichung vom Design: `evalProperty` versucht bei jedem unaufgelösten gepunkteten Namen den kürzeren Pfad (früher nur bei bekannten Member-Namen),
   damit `file.properties.status` und `formula.o.key` funktionieren; ein Objekt akzeptiert jeden Schlüssel, alles andere weiter nur die Built-in-Member.
-- `file.properties` und `this.file.properties` (`base-eval.ts`) enthalten die Properties, die die Zeile trägt — **bis Phase 2.2/2.3 sind das nur die
-  angefragten Spalten**, also nicht alle Properties der Notiz. Die Hilfe darf das erst nach Phase 2 als „alle Properties“ beschreiben.
+- Phase 2 (nach dem Review von PR #373 gleich mit umgesetzt): `buildQuerySpec`/`buildHostQuerySpec` setzen `allProperties`, wenn ein Ausdruck
+  `file.properties[.key]` liest, und schicken diese Referenz NICHT mehr als `fileColumns` (die Route begrenzt Einträge auf 50 Zeichen/20 Stück, ein
+  langer Schlüssel hätte die Abfrage mit 400 abgelehnt). Backend: `allProperties` in `BaseQuerySpec` und im Zod-Schema der Route; `LinkIndexService.rowColumns()`
+  liefert alle Properties der Notiz (angefragte Spalten zuerst), höchstens `MAX_PROPERTIES_PER_ROW` = 200. Das Objekt je Zeile wird einmal gebaut (WeakMap).
+- Review-Korrekturen: strikte Typgleichheit in `objectsEqual` (`1` ≠ `"1"`, `null` ≠ `""`, Listenform zählt), dasselbe Objekt ist immer sich selbst gleich,
+  Zahl als Index (`o[2024]`), ein defekter Präfix (`formula.bad.key`) bleibt `null` statt Fehler, `isEmpty` nur noch einmal (universal).
+- Noch offen: Grenze der Antwortgröße über `truncated` (nur die Zeilenkappung existiert), Phase 3 (Anzeige/Doku).
 
 ## Phase 1 — Werttyp und Zugriff (shared-contracts)
 
@@ -29,9 +34,9 @@ Jede Phase wird einzeln grün (tsc, `npm run lint`, betroffene Tests, `npm run b
 ## Phase 2 — Quellen und Abfrage
 
 - [x] 2.1 `file.properties`/`this.file.properties` in `base-eval.ts` aus `row.values` bauen (Skalar-/Listen-Erkennung wie `note.<key>`)
-- [ ] 2.2 `collectRefs` + `buildQuerySpec`: `allProperties` setzen, wenn ein Ausdruck `file.properties` nutzt
-- [ ] 2.3 Backend `queryForBase`: alle Properties je Zeile liefern, Grenzen (200 Properties, Antwortgröße → `truncated`); MCP `toIndexSpec` durchreichen
-- [ ] 2.4 Tests (Backend, `base-eval`, `parity.test.ts` Frontend gegen MCP)
+- [x] 2.2 `collectRefs` + `buildQuerySpec`: `allProperties` setzen, wenn ein Ausdruck `file.properties` nutzt
+- [x] 2.3 Backend `queryForBase`: alle Properties je Zeile liefern, Grenzen (200 Properties, Antwortgröße → `truncated`); MCP `toIndexSpec` durchreichen
+- [x] 2.4 Tests (Backend, `base-eval`, `parity.test.ts` Frontend gegen MCP)
 
 ## Phase 3 — Anzeige und Doku
 

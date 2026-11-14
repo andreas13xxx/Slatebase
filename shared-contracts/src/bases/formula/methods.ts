@@ -188,11 +188,13 @@ const universalMethods: Record<string, MethodFn> = {
   isType: (r, a) => typeName(r) === stringify(a[0] ?? null).toLowerCase(),
 }
 
-/** Methods of the object type (Obsidian docs: `keys()`, `values()`, `isEmpty()`; plus the generic `toString()`). */
+/**
+ * Methods only objects have (Obsidian docs: `keys()`, `values()`; `isEmpty()` is the shared one in
+ * `universalMethods`, which knows objects too), plus the generic `toString()`.
+ */
 const objectMethods: Record<string, MethodFn> = {
   keys: (r) => (isObject(r) ? [...r.entries.keys()] : null),
   values: (r) => (isObject(r) ? [...r.entries.values()] : null),
-  isEmpty: (r) => isObject(r) && r.entries.size === 0,
   toString: (r: FormulaValue) => stringify(r),
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterRows, evaluateFormulaColumn, wireRowToBaseRow } from './base-eval.js'
+import { filterRows, evaluateFormulaColumn, wireRowToBaseRow, buildQuerySpec, buildHostQuerySpec } from './base-eval.js'
 import type { BaseDocument, BaseQueryRowWire } from './types.js'
 
 const wire = (path: string, values: Record<string, string[]>, extra: Partial<BaseQueryRowWire> = {}): BaseQueryRowWire => ({
@@ -48,6 +48,38 @@ describe('file.properties', () => {
     const rows = [wire('a.md', { status: ['open'] }), wire('b.md', { status: ['done'] })]
     const { rows: out } = filterRows(rows, doc, { type: 'table' })
     expect(out.map((r) => r.path)).toEqual(['a.md'])
+  })
+})
+
+describe('buildQuerySpec / buildHostQuerySpec with file.properties', () => {
+  it('asks for all properties and never sends file.properties as a fileColumns entry', () => {
+    const doc: BaseDocument = { filters: 'file.properties.status == "open"', formulas: { f: 'file.properties.keys().length + file.size' }, views: [] }
+    const spec = buildQuerySpec(doc, { type: 'table', order: ['file.name'] })
+    expect(spec.allProperties).toBe(true)
+    expect(spec.fileColumns?.sort()).toEqual(['file.name', 'file.size'])
+    expect(spec.fileColumns?.some((c) => c.startsWith('file.properties'))).toBe(false)
+    expect(spec.columns).not.toContain('file.properties')
+    expect(spec.columns).not.toContain('file.properties.status')
+  })
+
+  it('does not set allProperties for a base that never reads file.properties', () => {
+    const spec = buildQuerySpec({ filters: 'status == "open"', views: [] }, { type: 'table', order: ['status'] })
+    expect(spec.allProperties).toBeUndefined()
+  })
+
+  it('keeps a very long file.properties.<key> out of the request (the route limits fileColumns entries)', () => {
+    const key = 'k'.repeat(80)
+    const spec = buildQuerySpec({ filters: `file.properties.${key} == "x"`, views: [] }, { type: 'table', order: [] })
+    expect(spec.fileColumns).toBeUndefined()
+    expect(spec.allProperties).toBe(true)
+  })
+
+  it('does the same for the host lookup of this.file.properties', () => {
+    const doc: BaseDocument = { filters: 'file.properties == this.file.properties', views: [] }
+    const host = buildHostQuerySpec(doc, { type: 'table' }, 'Notes/home.md')
+    expect(host?.allProperties).toBe(true)
+    expect(host?.fileColumns).toBeUndefined()
+    expect(host?.filters).toEqual({ path: 'Notes/home.md' })
   })
 })
 

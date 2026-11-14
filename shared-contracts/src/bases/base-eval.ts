@@ -82,11 +82,23 @@ export function buildQuerySpec(doc: BaseDocument, view: BaseView, extraColumns?:
   // file.* pseudo-columns referenced anywhere (columns/filters/formulas/sort),
   // so the backend knows whether a stat() for file.size is worth doing.
   const fileColumns = new Set<string>()
-  for (const id of wanted) if (id.startsWith('file.')) fileColumns.add(id)
-  for (const s of view.sort ?? []) if (s.column.startsWith('file.')) fileColumns.add(s.column)
+  let allProperties = false
+  for (const id of wanted) {
+    // `file.properties[.key]` is the object of all properties, not a file pseudo-column: it asks the
+    // backend for every property and must never be sent as a `fileColumns` entry (length/count limits).
+    if (isPropertiesRef(id)) { allProperties = true; continue }
+    if (id.startsWith('file.')) fileColumns.add(id)
+  }
+  for (const s of view.sort ?? []) if (s.column.startsWith('file.') && !isPropertiesRef(s.column)) fileColumns.add(s.column)
   if (fileColumns.size > 0) spec.fileColumns = Array.from(fileColumns)
+  if (allProperties) spec.allProperties = true
 
   return spec
+}
+
+/** `file.properties` or a path into it (`file.properties.status`). */
+function isPropertiesRef(id: string): boolean {
+  return id === 'file.properties' || id.startsWith('file.properties.')
 }
 
 /** `this` or a `this.…` reference — the host note of an embedded base. */
@@ -129,14 +141,17 @@ export function buildHostQuerySpec(doc: BaseDocument, view: BaseView, hostPath: 
   if (refs.length === 0) return null
   const columns = new Set<string>()
   const fileColumns = new Set<string>()
+  let allProperties = false
   for (const ref of refs) {
     if (ref === 'this' || ref === 'this.file') continue
     const rest = ref.slice('this.'.length)
+    if (isPropertiesRef(rest)) { allProperties = true; continue }
     if (rest.startsWith('file.')) fileColumns.add(rest)
     else columns.add(rest.startsWith('note.') ? rest.slice('note.'.length) : rest)
   }
   const spec: BaseQuerySpecWire = { columns: Array.from(columns), filters: { path: hostPath } }
   if (fileColumns.size > 0) spec.fileColumns = Array.from(fileColumns)
+  if (allProperties) spec.allProperties = true
   return spec
 }
 
@@ -169,17 +184,26 @@ function toExprValue(key: string, v: unknown, extraListKeys?: ReadonlySet<string
 
 /**
  * `file.properties`: the note's properties as an object, each value read like `note.<key>` (same
- * single-value/list rule). Holds the properties the row carries — which are the requested columns until
- * the query asks for all of them (spec `bases-object-type`, phase 2) — and never the `file.*` metadata.
+ * single-value/list rule). Holds the properties the row carries and never the `file.*` metadata. A base
+ * that reads `file.properties` makes `buildQuerySpec` set `allProperties`, so the backend sends every
+ * property of the note (capped); without it a row only has the requested columns.
  */
 function propertiesObject(row: BaseRow): FormulaValue {
+  // Rows are immutable once built, so the object is made once per row (and once for the host row)
+  // however many times an expression reads `file.properties`.
+  const cached = propertiesCache.get(row)
+  if (cached) return cached
   const entries: Array<[string, FormulaValue]> = []
   for (const [key, raw] of Object.entries(row.values)) {
     if (key.startsWith('file.')) continue
     entries.push([key, toExprValue(key, raw, row.listKeys)])
   }
-  return makeObject(entries)
+  const object = makeObject(entries)
+  propertiesCache.set(row, object)
+  return object
 }
+
+const propertiesCache = new WeakMap<BaseRow, FormulaValue>()
 
 /**
  * Builds the expression `FormulaContext` for one row, resolving the Obsidian

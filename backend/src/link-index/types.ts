@@ -316,6 +316,11 @@ export interface BaseQuerySpec {
    * populated regardless.
    */
   fileColumns?: string[] | undefined
+  /**
+   * Return every property of each note (up to `MAX_PROPERTIES_PER_ROW`), the requested columns first.
+   * Set for bases that read the `file.properties` object.
+   */
+  allProperties?: boolean | undefined
 }
 
 /** A single resolved Bases query row. */

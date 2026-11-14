@@ -82,7 +82,15 @@ function evalProperty(name: string, ctx: FormulaContext): FormulaValue {
     const member = name.slice(dot + 1)
     // `file.properties.status`: the tokenizer keeps the dotted name whole, so look at what the shorter
     // path is. An object accepts ANY key; everything else only the built-in member names.
-    const base = evalProperty(name.slice(0, dot), ctx)
+    let base: FormulaValue
+    try {
+      base = evalProperty(name.slice(0, dot), ctx)
+    } catch (err) {
+      // A prefix that merely MIGHT hold an object (`formula.x` of a broken formula) must not turn a
+      // missing dotted name into an error it never was; only a member the evaluator knows keeps the error.
+      if (MEMBER_NAMES.has(member)) throw err
+      return null
+    }
     if (base === null) return null
     if (isObject(base) || MEMBER_NAMES.has(member)) return memberOf(base, member)
   }
@@ -157,7 +165,11 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
         return ctx.resolve(`${node.object.name}.${idx}`)
       }
       const obj = evalNode(node.object, ctx)
-      if (isObject(obj)) return typeof idx === 'string' ? (obj.entries.get(idx) ?? null) : null
+      if (isObject(obj)) {
+        // A number names the entry of that text: a frontmatter key `2024` is the entry "2024".
+        const key = typeof idx === 'string' ? idx : typeof idx === 'number' ? String(idx) : null
+        return key === null ? null : (obj.entries.get(key) ?? null)
+      }
       if (Array.isArray(obj)) {
         const n = toNumber(idx)
         if (n === null) return null

@@ -18,6 +18,9 @@ import { extractProperties } from './property-extractor.js'
 import { extractCanvasFileRefs } from './canvas-parser.js'
 import { globMatch } from '../search/glob-match.js'
 
+/** Most properties one Bases row carries when a base asks for all of them (`file.properties`). */
+const MAX_PROPERTIES_PER_ROW = 200
+
 /** JSON schema v1 for backward compatibility. */
 interface LinkIndexJsonV1 {
   version: 1
@@ -689,12 +692,30 @@ export class LinkIndexService implements ILinkIndex {
       }
       const props = this.fileProperties.get(filePath)
       if (props) for (const key of props.keys()) propertyKeys.add(key)
-      rows.push(await this.buildBaseRow(filePath, spec.columns, needsStat))
+      rows.push(await this.buildBaseRow(filePath, this.rowColumns(spec, filePath), needsStat))
     }
 
     const total = rows.length
     this.sortBaseRows(rows, spec.sort ?? [])
     return { rows: rows.slice(0, limit), total, truncated: total > limit, listKeys: this.collectObservedListKeys(), propertyKeys: [...propertyKeys] }
+  }
+
+  /**
+   * The property columns to fill for one note. Normally exactly the requested ones; with
+   * `allProperties` (a base that reads the `file.properties` object) every property of the note,
+   * requested columns first, capped at `MAX_PROPERTIES_PER_ROW` so one note with a huge frontmatter
+   * cannot blow up the answer.
+   */
+  private rowColumns(spec: BaseQuerySpec, filePath: string): string[] {
+    if (!spec.allProperties) return spec.columns
+    const own = this.fileProperties.get(filePath)
+    if (!own) return spec.columns
+    const columns = new Set<string>(spec.columns)
+    for (const key of own.keys()) {
+      if (columns.size >= MAX_PROPERTIES_PER_ROW) break
+      columns.add(key)
+    }
+    return [...columns]
   }
 
   /**

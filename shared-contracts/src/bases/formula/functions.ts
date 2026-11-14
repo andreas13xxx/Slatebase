@@ -80,18 +80,35 @@ function toJsonShape(v: FormulaValue, depth: number): unknown {
   return v
 }
 
-/** Structural equality of two objects: same keys, equal values (order does not matter). */
+/**
+ * Strict structural equality of two values inside an object: same type and same content. Unlike the
+ * loose `==` of expressions, `1` is not `"1"`, `null` is not `""`, and the list `["x, y"]` is not `["x","y"]`.
+ */
+function valuesIdentical(a: FormulaValue, b: FormulaValue, depth: number): boolean {
+  if (a === b) return true
+  if (a === null || b === null) return false
+  if (a instanceof Date || b instanceof Date) return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => valuesIdentical(item, b[i] ?? null, depth + 1))
+  }
+  if (isObject(a) || isObject(b)) return isObject(a) && isObject(b) && objectsEqual(a, b, depth + 1)
+  if (isLink(a) || isLink(b)) return isLink(a) && isLink(b) && a.path === b.path && a.display === b.display
+  if (isRegex(a) || isRegex(b)) return isRegex(a) && isRegex(b) && a.source === b.source && a.flags === b.flags
+  return false // primitives of a different type or value (the identity check above handled equal ones)
+}
+
+/**
+ * Structural equality of two objects: same keys, identical values (order does not matter). The same
+ * object is always equal to itself; two DIFFERENT objects nested deeper than the guard compare unequal
+ * rather than recursing without bound.
+ */
 export function objectsEqual(a: ObjectValue, b: ObjectValue, depth = 0): boolean {
+  if (a === b) return true
   if (a.entries.size !== b.entries.size) return false
   if (depth > MAX_OBJECT_DEPTH) return false
   for (const [key, value] of a.entries) {
     if (!b.entries.has(key)) return false
-    const other = b.entries.get(key) ?? null
-    if (isObject(value) && isObject(other)) {
-      if (!objectsEqual(value, other, depth + 1)) return false
-    } else if (isObject(value) !== isObject(other) || stringify(value) !== stringify(other)) {
-      return false
-    }
+    if (!valuesIdentical(value, b.entries.get(key) ?? null, depth)) return false
   }
   return true
 }

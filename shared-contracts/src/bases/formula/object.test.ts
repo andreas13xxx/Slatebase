@@ -122,12 +122,47 @@ describe('object text form, equality and ordering', () => {
     expect(ok('meta > 1')).toBe(false)
   })
 
-  it('has bounded depth when compared or printed', () => {
-    let deep: FormulaValue = 'leaf'
-    for (let i = 0; i < 40; i++) deep = makeObject([['k', deep]])
+  it('compares values strictly: 1 is not "1", null is not "", a one-item list is not two items', () => {
+    expect(objectsEqual(makeObject([['a', 1]]), makeObject([['a', '1']]))).toBe(false)
+    expect(objectsEqual(makeObject([['a', null]]), makeObject([['a', '']]))).toBe(false)
+    expect(objectsEqual(makeObject([['a', ['x, y']]]), makeObject([['a', ['x', 'y']]]))).toBe(false)
+    expect(objectsEqual(makeObject([['a', ['x', 'y']]]), makeObject([['a', ['x', 'y']]]))).toBe(true)
+    expect(objectsEqual(makeObject([['d', new Date(5)]]), makeObject([['d', new Date(5)]]))).toBe(true)
+    expect(objectsEqual(makeObject([['l', { kind: 'link', path: 'A.md' }]]), makeObject([['l', { kind: 'link', path: 'A.md' }]]))).toBe(true)
+    expect(objectsEqual(makeObject([['l', { kind: 'link', path: 'A.md' }]]), makeObject([['l', { kind: 'link', path: 'B.md' }]]))).toBe(false)
+  })
+
+  it('has bounded depth when compared or printed; the same object is still equal to itself', () => {
+    const build = () => {
+      let deep: FormulaValue = 'leaf'
+      for (let i = 0; i < 40; i++) deep = makeObject([['k', deep]])
+      return deep
+    }
+    const deep = build()
     expect(isObject(deep)).toBe(true)
     expect(() => stringify(deep)).not.toThrow()
-    expect(objectsEqual(deep as never, deep as never)).toBe(false) // past the guard: not equal, not a hang
+    expect(objectsEqual(deep as never, deep as never)).toBe(true)
+    expect(ok('d == d', ctx({ d: deep }))).toBe(true)
+    // Two different deep objects: past the guard they compare unequal instead of recursing forever.
+    expect(objectsEqual(deep as never, build() as never)).toBe(false)
     expect(isTruthy(deep)).toBe(true)
+  })
+
+  it('reads an entry by number as the entry of that text', () => {
+    const o = makeObject([['2024', 'year'], ['1', 'one']])
+    expect(ok('o[2024]', ctx({ o }))).toBe('year')
+    expect(ok('o[1]', ctx({ o }))).toBe('one')
+    expect(ok('o[2]', ctx({ o }))).toBeNull()
+    expect(ok('o[true]', ctx({ o }))).toBeNull()
+  })
+
+  it('does not turn a missing dotted name into an error when a prefix formula is broken', () => {
+    const throwing: FormulaContext = {
+      resolve: (name) => {
+        if (name === 'formula.bad') throw new Error('Formula cycle')
+        return null
+      },
+    }
+    expect(evaluateFormula('formula.bad.key', throwing)).toEqual({ ok: true, value: null })
   })
 })
