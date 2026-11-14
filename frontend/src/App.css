@@ -1,3 +1,16 @@
+/* ===== Breakpoints (single reference for CSS and JS) =====
+ *
+ * Same numbers as BREAKPOINTS in src/hooks/useMediaQuery.ts. A CSS media query cannot read a JS
+ * constant, so every width rule uses these literals; change them here AND there, or not at all.
+ *
+ *   mobile   max-width: 767px      (< 768px)     @media (max-width: 767px)
+ *   tablet   768px to 1024px                      @media (min-width: 768px) and (max-width: 1024px)
+ *   desktop  > 1024px                             no query (the default)
+ *
+ * Window width decides the LAYOUT; the device (Platform.isPhone/isTablet, pointer: coarse) decides
+ * TOUCH behaviour. They are separate on purpose.
+ */
+
 /* ===== Skip Navigation Link ===== */
 .skip-link {
   position: absolute;
