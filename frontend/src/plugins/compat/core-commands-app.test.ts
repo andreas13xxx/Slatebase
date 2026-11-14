@@ -1413,7 +1413,7 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
 
   it('routes bases:change-view / add-view / copy-table / add-item to the active base', async () => {
     const toastSpy = vi.spyOn(ToastNotificationModule, 'showToast').mockImplementation(() => {})
-    const controller = { nextView: vi.fn(() => true), addView: vi.fn(() => true), copyTable: vi.fn(async () => true), addItem: vi.fn(async () => 'Tasks/Unbenannt.md') }
+    const controller = { nextView: vi.fn(() => true), addView: vi.fn(() => true), copyTable: vi.fn(async () => true), exportCsv: vi.fn(() => true), addItem: vi.fn(async () => 'Tasks/Unbenannt.md') }
     setActiveBasesController(controller)
     const registry = new CommandRegistry()
     registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
@@ -1421,6 +1421,7 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     registry.executeCommand('bases:change-view')
     registry.executeCommand('bases:add-view')
     registry.executeCommand('bases:copy-table')
+    registry.executeCommand('bases:export-csv')
     registry.executeCommand('bases:add-item')
     await Promise.resolve()
     await Promise.resolve()
@@ -1428,6 +1429,7 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     expect(controller.nextView).toHaveBeenCalled()
     expect(controller.addView).toHaveBeenCalled()
     expect(controller.copyTable).toHaveBeenCalled()
+    expect(controller.exportCsv).toHaveBeenCalled()
     expect(controller.addItem).toHaveBeenCalled()
     expect(toastSpy).toHaveBeenCalledWith('success', expect.any(String))
     setActiveBasesController(null)

@@ -227,4 +227,84 @@ views:
     expect(result.isError).toBe(true)
     expect(parse(result)['code']).toBe(-32006)
   })
+
+  describe('thisPath (`this` = the embedding note)', () => {
+    const THIS_BASE = `filters:
+  and:
+    - 'project == this.project'
+formulas:
+  where: this.file.name
+views:
+  - type: table
+    order:
+      - file.name
+      - formula.where
+`
+    const HOME: BaseQueryRow = { path: 'Notes/home.md', fileName: 'home', folder: 'Notes', tags: [], values: { project: ['alpha'] } }
+    const PROJECT_ROWS: BaseQueryRow[] = [
+      { path: 'Tasks/a.md', fileName: 'a', folder: 'Tasks', tags: [], values: { project: ['alpha'] } },
+      { path: 'Tasks/b.md', fileName: 'b', folder: 'Tasks', tags: [], values: { project: ['beta'] } },
+    ]
+
+    /** The index answers the host lookup (path filter) with the host note, everything else with the candidates. */
+    function wireIndex(linkIndex: ILinkIndex, host: BaseQueryRow | null) {
+      vi.mocked(linkIndex.queryForBase).mockImplementation(async (spec) => {
+        const isHostLookup = (spec.filters as { path?: string } | undefined)?.path === 'Notes/home.md'
+        const rows = isHostLookup ? (host ? [host] : []) : PROJECT_ROWS
+        return { rows, total: rows.length } as never
+      })
+    }
+
+    it('evaluates `this.*` in filters and formulas against the given note', async () => {
+      const { call, linkIndex } = await setup({ content: THIS_BASE })
+      wireIndex(linkIndex, HOME)
+      const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' }))
+      expect(out['rows']).toEqual([{ path: 'Tasks/a.md', cells: { 'file.name': 'a', 'formula.where': 'home' } }])
+      expect(out['thisPath']).toBe('Notes/home.md')
+      expect(out['thisFound']).toBe(true)
+    })
+
+    it('leaves `this` empty without thisPath', async () => {
+      const { call, linkIndex } = await setup({ content: THIS_BASE })
+      wireIndex(linkIndex, HOME)
+      const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100 }))
+      expect(out['rows']).toEqual([])
+      expect(out).not.toHaveProperty('thisPath')
+    })
+
+    it('reports a note that is not indexed instead of silently matching nothing', async () => {
+      const { call, linkIndex } = await setup({ content: THIS_BASE })
+      wireIndex(linkIndex, null)
+      const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' }))
+      expect(out['thisFound']).toBe(false)
+      expect(out['thisUsed']).toBe(true)
+    })
+
+    it('does not claim "not found" for a base that never mentions `this`', async () => {
+      const { call, linkIndex } = await setup()
+      wireIndex(linkIndex, null)
+      const out = parse(await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' }))
+      expect(out['thisUsed']).toBe(false)
+      expect(out).not.toHaveProperty('thisFound')
+    })
+
+    it('still answers when the this-note lookup fails, reporting it as not found', async () => {
+      const { call, linkIndex } = await setup({ content: THIS_BASE })
+      vi.mocked(linkIndex.queryForBase).mockImplementation(async (spec) => {
+        if ((spec.filters as { path?: string } | undefined)?.path === 'Notes/home.md') throw new Error('index busy')
+        return { rows: PROJECT_ROWS, total: PROJECT_ROWS.length } as never
+      })
+      const result = await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath: 'Notes/home.md' })
+      expect(result.isError).toBeFalsy()
+      expect(parse(result)['thisFound']).toBe(false)
+    })
+
+    it.each(['../secret.md', '/etc/passwd', 'a//b.md', 'a\\b.md'])('rejects the unsafe thisPath %j', async (thisPath) => {
+      const { call, linkIndex } = await setup({ content: THIS_BASE })
+      wireIndex(linkIndex, HOME)
+      const result = await call({ vaultId: 'v1', path: 'tasks.base', limit: 100, thisPath })
+      expect(result.isError).toBe(true)
+      expect(parse(result)['code']).toBe(-32602)
+    })
+  })
 })

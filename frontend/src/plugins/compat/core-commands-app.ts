@@ -897,6 +897,14 @@ function buildSpecs(): CoreAppCommandSpec[] {
         else showToast('error', 'Keine Tabellenansicht einer Base geöffnet')
       },
     },
+    {
+      id: 'bases:export-csv',
+      name: 'Bases: Export table as CSV',
+      run: () => {
+        if (getActiveBasesController()?.exportCsv()) showToast('success', 'Tabelle als CSV exportiert')
+        else showToast('error', 'Keine Tabellenansicht einer Base geöffnet')
+      },
+    },
     { id: 'open-with-default-app:open', name: 'Open in default app', unsupported: 'desktop-shell' },
     { id: 'open-with-default-app:show', name: 'Show in system explorer', unsupported: 'desktop-shell' },
     { id: 'switcher:open', name: 'Quick switcher: Open quick switcher', run: (h) => h.onOpenQuickSwitcher() },

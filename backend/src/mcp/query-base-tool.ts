@@ -12,6 +12,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import {
   parseBase,
   buildQuerySpec,
+  buildHostQuerySpec,
+  wireRowToBaseRow,
   filterRows,
   evaluateFormulaColumn,
   formatFormulaValue,
@@ -77,10 +79,10 @@ function outputColumns(doc: BaseDocument, view: BaseView): string[] {
 }
 
 /** One cell as JSON: formulas evaluated, single-element property lists unwrapped. */
-function cellValue(doc: BaseDocument, row: BaseRow, column: string): unknown {
+function cellValue(doc: BaseDocument, row: BaseRow, column: string, thisRow?: BaseRow): unknown {
   const formulaId = column.startsWith('formula.') ? column.slice('formula.'.length) : column
   if (doc.formulas && formulaId in doc.formulas) {
-    const r = evaluateFormulaColumn(doc, row, formulaId)
+    const r = evaluateFormulaColumn(doc, row, formulaId, thisRow)
     return r.ok ? formatFormulaValue(r.value) : `#ERR: ${r.error}`
   }
   if (column === 'file.name') return row.fileName
@@ -88,6 +90,56 @@ function cellValue(doc: BaseDocument, row: BaseRow, column: string): unknown {
   const v = row.values[key] ?? row.values[column]
   if (Array.isArray(v)) return v.length === 1 ? v[0] : v
   return v ?? null
+}
+
+/** Maps the wire spec the shared engine builds to the link index's own spec type. */
+function toIndexSpec(wireSpec: ReturnType<typeof buildQuerySpec>): BaseQuerySpec {
+  return {
+    columns: wireSpec.columns,
+    sort: wireSpec.sort,
+    filters: wireSpec.filters as BaseQuerySpec['filters'],
+    fileColumns: wireSpec.fileColumns,
+  }
+}
+
+/** A vault-relative note path usable as a lookup key: no traversal, no absolute path, no NUL. */
+function isSafeHostPath(path: string): boolean {
+  return path.length > 0 && path.length <= 4096 && !path.startsWith('/') && !path.includes('\\') && !path.includes('\0')
+    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
+}
+
+/** Outcome of the host lookup: whether the base reads `this` at all, and the row when it was found. */
+interface HostLookup {
+  /** False when no expression of the base references `this` (then nothing was looked up). */
+  used: boolean
+  row?: BaseRow
+}
+
+/**
+ * Loads the row `this` refers to (the note a base is embedded in). A failing lookup degrades to
+ * "not found" (logged) instead of failing the whole call: the base is still evaluable, `this` is
+ * just empty, and the response says so.
+ */
+async function fetchHostRow(
+  linkIndex: ILinkIndex,
+  logger: ToolHandlerDeps['logger'],
+  doc: BaseDocument,
+  view: BaseView,
+  hostPath: string,
+): Promise<HostLookup> {
+  const spec = buildHostQuerySpec(doc, view, hostPath)
+  if (spec === null) return { used: false }
+  try {
+    const result = await linkIndex.queryForBase(toIndexSpec(spec))
+    // The path is a backend glob and may match more than the host: take the exact path.
+    const wire = result.rows.find((r) => r.path === hostPath)
+    if (!wire) return { used: true }
+    const listKeys = result.listKeys && result.listKeys.length > 0 ? new Set(result.listKeys) : undefined
+    return { used: true, row: wireRowToBaseRow(wire, listKeys) }
+  } catch (error) {
+    logger.warn('query_base could not load the this-note', { error: error instanceof Error ? error.message : String(error) })
+    return { used: true }
+  }
 }
 
 export function registerQueryBase(
@@ -111,6 +163,10 @@ export function registerQueryBase(
         .optional()
         .default(DEFAULT_LIMIT)
         .describe('Maximum rows to return (applied on top of the view\'s own limit).'),
+      thisPath: z.string()
+        .max(4096)
+        .optional()
+        .describe('Vault-relative path of a note to use as `this` in the base\'s filters and formulas (as if the base were embedded in that note). Without it, `this` is empty.'),
     },
     async (args) => {
       try {
@@ -178,15 +234,16 @@ export function registerQueryBase(
         // Filters + limit are evaluated here, not by the index (see buildQuerySpec).
         // The wire spec's `filters` is the conservative structured prefilter,
         // structurally a BaseQueryNode (property/tag/path/op/value + and/or).
-        const wireSpec = buildQuerySpec(doc, view)
-        const indexSpec: BaseQuerySpec = {
-          columns: wireSpec.columns,
-          sort: wireSpec.sort,
-          filters: wireSpec.filters as BaseQuerySpec['filters'],
-          fileColumns: wireSpec.fileColumns,
+        if (args.thisPath !== undefined && !isSafeHostPath(args.thisPath)) {
+          return mcpToolError(MCP_ERROR_INVALID_PARAMS, 'Invalid thisPath')
         }
-        const candidates = await linkIndex.queryForBase(indexSpec)
-        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys)
+        // The host lookup and the candidate query are independent: run them together.
+        const [host, candidates] = await Promise.all([
+          args.thisPath !== undefined ? fetchHostRow(linkIndex, deps.logger, doc, view, args.thisPath) : Promise.resolve(undefined),
+          linkIndex.queryForBase(toIndexSpec(buildQuerySpec(doc, view))),
+        ])
+        const thisRow = host?.row
+        const { rows, total, truncated: candidatesTruncated } = filterRows(candidates.rows, doc, view, candidates.truncated, candidates.listKeys, thisRow)
 
         const returned = rows.slice(0, args.limit)
         // `filterRows` counts matches before the view's own limit. The view limit
@@ -208,8 +265,14 @@ export function registerQueryBase(
           columns,
           rows: returned.map((row) => ({
             path: row.path,
-            cells: Object.fromEntries(columns.map((c) => [c, cellValue(doc, row, c)])),
+            cells: Object.fromEntries(columns.map((c) => [c, cellValue(doc, row, c, thisRow)])),
           })),
+          // Echo the host so a client can tell "this was empty" from "the note is not indexed".
+          // `thisUsed` is false for a base that never mentions `this` (then `thisFound` is omitted:
+          // nothing was looked up, so "not found" would be a claim about a lookup that never ran).
+          ...(args.thisPath !== undefined
+            ? { thisPath: args.thisPath, thisUsed: host?.used ?? false, ...(host?.used ? { thisFound: thisRow !== undefined } : {}) }
+            : {}),
           total: available,
           matches: total,
           returned: returned.length,
