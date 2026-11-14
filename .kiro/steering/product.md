@@ -75,6 +75,7 @@ Obsidian-compatible vaults — no database, no sync service, no desktop app requ
 - Workspace state persistence (open tabs, expanded folders, panel sizes/visibility, active page; per-vault tab memory on vault switch)
 
 ### Platform
+- Responsive / mobile (below 768 px; built, **not yet checked on real devices**): side panels are overlay drawers with a backdrop, the canvas pans and pinch-zooms by touch (pointer events), resize handles have 44 px hit areas, tables scroll sideways with a sticky first column or become cards (users, vaults, MCP tokens), settings and chat alternate between list and detail with a back button, graph/Bases toolbars fit narrow screens. PWA: manifest with maskable icon and a service worker that only serves an offline page (no offline use, nothing cached). Layout follows the window width, touch behaviour the device (`pointer: coarse`). Known limits: `.kiro/specs/responsive-mobile/known-limitations.md`
 - Feature toggles (hot/cold, env overlay, API + admin UI). Registered: `obsidian-plugin-compat`, `chat`, `mcp`, `git-sync`, `mail-import`, `voice-transcription`, `bases`, `activity-timeline` — see `featureRegistry.register()` in `backend/src/index.ts`
 - Welcome Vault (tutorial vault with 70+ guides DE/EN, screenshots, exercises, templates incl. Templater examples; on-demand creation via API, Settings and Command Palette)
 - Security hardening (OWASP Top 10 audit, full CSP, HSTS, path-traversal defense in depth, Zod validation on every route module, npm audit in CI) — see `SECURITY-AUDIT.md`
