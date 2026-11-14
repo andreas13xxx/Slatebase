@@ -7,7 +7,7 @@ Stand 2026-11-03. Quelle: Abgleich von Code gegen die Obsidian-Hilfe (obsidian.m
 P1, P2, P3, P5 umgesetzt. P4 teilweise: `groupOrder`, Cards-Raster und -Optionen, `type: kanban` umgesetzt; Tabellen-`rowHeight` und
 Listen-Optionen **nicht** (YAML-Schlüssel in der Obsidian-Doku nicht belegt; Raten würde das Dateiformat verbiegen); Copy/CSV offen.
 Nachprüfung 2026-11-14: Die Doku nennt die Optionen (Zeilenhöhe: short/medium/tall/extra tall; Liste: Markierung, Einrücken, Trennzeichen),
-aber weiterhin keinen YAML-Schlüssel — offen, bis eine in Obsidian erzeugte `.base` vorliegt. Objekt-Typ: umgesetzt in `bases-object-type/` (`file.properties`, `keys`/`values`/`isEmpty`).
+aber keinen YAML-Schlüssel. Zwei in Obsidian erzeugte `.base`-Dateien belegen sie, umgesetzt am 2026-11-14: `rowHeight` (`medium`/`tall`/`extra`), `markers` (`number`/`none`), `indentProperties`, `separator`; Panel „Anzeige" in der Toolbar. Objekt-Typ: umgesetzt in `bases-object-type/` (`file.properties`, `keys`/`values`/`isEmpty`).
 Abweichungen: `file()`/`image()` liefern einen Link, `icon()`/`html()` Text;
 `map`-Ansicht bleibt in der Einbettung eine Tabelle (Kacheln sind Operator-Konfiguration). Ein `cards`-View ohne `groupBy` ist jetzt das
 Obsidian-Kartenraster, mit `groupBy` bleibt es das Kanban-Board.
@@ -33,9 +33,9 @@ Cards-Schlüssel (`image`, `imageFit`, `imageAspectRatio`, `cardSize`) stammen a
 
 ### P4 — Ansichts-Einstellungen
 - R4.1 `groupOrder` (Liste, leere Liste blendet alle Gruppen aus, `null` = Elemente ohne Wert) in Parser, Serializer, Tabelle/Karten/Liste/Kanban.
-- R4.2 Tabelle: `rowHeight` (short/medium/tall/extraTall).
+- R4.2 Tabelle: `rowHeight` (`medium`/`tall`/`extra`; kurz = Schlüssel fehlt) — umgesetzt.
 - R4.3 Karten: `image`, `imageFit` (cover/contain), `imageAspectRatio`, `cardSize`.
-- R4.4 Liste: Marker (bullets/numbers/none), Einrückung, Trennzeichen.
+- R4.4 Liste: `markers` (`number`/`none`; Aufzählung = Schlüssel fehlt), `indentProperties`, `separator` — umgesetzt. Standard laut Doku: Trennzeichen ein Komma, nur ohne „Eigenschaften einrücken"; mit Einrücken steht jede Eigenschaft in einer eigenen Zeile (Slatebase zeigt dabei die Bezeichner). Ein Leerzeichen nach dem Trennzeichen ist Slatebase-Wahl. Nicht belegt: Standard von Markierung (Aufzählung angenommen) und Einrücken (aus angenommen), Zeilenhöhe (kurz angenommen).
 - R4.5 Toolbar: Ergebnisse kopieren und CSV exportieren.
 - Unbekannte Schlüssel bleiben im Round-Trip erhalten (Passthrough).
 

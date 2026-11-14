@@ -16,6 +16,7 @@ const doc: BaseDocument = {
 const view: BaseView = {
   type: 'list',
   order: ['file.name', 'status', 'days_left'],
+  indentProperties: true,
 }
 
 const rows: BaseRow[] = [
