@@ -10,7 +10,7 @@ import type { ILogger } from '../logger/index.js'
 import type { SessionContext } from '../auth/index.js'
 import type { IVaultAccessControl } from '../business/index.js'
 import type { IVaultRegistry } from '../vault/registry.js'
-import { validateFilePath, PathTraversalError } from '../vault/index.js'
+import { validateFilePath, assertRealPathInsideVault, PathTraversalError } from '../vault/index.js'
 import type { IEventBus } from '../realtime/types.js'
 import type { UploadConfig } from '../config/index.js'
 import { UploadTooLargeError, UploadLimitExceededError } from '../upload/errors.js'
@@ -264,6 +264,8 @@ export function createUploadRoutes(deps: UploadRouteDependencies): Hono {
         let absolutePath: string
         try {
           absolutePath = validateFilePath(vaultPath, relativePath)
+          // Symlink-aware: a link inside the vault must not lead the write (or mkdir) outside
+          await assertRealPathInsideVault(vaultPath, absolutePath, { vaultId, requestedPath: relativePath, logger })
         } catch (error) {
           if (error instanceof PathTraversalError) {
             const apiError = createApiError('PATH_TRAVERSAL', error.message)

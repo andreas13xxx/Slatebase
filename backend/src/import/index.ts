@@ -7,7 +7,7 @@ import { createWriteStream } from 'node:fs'
 import type { ILogger } from '../logger/index.js'
 import type { IConfigService } from '../config/index.js'
 import type { IVaultManager } from '../vault/index.js'
-import { validateFilePath } from '../vault/index.js'
+import { validateFilePath, assertRealPathInsideVault } from '../vault/index.js'
 import { VaultNotFoundError } from '../business/index.js'
 
 // --- Custom Errors ---
@@ -124,9 +124,10 @@ export class ImportService implements IImportService {
     }
 
     // 4. Check for name conflict at root level
-    const targetPath = validateFilePath(vault.info.path, file.name)
+    const targetPath = await this.resolveContained(vaultId, vault.info.path, file.name)
     try {
-      await fs.access(targetPath)
+      // lstat, not access: a dangling symlink at the target counts as a conflict
+      await fs.lstat(targetPath)
       // If access succeeds, the file already exists
       throw new FileConflictError(
         `A file named '${file.name}' already exists at the target location`,
@@ -205,9 +206,9 @@ export class ImportService implements IImportService {
 
     // 4. Check for name conflicts at all target paths before writing
     for (const file of files) {
-      const targetPath = validateFilePath(vault.info.path, file.relativePath)
+      const targetPath = await this.resolveContained(vaultId, vault.info.path, file.relativePath)
       try {
-        await fs.access(targetPath)
+        await fs.lstat(targetPath)
         // If access succeeds, there's a conflict
         throw new FileConflictError(
           `A file or folder already exists at '${file.relativePath}'`,
@@ -223,7 +224,7 @@ export class ImportService implements IImportService {
     // Also check if any intermediate directories conflict with existing files
     const allDirs = this.extractDirectories(files)
     for (const dir of allDirs) {
-      const dirPath = validateFilePath(vault.info.path, dir)
+      const dirPath = await this.resolveContained(vaultId, vault.info.path, dir)
       try {
         const stat = await fs.stat(dirPath)
         if (!stat.isDirectory()) {
@@ -247,11 +248,11 @@ export class ImportService implements IImportService {
       // Create all needed directories first
       const dirsToCreate = this.extractDirectories(files)
       for (const dir of dirsToCreate) {
-        const dirPath = validateFilePath(vault.info.path, dir)
+        const dirPath = await this.resolveContained(vaultId, vault.info.path, dir)
         // Check if directory already exists before tracking it as created
         let existed = false
         try {
-          await fs.access(dirPath)
+          await fs.lstat(dirPath)
           existed = true
         } catch {
           // Doesn't exist yet
@@ -266,7 +267,7 @@ export class ImportService implements IImportService {
 
       // Write all files
       for (const file of files) {
-        const targetPath = validateFilePath(vault.info.path, file.relativePath)
+        const targetPath = await this.resolveContained(vaultId, vault.info.path, file.relativePath)
 
         const nodeReadable = Readable.fromWeb(file.stream as import('node:stream/web').ReadableStream)
         const writeStream = createWriteStream(targetPath)
@@ -310,6 +311,17 @@ export class ImportService implements IImportService {
       filesImported: files.length,
       dirsCreated: createdDirs.length,
     })
+  }
+
+  /**
+   * Lexical check plus symlink-aware containment (also for not-yet-existing targets).
+   * Throws PathTraversalError carrying only the relative path, never the server path.
+   * shortcut: check-then-write is not atomic (TOCTOU), same as the other vault writers.
+   */
+  private async resolveContained(vaultId: string, vaultPath: string, relativePath: string): Promise<string> {
+    const resolved = validateFilePath(vaultPath, relativePath)
+    await assertRealPathInsideVault(vaultPath, resolved, { vaultId, requestedPath: relativePath, logger: this.logger })
+    return resolved
   }
 
   /**
