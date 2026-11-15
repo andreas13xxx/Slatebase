@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.85.1](https://github.com/andreas13xxx/Slatebase/compare/v0.85.0...v0.85.1) (2026-11-15)
+
+
+### Bugfixes
+
+* **plugins:** add registeredTypeWidgets to metadataTypeManager shim ([0a7c3a9](https://github.com/andreas13xxx/Slatebase/commit/0a7c3a9b8b3a934a47cf22c396477bf64b6faec3))
+* **plugins:** add registeredTypeWidgets to metadataTypeManager shim ([ac3f9e0](https://github.com/andreas13xxx/Slatebase/commit/ac3f9e09545072a791362f6de11aaf0ec900f702))
+
+
+### Sonstige Änderungen
+
+* hide release markers in welcome vault meta, add timestamp ([f7637ee](https://github.com/andreas13xxx/Slatebase/commit/f7637ee61e30c95658cf7386cf3c9750fb752629))
+* hide release markers in welcome vault meta, add timestamp ([bfacca2](https://github.com/andreas13xxx/Slatebase/commit/bfacca2bb505c65b5c45a9bb521986ac45519f0e))
+
 ## [0.85.0](https://github.com/andreas13xxx/Slatebase/compare/v0.84.0...v0.85.0) (2026-11-15)
 
 
