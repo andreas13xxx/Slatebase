@@ -460,7 +460,8 @@
 .bases-kanban {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  /* Columns run to the bottom of the view, so an empty column is still a drop target. */
+  align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: auto;
@@ -549,6 +550,8 @@
   flex-direction: column;
   gap: 6px;
   padding: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
