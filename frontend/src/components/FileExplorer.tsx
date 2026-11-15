@@ -162,18 +162,32 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     return tree
   }, [apiClient, dispatch])
 
-  // Persist expanded paths/vaults to workspace store
+  // Persist expanded paths/vaults to workspace store. Once the vault list is known,
+  // IDs of vaults that no longer exist are dropped so stale entries do not linger.
   useEffect(() => {
-    updateExpandedState([...expandedPaths], [...expandedVaults])
-  }, [expandedPaths, expandedVaults])
+    if (state.vaults.length === 0) {
+      updateExpandedState([...expandedPaths], [...expandedVaults])
+      return
+    }
+    const knownIds = new Set(state.vaults.map((v) => v.id))
+    updateExpandedState(
+      [...expandedPaths].filter((key) => knownIds.has(key.split('::')[0] ?? '')),
+      [...expandedVaults].filter((id) => knownIds.has(id)),
+    )
+  }, [expandedPaths, expandedVaults, state.vaults])
 
   // On mount: lazy-load trees for vaults that were persisted as expanded
   const hasLoadedPersistedVaultsRef = useRef(false)
   useEffect(() => {
     if (hasLoadedPersistedVaultsRef.current) return
     if (expandedVaults.size === 0) return
+    // Wait for the vault list: persisted IDs of vaults that no longer exist (deleted,
+    // or no longer shared) must not be fetched — every one of them is a 404 on /tree.
+    if (state.vaults.length === 0) return
     hasLoadedPersistedVaultsRef.current = true
+    const knownIds = new Set(state.vaults.map((v) => v.id))
     for (const vaultId of expandedVaults) {
+      if (!knownIds.has(vaultId)) continue
       if (!state.vaultTrees[vaultId] && apiClient && !state.vaultTreesLoading.has(vaultId)) {
         dispatch({ type: 'VAULT_TREE_LOADING', payload: vaultId })
         refreshVaultTree(vaultId).catch(
@@ -181,7 +195,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         )
       }
     }
-  }, [expandedVaults, state.vaultTrees, state.vaultTreesLoading, dispatch, refreshVaultTree])
+  }, [expandedVaults, state.vaults, state.vaultTrees, state.vaultTreesLoading, dispatch, refreshVaultTree])
 
   useEffect(() => {
     if (!publicSharesEnabled || !apiClient) return

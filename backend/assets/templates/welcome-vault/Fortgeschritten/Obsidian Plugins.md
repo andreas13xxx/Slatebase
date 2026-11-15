@@ -113,6 +113,9 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Better Word Count | Gut | Erweiterte Statusleisten-Statistik (Sätze, Lesezeit, Seitenanzahl), mit echtem Plugin-Bundle verifiziert |
 | Style Settings | Teilweise | Theme-Einstellungen: Variablen wirken voll, Klassen-Schalter nur wo Slatebase das Element hat |
 | Maps | Gut | Fügt Bases eine Karten-Ansicht (`type: map`) hinzu — Notizen mit Geokoordinaten als Pins. Slatebase hat keine eingebaute Karte; diese Ansicht kommt nur von diesem Plugin. Demo: [[Features/Beispiel-Orte (Base)]] |
+| Base Graph | Gut | Fügt Bases eine Graph-Ansicht (`type: base-graph`) hinzu — Notizen als kräftegesteuerter Graph. Demo: [[Features/Beispiel-Aufgaben (Base)]] |
+| Bases Charts | Gut | Fügt Bases Balken-/Linien-/Streudiagramme hinzu (`type: chart-bar` usw.). Demo: [[Features/Beispiel-Aufgaben (Base)]] |
+| Bases Timeline View | Gut | Fügt Bases eine Zeitleiste (`type: timeline-view`) hinzu — Notizen mit Start-/Enddatum als Balken. Demo: [[Features/Beispiel-Projekte (Base)]] |
 
 Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
 

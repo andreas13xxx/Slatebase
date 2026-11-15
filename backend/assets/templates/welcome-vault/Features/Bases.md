@@ -172,6 +172,14 @@ Eine Base kann mehrere Ansichten enthalten; oben erscheint dann ein Umschalter.
 - **Gruppen in Tabelle und Liste** — ein `groupBy` an einer Tabellen- oder Listenansicht teilt die Zeilen in Gruppen mit Kopfzeile (Name und Anzahl). Ein Klick auf die Kopfzeile klappt die Gruppe ein oder aus. `groupOrder` wirkt wie in der Kanban-Ansicht: nur die genannten Gruppen erscheinen, in dieser Reihenfolge; `null` steht für Notizen ohne Wert; eine leere Liste blendet alle Gruppen aus. Ohne `groupOrder` sind die Gruppen nach Wert sortiert (`direction: DESC` kehrt um), die Gruppe „Ohne …" steht zuletzt. Das Einklappen wird nicht gespeichert.
 - **Karte** (`type: map`) — Slatebase bringt keine eingebaute Kartenansicht mit; sie kommt vom Obsidian-Community-Plugin **Maps** (aktiviere die Obsidian-Plugin-Kompatibilität und installiere das Plugin). Das Plugin registriert die Ansicht `type: map` und zeichnet Notizen mit Geokoordinaten als Pins auf eine Karte. Die Demo-Base „Beispiel-Orte" nutzt diese Ansicht; ohne das Plugin fällt sie auf die Tabelle zurück.
 
+### Weitere Ansichten aus Plugins
+
+Diese Ansichten liefern Community-Plugins (siehe [[Fortgeschritten/Obsidian Plugins]]). Jede Demo trägt zusätzlich eine `type: table`-Ansicht, sodass sie ohne Plugin auf eine Tabelle zurückfällt statt leer zu bleiben.
+
+- **Graph** (`type: base-graph`, Plugin **Base Graph**) — zeichnet die Notizen der Base als kräftegesteuerten Graph; Kanten sind die Wikilinks zwischen den Notizen. Die Aufgaben-Demo [[Features/Beispiel-Aufgaben (Base)]] enthält diese Ansicht; die Beispiel-Aufgaben verlinken aufeinander, sodass Kanten entstehen.
+- **Diagramm** (`type: chart-bar` / `chart-line` / `chart-scatter`, Plugin **Bases Charts**) — Balken-, Linien- oder Streudiagramm. Die X-Achse (`x`) wählst du als Property/Formel, die Y-Werte kommen aus den Zahlen-Spalten der Ansicht. Die Demo [[Features/Beispiel-Aufgaben (Base)]] zeigt den Aufwand je Aufgabe als Balkendiagramm (X = Aufgabe, Y = `estimate`).
+- **Zeitleiste** (`type: timeline-view`, Plugin **Bases Timeline View**) — trägt Notizen mit Start- und End-Datum auf einer Zeitachse als Balken ab. Die Felder legst du über `startField` / `endField` / `contentField` fest. Die Demo [[Features/Beispiel-Projekte (Base)]] zeigt vier Beispielprojekte entlang des Jahres.
+
 ```yaml
 views:
   - type: table

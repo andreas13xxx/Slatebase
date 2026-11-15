@@ -11,4 +11,5 @@ tags: [beispiel, task]
 
 Geh die Feature-Guides durch und korrigiere veraltete Screenshots.
 
-Dies ist eine Beispielnotiz für den [[Features/Bases|Bases]]-Guide.
+Dies ist eine Beispielnotiz für den [[Features/Bases|Bases]]-Guide. Folgt auf
+[[Features/Beispiel-Aufgaben/Projektantrag schreiben]].

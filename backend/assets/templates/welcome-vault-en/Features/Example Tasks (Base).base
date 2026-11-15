@@ -34,3 +34,12 @@ views:
       file.name: Filled
       estimate: Sum
       formula.days_left: Average
+  - type: chart-bar
+    name: "Effort (chart)"
+    x: file.name
+    order:
+      - estimate
+  - type: base-graph
+    name: "Connections (graph)"
+    order:
+      - file.name

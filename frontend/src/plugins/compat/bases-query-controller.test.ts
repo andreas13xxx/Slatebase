@@ -93,6 +93,36 @@ describe('BasesQueryController', () => {
     expect(api.queryBase).toHaveBeenCalledTimes(1)
   })
 
+  it('reports a single key-less group for an ungrouped view', async () => {
+    const ctrl = new BasesQueryController({ apiClient: makeApiClient(result), vaultId: 'v1', doc, view, target })
+    await ctrl.start()
+    const groups = (target.data as { groupedData: Array<{ hasKey(): boolean; entries: unknown[] }> }).groupedData
+    expect(groups).toHaveLength(1)
+    expect(groups[0]!.hasKey()).toBe(false)
+    expect(groups[0]!.entries).toHaveLength(2)
+    ctrl.stop()
+  })
+
+  it('splits entries into groups per groupBy; notes without a value form a key-less group last', async () => {
+    const grouped: BaseView = { ...view, groupBy: { property: 'status', direction: 'ASC' } } as BaseView
+    const res: BaseQueryResultWire = {
+      rows: [
+        { path: 'a.md', fileName: 'a', values: { status: ['open'] } },
+        { path: 'b.md', fileName: 'b', values: { status: ['done'] } },
+        { path: 'c.md', fileName: 'c', values: { status: ['open'] } },
+        { path: 'd.md', fileName: 'd', values: {} },
+      ],
+      total: 4,
+    }
+    const ctrl = new BasesQueryController({ apiClient: makeApiClient(res), vaultId: 'v1', doc, view: grouped, target })
+    await ctrl.start()
+    const groups = (target.data as { groupedData: Array<{ key: { toString(): string } | null; hasKey(): boolean; entries: unknown[] }> }).groupedData
+    expect(groups.map((g) => g.key?.toString() ?? null)).toEqual(['done', 'open', null])
+    expect(groups.map((g) => g.entries.length)).toEqual([1, 2, 1])
+    expect(groups[2]!.hasKey()).toBe(false)
+    ctrl.stop()
+  })
+
   it('reports a query error through onError', async () => {
     const api = { queryBase: vi.fn().mockRejectedValue(new Error('boom')), getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }) } as unknown as IApiClient
     const onError = vi.fn()

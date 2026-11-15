@@ -13,4 +13,5 @@ Entwirf den Q4-Projektantrag und schicke ihn zur Rückmeldung in die Runde.
 
 Dies ist eine Beispielnotiz für den [[Features/Bases|Bases]]-Guide. Die Tabelle
 [[Features/Beispiel-Aufgaben (Base)]] liest ihre Properties `type`, `status`,
-`priority` und `deadline` aus der Frontmatter oben.
+`priority` und `deadline` aus der Frontmatter oben. Baut auf
+[[Features/Beispiel-Aufgaben/Vault einrichten]] auf.

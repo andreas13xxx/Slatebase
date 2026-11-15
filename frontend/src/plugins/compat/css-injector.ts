@@ -14,8 +14,8 @@
 
 import { OBSIDIAN_HOST_BODY_CLASSES } from './body-classes';
 
-/** Maximum allowed CSS size in bytes (512 KB). */
-const MAX_CSS_SIZE_BYTES = 512 * 1024;
+/** Maximum allowed CSS size in bytes (2 MB — large plugins such as TaskNotes ship ~650 KB). */
+const MAX_CSS_SIZE_BYTES = 2 * 1024 * 1024;
 
 /**
  * ICssInjector — Interface for CSS injection and removal.
@@ -478,7 +478,7 @@ export class CssInjector implements ICssInjector {
     const byteLength = new TextEncoder().encode(css).length;
     if (byteLength > MAX_CSS_SIZE_BYTES) {
       console.error(
-        `[plugin:${pluginId}] styles.css exceeds maximum size of 512 KB (${byteLength} bytes). CSS not injected.`
+        `[plugin:${pluginId}] styles.css exceeds maximum size of 2 MB (${byteLength} bytes). CSS not injected.`
       );
       return;
     }

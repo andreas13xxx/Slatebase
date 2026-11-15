@@ -454,6 +454,26 @@ export class AppShim implements IAppShim {
     openTabById: (_id: string): boolean => false,
   }
 
+  private _renderContext: unknown = null;
+
+  /**
+   * `app.renderContext` — the `RenderContext` Obsidian hands to `Value.renderTo()`
+   * (TaskNotes calls `value.renderTo(el, app.renderContext)` for every Bases cell).
+   * Without it the Proxy returned a truthy no-op function, which plugins then
+   * treated as a real context. Created lazily (the global class is installed after
+   * this module loads); `onOpenNote` makes rendered links open the note.
+   */
+  get renderContext(): unknown {
+    if (this._renderContext) return this._renderContext;
+    const Ctor = (window.obsidian as Record<string, unknown> | undefined)?.['RenderContext'] as
+      (new () => { onOpenNote?: (path: string) => void }) | undefined;
+    if (!Ctor) return undefined;
+    const ctx = new Ctor();
+    ctx.onOpenNote = (path: string) => { void this.workspace.openLinkText(path, ''); };
+    this._renderContext = ctx;
+    return ctx;
+  }
+
   /**
    * metadataTypeManager — Obsidian-internal registry of frontmatter property
    * types (undocumented; backs the Properties view's type icons/pickers).
@@ -761,6 +781,7 @@ export class AppShim implements IAppShim {
       'keymap',
       'scope',
       'metadataTypeManager',
+      'renderContext',
       'viewRegistry',
       'isMobile',
       'appId',

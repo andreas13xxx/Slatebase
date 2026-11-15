@@ -1006,6 +1006,28 @@ export function PluginProvider({
             'The suggester exposes neither a CodeMirror `provider` nor the EditorSuggest interface (onTrigger/getSuggestions), so it cannot be wired up.',
           )
         }
+
+        // A plugin may define its OWN method under one of these names — with a different
+        // meaning than Obsidian's (bases-timeline-view has `registerView()` taking no
+        // arguments, which calls `registerBasesView`). In Obsidian the subclass method
+        // wins. The instance-level wiring above shadows prototype methods, so remove it
+        // again for every name the plugin class itself defines; otherwise the plugin's
+        // method never runs (here: the Timeline view was never registered).
+        const wiredNames = [
+          'registerView', 'registerExtensions', 'registerEditorExtension', 'registerEditorSuggest',
+          'registerMarkdownCodeBlockProcessor', 'registerMarkdownPostProcessor',
+        ] as const
+        const PluginBase = (window.obsidian as Record<string, unknown> | undefined)?.['Plugin'] as { prototype?: object } | undefined
+        for (const name of wiredNames) {
+          let proto: object | null = Object.getPrototypeOf(instance)
+          while (proto && proto !== PluginBase?.prototype && proto !== Object.prototype) {
+            if (Object.prototype.hasOwnProperty.call(proto, name)) {
+              delete (instance as unknown as Record<string, unknown>)[name]
+              break
+            }
+            proto = Object.getPrototypeOf(proto)
+          }
+        }
       },
     })
 

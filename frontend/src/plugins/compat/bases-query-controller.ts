@@ -20,7 +20,8 @@ import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import type { PropertyType } from '../../state/propertyTypes'
 import { runBaseQuery } from '../../bases/query-engine'
-import { evaluateFormula } from '@slatebase/shared-contracts'
+import { evaluateFormula, rowValueKey } from '@slatebase/shared-contracts'
+import { groupRows, UNGROUPED } from '../../components/bases/base-groups'
 import type { FormulaContext } from '@slatebase/shared-contracts'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { extractErrorMessage } from '../../utils/error'
@@ -143,8 +144,9 @@ export class BasesQueryController {
       const entries = rows.map((row) => this.buildEntry(row))
       const columns = this.view.order ?? Object.keys(this.doc.properties ?? {})
       this.target.allProperties = columns
-      const QueryResult = window.obsidian?.['BasesQueryResult'] as unknown as (new (e: unknown[]) => unknown) | undefined
-      this.target.data = QueryResult ? new QueryResult(entries) : entries
+      const QueryResult = window.obsidian?.['BasesQueryResult'] as unknown as (new (e: unknown[], g?: unknown[]) => unknown) | undefined
+      const groups = this.buildGroups(rows, entries)
+      this.target.data = QueryResult ? new QueryResult(entries, groups) : entries
       try {
         this.target.onDataUpdated?.()
       } catch (err) {
@@ -153,6 +155,28 @@ export class BasesQueryController {
     } catch (err) {
       if (!this.stopped) this.onError(extractErrorMessage(err, 'Die Base-Abfrage ist fehlgeschlagen'))
     }
+  }
+
+  /**
+   * Splits the entries into `BasesEntryGroup`s per the view's `groupBy` (same
+   * grouping as the built-in table: `groupOrder`, direction, "no value" last).
+   * Returns `undefined` for an ungrouped view — `BasesQueryResult` then reports
+   * the single key-less group Obsidian reports for it.
+   */
+  private buildGroups(rows: BaseRow[], entries: unknown[]): unknown[] | undefined {
+    const grouped = groupRows(rows, this.view)
+    if (!grouped) return undefined
+    const GroupCtor = window.obsidian?.['BasesEntryGroup'] as unknown as (new () => { key: unknown; entries: unknown[] }) | undefined
+    if (!GroupCtor) return undefined
+    const entryByRow = new Map<BaseRow, unknown>(rows.map((row, i) => [row, entries[i]]))
+    const property = rowValueKey(this.view.groupBy?.property ?? '')
+    return grouped.map((g) => {
+      const group = new GroupCtor()
+      // A group of notes without a value has no key (`hasKey()` is false).
+      group.key = g.key === UNGROUPED ? null : toValue([g.key], this.declaredTypes.get(property))
+      group.entries = g.rows.map((r) => entryByRow.get(r))
+      return group
+    })
   }
 
   /** Builds a BasesEntry (via the global class) for one row, with Value columns. */
