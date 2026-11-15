@@ -172,12 +172,12 @@ export function setOrder(doc: BaseDocument, index: number, order: string[]): Bas
  * Sets the explicit order of Kanban/cards groups (`groupOrder`), e.g. after a
  * drag-reorder of the columns. An empty list removes the key (fall back to the
  * default alphabetical order) rather than writing `groupOrder: []`, which
- * Obsidian reads as "hide all groups".
+ * Obsidian reads as "hide all groups" — unless `keepEmpty` asks for exactly that.
  */
-export function setGroupOrder(doc: BaseDocument, index: number, groupOrder: BaseGroupValue[]): BaseDocument {
+export function setGroupOrder(doc: BaseDocument, index: number, groupOrder: BaseGroupValue[], keepEmpty = false): BaseDocument {
   return withView(doc, index, (v) => {
     const { groupOrder: _old, ...rest } = v
-    return groupOrder.length > 0 ? { ...rest, groupOrder } : rest
+    return groupOrder.length > 0 || keepEmpty ? { ...rest, groupOrder } : rest
   })
 }
 

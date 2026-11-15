@@ -488,6 +488,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={displayRows}
           layout={isKanbanView ? 'columns' : 'rows'}
+          vaultId={vaultId}
           onOpenNote={onOpenNote}
           onMoveCard={readOnly ? undefined : handleMoveCard}
           onAddCard={readOnly ? undefined : handleAddCardInColumn}
@@ -501,6 +502,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={displayRows}
           vaultId={vaultId}
+          readOnly={readOnly}
           onOpenNote={onOpenNote}
         />
       )}

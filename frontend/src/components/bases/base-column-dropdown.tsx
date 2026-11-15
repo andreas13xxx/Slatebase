@@ -13,6 +13,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check } from 'lucide-react'
+import { rowValueKey } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseRow } from '@slatebase/shared-contracts'
 import type { ColumnChoice } from './base-edit'
 import { ColumnTypeIcon } from './base-column-icon'
@@ -41,8 +42,10 @@ export interface ColumnDropdownProps {
 }
 
 export function ColumnDropdown({
-  doc, rows, columns, value, onChange, label, disabled, allowEmpty, emptyLabel,
+  doc, rows, columns, value: rawValue, onChange, label, disabled, allowEmpty, emptyLabel,
 }: ColumnDropdownProps): ReactNode {
+  // A stored `note.status` is the same column as the offered `status`.
+  const value = rawValue === '' ? '' : rowValueKey(rawValue)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)

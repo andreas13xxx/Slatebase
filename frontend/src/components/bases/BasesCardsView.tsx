@@ -18,6 +18,7 @@ import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contract
 import { formatFormulaValue, evaluateFormula, rowContext } from '@slatebase/shared-contracts'
 import { AppContext } from '../../state'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { useCardContextMenu } from './base-card-menu'
 import { parseCardImage } from './cardImage'
 import type { CardImage } from './cardImage'
 import { CARD_RATIO, CARD_SIZE, clampTo, columnLabel as baseColumnLabel } from './base-edit'
@@ -27,6 +28,7 @@ export interface BasesCardsViewProps {
   view: BaseView
   rows: BaseRow[]
   vaultId: string
+  readOnly?: boolean
   onOpenNote: (path: string) => void
 }
 
@@ -43,7 +45,8 @@ function firstValue(row: BaseRow, key: string): string {
   return String(v)
 }
 
-export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, vaultId, onOpenNote }: BasesCardsViewProps) {
+export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, vaultId, readOnly, onOpenNote }: BasesCardsViewProps) {
+  const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, readOnly)
   const tree = useContext(AppContext)?.state.directoryTree ?? null
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
 
@@ -85,6 +88,7 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
   const gridStyle = { '--bases-card-size': `${cardSize}px` } as CSSProperties
 
   return (
+    <>
     <ul className="bases-cards" role="list" aria-label="Karten-Ansicht" style={gridStyle}>
       {rows.map((row) => {
         const image = imageFor(row)
@@ -105,17 +109,16 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
         }
         return (
           <li key={row.path} className="bases-cards__item">
-            <button type="button" className="bases-cards__card" onClick={() => onOpenNote(row.path)}>
+            <button type="button" className="bases-cards__card" onClick={() => onOpenNote(row.path)} onContextMenu={(e) => openMenu(e, row.path)}>
               {cover}
               <span className="bases-cards__body">
                 <span className="bases-list__title">{row.fileName}</span>
                 {detailColumns.map((col) => {
                   const text = cellText(row, col)
-                  if (!text) return null
                   return (
-                    <span key={col} className="bases-list__chip">
+                    <span key={col} className={text ? 'bases-list__chip' : 'bases-list__chip bases-list__chip--empty'}>
                       <span className="bases-list__chip-key">{columnLabel(col)}</span>
-                      <span className="bases-list__chip-val">{text}</span>
+                      <span className="bases-list__chip-val">{text || '–'}</span>
                     </span>
                   )
                 })}
@@ -125,5 +128,7 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
         )
       })}
     </ul>
+    {cardMenu}
+    </>
   )
 })
