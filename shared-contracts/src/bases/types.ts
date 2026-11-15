@@ -128,6 +128,20 @@ export interface BaseView {
   cardSize?: number
   /** Column id → named summary aggregation. */
   summaries?: BaseSummaries
+  /**
+   * Table: row height. Obsidian writes `medium`, `tall` or `extra`; absent is the
+   * default (short). Unknown values are kept as written and shown as the default.
+   */
+  rowHeight?: string
+  /**
+   * List: marker in front of each entry. Obsidian writes `number` or `none`;
+   * absent is the default (bullet). Unknown values are kept and shown as bullets.
+   */
+  markers?: string
+  /** List: indent the property line under the entry title. */
+  indentProperties?: boolean
+  /** List: text between the property values of one entry (Obsidian writes e.g. `;`). */
+  separator?: string
   /** Unknown fields preserved for round-trip compatibility. */
   _unknown?: Record<string, unknown>
 }

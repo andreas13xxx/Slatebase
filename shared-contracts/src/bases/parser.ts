@@ -146,7 +146,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'rowHeight', 'markers', 'indentProperties', 'separator']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -233,6 +233,18 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   if (isString(raw['imageFit'])) view.imageFit = raw['imageFit']
   if (typeof raw['imageAspectRatio'] === 'number') view.imageAspectRatio = raw['imageAspectRatio']
   if (typeof raw['cardSize'] === 'number') view.cardSize = raw['cardSize']
+  if (isString(raw['rowHeight'])) view.rowHeight = raw['rowHeight']
+  if (isString(raw['markers'])) view.markers = raw['markers']
+  if (typeof raw['indentProperties'] === 'boolean') view.indentProperties = raw['indentProperties']
+  if (isString(raw['separator'])) view.separator = raw['separator']
+  for (const key of ['rowHeight', 'markers', 'separator'] as const) {
+    if (raw[key] !== undefined && !isString(raw[key])) {
+      errors.push({ message: `view "${key}" must be a string`, path: `views[${index}].${key}` })
+    }
+  }
+  if (raw['indentProperties'] !== undefined && typeof raw['indentProperties'] !== 'boolean') {
+    errors.push({ message: 'view "indentProperties" must be true or false', path: `views[${index}].indentProperties` })
+  }
   const summaries = parseSummaries(raw['summaries'], errors, `views[${index}].summaries`)
   if (summaries) view.summaries = summaries
 

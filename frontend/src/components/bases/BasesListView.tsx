@@ -81,6 +81,15 @@ export const BasesListView = memo(function BasesListView({
   const [collapsed, toggleGroup] = useCollapsedGroups()
   const groupPropertyLabel = columnLabel(view.groupBy?.property ?? '')
 
+  // Markers: Obsidian writes `number` or `none`; absent (or anything else) is a bullet.
+  const markerKind = view.markers === 'number' || view.markers === 'none' ? view.markers : 'bullet'
+  const listClass = `bases-list bases-list--${markerKind}`
+  // Obsidian: with "indent properties" off the values run on in one line, divided by the separator
+  // (default a comma); with it on each property is its own indented item and the separator is not used.
+  const indent = view.indentProperties === true
+  const separator = view.separator ?? ','
+  const joiner = /\s$/.test(separator) ? separator : `${separator} `
+
   const renderItem = (row: BaseRow) => (
           <li key={row.path} className="bases-list__item">
             <button
@@ -90,18 +99,24 @@ export const BasesListView = memo(function BasesListView({
             >
               <span className="bases-list__title">{row.fileName}</span>
               {detailColumns.length > 0 && (
-                <span className="bases-list__details">
-                  {detailColumns.map((col) => {
-                    const text = cellText(row, col)
-                    if (!text) return null
-                    return (
-                      <span key={col} className="bases-list__chip">
-                        <span className="bases-list__chip-key">{columnLabel(col)}</span>
-                        <span className="bases-list__chip-val">{text}</span>
-                      </span>
-                    )
-                  })}
-                </span>
+                indent ? (
+                  <span className="bases-list__details bases-list__details--indent">
+                    {detailColumns.map((col) => {
+                      const text = cellText(row, col)
+                      if (!text) return null
+                      return (
+                        <span key={col} className="bases-list__chip">
+                          <span className="bases-list__chip-key">{columnLabel(col)}</span>
+                          <span className="bases-list__chip-val">{text}</span>
+                        </span>
+                      )
+                    })}
+                  </span>
+                ) : (
+                  <span className="bases-list__details bases-list__details--joined">
+                    {detailColumns.map((col) => cellText(row, col)).filter((t) => t !== '').join(joiner)}
+                  </span>
+                )
               )}
             </button>
           </li>
@@ -138,12 +153,12 @@ export const BasesListView = memo(function BasesListView({
                 {groupLabel(g.key, groupPropertyLabel)}
                 <span className="bases-list__group-count"> ({g.rows.length})</span>
               </button>
-              {!collapsed[g.key] && <ul className="bases-list">{g.rows.map(renderItem)}</ul>}
+              {!collapsed[g.key] && <ul className={listClass}>{g.rows.map(renderItem)}</ul>}
             </section>
           ))}
         </div>
       ) : (
-        <ul className="bases-list" role="list" aria-label="Listen-Ansicht">
+        <ul className={listClass} role="list" aria-label="Listen-Ansicht">
           {rows.map(renderItem)}
         </ul>
       )}
