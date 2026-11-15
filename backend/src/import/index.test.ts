@@ -12,6 +12,7 @@ import {
   FileCountExceededError,
 } from './index.js'
 import { VaultNotFoundError } from '../business/index.js'
+import { PathTraversalError } from '../vault/index.js'
 import type { IVaultManager, Vault } from '../vault/index.js'
 import type { IConfigService, ServerConfig } from '../config/index.js'
 import type { ILogger } from '../logger/index.js'
@@ -625,5 +626,54 @@ describe('ImportService', () => {
       expect(contentA).toBe('a')
     })
 
+  })
+
+  describe('symlink escape', () => {
+    let outside: string
+
+    beforeEach(async () => {
+      outside = path.join(tempDir, 'outside')
+      await fs.mkdir(outside, { recursive: true })
+      await fs.symlink(outside, path.join(vaultPath, 'link'), 'dir')
+    })
+
+    function newService(): ImportService {
+      return new ImportService(createMockVaultManager(createTestVault()), createMockConfig(), createMockLogger())
+    }
+
+    it('importFolder refuses to write through a symlinked directory', async () => {
+      const err = await newService()
+        .importFolder('testvault123', [createUploadedFileWithPath('link/evil.txt', 'x')])
+        .catch((e: Error) => e)
+      expect(err).toBeInstanceOf(PathTraversalError)
+      expect((err as Error).message).not.toContain(tempDir)
+      await expect(fs.access(path.join(outside, 'evil.txt'))).rejects.toThrow()
+    })
+
+    it('importFolder refuses to create directories through a symlink', async () => {
+      await expect(
+        newService().importFolder('testvault123', [createUploadedFileWithPath('link/sub/evil.txt', 'x')]),
+      ).rejects.toBeInstanceOf(PathTraversalError)
+      await expect(fs.access(path.join(outside, 'sub'))).rejects.toThrow()
+    })
+
+    it('importFolder refuses a dangling symlink as file target', async () => {
+      await fs.symlink(path.join(outside, 'new.txt'), path.join(vaultPath, 'dangling.txt'))
+      await expect(
+        newService().importFolder('testvault123', [createUploadedFileWithPath('dangling.txt', 'x')]),
+      ).rejects.toThrow()
+      await expect(fs.access(path.join(outside, 'new.txt'))).rejects.toThrow()
+    })
+
+    it('importFile refuses a dangling symlink as file target', async () => {
+      await fs.symlink(path.join(outside, 'new.txt'), path.join(vaultPath, 'dangling.txt'))
+      await expect(newService().importFile('testvault123', createUploadedFile('dangling.txt', 'x'))).rejects.toThrow()
+      await expect(fs.access(path.join(outside, 'new.txt'))).rejects.toThrow()
+    })
+
+    it('still imports into a normal nested folder', async () => {
+      await newService().importFolder('testvault123', [createUploadedFileWithPath('ok/deep/a.txt', 'a')])
+      expect(await fs.readFile(path.join(vaultPath, 'ok', 'deep', 'a.txt'), 'utf-8')).toBe('a')
+    })
   })
 })

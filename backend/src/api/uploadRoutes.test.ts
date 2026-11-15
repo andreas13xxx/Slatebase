@@ -256,6 +256,24 @@ describe('Upload Routes', () => {
       expect(mockBus.publishCalls[0]!.type).toBe('vault:change')
     })
 
+    it('rejects a target directory that is a symlink leaving the vault', async () => {
+      const vaultDir = path.join(tempDir, 'vault')
+      const outside = path.join(tempDir, 'outside')
+      await fs.mkdir(vaultDir)
+      await fs.mkdir(outside)
+      await fs.symlink(outside, path.join(vaultDir, 'link'), 'dir')
+
+      const { app } = createTestApp({ storagePath: vaultDir })
+      const formData = new FormData()
+      formData.append('file', new File(['x'], 'evil.md'))
+      formData.append('targetDir', 'link/sub')
+
+      const res = await app.request('/api/v1/vaults/vault-1/upload', { method: 'POST', body: formData })
+      expect(res.status).toBe(400)
+      expect(JSON.stringify(await res.json())).not.toContain(tempDir)
+      expect(await fs.readdir(outside)).toEqual([])
+    })
+
     it('uploads to a target directory', async () => {
       // Create the target directory
       await fs.mkdir(path.join(tempDir, 'notes'), { recursive: true })
