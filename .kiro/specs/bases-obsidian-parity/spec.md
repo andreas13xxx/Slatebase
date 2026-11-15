@@ -34,7 +34,7 @@ Cards-Schlüssel (`image`, `imageFit`, `imageAspectRatio`, `cardSize`) stammen a
 ### P4 — Ansichts-Einstellungen
 - R4.1 `groupOrder` (Liste, leere Liste blendet alle Gruppen aus, `null` = Elemente ohne Wert) in Parser, Serializer, Tabelle/Karten/Liste/Kanban.
 - R4.2 Tabelle: `rowHeight` (`medium`/`tall`/`extra`; kurz = Schlüssel fehlt) — umgesetzt.
-- R4.3 Karten: `image`, `imageFit` (cover/contain), `imageAspectRatio`, `cardSize`.
+- R4.3 Karten: `image`, `imageFit` (`contain` = einpassen, Schlüssel fehlt = ausfüllen), `imageAspectRatio` (0,25–2,5, Standard 1), `cardSize` (50–800, Standard 200) — umgesetzt, inkl. Panel „Anzeige"; Werte außerhalb des Bereichs werden begrenzt. `image: file.file` zeigt die Notiz selbst, wenn sie ein Bild ist (Bases liefert vermutlich nur Markdown-Zeilen, ungeprüft).
 - R4.4 Liste: `markers` (`number`/`none`; Aufzählung = Schlüssel fehlt), `indentProperties`, `separator` — umgesetzt. Standard laut Doku: Trennzeichen ein Komma, nur ohne „Eigenschaften einrücken"; mit Einrücken steht jede Eigenschaft in einer eigenen Zeile (Slatebase zeigt dabei die Bezeichner). Ein Leerzeichen nach dem Trennzeichen ist Slatebase-Wahl. Nicht belegt: Standard von Markierung (Aufzählung angenommen) und Einrücken (aus angenommen), Zeilenhöhe (kurz angenommen).
 - R4.5 Toolbar: Ergebnisse kopieren und CSV exportieren.
 - Unbekannte Schlüssel bleiben im Round-Trip erhalten (Passthrough).

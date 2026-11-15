@@ -20,7 +20,7 @@ import { AppContext } from '../../state'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { parseCardImage } from './cardImage'
 import type { CardImage } from './cardImage'
-import { columnLabel as baseColumnLabel } from './base-edit'
+import { CARD_RATIO, CARD_SIZE, clampTo, columnLabel as baseColumnLabel } from './base-edit'
 
 export interface BasesCardsViewProps {
   doc: BaseDocument
@@ -30,7 +30,6 @@ export interface BasesCardsViewProps {
   onOpenNote: (path: string) => void
 }
 
-const DEFAULT_CARD_SIZE = 200
 /** Vault file URL for an image path (same raw endpoint the note viewer uses). */
 function vaultImageSrc(vaultId: string, path: string): string {
   return `/api/v1/vaults/${encodeURIComponent(vaultId)}/files?path=${encodeURIComponent(path)}&raw=true`
@@ -66,14 +65,20 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
     [formulaKeys, doc],
   )
 
+  // `file.file` is the note itself: the card shows it when it is an image.
   const imageFor = useCallback(
-    (row: BaseRow): CardImage | null => (view.image ? parseCardImage(cellText(row, view.image)) : null),
+    (row: BaseRow): CardImage | null => {
+      if (!view.image) return null
+      if (view.image === 'file.file') return /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(row.path) ? { kind: 'file', target: row.path } : null
+      return parseCardImage(cellText(row, view.image))
+    },
     [view.image, cellText],
   )
 
-  const cardSize = view.cardSize && view.cardSize > 0 ? view.cardSize : DEFAULT_CARD_SIZE
-  const ratio = view.imageAspectRatio && view.imageAspectRatio > 0 ? view.imageAspectRatio : 1
-  const fit = view.imageFit === 'contain' ? 'contain' : 'cover'
+  const cardSize = (view.cardSize !== undefined ? clampTo(view.cardSize, CARD_SIZE.min, CARD_SIZE.max) : undefined) ?? CARD_SIZE.default
+  const ratio = (view.imageAspectRatio !== undefined ? clampTo(view.imageAspectRatio, CARD_RATIO.min, CARD_RATIO.max) : undefined) ?? CARD_RATIO.default
+  // Obsidian writes `contain` for "fit in"; a missing key is "fill". Tolerates a stray trailing comma.
+  const fit = view.imageFit?.trim().startsWith('contain') ? 'contain' : 'cover'
 
   if (rows.length === 0) return <p className="bases-list__empty">Keine Einträge</p>
 

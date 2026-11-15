@@ -126,6 +126,49 @@ export function setListSeparator(doc: BaseDocument, index: number, separator: st
   })
 }
 
+/** Card options, as the Obsidian UI offers them (sample file: size 440, ratio 2.5, `contain`). */
+export const CARD_SIZE = { min: 50, max: 800, default: 200 } as const
+export const CARD_RATIO = { min: 0.25, max: 2.5, default: 1 } as const
+
+/** Clamps `value` into the range; `undefined` for anything that is not a finite number. */
+export function clampTo(value: number, min: number, max: number): number | undefined {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : undefined
+}
+
+/** The default size is never written: the key is removed instead. */
+export function setCardSize(doc: BaseDocument, index: number, size: number | undefined): BaseDocument {
+  const clamped = size === undefined ? undefined : clampTo(size, CARD_SIZE.min, CARD_SIZE.max)
+  return withView(doc, index, (v) => {
+    const { cardSize: _old, ...rest } = v
+    return clamped !== undefined && clamped !== CARD_SIZE.default ? { ...rest, cardSize: Math.round(clamped) } : rest
+  })
+}
+
+/** An empty id removes the key (no image property is the default). */
+export function setCardImageProperty(doc: BaseDocument, index: number, property: string): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { image: _old, ...rest } = v
+    return property ? { ...rest, image: property } : rest
+  })
+}
+
+/** `contain` (fit in) is written; fill (`cover`, the default) removes the key. */
+export function setCardImageFit(doc: BaseDocument, index: number, fit: 'contain' | 'cover'): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { imageFit: _old, ...rest } = v
+    return fit === 'contain' ? { ...rest, imageFit: 'contain' } : rest
+  })
+}
+
+/** The default ratio (1) is never written: the key is removed instead. */
+export function setCardImageAspectRatio(doc: BaseDocument, index: number, ratio: number | undefined): BaseDocument {
+  const clamped = ratio === undefined ? undefined : clampTo(ratio, CARD_RATIO.min, CARD_RATIO.max)
+  return withView(doc, index, (v) => {
+    const { imageAspectRatio: _old, ...rest } = v
+    return clamped !== undefined && clamped !== CARD_RATIO.default ? { ...rest, imageAspectRatio: Math.round(clamped * 100) / 100 } : rest
+  })
+}
+
 export function setOrder(doc: BaseDocument, index: number, order: string[]): BaseDocument {
   return withView(doc, index, (v) => ({ ...v, order }))
 }

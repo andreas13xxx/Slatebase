@@ -17,6 +17,7 @@ import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
   addFormula, addView, availableColumns, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
   removeFormula, renameView, rootGroup,
+  CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setCardImageFit, setCardImageProperty, setCardSize,
   setDocFilter, setGroupBy, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
@@ -182,9 +183,66 @@ const SortPanel = memo(function SortPanel({ doc, index, columns, rows, disabled,
 })
 
 /** Display options that exist for one view type only: row height (table) and marker/indent/separator (list). */
-const DisplayPanel = memo(function DisplayPanel({ doc, index, disabled, onChange }: PanelProps) {
+const DisplayPanel = memo(function DisplayPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const view = doc.views[index]
   if (!view) return null
+  if (view.type === 'cards') {
+    const numberOr = (text: string): number | undefined => {
+      const n = Number(text.replace(',', '.'))
+      return text.trim() !== '' && Number.isFinite(n) ? n : undefined
+    }
+    return (
+      <div className="bases-tb__section">
+        <div className="bases-tb__row">
+          <span>Kartengröße</span>
+          <CommitInput
+            value={String(view.cardSize ?? CARD_SIZE.default)}
+            label="Kartengröße"
+            disabled={disabled}
+            onCommit={(text) => { const n = numberOr(text); if (n !== undefined) onChange((d) => setCardSize(d, index, n)) }}
+          />
+          <span className="bases-tb__hint">{CARD_SIZE.min}–{CARD_SIZE.max}</span>
+        </div>
+        <div className="bases-tb__row">
+          <span>Bild-Eigenschaft</span>
+          <ColumnDropdown
+            doc={doc}
+            rows={rows}
+            columns={columns}
+            value={view.image ?? ''}
+            label="Bild-Eigenschaft"
+            disabled={disabled}
+            allowEmpty
+            emptyLabel="Keine"
+            onChange={(id) => onChange((d) => setCardImageProperty(d, index, id))}
+          />
+        </div>
+        <label className="bases-tb__row">
+          <span>Bildanpassung</span>
+          <select
+            className="bases-tb__select"
+            aria-label="Bildanpassung"
+            value={view.imageFit?.trim().startsWith('contain') ? 'contain' : 'cover'}
+            disabled={disabled}
+            onChange={(e) => { const fit = e.target.value === 'contain' ? 'contain' : 'cover'; onChange((d) => setCardImageFit(d, index, fit)) }}
+          >
+            <option value="cover">Ausfüllen</option>
+            <option value="contain">Einpassen</option>
+          </select>
+        </label>
+        <div className="bases-tb__row">
+          <span>Bildformat</span>
+          <CommitInput
+            value={String(view.imageAspectRatio ?? CARD_RATIO.default)}
+            label="Bildformat"
+            disabled={disabled}
+            onCommit={(text) => { const n = numberOr(text); if (n !== undefined) onChange((d) => setCardImageAspectRatio(d, index, n)) }}
+          />
+          <span className="bases-tb__hint">{CARD_RATIO.min}–{CARD_RATIO.max}</span>
+        </div>
+      </div>
+    )
+  }
   if (view.type === 'table') {
     return (
       <div className="bases-tb__section">
@@ -608,7 +666,7 @@ export const BasesToolbar = memo(function BasesToolbar({
             <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
             <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
             <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
-            {(view.type === 'table' || view.type === 'list') && (
+            {(view.type === 'table' || view.type === 'list' || view.type === 'cards') && (
               <Popover label={<><SlidersHorizontal aria-hidden="true" className="bases-tb__btn-icon" />Anzeige</>} title="Anzeige"><DisplayPanel {...panelProps} /></Popover>
             )}
             <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>
