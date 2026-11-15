@@ -33,6 +33,8 @@ export interface ContextMenuState {
   y: number
   targetNode: DirectoryTree | null
   vaultId: string | null
+  /** True when the menu was opened on the empty space below the vault list (adds "Neuer Vault"). */
+  emptyArea?: boolean
 }
 
 /**

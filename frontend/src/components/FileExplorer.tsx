@@ -71,6 +71,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   // Optional context (not the throwing hook): the explorer also renders without a FeatureProvider.
   const featureContext = useContext(FeatureContext)
   const publicSharesEnabled = featureContext?.isEnabled('public-shares') ?? false
+  const basesEnabled = featureContext?.isEnabled('bases') ?? false
   const vaultLongPress = useLongPress()
   // Empty-area menu: a press that starts on a row belongs to that row's own menu, so don't arm a second timer for it.
   const emptyAreaLongPress = useLongPress()
@@ -466,6 +467,47 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     })
   }
 
+  /** Creates a starter `.base` (whole vault, table of file names) with a free name in the folder and opens it. */
+  async function createBaseFile(vaultId: string, parentPath: string) {
+    if (!apiClient) return
+    const starter = [
+      'properties:',
+      '  file.name:',
+      '    displayName: Name',
+      'views:',
+      '  - type: table',
+      '    name: View',
+      '    order:',
+      '      - file.name',
+      '',
+    ].join('\n')
+    try {
+      // The cached tree may be stale; fetch the folder's current children for a collision-free name.
+      const tree = await apiClient.fetchVaultTree(vaultId)
+      let folder: DirectoryTree | undefined = tree
+      for (const segment of parentPath.split('/').filter(Boolean)) {
+        folder = folder?.children?.find((c) => c.type === 'directory' && c.name === segment)
+      }
+      const existing = new Set((folder?.children ?? []).map((c) => c.name))
+      let name = 'Neue Base.base'
+      for (let i = 2; existing.has(name); i++) name = `Neue Base ${i}.base`
+      const filePath = parentPath ? `${parentPath}/${name}` : name
+      await apiClient.saveFile(vaultId, filePath, starter)
+      setExpandedVaults((prev) => new Set(prev).add(vaultId))
+      if (parentPath) {
+        setExpandedPaths((prev) => new Set(prev).add(`${vaultId}::${parentPath}`))
+      }
+      await refreshVaultTree(vaultId)
+      if (state.selectedVaultId !== vaultId) {
+        dispatch({ type: 'VAULT_SELECTED', payload: vaultId })
+      }
+      openTab(tabDispatch, dispatch, apiClient, vaultId, filePath, name)
+      showToast('success', t('fileOps.created', { name }))
+    } catch (err: unknown) {
+      showToast('error', extractErrorMessage(err, t('fileOps.baseCreateError')))
+    }
+  }
+
   // Register the create canvas trigger for the toolbar button
   useEffect(() => {
     if (onRegisterCreateCanvas) {
@@ -677,14 +719,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
     // Use selected vault, or fall back to first vault
     const vaultId = state.selectedVaultId ?? state.vaults[0]?.id
-    if (!vaultId) return
+    const vault = vaultId ? state.vaults.find((v) => v.id === vaultId) : undefined
 
-    const vault = state.vaults.find((v) => v.id === vaultId)
-    if (!vault) return
-
-    // Create a synthetic root node for the selected vault
+    // Create a synthetic root node for the selected vault (none without vaults: the menu then only offers "Neuer Vault")
     const rootNode: DirectoryTree = {
-      name: vault.name,
+      name: vault?.name ?? '',
       path: '',
       type: 'directory',
       children: [],
@@ -694,7 +733,8 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       x: e.clientX,
       y: e.clientY,
       targetNode: rootNode,
-      vaultId,
+      vaultId: vault ? vault.id : null,
+      emptyArea: true,
     })
   }
 
@@ -902,6 +942,18 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         void createCanvasFile(vaultId, parentPath)
         break
       }
+      case 'newBase': {
+        const vaultId = contextMenuState.vaultId
+        if (!vaultId) break
+        const parentPath = node.type === 'directory'
+          ? node.path
+          : node.path.lastIndexOf('/') === -1 ? '' : node.path.slice(0, node.path.lastIndexOf('/'))
+        void createBaseFile(vaultId, parentPath)
+        break
+      }
+      case 'newVault':
+        setShowCreateVaultForm(true)
+        break
       case 'rename':
         handleRename(node)
         break
@@ -1543,6 +1595,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'newFolder', label: t('contextMenu.newFolder'), icon: <FolderPlus size={14} /> },
             { id: 'newFile', label: t('contextMenu.newFile'), icon: <FilePlus size={14} /> },
             { id: 'newCanvas', label: 'Neues Canvas', icon: <LayoutDashboard size={14} /> },
+            ...(basesEnabled ? [{ id: 'newBase', label: 'Neue Base', icon: <Database size={14} /> }] : []),
             { id: 'separator-1', label: '', separator: true },
             { id: 'rename', label: t('contextMenu.rename'), icon: <Pencil size={14} /> },
             { id: 'move', label: t('contextMenu.move'), icon: <Move size={14} /> },
@@ -1555,9 +1608,19 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'newFolder', label: t('contextMenu.newFolder'), icon: <FolderPlus size={14} /> },
             { id: 'newFile', label: t('contextMenu.newFile'), icon: <FilePlus size={14} /> },
             { id: 'newCanvas', label: 'Neues Canvas', icon: <LayoutDashboard size={14} /> },
+            ...(basesEnabled ? [{ id: 'newBase', label: 'Neue Base', icon: <Database size={14} /> }] : []),
             { id: 'newFromTemplate', label: 'Neue Notiz aus Vorlage', icon: <FileText size={14} /> },
             { id: 'separator-1', label: '', separator: true },
             { id: 'export', label: t('contextMenu.export'), icon: <Download size={14} /> },
+          ]
+        }
+
+        if (contextMenuState.emptyArea) {
+          // Below the vault list: "Neuer Vault" first, then the selected vault's root actions (none without vault / when read-only).
+          const rootItems = !contextMenuState.vaultId || isReadOnly ? [] : menuItems
+          menuItems = [
+            { id: 'newVault', label: t('vault.newVault'), icon: <Database size={14} /> },
+            ...(rootItems.length > 0 ? [{ id: 'separator-vault', label: '', separator: true }, ...rootItems] : []),
           ]
         }
 

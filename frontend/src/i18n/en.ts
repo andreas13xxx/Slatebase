@@ -192,6 +192,7 @@ export const en: TranslationShape = {
 
   vault: {
     label: 'Vault',
+    newVault: 'New vault',
     empty: 'Vault is empty',
     noVaults: 'No vaults available',
     vaultNamePlaceholder: 'Vault name…',
@@ -641,6 +642,7 @@ export const en: TranslationShape = {
     createError: 'Error creating file',
     deleteError: 'Error deleting',
     canvasCreateError: 'Could not create canvas',
+    baseCreateError: 'Could not create base',
     created: '{name} created',
     statisticsUnavailable: 'Statistics unavailable',
     nameEmpty: 'Filename must not be empty',
