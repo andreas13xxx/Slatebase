@@ -89,10 +89,7 @@ export function setGroupBy(doc: BaseDocument, index: number, groupBy: BaseGroupB
   })
 }
 
-/** Row heights Obsidian writes; absent (short) is the default and is never written. */
-export const ROW_HEIGHTS = ['medium', 'tall', 'extra'] as const
-
-/** `undefined` (or the default) removes the key instead of writing it. */
+/** Obsidian writes `medium`, `tall` or `extra`; short (the default) is never written, the key is removed. */
 export function setRowHeight(doc: BaseDocument, index: number, rowHeight: string | undefined): BaseDocument {
   return withView(doc, index, (v) => {
     const { rowHeight: _old, ...rest } = v
@@ -100,9 +97,7 @@ export function setRowHeight(doc: BaseDocument, index: number, rowHeight: string
   })
 }
 
-/** List markers Obsidian writes; absent (bullet) is the default and is never written. */
-export const LIST_MARKERS = ['number', 'none'] as const
-
+/** Obsidian writes `number` or `none`; bullets (the default) are never written, the key is removed. */
 export function setListMarkers(doc: BaseDocument, index: number, markers: string | undefined): BaseDocument {
   return withView(doc, index, (v) => {
     const { markers: _old, ...rest } = v
