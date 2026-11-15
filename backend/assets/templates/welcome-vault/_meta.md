@@ -1,6 +1,6 @@
 ---
 version: "0.85.0" # x-release-please-version
-updated: "2026-11-08"
+updated: "2026-11-15T13:40"
 min_slatebase_version: "0.85.0" # x-release-please-version
 ---
 
@@ -8,6 +8,10 @@ min_slatebase_version: "0.85.0" # x-release-please-version
 
 Dieses Vault enthält eine vollständige Anleitung für alle Slatebase-Features.
 
-- **Version:** 0.85.0 <!-- x-release-please-version -->
-- **Zuletzt aktualisiert:** November 2026
-- **Minimale Slatebase-Version:** 0.85.0 <!-- x-release-please-version -->
+[//]: # (x-release-please-start-version)
+
+- **Version:** 0.85.0
+- **Zuletzt aktualisiert:** 15. November 2026, 13:40 Uhr
+- **Minimale Slatebase-Version:** 0.85.0
+
+[//]: # (x-release-please-end)
