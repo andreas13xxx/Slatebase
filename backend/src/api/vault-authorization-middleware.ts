@@ -35,6 +35,9 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   // --- read instead of the write/patch/delete default ---
   // propertyRoutes.ts:143 — read-only filter, POST verb used for the query body only.
   { method: 'POST', pathPattern: '/properties/query', level: 'read' },
+  // basesRoutes.ts:101 — resolves a .base query against the vault's in-memory link index; reads only,
+  // POST verb used for the query body only. Read-only collaborators need it to open a .base view.
+  { method: 'POST', pathPattern: '/bases/query', level: 'read' },
   // pluginRoutes.ts — plugin code and activation live in the vault (.obsidian/plugins/,
   // community-plugins.json) and run in every user's browser, so installing, deleting and
   // activating need write access (they fall through to the write default). What stays at read:
