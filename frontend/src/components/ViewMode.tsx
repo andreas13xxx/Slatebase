@@ -906,13 +906,22 @@ function renderBlockNode(
   embedDepth: number = 0
 ): ReactNode {
   switch (node.type) {
-    case 'paragraph':
-      return createElement('p', {
+    case 'paragraph': {
+      // A `![[x.base]]` embed renders a block (div/table), which is invalid inside <p>
+      // (React DOM-nesting warning, breaks hydration). Such paragraphs become a <div>
+      // that is styled like a paragraph.
+      const hasBlockEmbed = node.children.some(
+        (child) => (child as { type: string; embedType?: string }).type === 'embed'
+          && (child as { embedType?: string }).embedType === 'base',
+      )
+      return createElement(hasBlockEmbed ? 'div' : 'p', {
         key,
+        ...(hasBlockEmbed ? { className: 'view-mode-paragraph' } : {}),
         ...(((node as unknown as { blockId?: string }).blockId) ? { id: `^${(node as unknown as { blockId: string }).blockId}` } : {}),
       },
         renderPhrasingNodes(node.children, vaultId, directoryTree, onInternalLinkClick, key, token, onTagClick)
       )
+    }
 
     case 'heading':
       // Standalone heading (shouldn't normally appear here due to grouping, but handle gracefully)

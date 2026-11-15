@@ -116,6 +116,7 @@ import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installObsidianBodyClasses, resolveActiveTheme } from './body-classes'
+import { getActiveWorkspaceShim } from './active-workspace-shim'
 import { installApiGapInspector } from './api-gap-registry'
 import { debugOnce, warnNoOp, warnOnce } from './log'
 import { isOwnedEventRef, offrefAtOwner } from './event-system'
@@ -1048,8 +1049,27 @@ export function installObsidianGlobals(): void {
      */
     window.obsidian.BasesQueryResult = class BasesQueryResult {
       data: unknown[] = []
-      constructor(entries?: unknown[]) { if (entries) this.data = entries }
+      private readonly groups: unknown[] | undefined
+      constructor(entries?: unknown[], groups?: unknown[]) {
+        if (entries) this.data = entries
+        this.groups = groups
+      }
       hasKey(): boolean { return false }
+      /**
+       * Real Obsidian exposes the entries twice: flat (`data`) and as `groupedData`,
+       * an array of `BasesEntryGroup`. Plugins (TaskNotes `isGrouped()`) read
+       * `groupedData.length` directly. The controller passes real groups for a view
+       * with `groupBy`; otherwise this is one group without a key, which is what
+       * Obsidian reports for an ungrouped view (`hasKey()` false → flat list).
+       */
+      get groupedData(): unknown[] {
+        if (this.groups) return this.groups
+        const GroupCtor = window.obsidian?.['BasesEntryGroup'] as unknown as (new () => { key: unknown; entries: unknown[] }) | undefined
+        if (!GroupCtor) return []
+        const group = new GroupCtor()
+        group.entries = this.data
+        return [group]
+      }
       length(): number { return this.data.length }
       get(index: number): unknown { return this.data[index] ?? nullValue() }
     } as unknown as Record<string, unknown>
@@ -1120,7 +1140,8 @@ export function installObsidianGlobals(): void {
   // Obsidian exposes `window.app` as a global reference to the app instance.
   // Many plugins and libraries (like obsidian-daily-notes-interface) access it directly.
   if (!(window as unknown as { app?: unknown }).app) {
-    (window as unknown as { app: Record<string, unknown> }).app = {
+    let stubRenderContext: { onOpenNote?: (p: string) => void } | null = null
+    ;(window as unknown as { app: Record<string, unknown> }).app = {
       internalPlugins: {
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
@@ -1221,6 +1242,19 @@ export function installObsidianGlobals(): void {
       // the bare stub and threw "isDarkMode is not a function" inside
       // onDataUpdated → the map never rendered. Mirror it here.
       isDarkMode: (): boolean => resolveActiveTheme() === 'dark',
+      // Same reason: AppShim.renderContext exists, but a Bases view driven through
+      // window.app (TaskNotes calls `value.renderTo(el, app.renderContext)`) must get
+      // a real RenderContext too. Lazy, because the class is installed after this
+      // object literal is built; links open via the active workspace shim.
+      get renderContext(): unknown {
+        if (stubRenderContext) return stubRenderContext
+        const Ctor = window.obsidian?.['RenderContext'] as unknown as (new () => { onOpenNote?: (p: string) => void }) | undefined
+        if (!Ctor) return undefined
+        const ctx = new Ctor()
+        ctx.onOpenNote = (path: string) => { void getActiveWorkspaceShim()?.openLinkText(path, '') }
+        stubRenderContext = ctx
+        return ctx
+      },
       // Backed by the same module-level `embedByExtension` record every other
       // embedRegistry consumer (AppShim's `this.app.embedRegistry`, and
       // plugin-context.ts's later `window.app.embedRegistry` overwrite) reads

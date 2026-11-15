@@ -1174,7 +1174,9 @@ app.route('/api/v1', welcomeVaultRoutes)
 // in proxyRoutes.ts — there is no "allow everything public" fallback. The env var
 // SLATEBASE_PROXY_ALLOWED_ORIGINS still wins and pins the list beyond the admin UI.
 import { createProxyRoutes } from './api/proxyRoutes.js'
-const proxyRateLimiter = new SlidingWindowRateLimiter(60, 60_000)
+// A single map view fires dozens of tile/glyph/style requests at once, so 60/min was
+// exhausted by one map load (429s, half-empty map). 600/min is ~10 req/s per user.
+const proxyRateLimiter = new SlidingWindowRateLimiter(600, 60_000)
 const proxyRoutes = createProxyRoutes({
   logger,
   getAllowedOrigins: () => config.getProxyConfig().allowedOrigins,

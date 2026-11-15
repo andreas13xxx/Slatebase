@@ -46,16 +46,16 @@ describe('CssInjector', () => {
       expect(styles[0]?.textContent).not.toContain('.first');
     });
 
-    it('rejects CSS exceeding 512 KB with error log', () => {
+    it('rejects CSS exceeding 2 MB with error log', () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const largeCss = 'a'.repeat(512 * 1024 + 1);
+      const largeCss = 'a'.repeat(2 * 1024 * 1024 + 1);
 
       injector.inject('large-plugin', largeCss);
 
       const style = document.querySelector('style[data-plugin-id="large-plugin"]');
       expect(style).toBeNull();
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('exceeds maximum size of 512 KB')
+        expect.stringContaining('exceeds maximum size of 2 MB')
       );
       errorSpy.mockRestore();
     });

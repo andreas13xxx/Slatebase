@@ -742,6 +742,15 @@ function require(id) {
   if (id === '@lezer/lr') return window.__lezerLr || {};
   if (id === '@lezer/highlight') return window.__lezerHighlight || {};
   if (id.startsWith('@lezer/')) { if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Module "' + id + '" is not available — returning a safe stub.'); } return __unknownModuleStub(id); }
+  if (id.startsWith('./locale/')) {
+    // A plugin that bundles its OWN moment copy asks for its locale file this way. The
+    // locale file would have to register itself on that private copy, which cannot be
+    // done from outside the bundle, so it stays English. Plugins using the shared moment
+    // (require('moment') / import from 'obsidian') get every locale. Not a plugin
+    // malfunction, so debug level instead of a warning.
+    if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.debug('[PluginLoader] Plugin bundles its own moment and requested "' + id + '" — dates stay English for that plugin (the shared moment has all locales).'); }
+    return __unknownModuleStub(id);
+  }
   if (!__requireWarnedModules.has(id)) { __requireWarnedModules.add(id); console.warn('[PluginLoader] Unknown module "' + id + '" — returning a safe stub. Plugin features using this module will not work.'); }
   return __unknownModuleStub(id);
 }

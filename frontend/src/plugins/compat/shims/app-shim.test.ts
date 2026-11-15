@@ -488,5 +488,19 @@ describe('AppShim', () => {
       const app = AppShim.wrapWithProxy(new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' }));
       expect(typeof app.getAccentColor()).toBe('string');
     });
+
+    it('renderContext is a real RenderContext (not the gap no-op) whose onOpenNote opens the link', async () => {
+      const { installObsidianGlobals } = await import('../install-globals');
+      installObsidianGlobals();
+      const openLinkText = vi.fn().mockResolvedValue(undefined);
+      const ws = { ...workspace, openLinkText } as unknown as IWorkspaceShim;
+      const app = AppShim.wrapWithProxy(new AppShim({ vault, workspace: ws, metadataCache, pluginId: 'test-plugin' }));
+      const ctx = app.renderContext as { onOpenNote?: (p: string) => void; hoverPopover: unknown };
+      expect(typeof ctx).toBe('object');
+      expect(ctx.hoverPopover).toBeNull();
+      expect(app.renderContext).toBe(ctx);
+      ctx.onOpenNote?.('Note.md');
+      expect(openLinkText).toHaveBeenCalledWith('Note.md', '');
+    });
   });
 });
