@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.85.0](https://github.com/andreas13xxx/Slatebase/compare/v0.84.0...v0.85.0) (2026-11-15)
+
+
+### Features
+
+* **bases:** table row height and list display options ([#389](https://github.com/andreas13xxx/Slatebase/issues/389)) ([bd810b6](https://github.com/andreas13xxx/Slatebase/commit/bd810b60f46fa727dbb8e91f85023fa147415a45))
+* **ui:** add graph time-lapse and slides presentation ([177d4d9](https://github.com/andreas13xxx/Slatebase/commit/177d4d927945180594e64a150262d8f6e3da7734))
+* **ui:** graph time-lapse and slides presentation ([f2dcaba](https://github.com/andreas13xxx/Slatebase/commit/f2dcabae1858a36ea26b5ec5d76615bb821a2405))
+
+
+### Bugfixes
+
+* **ui:** harden graph time-lapse and slides ([be9cfcd](https://github.com/andreas13xxx/Slatebase/commit/be9cfcd845d88ca9712a3294ea06d526e350df33))
+* **ui:** harden graph time-lapse and slides ([d079b9f](https://github.com/andreas13xxx/Slatebase/commit/d079b9f098823183136e8d17d61b39ab4fa92ae4))
+
+
+### Sonstige Änderungen
+
+* document graph time-lapse and slides, add welcome-vault guides ([3964372](https://github.com/andreas13xxx/Slatebase/commit/39643720cb8d0c64527ff6ec7581a6cae14d73ae))
+
 ## [0.84.0](https://github.com/andreas13xxx/Slatebase/compare/v0.83.0...v0.84.0) (2026-11-14)
 
 
