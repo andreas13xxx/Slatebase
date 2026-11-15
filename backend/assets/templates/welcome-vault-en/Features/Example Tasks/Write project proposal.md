@@ -13,4 +13,5 @@ Draft the Q4 project proposal and circulate it for feedback.
 
 This is an example note for the [[Features/Bases|Bases]] guide. The
 [[Features/Example Tasks (Base)]] table reads its `type`, `status`, `priority`
-and `deadline` properties from the frontmatter above.
+and `deadline` properties from the frontmatter above. Builds on
+[[Features/Example Tasks/Set up the vault]].

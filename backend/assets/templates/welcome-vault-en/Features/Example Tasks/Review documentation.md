@@ -11,4 +11,5 @@ tags: [example, task]
 
 Go through the feature guides and fix any outdated screenshots.
 
-This is an example note for the [[Features/Bases|Bases]] guide.
+This is an example note for the [[Features/Bases|Bases]] guide. Follows
+[[Features/Example Tasks/Write project proposal]].

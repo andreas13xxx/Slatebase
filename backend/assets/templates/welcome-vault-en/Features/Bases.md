@@ -172,6 +172,14 @@ A base can hold several views; a view switcher appears at the top.
 - **Groups in table and list** — a `groupBy` on a table or list view splits the rows into groups with a header (name and count). Click a header to collapse or expand its group. `groupOrder` works as in the Kanban view: only the listed groups show, in that order; `null` is the group of notes without a value; an empty list hides all groups. Without `groupOrder` the groups are sorted by value (`direction: DESC` reverses it) and the "No …" group comes last. Collapsing is not saved.
 - **Map** (`type: map`) — Slatebase has no built-in map view; it comes from the Obsidian community plugin **Maps** (enable Obsidian plugin compatibility and install the plugin). The plugin registers the `type: map` view and plots notes with geo coordinates as pins on a map. The "Example Places" demo base uses this view; without the plugin it falls back to the table.
 
+### More views from plugins
+
+These views come from community plugins (see [[Advanced/Obsidian Plugins]]). Each demo also carries a `type: table` view, so without the plugin it falls back to a table instead of staying empty.
+
+- **Graph** (`type: base-graph`, plugin **Base Graph**) - draws the base's notes as a force-directed graph; edges are the wikilinks between notes. The tasks demo [[Features/Example Tasks (Base)]] contains this view; the example tasks link to each other so edges appear.
+- **Chart** (`type: chart-bar` / `chart-line` / `chart-scatter`, plugin **Bases Charts**) - bar, line or scatter chart. Pick the X axis (`x`) as a property/formula; Y values come from the numeric columns of the view. The tasks demo shows effort per task as a bar chart (X = task, Y = `estimate`).
+- **Timeline** (`type: timeline-view`, plugin **Bases Timeline View**) - plots notes with start and end dates as bars on a time axis. Set the fields via `startField` / `endField` / `contentField`. The demo [[Features/Example Projects (Base)]] shows four example projects across the year.
+
 ```yaml
 views:
   - type: table

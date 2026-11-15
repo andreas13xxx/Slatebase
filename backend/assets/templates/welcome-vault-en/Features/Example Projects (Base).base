@@ -1,0 +1,34 @@
+filters:
+  and:
+    - file.inFolder("Features/Example Projects")
+    - 'type == "project"'
+properties:
+  file.name:
+    displayName: "Project"
+  phase:
+    displayName: "Phase"
+  start:
+    displayName: "Start"
+  end:
+    displayName: "End"
+views:
+  - type: timeline-view
+    name: "Timeline"
+    startField: start
+    endField: end
+    contentField: file.name
+    order:
+      - file.name
+      - phase
+      - start
+      - end
+  - type: table
+    name: "List"
+    order:
+      - file.name
+      - phase
+      - start
+      - end
+    sort:
+      - property: start
+        direction: ASC

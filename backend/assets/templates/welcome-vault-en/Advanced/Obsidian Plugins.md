@@ -137,6 +137,9 @@ These plugins have been tested and work with Slatebase:
 | Better Word Count | Good | Extended status bar stats (sentences, reading time, page count), manually verified with a real plugin bundle |
 | Style Settings | Partial | Theme settings: variables take full effect, class toggles only where Slatebase has the element |
 | Maps | Good | Adds a map view (`type: map`) to Bases — notes with geo coordinates as pins. Slatebase has no built-in map; this view comes only from this plugin. Demo: [[Features/Example Places (Base)]] |
+| Base Graph | Good | Adds a graph view (`type: base-graph`) to Bases - notes as a force-directed graph. Demo: [[Features/Example Tasks (Base)]] |
+| Bases Charts | Good | Adds bar/line/scatter chart views (`type: chart-bar` etc.) to Bases. Demo: [[Features/Example Tasks (Base)]] |
+| Bases Timeline View | Good | Adds a timeline view (`type: timeline-view`) to Bases - notes with start/end dates as bars. Demo: [[Features/Example Projects (Base)]] |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 
