@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { DirectoryTree, GraphData } from '../types'
-import { collectCreationTimes, computeVisibleNodeIds, getTimelapseRange } from './graph-timelapse'
+import { consumeGraphTimelapseRequest, requestGraphTimelapse, collectCreationTimes, computeVisibleNodeIds, getTimelapseRange } from './graph-timelapse'
 
 const tree: DirectoryTree = {
   name: 'root', path: '', type: 'directory',
@@ -44,5 +44,22 @@ describe('graph time-lapse', () => {
     expect([...computeVisibleNodeIds(graph, times, 50)]).toEqual([])
     expect([...computeVisibleNodeIds(graph, times, 150)].sort()).toEqual(['a.md', 'ghost.md'])
     expect([...computeVisibleNodeIds(graph, times, 300)].sort()).toEqual(['a.md', 'ghost.md', 'sub/b.md', 'tag:x'])
+  })
+})
+
+describe('time-lapse request', () => {
+  afterEach(() => { vi.useRealTimers() })
+
+  it('is consumed once', () => {
+    requestGraphTimelapse()
+    expect(consumeGraphTimelapseRequest()).toBe(true)
+    expect(consumeGraphTimelapseRequest()).toBe(false)
+  })
+
+  it('expires when no graph picks it up', () => {
+    vi.useFakeTimers()
+    requestGraphTimelapse()
+    vi.advanceTimersByTime(5000)
+    expect(consumeGraphTimelapseRequest()).toBe(false)
   })
 })

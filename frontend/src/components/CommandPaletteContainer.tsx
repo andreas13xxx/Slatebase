@@ -210,7 +210,7 @@ export function CommandPaletteContainer({
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false)
   const [debugInfoOpen, setDebugInfoOpen] = useState(false)
-  const [slides, setSlides] = useState<{ content: string; vaultId: string; sourcePath: string } | null>(null)
+  const [slides, setSlides] = useState<string | null>(null)
   const [webViewerPromptOpen, setWebViewerPromptOpen] = useState(false)
   const [workspacesModal, setWorkspacesModal] = useState<{ open: boolean; mode: 'save' | 'load' }>({ open: false, mode: 'load' })
   // The saved layouts are the vault's workspaces.json: they change when it is read, written or changed elsewhere
@@ -473,7 +473,7 @@ export function CommandPaletteContainer({
     onStartSlides: () => {
       const tab = tabState.tabs.find((t) => t.id === tabState.activeTabId)
       if (!tab || tab.isBinary || tab.filePath.startsWith('__') || !tab.fileName.toLowerCase().endsWith('.md')) return
-      setSlides({ content: tab.editBuffer ?? tab.content, vaultId: tab.vaultId, sourcePath: tab.filePath })
+      setSlides(tab.id)
     },
     onNavigateBack: goBack,
     onNavigateForward: goForward,
@@ -1302,6 +1302,9 @@ export function CommandPaletteContainer({
     : []
   const allCommands = [...builtinCommands, ...pluginCommands]
 
+  // Read live from the tab, so edits show up and a closed tab ends the presentation.
+  const slidesTab = slides ? (tabState.tabs.find((t) => t.id === slides) ?? null) : null
+
   return (
     <>
       <CommandPalette
@@ -1357,12 +1360,12 @@ export function CommandPaletteContainer({
         open={releaseNotesOpen}
         onClose={() => setReleaseNotesOpen(false)}
       />
-      {slides && (
+      {slidesTab && (
         <SlidesPresentation
-          content={slides.content}
-          vaultId={slides.vaultId}
-          directoryTree={state.vaultTrees[slides.vaultId] ?? null}
-          sourcePath={slides.sourcePath}
+          content={slidesTab.editBuffer ?? slidesTab.content}
+          vaultId={slidesTab.vaultId}
+          directoryTree={state.vaultTrees[slidesTab.vaultId] ?? null}
+          sourcePath={slidesTab.filePath}
           onClose={() => setSlides(null)}
         />
       )}
