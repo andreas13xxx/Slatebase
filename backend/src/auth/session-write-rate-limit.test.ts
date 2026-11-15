@@ -5,6 +5,7 @@ import type { SessionContext } from './index.js'
 import {
   createSessionWriteRateLimit,
   parseWriteRateLimitMode,
+  resolveWriteRateLimitMode,
   EXPENSIVE_ROUTE_RULES,
   type SessionWriteRateLimit,
   type WriteRateLimitMode,
@@ -109,7 +110,6 @@ describe('exemptions', () => {
     ['PUT', '/api/v1/users/me/password'],
     ['POST', '/api/v1/mcp'],
     ['POST', '/api/v1/mcp/tokens'],
-    ['DELETE', '/api/v1/mcp/tokens/t1'],
     ['POST', '/api/v1/chat/conversations/c1/messages'],
     ['POST', '/api/v1/proxy'],
     ['POST', '/api/v1/vaults/v1/transcribe'],
@@ -138,9 +138,9 @@ describe('route table', () => {
     expect((await call(app, 'POST', '/api/v1/vaults/v1/replace')).status).toBe(429)
   })
 
-  it('GET search is limited by the table only (120/min)', async () => {
+  it('GET search is limited by the table only (240/min)', async () => {
     const app = createApp('enforce', createMockLogger(), SMALL)
-    for (let i = 0; i < 120; i++) expect((await call(app, 'GET', '/api/v1/vaults/v1/search?q=x')).status).toBe(200)
+    for (let i = 0; i < 240; i++) expect((await call(app, 'GET', '/api/v1/vaults/v1/search?q=x')).status).toBe(200)
     expect((await call(app, 'GET', '/api/v1/vaults/v1/search?q=x')).status).toBe(429)
     expect((await call(app, 'GET', '/api/v1/search?q=x', 'x')).status).toBe(200)
   })
@@ -187,7 +187,7 @@ describe('log-only mode', () => {
     const logger = createMockLogger()
     const app = createApp('log-only', logger, SMALL)
     for (let i = 0; i < 6; i++) expect((await call(app, 'POST', '/api/v1/vaults/v1/folders')).status).toBe(200)
-    expect(logger.warn).toHaveBeenCalledTimes(3)
+    expect(logger.warn).toHaveBeenCalledTimes(1) // 3 over the limit, throttled to one warning
     const [message, meta] = logger.warn.mock.calls[0] as [string, { userId: string; buckets: string[] }]
     expect(message).toContain('would block')
     expect(meta.userId).toBe('u1')
@@ -199,6 +199,83 @@ describe('log-only mode', () => {
     const app = createApp('enforce', logger, SMALL)
     for (let i = 0; i < 4; i++) await call(app, 'POST', '/api/v1/vaults/v1/folders')
     expect((logger.warn.mock.calls[0] as [string])[0]).toContain('blocked')
+  })
+})
+
+describe('log-only warning throttle', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('warns once per user and bucket per minute, with a suppressed count', async () => {
+    vi.useFakeTimers()
+    const logger = createMockLogger()
+    const app = createApp('log-only', logger, { defaultLimit: { limit: 1, windowMs: 10 * 60_000 } })
+    for (let i = 0; i < 5; i++) await call(app, 'POST', '/api/v1/vaults/v1/folders') // 1 ok + 4 over
+    await call(app, 'POST', '/api/v1/vaults/v1/folders', 'u2')
+    await call(app, 'POST', '/api/v1/vaults/v1/folders', 'u2') // u2 has its own throttle slot
+    expect(logger.warn).toHaveBeenCalledTimes(2)
+    vi.advanceTimersByTime(61_000)
+    await call(app, 'POST', '/api/v1/vaults/v1/folders')
+    expect(logger.warn).toHaveBeenCalledTimes(3)
+    const meta = logger.warn.mock.calls[2]?.[1] as { suppressedSinceLastWarning: number }
+    expect(meta.suppressedSinceLastWarning).toBe(3)
+  })
+
+  it('does not throttle blocked warnings when enforcing', async () => {
+    const logger = createMockLogger()
+    const app = createApp('enforce', logger, SMALL)
+    for (let i = 0; i < 6; i++) await call(app, 'POST', '/api/v1/vaults/v1/folders')
+    expect(logger.warn).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('resolveWriteRateLimitMode', () => {
+  it('warns on an invalid value and falls back to log-only', () => {
+    const logger = createMockLogger()
+    expect(resolveWriteRateLimitMode('enfroce', logger)).toBe('log-only')
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays silent for valid, unset or empty values', () => {
+    const logger = createMockLogger()
+    for (const v of ['enforce', ' Off ', 'log-only', undefined, '']) resolveWriteRateLimitMode(v, logger)
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('narrowed chat/MCP exemption and new rules', () => {
+  it.each([
+    ['POST', '/api/v1/chat/conversations', 30],
+    ['DELETE', '/api/v1/mcp/tokens/t1', 20],
+    ['PUT', '/api/v1/users/me/email', 5],
+    ['POST', '/api/v1/admin/account-settings/test', 5],
+    ['PUT', '/api/v1/admin/config', 20],
+    ['POST', '/api/v1/auth/passkey/register/verify', 20],
+    ['DELETE', '/api/v1/users/me/passkeys/p1', 20],
+    ['DELETE', '/api/v1/admin/users/u9/passkeys', 20],
+    ['POST', '/api/v1/vaults/v1/public-shares/s1/regenerate', 10],
+  ])('%s %s is limited to %i', async (method, path, limit) => {
+    const app = createApp('enforce', createMockLogger(), { defaultLimit: { limit: 10_000, windowMs: 60_000 } })
+    for (let i = 0; i < limit; i++) expect((await call(app, method, path)).status).toBe(200)
+    expect((await call(app, method, path)).status).toBe(429)
+  })
+
+  it('mail routes share one bucket', async () => {
+    const app = createApp('enforce', createMockLogger(), { defaultLimit: { limit: 10_000, windowMs: 60_000 } })
+    for (let i = 0; i < 3; i++) await call(app, 'PUT', '/api/v1/users/me/email')
+    for (let i = 0; i < 2; i++) await call(app, 'POST', '/api/v1/admin/account-settings/test')
+    expect((await call(app, 'PUT', '/api/v1/users/me/email')).status).toBe(429)
+  })
+
+  it('other chat writes now count against the default bucket', async () => {
+    const app = createApp('enforce', createMockLogger(), SMALL)
+    for (let i = 0; i < 3; i++) await call(app, 'DELETE', '/api/v1/chat/conversations/c1/participants/me')
+    expect((await call(app, 'DELETE', '/api/v1/chat/conversations/c1/participants/me')).status).toBe(429)
+  })
+
+  it('HEAD on search shares the search bucket', async () => {
+    const app = createApp('enforce', createMockLogger(), SMALL)
+    for (let i = 0; i < 240; i++) await call(app, 'HEAD', '/api/v1/vaults/v1/search?q=x')
+    expect((await call(app, 'GET', '/api/v1/vaults/v1/search?q=x')).status).toBe(429)
   })
 })
 
