@@ -463,8 +463,26 @@ export class AppShim implements IAppShim {
    * Properties view to reflect these into, so `setType` just records them —
    * enough that `getAllProperties()`/`getPropertyInfo()` echo back what a
    * plugin registered instead of crashing on a missing method.
+   *
+   * `registeredTypeWidgets` maps a widget type (`text`, `list`, ...) to its
+   * descriptor. Plugins such as Nested Properties read an entry and wrap or
+   * register their own; Slatebase renders properties itself, so the entries
+   * are inert descriptors (no-op `render`, accept-all `validate`).
    */
   readonly metadataTypeManager = {
+    registeredTypeWidgets: Object.fromEntries(
+      ['text', 'multitext', 'list', 'number', 'checkbox', 'date', 'datetime', 'tags', 'aliases'].map((type) => [
+        type,
+        {
+          type,
+          icon: 'lucide-text',
+          name: () => type,
+          default: (): unknown => '',
+          validate: (): boolean => true,
+          render: (): void => {},
+        },
+      ]),
+    ) as Record<string, Record<string, unknown>>,
     properties: {} as Record<string, { name: string; type: string }>,
     getAllProperties: (): Record<string, { name: string; type: string }> => this.metadataTypeManager.properties,
     getPropertyInfo: (property: string): { name: string; type: string } | undefined =>
