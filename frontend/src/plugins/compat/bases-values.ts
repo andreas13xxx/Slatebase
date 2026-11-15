@@ -45,6 +45,14 @@ export abstract class Value {
   value: unknown
   constructor(value?: unknown) { this.value = value }
 
+  /**
+   * The wrapped raw value under the name Obsidian's runtime uses. It is not in
+   * the published `obsidian.d.ts`, but plugins read it (Bases Charts:
+   * `numberValue.data`); without it every value read as missing.
+   */
+  get data(): unknown { return this.value }
+  set data(v: unknown) { this.value = v }
+
   toString(): string { return this.value == null ? '' : String(this.value) }
   isTruthy(): boolean { return !!this.value }
   equals(other: unknown): boolean {
@@ -184,13 +192,28 @@ export class UrlValue extends StringValue {
 
 /** Date / datetime value. Formats a parsed date; falls back to the raw string. */
 export class DateValue extends NotNullValue {
+  /**
+   * Machine-readable form (`YYYY-MM-DD`, or the ISO date-time as stored).
+   * Plugins parse this string (Bases Timeline View, Bases Charts via
+   * `new Date(v.toString())`), so it must never be locale-formatted —
+   * "3.8.2026" is unparseable. The human-readable form is `renderTo()`.
+   */
   toString(): string {
-    const raw = String(this.value ?? '')
+    const raw = String(this.value ?? '').trim()
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw
     const d = new Date(raw)
     if (Number.isNaN(d.getTime())) return raw
-    // Date-only (no time component) → date; otherwise date + time, locale-formatted.
-    const hasTime = /T\d{2}:\d{2}/.test(raw)
-    return hasTime ? d.toLocaleString() : d.toLocaleDateString()
+    return d.toISOString()
+  }
+  renderTo(el: HTMLElement): void {
+    const raw = String(this.value ?? '').trim()
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.exec(raw)
+    // A bare date is a calendar day: build it in local time so it never shifts a day.
+    const d = dateOnly
+      ? new Date(Number(raw.slice(0, 4)), Number(raw.slice(5, 7)) - 1, Number(raw.slice(8, 10)))
+      : new Date(raw)
+    if (Number.isNaN(d.getTime())) { el.textContent = raw; return }
+    el.textContent = dateOnly ? d.toLocaleDateString() : d.toLocaleString()
   }
   isTruthy(): boolean { return this.value != null && this.value !== '' }
 }

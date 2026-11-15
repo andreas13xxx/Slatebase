@@ -34,6 +34,18 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   private tree: DirectoryTree | null;
   /** Content store for on-demand metadata parsing when explicit cache is empty */
   private contentStore: Map<string, string> = new Map();
+  /**
+   * Forward-link targets per file as the server's link index knows them. Fills
+   * `resolvedLinks` for files no plugin has read yet — otherwise a graph built
+   * from it (Base Graph) shows notes without any edges.
+   */
+  private indexedLinks: Map<string, string[]> = new Map();
+
+  /** Records a file's forward-link targets from the server's link index. */
+  setIndexedLinks(path: string, targets: string[]): void {
+    if (targets.length > 0) this.indexedLinks.set(path, targets);
+    else this.indexedLinks.delete(path);
+  }
 
   constructor(directoryTree: DirectoryTree | null) {
     this.tree = directoryTree;
@@ -158,6 +170,17 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       if (Object.keys(targets).length > 0) {
         result[sourcePath] = targets;
       }
+    }
+
+    // Files known only from the server's link index (not parsed here yet).
+    for (const [sourcePath, links] of this.indexedLinks) {
+      if (this.cache.has(sourcePath)) continue;
+      const targets: Record<string, number> = {};
+      for (const link of links) {
+        const resolvedPath = resolveWikilinkTarget(link.split('#')[0]?.trim() ?? '', this.tree);
+        if (resolvedPath) targets[resolvedPath] = (targets[resolvedPath] ?? 0) + 1;
+      }
+      if (Object.keys(targets).length > 0) result[sourcePath] = targets;
     }
 
     return result;
@@ -435,6 +458,7 @@ export class MetadataCacheShim implements IMetadataCacheShim {
     const emulatedProperties = new Set<string | symbol>([
       'getFileCache',
       'populateFromContent',
+      'setIndexedLinks',
       'getCache',
       'getFirstLinkpathDest',
       'getBacklinksForFile',

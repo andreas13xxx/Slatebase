@@ -961,6 +961,22 @@ export function installObsidianGlobals(): void {
     const ComponentClass = window.obsidian.Component as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; addChild<C>(c: C): C; removeChild<C>(c: C): C; register(cb: unknown): void; registerEvent(ref: unknown): void; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void; registerInterval(id: number): number } }
     const nullValue = () => (window.obsidian!.NullValue as { value: unknown }).value
     /**
+     * Obsidian addresses properties as `BasesPropertyId` — `note.x`, `file.x`
+     * or `formula.x`. A `.base` file (and Slatebase's own row values) mostly
+     * use the bare frontmatter name, so ids handed TO a plugin are prefixed
+     * here, and ids a plugin hands back are accepted in either form.
+     */
+    const toPropertyId = (raw: string): string =>
+      /^(note|file|formula)\./.test(raw) ? raw : `note.${raw}`
+    /** Lookup keys to try for a property id, most specific first. */
+    const propertyIdCandidates = (id: string): string[] => {
+      const out = [id]
+      if (id.startsWith('note.')) out.push(id.slice(5))
+      else if (id.startsWith('formula.')) out.push(id.slice(8))
+      else if (!id.startsWith('file.')) out.push(`note.${id}`)
+      return out
+    }
+    /**
      * `class BasesViewConfig` — the per-view config object a BasesView reads.
      * Backed by a plain data map the host populates from the `.base` view
      * (name, column order). Formula evaluation is delegated to the host via
@@ -974,8 +990,17 @@ export function installObsidianGlobals(): void {
       _resolveFormula?: (key: string) => unknown
       getOption(key: string): unknown { return this._data[key] }
       get(key: string): unknown { return this._data[key] }
-      getAsPropertyId(key: string): unknown { return this._data[key] ?? null }
-      getOrder(): string[] { return this._order }
+      getAsPropertyId(key: string): unknown {
+        const v = this._data[key]
+        return typeof v === 'string' && v.trim() ? toPropertyId(v.trim()) : null
+      }
+      getOrder(): string[] { return this._order.map(toPropertyId) }
+      /** Host-set display names, keyed by bare property name. */
+      _displayNames: Record<string, string> = {}
+      getDisplayName(propertyId: string): string {
+        const bare = propertyId.replace(/^(note|formula)\./, '')
+        return this._displayNames[propertyId] ?? this._displayNames[bare] ?? bare
+      }
       setOrder(order: string[]): void { this._order = order }
       getEvaluatedFormula(_view: unknown, key: string): unknown {
         return this._resolveFormula ? this._resolveFormula(key) : nullValue()
@@ -1034,7 +1059,12 @@ export function installObsidianGlobals(): void {
       private _values: Map<string, unknown> = new Map()
       constructor(app?: unknown) { this.app = app }
       setValue(key: string, value: unknown): void { this._values.set(key, value) }
-      getValue(propertyId: string): unknown { return this._values.get(propertyId) ?? nullValue() }
+      getValue(propertyId: string): unknown {
+        for (const key of propertyIdCandidates(propertyId)) {
+          if (this._values.has(key)) return this._values.get(key)
+        }
+        return nullValue()
+      }
       /** Legacy alias some plugin code uses. */
       get(key: string): unknown { return this.getValue(key) }
     } as unknown as Record<string, unknown>
@@ -1050,10 +1080,18 @@ export function installObsidianGlobals(): void {
     window.obsidian.BasesQueryResult = class BasesQueryResult {
       data: unknown[] = []
       private readonly groups: unknown[] | undefined
-      constructor(entries?: unknown[], groups?: unknown[]) {
+      private readonly visible: string[]
+      constructor(entries?: unknown[], groups?: unknown[], properties?: string[]) {
         if (entries) this.data = entries
         this.groups = groups
+        this.visible = properties ?? []
       }
+      /**
+       * Visible properties as `BasesPropertyId`s (`note.x`, `file.x`, `formula.x`)
+       * — the view's column order. Bases Charts draws one chart per entry here;
+       * without it every chart view reads "No properties selected".
+       */
+      get properties(): string[] { return this.visible.map(toPropertyId) }
       hasKey(): boolean { return false }
       /**
        * Real Obsidian exposes the entries twice: flat (`data`) and as `groupedData`,
