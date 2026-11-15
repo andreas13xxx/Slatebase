@@ -95,9 +95,8 @@ function tokenizeWikilink(
     }
     // Start of heading-only link `[[#heading]]`
     if (code === 35) { // '#'
+      // No empty `wikilinkTarget` token: micromark (dev build) asserts tokens are non-empty
       effects.enter('wikilinkData')
-      effects.enter('wikilinkTarget')
-      effects.exit('wikilinkTarget')
       effects.enter('wikilinkHeadingMarker')
       effects.consume(code)
       effects.exit('wikilinkHeadingMarker')
