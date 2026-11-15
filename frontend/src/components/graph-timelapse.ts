@@ -62,21 +62,23 @@ export function computeVisibleNodeIds(
 }
 
 const TIMELAPSE_REQUEST_EVENT = 'slatebase:graph-timelapse'
-let timelapseRequested = false
+/** A parked request older than this is stale: no graph opened for it. */
+const REQUEST_TTL_MS = 3000
+let timelapseRequestedAt: number | null = null
 
 /**
  * Asks the vault-wide graph to start its time-lapse. The request is also parked,
  * because the command opens the graph tab first and its listener is not mounted yet.
  */
 export function requestGraphTimelapse(): void {
-  timelapseRequested = true
+  timelapseRequestedAt = Date.now()
   window.dispatchEvent(new CustomEvent(TIMELAPSE_REQUEST_EVENT))
 }
 
-/** Returns true once if a time-lapse was requested and not yet picked up. */
+/** Returns true once if a recent time-lapse request was not yet picked up. */
 export function consumeGraphTimelapseRequest(): boolean {
-  const pending = timelapseRequested
-  timelapseRequested = false
+  const pending = timelapseRequestedAt !== null && Date.now() - timelapseRequestedAt < REQUEST_TTL_MS
+  timelapseRequestedAt = null
   return pending
 }
 

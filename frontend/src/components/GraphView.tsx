@@ -219,8 +219,11 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
   } | null>(null)
   const [timelapseError, setTimelapseError] = useState(false)
 
+  const timelapseLoadingRef = useRef(false)
+
   const startTimelapse = useCallback(async () => {
-    if (!apiClient || isLocalGraph) return
+    if (!apiClient || isLocalGraph || timelapseLoadingRef.current) return
+    timelapseLoadingRef.current = true
     setTimelapseError(false)
     try {
       const times = collectCreationTimes(await apiClient.fetchVaultTree(vaultId))
@@ -229,6 +232,8 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       setTimelapse({ times, start: range.start, end: range.end, cutoff: range.start, playing: true })
     } catch {
       setTimelapseError(true)
+    } finally {
+      timelapseLoadingRef.current = false
     }
   }, [apiClient, vaultId, isLocalGraph])
 

@@ -64,7 +64,6 @@ explains why it does nothing:
 | `workspace:toggle-stacked-tabs` | tabs are side by side, not stacked |
 | `workspace:copy-url` | no `obsidian://` URL scheme |
 | `app:toggle-default-new-pane-mode` | no new-tab defaults |
-| `graph:animate` | no time-lapse of the graph |
 | `open-with-default-app:open`, `open-with-default-app:show` | no desktop shell |
 | `download-attachments` | remote attachments are not downloaded into the vault |
 

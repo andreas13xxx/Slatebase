@@ -68,6 +68,7 @@ Beyond the core features listed above, you'll find these additional capabilities
 - [[Features/Git Sync]] — Synchronize a vault server-side with one or more Git remotes
 - [[Features/Mail Import]] — Import emails from an IMAP mailbox as notes with attachments
 - [[Features/Dictation]] — Turn speech into text via Whisper (self-hosted, off by default)
+- [[Features/Presentation]] — Show a note as full-screen slides (`---` separates slides)
 
 ---
 
