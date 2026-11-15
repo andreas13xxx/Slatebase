@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.86.0](https://github.com/andreas13xxx/Slatebase/compare/v0.85.1...v0.86.0) (2026-11-15)
+
+
+### Features
+
+* **ui:** explorer context menus, editor long-press and heading fold gutter ([d264368](https://github.com/andreas13xxx/Slatebase/commit/d264368c2626fb68717a54c27d6a8f86077eebd8))
+* **ui:** explorer context menus, editor long-press, heading fold ([6e69437](https://github.com/andreas13xxx/Slatebase/commit/6e69437d01a6cfe5ec5f2e3d065007cc8eb55f1e))
+
+
+### Bugfixes
+
+* **authz:** POST /bases/query is read-level so read-only collaborators can open .base views ([#398](https://github.com/andreas13xxx/Slatebase/issues/398)) ([237b67a](https://github.com/andreas13xxx/Slatebase/commit/237b67a313827be1070e4d5ca34e1d57206d6e49))
+* Bases plugin views, proxy limit and stale vault trees ([#401](https://github.com/andreas13xxx/Slatebase/issues/401)) ([3f316fe](https://github.com/andreas13xxx/Slatebase/commit/3f316fe7fc220867670d4e4664cd136c762a4c85))
+* **import:** block symlink escape in folder import, file import and upload ([#399](https://github.com/andreas13xxx/Slatebase/issues/399)) ([0b0e560](https://github.com/andreas13xxx/Slatebase/commit/0b0e560dd3d22499732e949f8f4e783a09a508a6))
+* **security:** rate-limit follow-up (log throttle, narrower chat/MCP exemption, mail/passkey/config rules) ([#400](https://github.com/andreas13xxx/Slatebase/issues/400)) ([d0aad35](https://github.com/andreas13xxx/Slatebase/commit/d0aad35c5bbb5cdf4152cae23fa7fccc57b2e57f))
+
 ## [0.85.1](https://github.com/andreas13xxx/Slatebase/compare/v0.85.0...v0.85.1) (2026-11-15)
 
 
