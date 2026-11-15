@@ -111,6 +111,10 @@ Use the search field to jump to a different note. In the local graph, selecting 
 
 ---
 
+## Time-lapse
+
+The time-lapse shows how the vault grew. In the full graph, click **Start time-lapse** at the bottom left (or run the `graph:animate` command). Notes appear in the order of their creation date. Use the slider to jump to a point in time and Pause to stop. The local graph has no time-lapse.
+
 ## Practical Example
 
 1. Open the Knowledge Graph for this vault

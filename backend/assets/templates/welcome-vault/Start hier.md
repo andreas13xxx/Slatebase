@@ -61,6 +61,7 @@ Entdecke die vollständige Feature-Palette:
 - [[Features/Git-Sync|Git-Sync]]
 - [[Features/Mail-Import|Mail-Import]]
 - [[Features/Diktieren|Diktieren]]
+- [[Features/Präsentation|Präsentation]]
 - [[Features/Live Preview Editor|Live Preview Editor]]
 
 ---

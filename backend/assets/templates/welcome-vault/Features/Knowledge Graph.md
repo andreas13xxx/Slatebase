@@ -124,6 +124,10 @@ Der Radius wird für das nächste Öffnen gespeichert. Beim Ändern werden keine
 
 ---
 
+## Zeitraffer
+
+Der Zeitraffer zeigt, wie der Vault gewachsen ist. Klicke im Gesamtgraph unten links auf **Zeitraffer starten** (oder nutze den Befehl `graph:animate`). Notizen erscheinen in der Reihenfolge ihres Erstellungsdatums. Mit dem Regler springst du zu einem Zeitpunkt, mit Pause hältst du an. Der lokale Graph hat keinen Zeitraffer.
+
 ## Interaktion mit dem Graph
 
 ### Physik-Simulation

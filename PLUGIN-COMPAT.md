@@ -127,11 +127,7 @@ Diese Command-IDs sind registriert (damit `executeCommandById()` sie findet), f�
 | `download-attachments` | `attachments` | Es gibt keinen automatischen Download externer Bild-Links in den Vault — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen" hinein. |
 | `app:toggle-default-new-pane-mode` | `new-tab-defaults` | Neue Tabs öffnen immer im zuletzt genutzten Modus; es gibt keine Split-Pane-Voreinstellung zum Umschalten. |
 
-**Geplant, aber noch nicht umgesetzt** (im Unterschied zur Liste oben *nicht* dauerhaft ausgeschlossen, sondern bewusst auf später verschoben):
-
-| Command-ID | `unsupported` | Was dafür fehlt |
-|---|---|---|
-| `graph:animate` | `graph-animation` | Der Graph trägt heute keine Erstellungsdatum-Metadaten je Knoten, und ein echter Zeitraffer bräuchte zusätzlich eine Scrubber-/Abspiel-UI. |
+**Vorher geplant, jetzt umgesetzt:** `graph:animate` startet den Zeitraffer im Vollgraph (Abspielleiste unten links; Erstellungsdatum je Datei aus dem Verzeichnisbaum, Knoten werden nur ausgeblendet, das Layout bleibt). `slides:start` zeigt die aktive Notiz als Vollbild-Präsentation (`---` trennt Folien).
 
 **Bases-Befehle:** `bases:new-file` legt eine neue `.base`-Datei an (wie `slatebase:base-new`). `bases:insert` fügt einen ```` ```base ````-Block mit Tabellen-Gerüst an der Cursorposition ein (nur mit Feature-Toggle `bases`; ohne Toggle erscheint ein Hinweis). `bases:add-item` legt eine Notiz im Geltungsbereich der Base an — Zielordner aus einem `file.inFolder(...)`-Filter (sonst Vault-Wurzel), angezeigte Properties leer vorbelegt, ein `property == "x"`-Filter füllt den Wert vor (andere Filter, etwa auf Tags, werden nicht in die neue Notiz zurückübersetzt). `bases:change-view` wechselt zur nächsten Ansicht der geöffneten Base — Obsidian öffnet dafür ein Auswahlmenü. `bases:add-view` hängt eine neue Tabellenansicht an. `bases:copy-table` kopiert die angezeigte Tabelle tab-getrennt (direkt in eine Tabellenkalkulation einfügbar). `bases:export-csv` lädt sie als CSV-Datei herunter (RFC 4180, UTF-8 mit BOM; Zellen mit führendem `=`, `+`, `@` oder `-` bekommen ein Apostroph, damit eine Notiz in einem geteilten Vault keine Tabellenkalkulations-Formel einschleusen kann). Die vier letzten laufen über `state/activeBasesBridge.ts`, analog zur Canvas-Brücke (`bases:insert` über den Editor).
 
