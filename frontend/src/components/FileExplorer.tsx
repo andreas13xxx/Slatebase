@@ -21,7 +21,7 @@ import { getCachedStatistics, fetchVaultStatistics, invalidateStatisticsCache, f
 import { onRealtimeVaultChange } from '../state/realtimeVaultBridge'
 import { getState as getWorkspaceState, updateExpandedState } from '../state/workspaceStore'
 import { consumePendingReveal } from '../state/revealFileBridge'
-import { consumePendingRename, consumePendingDelete } from '../state/fileOpBridge'
+import { consumePendingRename, consumePendingDelete, consumePendingMove } from '../state/fileOpBridge'
 import { TreeNode } from './file-explorer'
 import type { DragState, ExternalDropState, ContextMenuState, InlineInputState } from './file-explorer'
 import { buildTFileFromPath, buildTFolderFromPath } from '../plugins/compat/plugin-event-bridge'
@@ -414,6 +414,15 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       setDeleteConfirm({ open: true, node, vaultId })
     }
 
+    function applyMove(detail: { path: string; kind?: 'file' | 'folder' } | null | undefined) {
+      const vaultId = state.selectedVaultId
+      if (!detail || !vaultId) return
+      setMoveDialog({ node: buildSyntheticNode(detail.path, detail.kind ?? 'file'), vaultId })
+    }
+
+    function handleMoveRequest(e: Event) {
+      applyMove((e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail)
+    }
     function handleRenameRequest(e: Event) {
       applyRename((e as CustomEvent<{ path: string; kind?: 'file' | 'folder' }>).detail)
     }
@@ -424,13 +433,16 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     if (state.selectedVaultId) {
       applyRename(consumePendingRename())
       applyDelete(consumePendingDelete())
+      applyMove(consumePendingMove())
     }
 
     window.addEventListener('slatebase:rename-file', handleRenameRequest)
     window.addEventListener('slatebase:delete-file', handleDeleteRequest)
+    window.addEventListener('slatebase:move-file', handleMoveRequest)
     return () => {
       window.removeEventListener('slatebase:rename-file', handleRenameRequest)
       window.removeEventListener('slatebase:delete-file', handleDeleteRequest)
+      window.removeEventListener('slatebase:move-file', handleMoveRequest)
     }
   }, [state.selectedVaultId])
 

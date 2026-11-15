@@ -88,15 +88,19 @@ const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns
         />
       ) : (
         <>
-          <ColumnDropdown
-            doc={doc}
-            rows={rows}
-            columns={columns}
-            value={condition.property}
-            label="Eigenschaft"
-            disabled={disabled || fixedProperty}
-            onChange={(property) => emit({ ...condition, property })}
-          />
+          {fixedProperty ? (
+            <span className="bases-tb__select bases-tb__select--fixed" aria-label="Eigenschaft">Datei</span>
+          ) : (
+                      <ColumnDropdown
+              doc={doc}
+              rows={rows}
+              columns={columns}
+              value={condition.property}
+              label="Eigenschaft"
+              disabled={disabled}
+              onChange={(property) => emit({ ...condition, property })}
+            />
+          )}
           <select
             className="bases-tb__select"
             aria-label="Operator"

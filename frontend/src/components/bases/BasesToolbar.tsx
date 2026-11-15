@@ -11,14 +11,15 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
-import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause } from '@slatebase/shared-contracts'
+import { rowValueKey } from '@slatebase/shared-contracts'
+import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause, BaseView } from '@slatebase/shared-contracts'
 import { ColumnTypeIcon } from './base-column-icon'
 import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
-  addFormula, addView, availableColumns, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
+  addFormula, addView, availableColumns, columnLabel, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
   removeFormula, renameView, rootGroup,
   CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setCardImageFit, setCardImageProperty, setCardSize,
-  setDocFilter, setGroupBy, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
+  setDocFilter, setGroupBy, setGroupOrder, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
 import {
@@ -27,6 +28,7 @@ import {
 } from '../../plugins/compat/bases-view-registry'
 import { BasesFilterEditor, CommitInput } from './BasesFilterEditor'
 import { moveFilterBetweenScopes } from './base-filter-tree'
+import { groupLabel, groupRows, UNGROUPED } from './base-groups'
 
 /**
  * Display label for a view type: the built-in German label, else the name a
@@ -309,7 +311,8 @@ const DisplayPanel = memo(function DisplayPanel({ doc, index, columns, rows, dis
 
 
 const GroupPanel = memo(function GroupPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
-  const groupBy = doc.views[index]?.groupBy
+  const view = doc.views[index]
+  const groupBy = view?.groupBy
   return (
     <div className="bases-tb__section">
       <div className="bases-tb__row">
@@ -337,7 +340,71 @@ const GroupPanel = memo(function GroupPanel({ doc, index, columns, rows, disable
           </select>
         )}
       </div>
+      {view && groupBy && <GroupValuesSection doc={doc} index={index} view={view} rows={rows} disabled={disabled} onChange={onChange} />}
     </div>
+  )
+})
+
+/** Show/hide, reorder and add the groups of the grouping property (`groupOrder`). */
+const GroupValuesSection = memo(function GroupValuesSection({ doc, index, view, rows, disabled, onChange }: {
+  doc: BaseDocument; index: number; view: BaseView; rows: BaseRow[]; disabled: boolean; onChange: (update: DocUpdate) => void
+}) {
+  const property = view.groupBy?.property ?? ''
+  const propertyLabel = columnLabel(doc, rowValueKey(property))
+  const observed = useMemo(() => (groupRows(rows, { ...view, groupOrder: undefined })?.map((g) => g.key) ?? []), [rows, view])
+  const listed = useMemo(() => (view.groupOrder ?? []).map((g) => (g === null ? UNGROUPED : String(g))), [view.groupOrder])
+  const visible = view.groupOrder ? listed.filter((k, i) => listed.indexOf(k) === i) : observed
+  const hidden = observed.filter((k) => !visible.includes(k))
+  const write = (keys: string[]) => onChange((d) => setGroupOrder(d, index, keys.map((k) => (k === UNGROUPED ? null : k)), true))
+  const move = (i: number, by: -1 | 1) => {
+    const next = [...visible]
+    const [item] = next.splice(i, 1)
+    if (item !== undefined) next.splice(i + by, 0, item)
+    write(next)
+  }
+  const count = (key: string) => observed.includes(key) ? (groupRows(rows, { ...view, groupOrder: undefined })?.find((g) => g.key === key)?.rows.length ?? 0) : 0
+
+  return (
+    <>
+      <p className="bases-tb__hint">Gruppen</p>
+      <ul className="bases-tb__list" aria-label="Angezeigte Gruppen">
+        {visible.map((key, i) => (
+          <li key={key} className="bases-tb__row">
+            <label className="bases-tb__check">
+              <input type="checkbox" checked disabled={disabled} onChange={() => write(visible.filter((k) => k !== key))} />
+              <span className="bases-tb__col-label">{groupLabel(key, propertyLabel)}</span>
+              <span className="bases-tb__col-id">{count(key)}</span>
+            </label>
+            <button type="button" className="bases-tb__icon-btn" aria-label={`${groupLabel(key, propertyLabel)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
+            <button type="button" className="bases-tb__icon-btn" aria-label={`${groupLabel(key, propertyLabel)} nach unten`} disabled={disabled || i === visible.length - 1} onClick={() => move(i, 1)}>↓</button>
+          </li>
+        ))}
+      </ul>
+      {hidden.length > 0 && (
+        <>
+          <p className="bases-tb__hint">Ausgeblendet</p>
+          <ul className="bases-tb__list" aria-label="Ausgeblendete Gruppen">
+            {hidden.map((key) => (
+              <li key={key} className="bases-tb__row">
+                <label className="bases-tb__check">
+                  <input type="checkbox" checked={false} disabled={disabled} onChange={() => write([...visible, key])} />
+                  <span className="bases-tb__col-label">{groupLabel(key, propertyLabel)}</span>
+                  <span className="bases-tb__col-id">{count(key)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {!disabled && (
+        <CommitInput
+          label="Neue Gruppe hinzufügen"
+          placeholder="Neue Gruppe hinzufügen…"
+          value=""
+          onCommit={(name) => { const n = name.trim(); if (n && !visible.includes(n)) write([...visible, n]) }}
+        />
+      )}
+    </>
   )
 })
 

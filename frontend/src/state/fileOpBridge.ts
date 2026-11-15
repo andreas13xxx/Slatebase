@@ -40,3 +40,17 @@ export function consumePendingDelete(): FileOpRequest | null {
   pendingDelete = null
   return request
 }
+
+let pendingMove: FileOpRequest | null = null
+
+/** Asks the File Explorer to open its "Move to…" folder picker for `path`. */
+export function requestMove(path: string, kind: 'file' | 'folder' = 'file'): void {
+  pendingMove = { path, kind }
+  window.dispatchEvent(new CustomEvent('slatebase:move-file', { detail: { path, kind } }))
+}
+
+export function consumePendingMove(): FileOpRequest | null {
+  const request = pendingMove
+  pendingMove = null
+  return request
+}

@@ -613,6 +613,11 @@
   color: var(--text-primary);
 }
 
+.bases-kanban__chip--empty .bases-kanban__chip-val,
+.bases-list__chip--empty .bases-list__chip-val {
+  color: var(--text-subtle);
+}
+
 /* ─── Embedded base (![[file.base]]) ───────────────────────────────────── */
 .bases-embed {
   border: 1px solid var(--border-subtle);
@@ -1465,4 +1470,10 @@
   .bases-view__mode {
     min-height: 44px;
   }
+}
+
+.bases-tb__select--fixed {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.7;
 }

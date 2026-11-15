@@ -20,6 +20,7 @@ import { ChevronDown, ChevronRight, Plus, GripVertical } from 'lucide-react'
 import type { BaseDocument, BaseGroupValue, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue, rowValueKey } from '@slatebase/shared-contracts'
 import { columnLabel as baseColumnLabel } from './base-edit'
+import { useCardContextMenu } from './base-card-menu'
 import { FOLDER_GROUP_PROPERTY, ROOT_FOLDER_LABEL } from './base-folder-move'
 
 export interface BasesKanbanViewProps {
@@ -32,6 +33,8 @@ export interface BasesKanbanViewProps {
    * Default `columns`.
    */
   layout?: 'columns' | 'rows'
+  /** Vault of the shown notes; enables the card context menu. */
+  vaultId?: string
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /**
@@ -75,8 +78,9 @@ interface KanbanColumn {
 }
 
 export const BasesKanbanView = memo(function BasesKanbanView({
-  doc, view, rows, layout = 'columns', onOpenNote, onMoveCard, onAddCard, onReorderColumns,
+  doc, view, rows, layout = 'columns', vaultId, onOpenNote, onMoveCard, onAddCard, onReorderColumns,
 }: BasesKanbanViewProps) {
+  const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, !onMoveCard)
   // The grouping property name (the new `groupBy` is an object `{property, direction}`).
   const groupBy = view.groupBy?.property
   // The frontmatter key to write when moving/adding a card: the row-value key
@@ -369,15 +373,15 @@ export const BasesKanbanView = memo(function BasesKanbanView({
                     onDragStart={draggable ? (e) => handleCardDragStart(e, row.path, column.key) : undefined}
                     onDragEnd={draggable ? handleDragEnd : undefined}
                     onClick={() => onOpenNote(row.path)}
+                    onContextMenu={(e) => openMenu(e, row.path)}
                   >
                     <span className="bases-kanban__card-title">{row.fileName}</span>
                     {chipColumns.map((col) => {
                       const text = firstValue(row, col)
-                      if (!text) return null
                       return (
-                        <span key={col} className="bases-kanban__chip">
+                        <span key={col} className={text ? 'bases-kanban__chip' : 'bases-kanban__chip bases-kanban__chip--empty'}>
                           <span className="bases-kanban__chip-key">{columnLabel(col)}</span>
-                          <span className="bases-kanban__chip-val">{text}</span>
+                          <span className="bases-kanban__chip-val">{text || '–'}</span>
                         </span>
                       )
                     })}
@@ -389,6 +393,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
         )
       })}
       </div>
+      {cardMenu}
     </div>
   )
 })

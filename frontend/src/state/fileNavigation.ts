@@ -11,7 +11,7 @@
  * receive the request that follows.
  */
 import { requestReveal } from './revealFileBridge'
-import { requestRename, requestDelete } from './fileOpBridge'
+import { requestRename, requestDelete, requestMove } from './fileOpBridge'
 
 interface ExecuteCommandGlobal {
   app?: { commands?: { executeCommandById?: (id: string) => void } }
@@ -34,4 +34,9 @@ export function renameInExplorer(path: string, kind: 'file' | 'folder' = 'file')
 export function deleteInExplorer(path: string, kind: 'file' | 'folder' = 'file'): void {
   activateExplorerPanel()
   requestDelete(path, kind)
+}
+
+export function moveInExplorer(path: string, kind: 'file' | 'folder' = 'file'): void {
+  activateExplorerPanel()
+  requestMove(path, kind)
 }
