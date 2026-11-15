@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.87.0](https://github.com/andreas13xxx/Slatebase/compare/v0.86.0...v0.87.0) (2026-11-15)
+
+
+### Features
+
+* **bases:** card context menu, empty properties, group editor ([d366385](https://github.com/andreas13xxx/Slatebase/commit/d366385ccfc4d115fddea9a1b4c8c1543c1ea078))
+* **bases:** card context menu, empty properties, group value editor ([3558676](https://github.com/andreas13xxx/Slatebase/commit/35586763a7257c2dc875af59936fb17bf51dd860))
+
+
+### Bugfixes
+
+* **bases:** feed plugin views the data shape real plugins read ([ca102c1](https://github.com/andreas13xxx/Slatebase/commit/ca102c1853669e24c9a9b5d672c874462ec0a8c5))
+* **bases:** feed plugin views the data shape real plugins read ([0d56792](https://github.com/andreas13xxx/Slatebase/commit/0d567926f2b7f624a17df9ebec493ddcc451c140))
+* render callouts containing heading-only wikilinks ([#402](https://github.com/andreas13xxx/Slatebase/issues/402)) ([2c9775b](https://github.com/andreas13xxx/Slatebase/commit/2c9775bc3cbdc2e2426fb92b3c41e09b056cf781))
+
 ## [0.86.0](https://github.com/andreas13xxx/Slatebase/compare/v0.85.1...v0.86.0) (2026-11-15)
 
 
