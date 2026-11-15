@@ -37,6 +37,27 @@ export function createSlatebaseTheme(): Extension {
       color: 'var(--text-subtle)',
       borderRight: '1px solid var(--border-subtle)',
     },
+    // Fold gutter alone (no line numbers): no bar, just the chevrons.
+    '.cm-gutters:not(:has(.cm-lineNumbers))': {
+      backgroundColor: 'transparent',
+      borderRight: 'none',
+    },
+    '.cm-foldGutter': {
+      width: '16px',
+    },
+    '.cm-foldGutter .cm-gutterElement': {
+      cursor: 'pointer',
+      textAlign: 'center',
+      padding: '0',
+    },
+    // Open chevrons appear on hover (or on touch devices, where there is no hover); folded ones always show.
+    '.cm-fold-marker--open': {
+      opacity: '0',
+      transition: 'opacity 0.1s',
+    },
+    '&:hover .cm-fold-marker--open, .cm-gutterElement:hover > .cm-fold-marker--open': {
+      opacity: '1',
+    },
     '.cm-activeLineGutter': {
       backgroundColor: 'var(--sidebar-active)',
       color: 'var(--text-secondary)',

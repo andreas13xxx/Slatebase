@@ -52,7 +52,8 @@ import { revealInExplorer } from '../state/fileNavigation'
 import { useAppConfigValue, getAppConfigValue } from '../state/vaultAppConfigStore'
 import { htmlToMarkdown } from '../utils/htmlToMarkdown'
 import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
-import { codeFolding } from '@codemirror/language'
+import { useLongPress } from '../hooks/useLongPress'
+import { codeFolding, foldGutter } from '@codemirror/language'
 import { markdownFoldService } from './folding'
 import { isEmbeddableFile } from '../utils/internalLink'
 import { openExternalUrl } from '../utils/externalUrl'
@@ -190,6 +191,8 @@ export function CodeMirrorEditor({
 
   // Compartments for dynamic reconfiguration
   const readOnlyCompartment = useRef(new Compartment())
+  // iOS never fires `contextmenu` on a long-press, and Android's selection UI can swallow it: dispatch it ourselves.
+  const editorLongPress = useLongPress({ dispatchOnTarget: true })
   const lineNumbersCompartment = useRef(new Compartment())
   const livePreviewCompartment = useRef(new Compartment())
   const spellcheckCompartment = useRef(new Compartment())
@@ -378,6 +381,17 @@ export function CodeMirrorEditor({
       // needs a custom foldService instead of CM6's syntax-node-based folding.
       codeFolding(),
       markdownFoldService,
+      // Fold chevron next to every heading/list item the service can fold (Obsidian shows it on hover;
+      // theme.ts keeps it unobtrusive). Without it a heading could only be folded by command or hotkey.
+      foldGutter({
+        markerDOM: (open) => {
+          const marker = document.createElement('span')
+          marker.className = open ? 'cm-fold-marker cm-fold-marker--open' : 'cm-fold-marker cm-fold-marker--closed'
+          marker.textContent = open ? '▾' : '▸'
+          marker.title = open ? 'Einklappen' : 'Ausklappen'
+          return marker
+        },
+      }),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return
         const isRemote = update.transactions.some((tr) => tr.annotation(remoteSync))
@@ -847,6 +861,7 @@ export function CodeMirrorEditor({
       <div
         ref={containerRef}
         className={`cm-editor-wrapper${readableLineLength ? '' : ' cm-full-width'}`}
+        {...editorLongPress}
       />
       {contextMenu && (
         <ContextMenu

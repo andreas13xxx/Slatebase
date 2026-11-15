@@ -771,3 +771,10 @@
   font-size: 0.9em;
   font-weight: 500;
 }
+
+/* Touch has no hover: keep the heading fold chevrons visible, but faint. */
+@media (hover: none) {
+  .cm-fold-marker--open {
+    opacity: 0.5 !important;
+  }
+}
