@@ -74,6 +74,7 @@ import { createFileVersionRoutes } from './fileVersionRoutes.js'
 import { createVaultConfigRoutes } from './vaultConfigRoutes.js'
 import { createPropertyTypeRoutes } from './propertyTypeRoutes.js'
 import { createPropertyRoutes } from './propertyRoutes.js'
+import { createBasesRoutes } from './basesRoutes.js'
 import { createVaultAuthorizationMiddleware, resolveRequiredLevel } from './vault-authorization-middleware.js'
 
 // ─── Stub helper ────────────────────────────────────────────────────────────
@@ -418,5 +419,40 @@ describe('app-config routes', () => {
   it('reading needs read access, changing needs write access (the file applies to every user of the vault)', () => {
     expect(resolveRequiredLevel('GET', '/app-config')).toBe('read')
     expect(resolveRequiredLevel('PATCH', '/app-config')).toBe('write')
+  })
+})
+
+describe('bases query route (read-only despite POST)', () => {
+  const basesApp = new Hono()
+  basesApp.use('*', async (c, next) => {
+    c.set('session' as never, currentSession as never)
+    await next()
+  })
+  basesApp.use('/api/v1/vaults/:vaultId/*', createVaultAuthorizationMiddleware({ vaultRegistry, accessControl }))
+  const readyIndex = {
+    isReady: () => true,
+    queryForBase: async () => ({ rows: [], total: 0, truncated: false, listKeys: [], propertyKeys: [] }),
+  } as unknown as ILinkIndex
+  basesApp.route('/api/v1', createBasesRoutes({ linkIndexResolver: async () => readyIndex, logger: silentLogger }))
+
+  const post = () =>
+    basesApp.request(`/api/v1/vaults/${VAULT_ID}/bases/query`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ columns: [] }),
+    })
+
+  it('is a read-level exception, unlike the POST write default', () => {
+    expect(resolveRequiredLevel('POST', '/bases/query')).toBe('read')
+  })
+
+  it('lets a read-only collaborator run the query (200)', async () => {
+    currentSession = readerSession
+    expect((await post()).status).toBe(200)
+  })
+
+  it('still denies a user with no access to the vault (403)', async () => {
+    currentSession = strangerSession
+    expect((await post()).status).toBe(403)
   })
 })

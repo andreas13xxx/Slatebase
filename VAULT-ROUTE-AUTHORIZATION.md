@@ -534,13 +534,13 @@ which every reader of the vault can see anyway in the tree and the file versions
 ## Addendum — `backend/src/api/basesRoutes.ts` (Bases query, 2026-11-08)
 
 Mounted via `app.route('/api/v1', basesRoutes)`, behind the `bases` feature guard (`.../bases/*`). No access check in
-the handler, and — unlike `POST .../properties/query` — **no exception**: the query is read-only, but the POST verb
-makes the middleware default `write`. Effect: a collaborator with only a read share is answered 403 and cannot open a
-`.base` view (finding F6 below). Not a leak; the restriction is stricter than necessary.
+the handler. Like `POST .../properties/query`, the query is read-only but uses the POST verb, so it is an **Exception**
+(`read`, resolved in F6 below). The handler only calls `ILinkIndex.queryForBase` on the index of the vault in the URL
+(in-memory data, plus `stat()` for file times); it writes nothing and reads no other vault.
 
 | Method | Path | Level |
 |---|---|---|
-| POST | `.../bases/query` | write (method default; read would suffice, see F6) |
+| POST | `.../bases/query` | **read** — Exception (read-only despite POST verb) |
 
 ## Addendum — `backend/src/api/spellcheckDictionaryRoutes.ts` (personal spellcheck words, 2026-11-08)
 
@@ -577,9 +577,10 @@ Not under `/api/v1/vaults/:vaultId/*`, listed so the inventory is complete. None
 
 ## New findings (2026-11-08, documentation only — nothing changed)
 
-**F6 — `POST .../bases/query` requires write for a read-only operation.** `basesRoutes.ts:101`, no entry in
-`VAULT_ROUTE_LEVEL_EXCEPTIONS`. Read-only collaborators get 403 on every Bases view. Fix would be one exception row
-(`POST /bases/query` → `read`), the same as `/properties/query`. Left open: it is a policy/behavior change, not a doc fix.
+**F6 — RESOLVED: `POST .../bases/query` required write for a read-only operation.** `basesRoutes.ts:101` had no entry
+in `VAULT_ROUTE_LEVEL_EXCEPTIONS`, so read-only collaborators got 403 on every Bases view. Fixed with one exception row
+(`POST /bases/query` → `read`), the same as `/properties/query`; test in `vault-authorization-middleware.test.ts`
+(reader 200, non-member 403).
 
 **F7 — `mapConfigRoutes.ts:35` documents the route as public, but it needs a session.** Code behavior is the safer
 one (see the table above); only the comment is misleading.
@@ -599,9 +600,9 @@ middleware), so the document cannot be checked against the code mechanically.
   `^/api/v1/vaults/:vaultId(/|$)` (the same filter as the test, dumped once with a temporary test); the 17 are
   counted from the route registrations of the unmounted modules. An earlier count of 112/95 wrongly included the
   one `ALL` entry, the authorization middleware itself (`app.use('/api/v1/vaults/:vaultId/*')`).
-- **13** entries in `VAULT_ROUTE_LEVEL_EXCEPTIONS`: 3× `read` instead of `write` (`POST /properties/query`,
-  `PUT /plugins/:pluginId/settings`, `POST /plugins/check-updates`), 3× `write` instead of `read`
+- **14** entries in `VAULT_ROUTE_LEVEL_EXCEPTIONS`: 4× `read` instead of `write` (`POST /properties/query`,
+  `POST /bases/query`, `PUT /plugins/:pluginId/settings`, `POST /plugins/check-updates`), 3× `write` instead of `read`
   (`GET /public-shares`, `GET /public-shares/preview`, `GET /keychain/:secretId`), 7× `owner` (`GET`/`POST /shares`,
   `PUT`/`DELETE /shares/:userId`, `POST /transfer`, `PUT /config`, `DELETE` of the vault itself).
 - Unchanged: routes outside the middleware pattern (§19 and the "Routes outside the vault middleware" table above).
-- Open findings: F1, F3, F4, F6, F7, F8 (F2 and F5 resolved).
+- Open findings: F1, F3, F4, F7, F8 (F2, F5 and F6 resolved).
