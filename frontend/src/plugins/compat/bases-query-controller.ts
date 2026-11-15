@@ -28,6 +28,8 @@ import { extractErrorMessage } from '../../utils/error'
 import { toValue } from './bases-value-factory'
 import { StringValue, NumberValue, BooleanValue, NullValue, type Value } from './bases-values'
 import { warnOnce } from './log'
+import { getActiveVaultShimRef, treeNodeToTFile } from './shims/vault-shim'
+import type { DirectoryTree } from '../../types'
 
 /** The subset of a BasesView instance this controller drives. */
 export interface DrivableBasesView {
@@ -67,6 +69,20 @@ function toStringList(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map((v) => String(v))
   if (raw === undefined || raw === null) return []
   return [String(raw)]
+}
+
+/**
+ * The `TFile` for a row. Plugins treat `entry.file` as a real TFile — they read
+ * `basename` (node labels, item titles), key `metadataCache.resolvedLinks` by
+ * its `path` and hand it to `getFileCache()`. Prefer the vault's own object;
+ * synthesize one with the same shape when the file is not in the tree yet.
+ */
+function resolveEntryFile(row: BaseRow): unknown {
+  const vault = getActiveVaultShimRef() as { getFileByPath?(p: string): unknown } | null
+  const found = vault?.getFileByPath?.(row.path)
+  if (found) return found
+  const name = row.path.split('/').pop() ?? row.path
+  return treeNodeToTFile({ name, path: row.path, type: 'file' } as unknown as DirectoryTree, null)
 }
 
 /**
@@ -134,6 +150,21 @@ export class BasesQueryController {
     return Array.from(cols)
   }
 
+  /**
+   * Hands each row's forward links (from the server's link index) to the
+   * shared metadata cache, so `app.metadataCache.resolvedLinks` — which a
+   * graph view walks for its edges — knows them without reading every note.
+   */
+  private publishIndexedLinks(rows: BaseRow[]): void {
+    const cache = (window as unknown as { app?: { metadataCache?: { setIndexedLinks?(p: string, l: string[]): void } } })
+      .app?.metadataCache
+    if (typeof cache?.setIndexedLinks !== 'function') return
+    for (const row of rows) {
+      const links = row.values['file.links']
+      cache.setIndexedLinks(row.path, Array.isArray(links) ? links.map(String) : [])
+    }
+  }
+
   /** Re-runs the query and calls the view's onDataUpdated(). */
   async refresh(): Promise<void> {
     try {
@@ -141,12 +172,13 @@ export class BasesQueryController {
         this.apiClient, this.vaultId, this.doc, this.view, undefined, this.pluginConfigColumns(),
       )
       if (this.stopped) return
+      this.publishIndexedLinks(rows)
       const entries = rows.map((row) => this.buildEntry(row))
       const columns = this.view.order ?? Object.keys(this.doc.properties ?? {})
       this.target.allProperties = columns
-      const QueryResult = window.obsidian?.['BasesQueryResult'] as unknown as (new (e: unknown[], g?: unknown[]) => unknown) | undefined
+      const QueryResult = window.obsidian?.['BasesQueryResult'] as unknown as (new (e: unknown[], g?: unknown[], p?: string[]) => unknown) | undefined
       const groups = this.buildGroups(rows, entries)
-      this.target.data = QueryResult ? new QueryResult(entries, groups) : entries
+      this.target.data = QueryResult ? new QueryResult(entries, groups, columns) : entries
       try {
         this.target.onDataUpdated?.()
       } catch (err) {
@@ -189,12 +221,19 @@ export class BasesQueryController {
     const formulaKeys = new Set(Object.keys(this.doc.formulas ?? {}))
 
     const entry = EntryCtor ? new EntryCtor() : ({ file: null, setValue() {} } as { file: unknown; setValue(k: string, v: unknown): void })
-    entry.file = { path: row.path, name: row.fileName }
+    entry.file = resolveEntryFile(row)
+
+    // `file.*` pseudo-properties resolve on every entry in Obsidian, whether or
+    // not they are displayed columns — a chart's X axis (`x: file.name`) or a
+    // timeline's title field reads them without listing them in `order`.
+    entry.setValue('file.name', new StringValue(row.fileName))
+    entry.setValue('file.path', new StringValue(row.path))
 
     // Displayed columns (incl. formula and file.* pseudo-columns).
     for (const col of columns) {
-      if (formulaKeys.has(col)) {
-        entry.setValue(col, formulaValue(this.doc.formulas?.[col] ?? '', row))
+      const formulaKey = col.startsWith('formula.') ? col.slice('formula.'.length) : col
+      if (formulaKeys.has(formulaKey)) {
+        entry.setValue(col, formulaValue(this.doc.formulas?.[formulaKey] ?? '', row))
       } else if (col === 'file.name') {
         entry.setValue(col, new StringValue(row.fileName))
       } else {

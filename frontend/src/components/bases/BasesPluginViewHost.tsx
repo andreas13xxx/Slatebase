@@ -85,6 +85,11 @@ export function BasesPluginViewHost({
       const config = ConfigCtor ? new ConfigCtor() : { name: view.name ?? 'Base' }
       config.name = view.name ?? view.type
       config.setOrder?.(view.order ?? Object.keys(doc.properties ?? {}))
+      const displayNames: Record<string, string> = {}
+      for (const [key, prop] of Object.entries(doc.properties ?? {})) {
+        if (prop?.displayName) displayNames[key] = prop.displayName
+      }
+      ;(config as { _displayNames?: Record<string, string> })._displayNames = displayNames
       // Feed the plugin view its per-view config. A plugin reads these through
       // `config.get(key)` / `config.getAsPropertyId(key)` (e.g. the Maps plugin
       // reads the `coordinates` marker property and its zoom/tile options), so

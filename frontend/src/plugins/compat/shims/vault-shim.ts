@@ -38,6 +38,11 @@ export function setActiveVaultShimRef(vault: IVaultShim | null): void {
   activeVaultShimRef = vault;
 }
 
+/** The active vault shim, or null before any vault has loaded. */
+export function getActiveVaultShimRef(): IVaultShim | null {
+  return activeVaultShimRef;
+}
+
 /**
  * Validates a file path for safety.
  * Rejects paths containing ../, null bytes, or starting with / (absolute paths).
