@@ -51,7 +51,7 @@ describe('PropertiesOverview', () => {
     expect(screen.getByText('1')).toBeInTheDocument()
 
     // "title" has a registry entry (text); "tags" has none, so it falls back to text too.
-    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[]
+    const selects = screen.getAllByLabelText(/^Typ von /) as HTMLSelectElement[]
     expect(selects.map((s) => s.value)).toEqual(['text', 'text'])
   })
 
@@ -59,7 +59,7 @@ describe('PropertiesOverview', () => {
     renderWithApi(makeApiClient(), { hasWriteAccess: false })
 
     await screen.findByText('title')
-    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByLabelText(/^Typ von /)).toBeNull()
     expect(screen.getAllByText('Text')).toHaveLength(2)
   })
 
@@ -79,11 +79,11 @@ describe('PropertiesOverview', () => {
     renderWithApi(apiClient)
 
     await screen.findByText('title')
-    const [titleSelect] = screen.getAllByRole('combobox') as HTMLSelectElement[]
-    await user.selectOptions(titleSelect!, 'checkbox')
+    const titleSelect = screen.getByLabelText('Typ von title') as HTMLSelectElement
+    await user.selectOptions(titleSelect, 'checkbox')
 
     expect(apiClient.setPropertyType).toHaveBeenCalledWith('vault1', 'title', 'checkbox')
-    await waitFor(() => expect(titleSelect!.value).toBe('checkbox'))
+    await waitFor(() => expect(titleSelect.value).toBe('checkbox'))
   })
 
   it('reverts the optimistic update if persisting the type fails', async () => {
@@ -92,9 +92,35 @@ describe('PropertiesOverview', () => {
     renderWithApi(apiClient)
 
     await screen.findByText('title')
-    const [titleSelect] = screen.getAllByRole('combobox') as HTMLSelectElement[]
-    await user.selectOptions(titleSelect!, 'checkbox')
+    const titleSelect = screen.getByLabelText('Typ von title') as HTMLSelectElement
+    await user.selectOptions(titleSelect, 'checkbox')
 
-    await waitFor(() => expect(titleSelect!.value).toBe('text'))
+    await waitFor(() => expect(titleSelect.value).toBe('text'))
+  })
+
+  it('filters by the search text', async () => {
+    const user = userEvent.setup()
+    renderWithApi(makeApiClient())
+
+    await screen.findByText('title')
+    await user.type(screen.getByRole('searchbox'), 'tag')
+
+    expect(screen.queryByText('title')).toBeNull()
+    expect(screen.getByText('tags')).toBeInTheDocument()
+  })
+
+  it('sorts by count and flips the direction', async () => {
+    const user = userEvent.setup()
+    renderWithApi(makeApiClient())
+
+    await screen.findByText('title')
+    const keys = () => Array.from(document.querySelectorAll('.properties-overview__key')).map((el) => el.textContent)
+    expect(keys()).toEqual(['tags', 'title'])
+
+    await user.selectOptions(screen.getByLabelText('Sortieren nach'), 'count')
+    expect(keys()).toEqual(['tags', 'title'])
+
+    await user.click(screen.getByRole('button', { name: 'Aufsteigend' }))
+    expect(keys()).toEqual(['title', 'tags'])
   })
 })

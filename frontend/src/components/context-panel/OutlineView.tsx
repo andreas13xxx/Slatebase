@@ -6,8 +6,8 @@
  * is highlighted, and clicking a heading triggers smooth scrolling to it.
  */
 
-import { useState } from 'react'
-import { Copy, Link2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Copy, Link2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { OutlineHeading } from '../../state/documentPanelData'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
@@ -23,16 +23,58 @@ export interface OutlineViewProps {
   activeAnchor: string | null
   /** Callback when a heading is clicked — parent handles scrolling */
   onHeadingClick: (anchor: string) => void
+  /** Double click: jump to the heading in the note (editor or reading view) */
+  onHeadingJump?: (index: number, anchor: string) => void
+  /** A heading was folded/unfolded in the list — the note folds the same section */
+  onHeadingFoldToggle?: (index: number, collapsed: boolean) => void
   /** Whether a document is currently open */
   hasDocument?: boolean
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function OutlineView({ headings, activeAnchor, onHeadingClick, hasDocument = true }: OutlineViewProps) {
+export function OutlineView({ headings, activeAnchor, onHeadingClick, onHeadingJump, onHeadingFoldToggle, hasDocument = true }: OutlineViewProps) {
   const { t } = useTranslation()
   const longPress = useLongPress()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; heading: OutlineHeading } | null>(null)
+
+  const [query, setQuery] = useState('')
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
+
+  const searching = query.trim() !== ''
+
+  /** Headings still shown: matches while searching, otherwise all but those under a folded one. */
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    const entries: Array<{ heading: OutlineHeading; index: number; hasChildren: boolean }> = []
+    let hiddenBelowLevel: number | null = null
+    headings.forEach((heading, index) => {
+      const next = headings[index + 1]
+      const hasChildren = next !== undefined && next.level > heading.level
+      if (needle !== '') {
+        if (heading.text.toLowerCase().includes(needle)) entries.push({ heading, index, hasChildren: false })
+        return
+      }
+      if (hiddenBelowLevel !== null) {
+        if (heading.level > hiddenBelowLevel) return
+        hiddenBelowLevel = null
+      }
+      entries.push({ heading, index, hasChildren })
+      if (hasChildren && collapsed.has(heading.anchor)) hiddenBelowLevel = heading.level
+    })
+    return entries
+  }, [headings, query, collapsed])
+
+  function toggleCollapsed(index: number, anchor: string) {
+    const willCollapse = !collapsed.has(anchor)
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (willCollapse) next.add(anchor)
+      else next.delete(anchor)
+      return next
+    })
+    onHeadingFoldToggle?.(index, willCollapse)
+  }
 
   /**
    * A heading isn't a `TAbstractFile` — there's no `file-menu`/plugin hook for
@@ -70,10 +112,22 @@ export function OutlineView({ headings, activeAnchor, onHeadingClick, hasDocumen
 
   return (
     <nav className="outline-view" aria-label={t('contextPanel.outlineAriaLabel')}>
+      <input
+        type="search"
+        className="outline-view__search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t('contextPanel.outlineSearch')}
+        aria-label={t('contextPanel.outlineSearch')}
+      />
+      {visible.length === 0 && (
+        <p className="outline-view__placeholder">{t('contextPanel.outlineNoMatches')}</p>
+      )}
       <ul className="outline-view__list">
-        {headings.map((heading, index) => {
+        {visible.map(({ heading, index, hasChildren }) => {
           const isActive = heading.anchor === activeAnchor
-          const indentation = (heading.level - 1) * 12
+          const indentation = searching ? 0 : (heading.level - 1) * 12
+          const isCollapsed = collapsed.has(heading.anchor)
 
           return (
             <li
@@ -81,9 +135,23 @@ export function OutlineView({ headings, activeAnchor, onHeadingClick, hasDocumen
               className={`outline-view__item${isActive ? ' outline-view__item--active' : ''}`}
               style={{ paddingLeft: `${indentation}px` }}
             >
+              {!searching && (hasChildren ? (
+                <button
+                  type="button"
+                  className="outline-view__toggle"
+                  onClick={() => toggleCollapsed(index, heading.anchor)}
+                  aria-expanded={!isCollapsed}
+                  aria-label={isCollapsed ? t('contextPanel.outlineExpand', { heading: heading.text }) : t('contextPanel.outlineCollapse', { heading: heading.text })}
+                >
+                  {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                </button>
+              ) : (
+                <span className="outline-view__toggle-spacer" aria-hidden="true" />
+              ))}
               <button
                 className="outline-view__button"
                 onClick={() => onHeadingClick(heading.anchor)}
+                onDoubleClick={() => onHeadingJump?.(index, heading.anchor)}
                 onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, heading }) }}
                 {...longPress}
                 title={heading.text}

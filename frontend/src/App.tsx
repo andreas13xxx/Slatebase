@@ -929,7 +929,8 @@ function AppContent() {
 
   const handleLinkClick = useCallback((target: string, resolved: boolean) => {
     if (!resolved || !state.selectedVaultId) return
-    const filePath = target.endsWith('.md') ? target : `${target}.md`
+    // LinksView passes the resolved vault path; only a bare note name still needs its extension
+    const filePath = /\.(md|canvas|base)$/i.test(target) ? target : `${target}.md`
     const parts = filePath.split('/')
     const fileName = parts[parts.length - 1] ?? filePath
     void openTab(tabDispatch, dispatch, apiClient, state.selectedVaultId, filePath, fileName)
@@ -980,6 +981,8 @@ function AppContent() {
     footnotes: documentPanelData.state.footnotes,
     hasDocument: documentContent !== null,
     onHeadingClick: documentPanelData.onHeadingClick,
+    onHeadingJump: documentPanelData.onHeadingJump,
+    onHeadingFold: documentPanelData.onHeadingFold,
     onLinkClick: handleLinkClick,
     onTagClick: documentPanelData.onTagClick,
     onFileClick: handleFileClick,

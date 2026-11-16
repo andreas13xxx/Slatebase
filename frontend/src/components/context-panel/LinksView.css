@@ -204,3 +204,13 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Resolved links look like links in a note (accent colour, underline), as in reading view. */
+.context-panel-link-resolved .context-panel-link-button {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.context-panel-link-resolved .context-panel-link-button:hover {
+  text-decoration-thickness: 2px;
+}

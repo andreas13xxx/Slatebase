@@ -7,7 +7,8 @@
  * keys exist, how widely used they are, and what type each should be.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useAppContext } from '../../state'
 import { useTranslation } from '../../i18n'
 import type { PropertyType } from '../../state/propertyTypes'
@@ -32,6 +33,8 @@ export interface PropertiesOverviewProps {
   hasWriteAccess: boolean
 }
 
+type SortField = 'name' | 'count' | 'type'
+
 interface OverviewRow {
   key: string
   count: number
@@ -43,6 +46,9 @@ export function PropertiesOverview({ vaultId, hasWriteAccess }: PropertiesOvervi
   const { t } = useTranslation()
   const [rows, setRows] = useState<OverviewRow[] | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [query, setQuery] = useState('')
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [descending, setDescending] = useState(false)
 
   const load = useCallback(() => {
     // No vault to fetch for — leave previous state in place rather than
@@ -84,6 +90,21 @@ export function PropertiesOverview({ vaultId, hasWriteAccess }: PropertiesOvervi
     })
   }, [vaultId, apiClient])
 
+  /** Rows matching the search, ordered by the chosen field; ties fall back to the name. */
+  const visibleRows = useMemo(() => {
+    if (!rows) return null
+    const needle = query.trim().toLowerCase()
+    const filtered = needle === '' ? rows : rows.filter((row) => row.key.toLowerCase().includes(needle))
+    const direction = descending ? -1 : 1
+    return [...filtered].sort((a, b) => {
+      let result = 0
+      if (sortField === 'count') result = a.count - b.count
+      else if (sortField === 'type') result = a.type.localeCompare(b.type)
+      // The name tiebreak stays A to Z whichever way the chosen field runs
+      return result !== 0 ? result * direction : a.key.localeCompare(b.key)
+    })
+  }, [rows, query, sortField, descending])
+
   if (!vaultId) {
     return (
       <div className="properties-overview properties-overview--empty">
@@ -119,8 +140,40 @@ export function PropertiesOverview({ vaultId, hasWriteAccess }: PropertiesOvervi
   return (
     <div className="properties-overview">
       <p className="properties-overview__hint">{t('contextPanel.propertiesOverview.hint')}</p>
+      <div className="properties-overview__tools">
+        <input
+          type="search"
+          className="properties-overview__search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('contextPanel.propertiesOverview.search')}
+          aria-label={t('contextPanel.propertiesOverview.search')}
+        />
+        <select
+          className="properties-overview__sort"
+          value={sortField}
+          onChange={(e) => setSortField(e.target.value as SortField)}
+          aria-label={t('contextPanel.propertiesOverview.sortBy')}
+        >
+          <option value="name">{t('contextPanel.propertiesOverview.sortName')}</option>
+          <option value="count">{t('contextPanel.propertiesOverview.sortCount')}</option>
+          <option value="type">{t('contextPanel.propertiesOverview.sortType')}</option>
+        </select>
+        <button
+          type="button"
+          className="properties-overview__sort-direction"
+          onClick={() => setDescending((prev) => !prev)}
+          aria-label={descending ? t('contextPanel.propertiesOverview.sortDescending') : t('contextPanel.propertiesOverview.sortAscending')}
+          title={descending ? t('contextPanel.propertiesOverview.sortDescending') : t('contextPanel.propertiesOverview.sortAscending')}
+        >
+          {descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+        </button>
+      </div>
+      {visibleRows !== null && visibleRows.length === 0 && (
+        <p className="properties-overview__placeholder">{t('contextPanel.propertiesOverview.noMatches')}</p>
+      )}
       <div className="properties-overview__list">
-        {rows.map((row) => (
+        {(visibleRows ?? []).map((row) => (
           <PropertiesOverviewRow
             key={row.key}
             row={row}

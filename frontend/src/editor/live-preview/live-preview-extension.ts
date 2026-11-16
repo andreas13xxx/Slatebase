@@ -126,6 +126,8 @@ function buildDecorations(
   // Phase 2: Link decorations (standard links [text](url) + wikilinks [[target]])
   const links = buildLinkDecorations(state, {
     onInternalLinkClick: options.onInternalLinkClick,
+    directoryTree: options.directoryTree,
+    sourcePath: state.field(editorInfoField, false)?.file?.path ?? '',
   })
 
   // Read callout fold state
