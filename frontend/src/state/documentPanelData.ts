@@ -309,7 +309,7 @@ export interface UseDocumentPanelDataResult {
   /** Jumps to the `index`-th heading in the editor (falls back to scrolling the reading view). */
   onHeadingJump: (index: number, anchor: string) => void
   /** Folds or unfolds the `index`-th heading's section in the editor. */
-  onHeadingFold: (index: number, collapsed: boolean) => void
+  onHeadingFold: (index: number, collapsed: boolean, anchor: string) => void
   /** Expands/collapses a tag, fetching its file list on first expand. */
   onTagClick: (tagName: string) => void
 }
@@ -483,7 +483,13 @@ export function useDocumentPanelData({
     onHeadingClick(anchor)
   }, [onHeadingClick])
 
-  const onHeadingFold = useCallback((index: number, collapsed: boolean) => {
+  const onHeadingFold = useCallback((index: number, collapsed: boolean, anchor: string) => {
+    // Reading view: every heading section is a <details> whose heading carries the anchor as id
+    const section = document.getElementById(anchor)?.closest('details')
+    if (section) {
+      section.open = !collapsed
+      return
+    }
     const view = getActiveEditorView()
     if (view) setOutlineHeadingFolded(view, index, collapsed)
   }, [])

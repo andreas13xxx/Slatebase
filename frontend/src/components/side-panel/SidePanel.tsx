@@ -39,7 +39,7 @@ export interface SidePanelDocumentProps {
   hasDocument: boolean
   onHeadingClick: (anchor: string) => void
   onHeadingJump: (index: number, anchor: string) => void
-  onHeadingFold: (index: number, collapsed: boolean) => void
+  onHeadingFold: (index: number, collapsed: boolean, anchor: string) => void
   onLinkClick: (target: string, resolved: boolean) => void
   onTagClick: (tagName: string) => void
   onFileClick: (filePath: string) => void

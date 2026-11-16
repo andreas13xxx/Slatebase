@@ -26,7 +26,7 @@ export interface OutlineViewProps {
   /** Double click: jump to the heading in the note (editor or reading view) */
   onHeadingJump?: (index: number, anchor: string) => void
   /** A heading was folded/unfolded in the list — the note folds the same section */
-  onHeadingFoldToggle?: (index: number, collapsed: boolean) => void
+  onHeadingFoldToggle?: (index: number, collapsed: boolean, anchor: string) => void
   /** Whether a document is currently open */
   hasDocument?: boolean
 }
@@ -73,7 +73,7 @@ export function OutlineView({ headings, activeAnchor, onHeadingClick, onHeadingJ
       else next.delete(anchor)
       return next
     })
-    onHeadingFoldToggle?.(index, willCollapse)
+    onHeadingFoldToggle?.(index, willCollapse, anchor)
   }
 
   /**

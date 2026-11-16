@@ -33,10 +33,10 @@ describe('OutlineView search, jump and fold', () => {
     const props = setup()
     await userEvent.click(screen.getByRole('button', { name: /„Eins“ einklappen/ }))
     expect(screen.queryByText('Unter')).toBeNull()
-    expect(props.onHeadingFoldToggle).toHaveBeenCalledWith(0, true)
+    expect(props.onHeadingFoldToggle).toHaveBeenCalledWith(0, true, 'eins')
 
     await userEvent.click(screen.getByRole('button', { name: /„Eins“ ausklappen/ }))
     expect(screen.getByText('Unter')).toBeInTheDocument()
-    expect(props.onHeadingFoldToggle).toHaveBeenCalledWith(0, false)
+    expect(props.onHeadingFoldToggle).toHaveBeenCalledWith(0, false, 'eins')
   })
 })
