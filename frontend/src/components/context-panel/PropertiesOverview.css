@@ -85,3 +85,44 @@
   font-size: 0.75rem;
   color: var(--right-panel-text-muted);
 }
+
+.properties-overview__tools {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.properties-overview__search,
+.properties-overview__sort {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.properties-overview__search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.properties-overview__sort-direction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.375rem;
+  color: var(--right-panel-text);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.properties-overview__search:focus-visible,
+.properties-overview__sort:focus-visible,
+.properties-overview__sort-direction:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

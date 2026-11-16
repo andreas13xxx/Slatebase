@@ -15,7 +15,7 @@ export interface OutlineHeading {
 }
 
 /** Regex to match markdown headings (lines starting with 1-6 # followed by space and text) */
-const HEADING_REGEX = /^(#{1,6})\s+(.+)$/gm
+const HEADING_REGEX = /^(#{1,6})[ \t]+(.+)$/gm
 
 /**
  * Strips inline formatting markers from heading text.

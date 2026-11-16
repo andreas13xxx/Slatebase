@@ -38,6 +38,8 @@ export interface SidePanelDocumentProps {
   footnotes: DocumentPanelState['footnotes']
   hasDocument: boolean
   onHeadingClick: (anchor: string) => void
+  onHeadingJump: (index: number, anchor: string) => void
+  onHeadingFold: (index: number, collapsed: boolean) => void
   onLinkClick: (target: string, resolved: boolean) => void
   onTagClick: (tagName: string) => void
   onFileClick: (filePath: string) => void
@@ -235,6 +237,8 @@ export function SidePanel({
               headings={documentPanel.outline.headings}
               activeAnchor={documentPanel.outline.activeAnchor}
               onHeadingClick={documentPanel.onHeadingClick}
+              onHeadingJump={documentPanel.onHeadingJump}
+              onHeadingFoldToggle={documentPanel.onHeadingFold}
               hasDocument={documentPanel.hasDocument}
             />
           </div>

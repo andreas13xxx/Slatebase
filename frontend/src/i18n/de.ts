@@ -789,6 +789,14 @@ export const de = {
       loadError: 'Eigenschaften konnten nicht geladen werden.',
       empty: 'Keine Eigenschaften in diesem Vault gefunden.',
       hint: 'Alle im Vault verwendeten Eigenschaften. Typ ändern, um festzulegen, wie eine Eigenschaft bearbeitet wird.',
+      search: 'Eigenschaften suchen …',
+      sortBy: 'Sortieren nach',
+      sortName: 'Name',
+      sortCount: 'Anzahl',
+      sortType: 'Typ',
+      sortAscending: 'Aufsteigend',
+      sortDescending: 'Absteigend',
+      noMatches: 'Keine passende Eigenschaft.',
       typeAriaLabel: 'Typ von {key}',
     },
     footnotes: {
@@ -810,6 +818,10 @@ export const de = {
     noDocument: 'Kein Dokument geöffnet',
     noHeadings: 'Keine Überschriften gefunden',
     outlineAriaLabel: 'Dokumentgliederung',
+    outlineSearch: 'Gliederung durchsuchen …',
+    outlineNoMatches: 'Keine passende Überschrift.',
+    outlineExpand: '„{heading}“ ausklappen',
+    outlineCollapse: '„{heading}“ einklappen',
   },
 
   sidePanel: {

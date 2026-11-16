@@ -6,6 +6,7 @@
  * All actions handle errors gracefully (dispatch error state, don't throw).
  */
 
+import { getAliasMapSnapshot } from './aliasStore'
 import type { Dispatch } from 'react'
 import type { DocumentPanelAction, LinkEntry, TagEntry, UnlinkedMentionEntry } from './documentPanelData'
 import type { IApiClient } from '../api'
@@ -53,12 +54,14 @@ export function loadForwardLinks(
   try {
     const wikilinks = extractWikilinks(content)
     const links: LinkEntry[] = wikilinks.map((link) => {
-      const resolved = resolveWikilinkTarget(link.target, vaultTree, sourcePath) !== null
+      // `[[Note#Heading]]` resolves by the note part; the path is what opening needs
+      const resolvedPath = resolveWikilinkTarget(link.target.split('#')[0] ?? link.target, vaultTree, sourcePath, getAliasMapSnapshot())
       const displayName = link.display || link.target
       return {
         target: link.target,
+        ...(resolvedPath !== null ? { path: resolvedPath } : {}),
         displayName,
-        resolved,
+        resolved: resolvedPath !== null,
       }
     })
     dispatch({ type: 'SET_FORWARD_LINKS', links })
@@ -89,6 +92,7 @@ export async function loadBacklinks(
     const response = await apiClient.getBacklinks(vaultId, filePath)
     const backlinks: LinkEntry[] = response.backlinks.map((sourcePath) => ({
       target: sourcePath,
+      path: sourcePath,
       displayName: formatLinkDisplayName(sourcePath),
       resolved: true, // Backlinks always reference existing files
     }))

@@ -20,7 +20,7 @@
  * `unfoldEffect`/`foldedRanges`.
  */
 import type { EditorState } from '@codemirror/state'
-import type { EditorView } from '@codemirror/view'
+import { EditorView } from '@codemirror/view'
 import { foldService, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language'
 import { getAppConfigValue } from '../state/vaultAppConfigStore'
 import { locateFrontmatterBlock } from '../utils/frontmatterWriter'
@@ -183,4 +183,47 @@ export function foldLess(view: EditorView): void {
       return
     }
   }
+}
+
+/** Matches the lines `extractHeadings` turns into outline entries, so ordinals line up. */
+const OUTLINE_HEADING_REGEX = /^(#{1,6})\s+(.+)$/
+
+/** Line numbers + levels of every outline heading, in document order (same rule as the Outline view). */
+function findOutlineHeadingLines(state: EditorState): Array<{ lineNo: number; level: number }> {
+  const result: Array<{ lineNo: number; level: number }> = []
+  for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
+    const match = OUTLINE_HEADING_REGEX.exec(state.doc.line(lineNo).text)
+    if (match) result.push({ lineNo, level: match[1]!.length })
+  }
+  return result
+}
+
+/**
+ * Moves the cursor to the `index`-th outline heading and scrolls it to the top.
+ * Returns false when the document has no such heading.
+ */
+export function jumpToOutlineHeading(view: EditorView, index: number): boolean {
+  const heading = findOutlineHeadingLines(view.state)[index]
+  if (!heading) return false
+  const line = view.state.doc.line(heading.lineNo)
+  view.dispatch({
+    selection: { anchor: line.from },
+    effects: EditorView.scrollIntoView(line.from, { y: 'start' }),
+  })
+  view.focus()
+  return true
+}
+
+/**
+ * Folds or unfolds the section of the `index`-th outline heading, using the
+ * same range as the fold gutter. Returns false when there is nothing to fold.
+ */
+export function setOutlineHeadingFolded(view: EditorView, index: number, folded: boolean): boolean {
+  const heading = findOutlineHeadingLines(view.state)[index]
+  if (!heading) return false
+  const range = computeHeadingFoldRange(view.state, heading.lineNo, heading.level)
+  if (range.to <= range.from) return false
+  if (isRangeFolded(view.state, range.from, range.to) === folded) return true
+  view.dispatch({ effects: folded ? foldEffect.of(range) : unfoldEffect.of(range) })
+  return true
 }

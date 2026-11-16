@@ -795,6 +795,14 @@ export const en: TranslationShape = {
       loadError: 'Properties could not be loaded.',
       empty: 'No properties found in this vault.',
       hint: 'All properties used in the vault. Change the type to control how a property is edited.',
+      search: 'Search properties …',
+      sortBy: 'Sort by',
+      sortName: 'Name',
+      sortCount: 'Count',
+      sortType: 'Type',
+      sortAscending: 'Ascending',
+      sortDescending: 'Descending',
+      noMatches: 'No matching property.',
       typeAriaLabel: 'Type of {key}',
     },
     footnotes: {
@@ -816,6 +824,10 @@ export const en: TranslationShape = {
     noDocument: 'No document open',
     noHeadings: 'No headings found',
     outlineAriaLabel: 'Document outline',
+    outlineSearch: 'Search outline …',
+    outlineNoMatches: 'No matching heading.',
+    outlineExpand: 'Expand "{heading}"',
+    outlineCollapse: 'Collapse "{heading}"',
   },
 
   sidePanel: {

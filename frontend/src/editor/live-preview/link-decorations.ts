@@ -3,6 +3,9 @@ import type { EditorState, Range, Extension } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import type { HideableRange } from './inline-decorations'
 import { openExternalUrl } from '../../utils/externalUrl'
+import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import type { DirectoryTree } from '../../types'
+import { getAliasMapSnapshot } from '../../state/aliasStore'
 
 /**
  * Options for link decoration behavior.
@@ -10,6 +13,10 @@ import { openExternalUrl } from '../../utils/externalUrl'
 export interface LinkDecorationOptions {
   /** Callback when an internal (wikilink) link is clicked. */
   onInternalLinkClick?: (target: string) => void
+  /** Vault tree used to show the resolved note path as a hover tooltip on wikilinks. */
+  directoryTree?: DirectoryTree | null
+  /** Path of the note being edited (same-folder links win when several notes share a name). */
+  sourcePath?: string
 }
 
 /**
@@ -58,12 +65,40 @@ export function resolveWikilinkMatchTarget(rawTarget: string, hasAlias: boolean)
  * Wikilinks are found via regex since they are not part of the standard Markdown grammar.
  *
  * @param state - The current editor state
- * @param _options - Link decoration options (callbacks for click handling)
+ * @param options - Link decoration options (callbacks for click handling)
  * @returns Decoration ranges and hideable ranges for cursor-aware show/hide
  */
+/** Resolved paths per vault tree, so a decoration rebuild (every caret move) does not re-walk the tree per link. */
+const resolvedPathCache = new WeakMap<DirectoryTree, Map<string, string | null>>()
+
+function resolveLinkPath(tree: DirectoryTree, target: string, sourcePath: string): string | null {
+  let perTree = resolvedPathCache.get(tree)
+  if (!perTree) {
+    perTree = new Map()
+    resolvedPathCache.set(tree, perTree)
+  }
+  const key = `${sourcePath}\0${target}`
+  if (perTree.has(key)) return perTree.get(key) ?? null
+  const resolved = resolveWikilinkTarget(target, tree, sourcePath, getAliasMapSnapshot())
+  perTree.set(key, resolved)
+  return resolved
+}
+
+/** `data-target` plus a `title` with the path the link resolves to (none while it does not resolve). */
+function wikilinkAttributes(target: string, options: LinkDecorationOptions): Record<string, string> {
+  const attributes: Record<string, string> = { 'data-target': target }
+  if (options.directoryTree) {
+    const noteTarget = target.split('#')[0] ?? target
+    // `[[#Heading]]` points into the current note
+    const resolved = noteTarget === '' ? options.sourcePath || null : resolveLinkPath(options.directoryTree, noteTarget, options.sourcePath ?? '')
+    if (resolved) attributes['title'] = resolved
+  }
+  return attributes
+}
+
 export function buildLinkDecorations(
   state: EditorState,
-  _options: LinkDecorationOptions
+  options: LinkDecorationOptions
 ): LinkDecorationResult {
   const decorations: Range<Decoration>[] = []
   const hideableRanges: HideableRange[] = []
@@ -190,7 +225,7 @@ export function buildLinkDecorations(
       decorations.push(
         Decoration.mark({
           class: 'cm-lp-wikilink',
-          attributes: { 'data-target': target }
+          attributes: wikilinkAttributes(target, options)
         }).range(aliasFrom, aliasTo)
       )
 
@@ -217,7 +252,7 @@ export function buildLinkDecorations(
       decorations.push(
         Decoration.mark({
           class: 'cm-lp-wikilink',
-          attributes: { 'data-target': target }
+          attributes: wikilinkAttributes(target, options)
         }).range(targetFrom, targetTo)
       )
 

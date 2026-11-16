@@ -19,6 +19,8 @@ import type { Dispatch } from 'react'
 import type { IApiClient } from '../api'
 import type { DirectoryTree } from '../types'
 import { onRealtimeVaultChange } from './realtimeVaultBridge'
+import { getActiveEditorView } from '../editor/plugin-extensions'
+import { jumpToOutlineHeading, setOutlineHeadingFolded } from '../editor/folding'
 import {
   loadOutline,
   loadForwardLinks,
@@ -53,6 +55,8 @@ export interface OutlineHeading {
 /** Link entry for the links view. */
 export interface LinkEntry {
   target: string
+  /** Vault path the link resolves to (absent while unresolved); `target` is only the text inside `[[...]]`. */
+  path?: string
   displayName: string
   resolved: boolean
 }
@@ -302,6 +306,10 @@ export interface UseDocumentPanelDataResult {
   dispatch: Dispatch<DocumentPanelAction>
   /** Scrolls the active document to the given heading anchor. */
   onHeadingClick: (anchor: string) => void
+  /** Jumps to the `index`-th heading in the editor (falls back to scrolling the reading view). */
+  onHeadingJump: (index: number, anchor: string) => void
+  /** Folds or unfolds the `index`-th heading's section in the editor. */
+  onHeadingFold: (index: number, collapsed: boolean) => void
   /** Expands/collapses a tag, fetching its file list on first expand. */
   onTagClick: (tagName: string) => void
 }
@@ -469,6 +477,17 @@ export function useDocumentPanelData({
     }
   }, [])
 
+  const onHeadingJump = useCallback((index: number, anchor: string) => {
+    const view = getActiveEditorView()
+    if (view && jumpToOutlineHeading(view, index)) return
+    onHeadingClick(anchor)
+  }, [onHeadingClick])
+
+  const onHeadingFold = useCallback((index: number, collapsed: boolean) => {
+    const view = getActiveEditorView()
+    if (view) setOutlineHeadingFolded(view, index, collapsed)
+  }, [])
+
   const onTagClick = useCallback((tagName: string) => {
     if (state.tags.expandedTag === tagName) {
       dispatch({ type: 'SET_TAG_EXPANDED', tag: null, files: [] })
@@ -496,5 +515,5 @@ export function useDocumentPanelData({
     [state, liveTags, liveTagFiles],
   )
 
-  return { state: liveState, dispatch, onHeadingClick, onTagClick }
+  return { state: liveState, dispatch, onHeadingClick, onHeadingJump, onHeadingFold, onTagClick }
 }

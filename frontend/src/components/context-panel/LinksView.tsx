@@ -213,16 +213,18 @@ interface LinkItemProps {
 function LinkItem({ link, onLinkClick }: LinkItemProps) {
   const longPress = useLongPress()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  /** The vault path the link points to; the text inside `[[...]]` alone cannot find a note in a subfolder. */
+  const openPath = link.path ?? link.target
 
   if (link.resolved) {
     return (
       <li className="context-panel-link-item context-panel-link-resolved">
         <button
           className="context-panel-link-button"
-          onClick={() => onLinkClick(link.target, true)}
+          onClick={() => onLinkClick(openPath, true)}
           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
           {...longPress}
-          title={link.target}
+          title={openPath}
           type="button"
         >
           {link.displayName}
@@ -231,7 +233,7 @@ function LinkItem({ link, onLinkClick }: LinkItemProps) {
           <ContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
-            items={buildFileMenuItems(link.target, () => onLinkClick(link.target, true))}
+            items={buildFileMenuItems(openPath, () => onLinkClick(openPath, true))}
             onClose={() => setContextMenu(null)}
             onSelect={() => setContextMenu(null)}
           />
