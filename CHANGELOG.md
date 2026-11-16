@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.88.0](https://github.com/andreas13xxx/Slatebase/compare/v0.87.0...v0.88.0) (2026-11-16)
+
+
+### Features
+
+* **bases:** add createFileForView to BasesView ([e429e04](https://github.com/andreas13xxx/Slatebase/commit/e429e04f04048fe7494233211865f0a1d95695a3))
+* **bases:** add createFileForView to BasesView for plugin views ([657c33b](https://github.com/andreas13xxx/Slatebase/commit/657c33b85aad9f89a4acbf4efe901e6e86cf245e))
+* **ui:** outline fold also folds heading sections in reading view ([18663f4](https://github.com/andreas13xxx/Slatebase/commit/18663f4b52494ff1e7c76fd64f647292e3ecc61d))
+* **ui:** outline search/fold/jump, properties search/sort, link paths ([e71fbae](https://github.com/andreas13xxx/Slatebase/commit/e71fbae0ad9a1ba2e903aacbd97177a376e7a3e9))
+* **ui:** outline search/fold/jump, properties search/sort, link paths ([b62fa5d](https://github.com/andreas13xxx/Slatebase/commit/b62fa5d90661275ee56258435f99ab49e7814f37))
+
+
+### Bugfixes
+
+* **bases:** add getSort/set to BasesViewConfig for plugin views ([ce0dfcc](https://github.com/andreas13xxx/Slatebase/commit/ce0dfcc77b5d59e429f6be1543f73b4b5382c1f9))
+* **bases:** add getSort/set to BasesViewConfig for plugin views ([bfc0386](https://github.com/andreas13xxx/Slatebase/commit/bfc03864ea840b344281d0ad9240e2b5ac6656d7))
+
 ## [0.87.0](https://github.com/andreas13xxx/Slatebase/compare/v0.86.0...v0.87.0) (2026-11-15)
 
 
