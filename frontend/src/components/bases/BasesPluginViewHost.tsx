@@ -18,6 +18,7 @@ import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseView } from '@slatebase/shared-contracts'
 import { getBasesViewRegistrationWithOwner } from '../../plugins/compat/bases-view-registry'
 import { BasesQueryController, type DrivableBasesView } from '../../plugins/compat/bases-query-controller'
+import { warnOnce } from '../../plugins/compat/log'
 import { withPluginContext } from '../../plugins/compat/plugin-execution-context'
 
 export interface BasesPluginViewHostProps {
@@ -28,6 +29,8 @@ export interface BasesPluginViewHostProps {
   view: BaseView
   /** Open a note by its vault-relative path (wired into the view's RenderContext). */
   onOpenNote: (path: string) => void
+  /** Create a note scoped to this base (and open it); resolves to its path, or null on failure. */
+  onAddItem?: (overrides?: Record<string, string>, folderOverride?: string, baseName?: string) => Promise<string | null>
   /** Report a query/render error upward (shown by the parent BasesView). */
   onError: (message: string) => void
 }
@@ -49,9 +52,13 @@ interface MountedPluginView extends DrivableBasesView {
  * manages the mount/unmount lifecycle.
  */
 export function BasesPluginViewHost({
-  apiClient, vaultId, doc, view, onOpenNote, onError,
+  apiClient, vaultId, doc, view, onOpenNote, onAddItem, onError,
 }: BasesPluginViewHostProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  // Kept in a ref: the mount effect below must not re-run (and remount the
+  // plugin view) just because `addItem` is rebuilt when the document changes.
+  const addItemRef = useRef(onAddItem)
+  useEffect(() => { addItemRef.current = onAddItem }, [onAddItem])
 
   useEffect(() => {
     const container = containerRef.current
@@ -109,6 +116,24 @@ export function BasesPluginViewHost({
         for (const [key, value] of Object.entries(forward)) config.setViewData(key, value)
       }
       ;(queryController as { config?: unknown }).config = config
+      // Backs `BasesView.createFileForView()`.
+      ;(queryController as { _createFile?: unknown })._createFile = async (
+        baseFileName?: string,
+        processor?: (frontmatter: Record<string, unknown>, file: unknown) => void,
+      ): Promise<void> => {
+        const path = await addItemRef.current?.({}, undefined, baseFileName)
+        if (!path || !processor) return
+        const shim = app as {
+          vault?: { getAbstractFileByPath?(p: string): unknown }
+          fileManager?: { processFrontMatter?(f: unknown, fn: (fm: Record<string, unknown>) => void): Promise<void> }
+        } | undefined
+        const file = shim?.vault?.getAbstractFileByPath?.(path)
+        if (!file || !shim?.fileManager?.processFrontMatter) {
+          warnOnce('bases-create-file-processor', 'BasesView.createFileForView: the new note is not in the vault cache yet, so the frontmatter processor was skipped')
+          return
+        }
+        await shim.fileManager.processFrontMatter(file, (fm) => processor(fm, file))
+      }
 
       // Instantiate the plugin view inside the plugin's execution context so
       // any DOM it builds is tagged for CSS scoping.

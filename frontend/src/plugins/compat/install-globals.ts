@@ -1045,6 +1045,18 @@ export function installObsidianGlobals(): void {
         this.config = (controller as { config?: unknown } | undefined)?.config
       }
       onDataUpdated(): void {}
+      /** Creates a note scoped to this base and opens it, then lets the plugin edit its frontmatter. */
+      async createFileForView(
+        baseFileName?: string,
+        frontmatterProcessor?: (frontmatter: Record<string, unknown>, file: unknown) => void,
+      ): Promise<void> {
+        const create = (this.controller as { _createFile?: (n?: string, p?: typeof frontmatterProcessor) => Promise<void> } | undefined)?._createFile
+        if (!create) {
+          warnNoOp('BasesView', 'createFileForView', 'no host is attached to create the note')
+          return
+        }
+        await create(baseFileName, frontmatterProcessor)
+      }
     } as unknown as Record<string, unknown>
     /**
      * `class QueryController extends Component` — drives a BasesView's data.

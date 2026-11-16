@@ -303,7 +303,7 @@ export const BasesView = memo(function BasesView({
   // "Neuer Eintrag" button and each Kanban column's "+" button, so they cannot
   // drift. `overrides` pre-fills specific frontmatter keys (the Kanban column's
   // groupBy value) so the note lands in the right column.
-  const addItem = useCallback(async (overrides: Record<string, string> = {}, folderOverride?: string): Promise<string | null> => {
+  const addItem = useCallback(async (overrides: Record<string, string> = {}, folderOverride?: string, baseNameOverride?: string): Promise<string | null> => {
     if (!doc) return null
     const view = doc.views[safeIndex]
     setActionError(null)
@@ -312,7 +312,7 @@ export const BasesView = memo(function BasesView({
       (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
     )
     const frontmatter = buildBlankFrontmatter(columns, doc, view, overrides)
-    const baseName = 'Unbenannt'
+    const baseName = baseNameOverride?.replace(/[\\/]/g, '-').trim() || 'Unbenannt'
     try {
       // Resolve a non-colliding file name under the target folder.
       const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
@@ -477,6 +477,7 @@ export const BasesView = memo(function BasesView({
             doc={doc}
             view={activeView}
             onOpenNote={onOpenNote}
+            onAddItem={addItem}
             onError={handlePluginViewError}
           />
         </ErrorBoundary>
