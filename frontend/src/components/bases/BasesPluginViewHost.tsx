@@ -80,11 +80,13 @@ export function BasesPluginViewHost({
       const ConfigCtor = window.obsidian?.['BasesViewConfig'] as unknown as (new () => {
         name: string
         setOrder?(o: string[]): void
+        setSort?(s: Array<{ column: string; direction?: 'asc' | 'desc' }>): void
         setViewData?(key: string, value: unknown): void
       }) | undefined
       const config = ConfigCtor ? new ConfigCtor() : { name: view.name ?? 'Base' }
       config.name = view.name ?? view.type
       config.setOrder?.(view.order ?? Object.keys(doc.properties ?? {}))
+      config.setSort?.(view.sort ?? [])
       const displayNames: Record<string, string> = {}
       for (const [key, prop] of Object.entries(doc.properties ?? {})) {
         if (prop?.displayName) displayNames[key] = prop.displayName

@@ -1002,6 +1002,21 @@ export function installObsidianGlobals(): void {
         return this._displayNames[propertyId] ?? this._displayNames[bare] ?? bare
       }
       setOrder(order: string[]): void { this._order = order }
+      private _sort: Array<{ column: string; direction?: 'asc' | 'desc' }> = []
+      /** Host-set sort clauses of the view (bare property names). */
+      setSort(sort: Array<{ column: string; direction?: 'asc' | 'desc' }>): void { this._sort = sort }
+      getSort(): Array<{ property: string; direction: 'ASC' | 'DESC' }> {
+        return this._sort
+          .filter(c => typeof c.column === 'string' && c.column.trim() !== '')
+          .map(c => ({
+            property: toPropertyId(c.column.trim()),
+            direction: c.direction === 'desc' ? 'DESC' : 'ASC',
+          }))
+      }
+      set(key: string, value: unknown): void {
+        if (value === null || value === undefined) delete this._data[key]
+        else this._data[key] = value
+      }
       getEvaluatedFormula(_view: unknown, key: string): unknown {
         return this._resolveFormula ? this._resolveFormula(key) : nullValue()
       }
