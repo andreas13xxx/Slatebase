@@ -7,7 +7,7 @@
  * behaviour: the Value hierarchy works, the runtime classes carry data,
  * and `Plugin.registerBasesView()` actually registers a view type.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { installObsidianGlobals } from './install-globals'
 import { getBasesViewRegistration, resetForVault } from './bases-view-registry'
 
@@ -95,5 +95,26 @@ describe('Plugin.registerBasesView', () => {
     expect(stored).toBe(true)
     expect(getBasesViewRegistration('my-view')?.name).toBe('My View')
     resetForVault()
+  })
+})
+
+describe('BasesView.createFileForView', () => {
+  it('delegates to the host-provided creator with name and processor', async () => {
+    const BasesView = window.obsidian?.['BasesView'] as unknown as new (c: unknown, el: HTMLElement) => {
+      createFileForView(name?: string, fn?: () => void): Promise<void>
+    }
+    const create = vi.fn().mockResolvedValue(undefined)
+    const view = new BasesView({ _createFile: create }, document.createElement('div'))
+    const processor = vi.fn()
+    await view.createFileForView('Task', processor)
+    expect(create).toHaveBeenCalledWith('Task', processor)
+  })
+
+  it('resolves without throwing when no host is attached', async () => {
+    const BasesView = window.obsidian?.['BasesView'] as unknown as new (c: unknown, el: HTMLElement) => {
+      createFileForView(): Promise<void>
+    }
+    const view = new BasesView({}, document.createElement('div'))
+    await expect(view.createFileForView()).resolves.toBeUndefined()
   })
 })
