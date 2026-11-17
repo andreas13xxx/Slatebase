@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.89.0](https://github.com/andreas13xxx/Slatebase/compare/v0.88.0...v0.89.0) (2026-11-17)
+
+
+### Features
+
+* **bases:** close the gaps against Obsidian's Bases ([#414](https://github.com/andreas13xxx/Slatebase/issues/414)) ([199e497](https://github.com/andreas13xxx/Slatebase/commit/199e497cc915e007c54db7de4e4c98ce2f4cdbc1))
+* **git-sync:** add diffNameStatus and showFileAt to GitCli ([ab7e1bd](https://github.com/andreas13xxx/Slatebase/commit/ab7e1bd5634810670f6f318147ede2badb1aa122))
+* **git-sync:** add SyncSideEffects for trash, versions, activity, index ([a4e68d2](https://github.com/andreas13xxx/Slatebase/commit/a4e68d21dba0f17b3f5f64356dbeb9b8e9c7ba2b))
+* **git-sync:** apply trash, versions and per-file activity after a pull ([8818369](https://github.com/andreas13xxx/Slatebase/commit/88183693a3799d941d042cce2b2a9f6369eff221))
+* **git-sync:** trash, versions and per-file activity on pull ([5177443](https://github.com/andreas13xxx/Slatebase/commit/517744323d822e17c10703cf2988824b54877bba))
+* **trash:** add addFromContent for files already gone from disk ([6d3e3ca](https://github.com/andreas13xxx/Slatebase/commit/6d3e3ca80e7528d32512c97f726aaacb48c79ded))
+* vault rename, Bases display options, TaskNotes demo ([#415](https://github.com/andreas13xxx/Slatebase/issues/415)) ([255d40b](https://github.com/andreas13xxx/Slatebase/commit/255d40bbca2f2d687089ed0c34ab1305f7941c56))
+
+
+### Bugfixes
+
+* **git-sync:** address review findings on pull side effects ([00bd797](https://github.com/andreas13xxx/Slatebase/commit/00bd7978d9a8fec38b43d30a5fa8ebfcf7e3f6cc))
+* **plugin-compat:** add getWidget and getTypeInfo to metadataTypeManager ([927faae](https://github.com/andreas13xxx/Slatebase/commit/927faaec86dd1df014960946685ac2e98dff011b))
+* **plugin-compat:** add getWidget and getTypeInfo to metadataTypeManager ([1397d9a](https://github.com/andreas13xxx/Slatebase/commit/1397d9ac387aa8baa7631265fc16785a8223d669))
+* **plugin-compat:** stop EditorSuggest Enter re-entry recursion ([5120d1f](https://github.com/andreas13xxx/Slatebase/commit/5120d1f6d44e6a8df27829dfc5eb13786aa397f5))
+* **plugin-compat:** stop EditorSuggest Enter re-entry recursion ([48766cf](https://github.com/andreas13xxx/Slatebase/commit/48766cff6248c09e44904d783080083d1ebd7edc))
+
+
+### Sonstige Änderungen
+
+* document git-sync trash, versions and per-file activity ([e3142a6](https://github.com/andreas13xxx/Slatebase/commit/e3142a68becee6cc672cda2945c0a45e353a60fb))
+
 ## [0.88.0](https://github.com/andreas13xxx/Slatebase/compare/v0.87.0...v0.88.0) (2026-11-16)
 
 
