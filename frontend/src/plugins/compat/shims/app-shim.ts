@@ -491,17 +491,19 @@ export class AppShim implements IAppShim {
    */
   readonly metadataTypeManager = {
     registeredTypeWidgets: Object.fromEntries(
-      ['text', 'multitext', 'list', 'number', 'checkbox', 'date', 'datetime', 'tags', 'aliases'].map((type) => [
-        type,
-        {
+      ['text', 'multitext', 'list', 'number', 'checkbox', 'date', 'datetime', 'tags', 'aliases', 'unknown'].map(
+        (type) => [
           type,
-          icon: 'lucide-text',
-          name: () => type,
-          default: (): unknown => '',
-          validate: (): boolean => true,
-          render: (): void => {},
-        },
-      ]),
+          {
+            type,
+            icon: 'lucide-text',
+            name: () => type,
+            default: (): unknown => '',
+            validate: (): boolean => true,
+            render: (): void => {},
+          },
+        ],
+      ),
     ) as Record<string, Record<string, unknown>>,
     properties: {} as Record<string, { name: string; type: string }>,
     getAllProperties: (): Record<string, { name: string; type: string }> => this.metadataTypeManager.properties,
@@ -509,6 +511,35 @@ export class AppShim implements IAppShim {
       this.metadataTypeManager.properties[property.toLowerCase()],
     setType: (property: string, type: string): void => {
       this.metadataTypeManager.properties[property.toLowerCase()] = { name: property, type };
+    },
+    /** Removes a registered type so the property falls back to inference. */
+    unsetType: (property: string): void => {
+      delete this.metadataTypeManager.properties[property.toLowerCase()];
+    },
+    /** Widget for a type name; unknown names resolve to the `unknown` widget, as in Obsidian. */
+    getWidget: (type: string): Record<string, unknown> | undefined =>
+      this.metadataTypeManager.registeredTypeWidgets[type] ?? this.metadataTypeManager.registeredTypeWidgets['unknown'],
+    /** Widget explicitly assigned to a property via `setType`, or null. */
+    getAssignedWidget: (property: string): Record<string, unknown> | null => {
+      const assigned = this.metadataTypeManager.properties[property.toLowerCase()]
+      return assigned ? (this.metadataTypeManager.registeredTypeWidgets[assigned.type] ?? null) : null
+    },
+    /**
+     * `{ expected, inferred }` widgets for a property and value. `inferred` comes from the value's JS type,
+     * `expected` is the assigned widget, else the inferred one. Plugins patch this method, so it must exist.
+     */
+    getTypeInfo: (
+      property: string,
+      value: unknown,
+    ): { expected: Record<string, unknown> | undefined; inferred: Record<string, unknown> | undefined } => {
+      const manager = this.metadataTypeManager
+      let inferredType = 'unknown'
+      if (typeof value === 'boolean') inferredType = 'checkbox'
+      else if (typeof value === 'number') inferredType = 'number'
+      else if (typeof value === 'string') inferredType = 'text'
+      else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) inferredType = 'multitext'
+      const inferred = manager.getWidget(inferredType)
+      return { expected: manager.getAssignedWidget(property) ?? inferred, inferred }
     },
   }
 
