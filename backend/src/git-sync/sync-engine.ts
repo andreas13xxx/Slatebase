@@ -78,6 +78,11 @@ export type RecordSyncActivityHook = (
   event: { remoteName: string; pulledFiles: number; pushedFiles: number },
 ) => void
 
+/** What the engine needs from {@link SyncSideEffects}; an interface so tests can fake it. */
+export interface ISyncSideEffects {
+  apply(vaultId: string, cwd: string, fromRef: string | null, toRef: string): Promise<unknown>
+}
+
 export class GitSyncEngine implements IGitSyncEngine {
   private readonly locks = new KeyedMutex()
 
@@ -92,6 +97,7 @@ export class GitSyncEngine implements IGitSyncEngine {
     private readonly eventBus?: IEventBus,
     private readonly accessControl?: IVaultAccessControl,
     private readonly recordActivity?: RecordSyncActivityHook,
+    private readonly sideEffects?: ISyncSideEffects,
   ) {}
 
   /**
@@ -199,6 +205,16 @@ export class GitSyncEngine implements IGitSyncEngine {
           const postMergeHead = await this.gitCli.getHead(cwd)
           if (postMergeHead) {
             pulledFiles = (await this.gitCli.diffNameOnly(cwd, preMergeHead, postMergeHead)).length
+            // Trash, versions, per-file activity and link index for what the merge changed
+            // on disk. Never throws; runs before the tree-refresh event so clients see the result.
+            if (this.sideEffects) {
+              try {
+                await this.sideEffects.apply(vaultId, cwd, preMergeHead, postMergeHead)
+              } catch (error) {
+                // Defensive: apply() is built never to throw, but a side effect must not fail the sync (R5).
+                this.logger.warn('Git-sync side effects failed', { vaultId, remoteId, message: error instanceof Error ? error.message : String(error) })
+              }
+            }
           }
           await this.publishVaultChange(vaultId)
         }

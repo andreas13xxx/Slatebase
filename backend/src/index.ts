@@ -82,6 +82,7 @@ import { VersionService } from './version/index.js'
 import { createFileVersionRoutes } from './api/fileVersionRoutes.js'
 import { TrashService } from './trash/index.js'
 import { ActivityStore } from './activity/index.js'
+import type { ActivityEventInput } from './activity/types.js'
 import { createActivityRoutes } from './api/activityRoutes.js'
 import { createTrashRoutes } from './api/trashRoutes.js'
 import { CleanupJob } from './cleanup/index.js'
@@ -122,7 +123,7 @@ import { createWorkspacesConfigRoutes } from './api/workspacesConfigRoutes.js'
 import { WorkspacesConfigService } from './obsidian-config/workspaces-config.js'
 import { HotkeysConfigService } from './obsidian-config/hotkeys-config.js'
 import { BookmarksConfigService } from './obsidian-config/bookmarks-config.js'
-import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator } from './git-sync/index.js'
+import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator, SyncSideEffects } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
 import { MailImportConfigStore, MailImportStatusStore, ImapClient, MailNoteWriter, MailImportEngine, MailImportScheduler } from './mail-import/index.js'
 import { createMailImportRoutes } from './api/mailImportRoutes.js'
@@ -1000,7 +1001,27 @@ const gitSyncRecordActivity = activityEnabled
       })
     }
   : undefined
-const gitSyncEngine = new GitSyncEngine(gitCli, vaultRegistry, gitSyncConfigStore, gitSyncStatusStore, moduleSecretStore, serverConfig.dataDir, logger, eventBus, vaultAccessControl, gitSyncRecordActivity)
+// Trash, versions, per-file activity and link index for what a pull changes on disk.
+// Closures for linkIndexHook: it is a `const` declared further down, only read at sync time.
+const gitSyncSideEffects = new SyncSideEffects({
+  gitCli,
+  trashService,
+  versionService,
+  logger,
+  ...(activityEnabled
+    ? {
+        recordActivity: (vaultId: string, event: ActivityEventInput): void => {
+          void activityStore.record(vaultId, event).catch(() => { /* recording is a side effect; swallow */ })
+        },
+      }
+    : {}),
+  linkIndexHook: {
+    onFileSaved: (vaultId, filePath, content) => { linkIndexHook.onFileSaved(vaultId, filePath, content) },
+    onFileDeleted: (vaultId, filePath) => linkIndexHook.onFileDeleted(vaultId, filePath),
+    onFileRenamed: (vaultId, oldPath, newPath) => linkIndexHook.onFileRenamed(vaultId, oldPath, newPath),
+  },
+})
+const gitSyncEngine = new GitSyncEngine(gitCli, vaultRegistry, gitSyncConfigStore, gitSyncStatusStore, moduleSecretStore, serverConfig.dataDir, logger, eventBus, vaultAccessControl, gitSyncRecordActivity, gitSyncSideEffects)
 const gitSyncScheduler = new GitSyncScheduler(gitSyncConfigStore, gitSyncStatusStore, gitSyncEngine, logger)
 const gitSshKeyGenerator = new SshKeyGenerator()
 const gitSyncRoutes = createGitSyncRoutes({

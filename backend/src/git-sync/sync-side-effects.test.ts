@@ -5,6 +5,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SyncSideEffects, MAX_PER_FILE_ACTIVITY } from './sync-side-effects.js'
+import { GitCli } from './git-cli.js'
 import type { GitFileChange, IGitCli } from './git-cli.js'
 import type { ActivityEventInput } from '../activity/types.js'
 import type { ILogger } from '../logger/index.js'
@@ -211,5 +212,32 @@ describe('SyncSideEffects', () => {
 
     expect(result).toEqual({ trashed: 0, versioned: 0, moved: 0, perFileActivity: false })
     expect(logger.warnings).toContain('Could not list the files changed by the sync')
+  })
+
+  it('works against a real repository: old content comes back from git after the file is gone', async () => {
+    const cli = new GitCli()
+    await cli.init(cwd, 'main')
+    await cli.configureIdentity(cwd)
+    await writeFile(join(cwd, 'del.md'), 'delete me\n')
+    await writeFile(join(cwd, 'edit.md'), 'v1\n')
+    await cli.commitAll(cwd, 'first')
+    const before = await cli.getHead(cwd)
+    await rm(join(cwd, 'del.md'))
+    await writeFile(join(cwd, 'edit.md'), 'v2\n')
+    await cli.commitAll(cwd, 'second')
+    const after = await cli.getHead(cwd)
+    if (!before || !after) throw new Error('no heads')
+
+    const real = new SyncSideEffects({
+      gitCli: cli,
+      trashService: { addFromContent: async (_v, path, content) => { trashed.push({ path, content: content.toString('utf-8') }); return { id: 'e', originalPath: path, deletedAt: '', isDirectory: false } } },
+      versionService: { createVersion: async (_v, path, content) => { versions.push({ path, content: content.toString('utf-8') }) }, moveVersions: async () => {} },
+      logger,
+    })
+    const result = await real.apply('v1', cwd, before, after)
+
+    expect(trashed).toEqual([{ path: 'del.md', content: 'delete me\n' }])
+    expect(versions).toEqual([{ path: 'edit.md', content: 'v1\n' }])
+    expect(result).toMatchObject({ trashed: 1, versioned: 1 })
   })
 })

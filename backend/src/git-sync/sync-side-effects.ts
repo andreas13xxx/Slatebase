@@ -64,10 +64,10 @@ export class SyncSideEffects {
 
   /**
    * Applies trash, version, activity and link-index side effects for every file
-   * the merge touched between `fromRef` and `toRef`. Never throws: each file and
+   * the merge touched between `fromRef` and `toRef` (`fromRef` null = the repo had no commit yet). Never throws: each file and
    * each effect is isolated, failures only go to the log (R5).
    */
-  async apply(vaultId: string, cwd: string, fromRef: string, toRef: string): Promise<SyncSideEffectsResult> {
+  async apply(vaultId: string, cwd: string, fromRef: string | null, toRef: string): Promise<SyncSideEffectsResult> {
     const result: SyncSideEffectsResult = { trashed: 0, versioned: 0, moved: 0, perFileActivity: false }
 
     let changes: GitFileChange[]
@@ -94,14 +94,14 @@ export class SyncSideEffects {
   private async applyOne(
     vaultId: string,
     cwd: string,
-    fromRef: string,
+    fromRef: string | null,
     change: GitFileChange,
     result: SyncSideEffectsResult,
   ): Promise<void> {
     const { gitCli, trashService, versionService, linkIndexHook } = this.deps
 
     if (change.status === 'D') {
-      const previous = await gitCli.showFileAt(cwd, fromRef, change.path)
+      const previous = fromRef === null ? null : await gitCli.showFileAt(cwd, fromRef, change.path)
       if (previous) {
         await this.guard(vaultId, change.path, async () => {
           await trashService.addFromContent(vaultId, change.path, previous)
@@ -123,7 +123,7 @@ export class SyncSideEffects {
     }
 
     if (change.status === 'M') {
-      const previous = await gitCli.showFileAt(cwd, fromRef, change.path)
+      const previous = fromRef === null ? null : await gitCli.showFileAt(cwd, fromRef, change.path)
       if (previous && previous.length <= MAX_VERSION_BYTES) {
         await this.guard(vaultId, change.path, async () => {
           await versionService.createVersion(vaultId, change.path, previous)

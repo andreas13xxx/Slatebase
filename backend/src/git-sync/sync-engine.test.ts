@@ -430,3 +430,71 @@ describe('GitSyncEngine — sync.completed recording (Task 2.6, L3)', () => {
     expect(recorded).toHaveLength(0)
   })
 })
+
+describe('GitSyncEngine — side effects of a pull (trash, versions, per-file activity)', () => {
+  let vaultPath: string
+  let gitCli: FakeGitCli
+  let vaultRegistry: IVaultRegistry
+  let configStore: IGitSyncConfigStore
+  let statusStore: IGitSyncStatusStore
+  let secretStore: IModuleSecretStore
+  let applyCalls: Array<{ vaultId: string; cwd: string; fromRef: string | null; toRef: string }>
+
+  function makeEngine(sideEffects: { apply(vaultId: string, cwd: string, fromRef: string | null, toRef: string): Promise<unknown> }): GitSyncEngine {
+    return new GitSyncEngine(gitCli, vaultRegistry, configStore, statusStore, secretStore, vaultPath, createMockLogger(), undefined, undefined, undefined, sideEffects)
+  }
+
+  const recording = {
+    apply: async (vaultId: string, cwd: string, fromRef: string | null, toRef: string): Promise<unknown> => {
+      applyCalls.push({ vaultId, cwd, fromRef, toRef })
+      return {}
+    },
+  }
+
+  beforeEach(async () => {
+    vaultPath = await mkdtemp(join(tmpdir(), 'git-sync-fx-'))
+    gitCli = new FakeGitCli()
+    applyCalls = []
+    vaultRegistry = {
+      findById: (id: string) => (id === 'vault-1' ? ({ id: 'vault-1', storagePath: vaultPath } as VaultRegistryEntry) : null),
+    } as unknown as IVaultRegistry
+    const vaultData: GitSyncVaultData = { branch: 'main', remotes: [makeRemote()] }
+    configStore = {
+      getVaultData: async () => vaultData,
+      getRemote: async (_v: string, remoteId: string) => vaultData.remotes.find((r) => r.id === remoteId) ?? null,
+    } as unknown as IGitSyncConfigStore
+    statusStore = { setStatus: async () => {} } as unknown as IGitSyncStatusStore
+    secretStore = { getSecret: async () => 'dummy-token' } as unknown as IModuleSecretStore
+  })
+
+  afterEach(async () => {
+    await rm(vaultPath, { recursive: true, force: true })
+  })
+
+  it('applies side effects between the head before and after the merge', async () => {
+    gitCli.headSequence = ['head-before-local', 'head-pre-merge', 'head-post-merge']
+    const outcome = await makeEngine(recording).runOne('vault-1', 'remote-1')
+
+    expect(outcome.result).toBe('success')
+    expect(applyCalls).toEqual([{ vaultId: 'vault-1', cwd: vaultPath, fromRef: 'head-pre-merge', toRef: 'head-post-merge' }])
+  })
+
+  it('applies nothing when the merge brought nothing in', async () => {
+    gitCli.mergeResult = 'up-to-date'
+    await makeEngine(recording).runOne('vault-1', 'remote-1')
+    expect(applyCalls).toHaveLength(0)
+  })
+
+  it('applies nothing on a conflict', async () => {
+    gitCli.isRepoValue = true
+    gitCli.mergeResult = 'conflict'
+    gitCli.conflicted = ['x.md']
+    await makeEngine(recording).runOne('vault-1', 'remote-1')
+    expect(applyCalls).toHaveLength(0)
+  })
+
+  it('does not fail the sync when the side effects throw', async () => {
+    const outcome = await makeEngine({ apply: async () => { throw new Error('boom') } }).runOne('vault-1', 'remote-1')
+    expect(outcome.result).toBe('success')
+  })
+})
