@@ -485,6 +485,16 @@ describe('AppShim', () => {
       mgr.unsetType('x');
       expect(mgr.getAssignedWidget('x')).toBeNull();
     });
+
+    it('treats prototype names as ordinary, unknown keys', () => {
+      const app = AppShim.wrapWithProxy(new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' }));
+      const mgr = app.metadataTypeManager;
+      expect(mgr.getWidget('constructor')?.type).toBe('unknown');
+      expect(mgr.getPropertyInfo('constructor')).toBeUndefined();
+      expect(mgr.getAssignedWidget('toString')).toBeNull();
+      mgr.setType('x', 'toString');
+      expect(mgr.getAssignedWidget('x')).toBeNull();
+    });
   });
 
   describe('theme helpers through the plugin-facing proxy', () => {

@@ -507,8 +507,11 @@ export class AppShim implements IAppShim {
     ) as Record<string, Record<string, unknown>>,
     properties: {} as Record<string, { name: string; type: string }>,
     getAllProperties: (): Record<string, { name: string; type: string }> => this.metadataTypeManager.properties,
-    getPropertyInfo: (property: string): { name: string; type: string } | undefined =>
-      this.metadataTypeManager.properties[property.toLowerCase()],
+    getPropertyInfo: (property: string): { name: string; type: string } | undefined => {
+      const key = property.toLowerCase();
+      // Own keys only: a property named `constructor` must not resolve to Object.prototype's.
+      return Object.hasOwn(this.metadataTypeManager.properties, key) ? this.metadataTypeManager.properties[key] : undefined;
+    },
     setType: (property: string, type: string): void => {
       this.metadataTypeManager.properties[property.toLowerCase()] = { name: property, type };
     },
@@ -517,12 +520,15 @@ export class AppShim implements IAppShim {
       delete this.metadataTypeManager.properties[property.toLowerCase()];
     },
     /** Widget for a type name; unknown names resolve to the `unknown` widget, as in Obsidian. */
-    getWidget: (type: string): Record<string, unknown> | undefined =>
-      this.metadataTypeManager.registeredTypeWidgets[type] ?? this.metadataTypeManager.registeredTypeWidgets['unknown'],
+    getWidget: (type: string): Record<string, unknown> | undefined => {
+      const widgets = this.metadataTypeManager.registeredTypeWidgets;
+      return Object.hasOwn(widgets, type) ? widgets[type] : widgets['unknown'];
+    },
     /** Widget explicitly assigned to a property via `setType`, or null. */
     getAssignedWidget: (property: string): Record<string, unknown> | null => {
-      const assigned = this.metadataTypeManager.properties[property.toLowerCase()]
-      return assigned ? (this.metadataTypeManager.registeredTypeWidgets[assigned.type] ?? null) : null
+      const assigned = this.metadataTypeManager.getPropertyInfo(property)
+      const widgets = this.metadataTypeManager.registeredTypeWidgets
+      return assigned && Object.hasOwn(widgets, assigned.type) ? (widgets[assigned.type] ?? null) : null
     },
     /**
      * `{ expected, inferred }` widgets for a property and value. `inferred` comes from the value's JS type,
