@@ -63,6 +63,15 @@ Token und SSH-Schlüssel werden verschlüsselt gespeichert und nie im Klartext a
 
 Jeder Lauf committet zunächst lokale Änderungen, holt dann den Remote-Stand, führt einen Merge durch und pusht das Ergebnis. Der Status-Badge zeigt das Ergebnis des letzten Laufs: **Erfolgreich**, **Fehler** oder **Konflikt**.
 
+### Was ein Pull mit deinen Dateien macht
+
+Git ändert Dateien direkt auf der Festplatte, Slatebase behandelt einen Pull aber wie eine normale Bearbeitung:
+
+- Eine beim Sync **gelöschte** Datei landet im **Papierkorb** und lässt sich wiederherstellen.
+- Eine beim Sync **geänderte** Datei bekommt eine **neue Version** mit ihrem Inhalt von vor dem Sync.
+- Jede angelegte, geänderte, gelöschte oder verschobene Datei erscheint als eigener Eintrag in der **Aktivitätsleiste** (Herkunft *Git-Sync*), dazu ein Sammel-Eintrag pro Sync. Ab 500 Dateien gibt es nur den Sammel-Eintrag.
+- Versteckte Dateien und Ordner (mit Punkt am Anfang, z. B. `.obsidian/`) werden übersprungen.
+
 ---
 
 ## Konflikte lösen

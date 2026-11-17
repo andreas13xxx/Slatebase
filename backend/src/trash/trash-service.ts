@@ -87,6 +87,41 @@ export class TrashService implements ITrashService {
   }
 
   /**
+   * Adds a trash entry for a file that is already gone from disk (e.g. deleted by a
+   * git merge), from its previous content. Same layout as {@link moveToTrash}:
+   * `.slatebase/trash/<uniqueId>/<originalFilename>`, so `restore()` works unchanged.
+   */
+  async addFromContent(vaultId: string, relativePath: string, content: Buffer): Promise<TrashEntry> {
+    const vaultDir = this.resolveVaultPath(vaultId)
+    const trashDir = path.join(vaultDir, TrashService.TRASH_DIR)
+
+    return this.locks.runExclusive(trashDir, async () => {
+      const entryId = crypto.randomBytes(6).toString('hex')
+      const entryDir = path.join(trashDir, entryId)
+      await fs.mkdir(entryDir, { recursive: true })
+
+      // Atomic: temp -> rename, so a crash never leaves a half-written trash file.
+      const destPath = path.join(entryDir, path.basename(relativePath))
+      const tmpPath = `${destPath}.${crypto.randomBytes(8).toString('hex')}.tmp`
+      await fs.writeFile(tmpPath, content)
+      await fs.rename(tmpPath, destPath)
+
+      const entry: TrashEntry = {
+        id: entryId,
+        originalPath: relativePath,
+        deletedAt: new Date().toISOString(),
+        isDirectory: false,
+      }
+      await this.updateIndex(trashDir, (index) => {
+        index.entries.push(entry)
+      })
+
+      this.logger.info('Added to trash from content', { vaultId, path: relativePath, entryId })
+      return entry
+    })
+  }
+
+  /**
    * Lists all trash entries for a vault, sorted by `deletedAt` descending.
    */
   async listTrash(vaultId: string): Promise<TrashEntry[]> {

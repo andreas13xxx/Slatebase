@@ -224,7 +224,7 @@ oversight — but it means:
 | 💬 **Real-time Chat** | Messaging between users with unread badges, archiving, and pagination |
 | 🔒 **Authentication** | Session-based auth with argon2id hashing, CSRF protection, rate limiting. Optional **passkeys** (WebAuthn) next to the password, and **password reset by mail** with confirmed addresses; see [Passkeys, password reset by mail, and the reverse proxy](#passkeys-password-reset-by-mail-and-the-reverse-proxy) |
 | 🔄 **Vault Sync** | Via Obsidian LiveSync plugin (running in plugin compat layer with server-side CORS proxy) |
-| 🗃️ **Git-Sync** | Sync a vault with one or more git remotes — HTTPS token or SSH deploy key, shared branch, per-remote interval, manual sync; credentials encrypted at rest |
+| 🗃️ **Git-Sync** | Sync a vault with one or more git remotes — HTTPS token or SSH deploy key, shared branch, per-remote interval, manual sync; a pull acts like a normal edit — deleted files go to the trash, changed files get a version, every file shows up in the activity timeline; credentials encrypted at rest |
 | 📧 **Mail-Import** | Poll IMAP mailboxes server-side and file unread mails as Markdown notes with attachments — mailbox tree picker, target folder, per-config interval |
 | 🤖 **MCP Context Server** | AI assistants (Claude, Cursor, etc.) read and write your vaults via MCP |
 | 🎨 **Canvas** | Open and edit Obsidian `.canvas` whiteboards: text, file, link, and group nodes with edges, drag, resize, zoom/pan, minimap, file-path search, and auto-save |

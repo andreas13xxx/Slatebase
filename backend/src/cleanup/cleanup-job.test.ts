@@ -16,6 +16,7 @@ import type { ILogger } from '../logger/index.js'
 function createMockTrashService(): ITrashService {
   return {
     moveToTrash: vi.fn(),
+    addFromContent: vi.fn(),
     listTrash: vi.fn(),
     restore: vi.fn(),
     deletePermanently: vi.fn(),

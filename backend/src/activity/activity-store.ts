@@ -91,7 +91,9 @@ export class ActivityStore implements IActivityService {
 
       const activityDir = this.activityDir(vaultId)
       await this.locks.runExclusive(activityDir, async () => {
-        if (normalized.type === 'note.edited') {
+        // git-sync edits never coalesce: they come from a pull, not from the typing session an
+        // open window belongs to — folding one in would drop it and credit the earlier editor.
+        if (normalized.type === 'note.edited' && normalized.origin !== 'git-sync') {
           await this.recordEditCoalesced(vaultId, activityDir, normalized)
         } else {
           await this.appendNew(activityDir, normalized)
