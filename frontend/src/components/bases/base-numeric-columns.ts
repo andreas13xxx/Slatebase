@@ -17,7 +17,7 @@ export function formulaKeyOf(column: string, formulaKeys: ReadonlySet<string>): 
 }
 
 /** Columns whose every non-empty value is a number (at least one value). */
-export function computeNumericColumns(doc: BaseDocument, columns: string[], rows: BaseRow[]): Set<string> {
+export function computeNumericColumns(doc: BaseDocument, columns: string[], rows: BaseRow[], thisRow?: BaseRow): Set<string> {
   const formulaKeys = new Set(Object.keys(doc.formulas ?? {}))
   const numeric = new Set<string>()
   columns.forEach((col, index) => {
@@ -27,7 +27,7 @@ export function computeNumericColumns(doc: BaseDocument, columns: string[], rows
     let allNumbers = true
     for (const row of rows) {
       if (formulaKey !== null) {
-        const result = evaluateFormulaColumn(doc, row, formulaKey)
+        const result = evaluateFormulaColumn(doc, row, formulaKey, thisRow)
         if (!result.ok || result.value === null || result.value === undefined || result.value === '') continue
         seen = true
         if (typeof result.value !== 'number') { allNumbers = false; break }

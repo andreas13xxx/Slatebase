@@ -146,7 +146,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'columnSize', 'rowHeight', 'markers', 'indentProperties', 'separator']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'rowHeight', 'markers', 'indentProperties', 'separator']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -187,6 +187,15 @@ function parseGroupBy(raw: unknown, path: string, errors: BaseValidationError[])
   const group: BaseGroupBy = { property: raw['property'] }
   if (isString(raw['direction'])) group.direction = raw['direction']
   return group
+}
+
+/** A `columnSize` map of its positive finite numbers (other entries are dropped), or undefined when none is left. */
+function parseColumnSize(raw: unknown): Record<string, number> | undefined {
+  if (!isObject(raw)) return undefined
+  const entries = Object.entries(raw).filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v > 0)
+  if (entries.length === 0) return undefined
+  // A prototype-less copy: a column named `__proto__` is an ordinary key.
+  return Object.assign(Object.create(null) as Record<string, number>, Object.fromEntries(entries))
 }
 
 function parseView(raw: unknown, index: number, errors: BaseValidationError[]): BaseView | null {
@@ -234,16 +243,6 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   if (typeof raw['imageAspectRatio'] === 'number') view.imageAspectRatio = raw['imageAspectRatio']
   if (typeof raw['cardSize'] === 'number') view.cardSize = raw['cardSize']
   if (isString(raw['rowHeight'])) view.rowHeight = raw['rowHeight']
-  if (isObject(raw['columnSize'])) {
-    const sizes: Record<string, number> = {}
-    for (const [column, width] of Object.entries(raw['columnSize'])) {
-      if (typeof width === 'number' && Number.isFinite(width) && width > 0) sizes[column] = width
-      else errors.push({ message: 'column width must be a positive number', path: `views[${index}].columnSize.${column}` })
-    }
-    if (Object.keys(sizes).length > 0) view.columnSize = sizes
-  } else if (raw['columnSize'] !== undefined) {
-    errors.push({ message: 'view "columnSize" must be an object of column widths', path: `views[${index}].columnSize` })
-  }
   if (isString(raw['markers'])) view.markers = raw['markers']
   if (typeof raw['indentProperties'] === 'boolean') view.indentProperties = raw['indentProperties']
   if (isString(raw['separator'])) view.separator = raw['separator']
@@ -258,7 +257,12 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   const summaries = parseSummaries(raw['summaries'], errors, `views[${index}].summaries`)
   if (summaries) view.summaries = summaries
 
-  const _unknown = extractUnknown(raw, VIEW_KEYS)
+  // `columnSize` (column id → width in px) is typed only when it is well-formed; anything else stays
+  // in `_unknown` and round-trips untouched instead of being dropped.
+  const columnSize = parseColumnSize(raw['columnSize'])
+  if (columnSize) view.columnSize = columnSize
+
+  const _unknown = extractUnknown(raw, columnSize ? [...VIEW_KEYS, 'columnSize'] : VIEW_KEYS)
   if (_unknown) view._unknown = _unknown
 
   return view

@@ -95,8 +95,8 @@ describe('BasesView plugin views', () => {
     // The toolbar's view menu names the active view and lists all of them.
     fireEvent.click(screen.getByRole('button', { name: /Karten/ }))
     const list = screen.getByRole('list', { name: 'Ansichten' })
-    expect(within(list).getByRole('button', { name: /Karten/ })).toBeTruthy()
-    expect(within(list).getByRole('button', { name: /Tabelle/ })).toBeTruthy()
+    expect(within(list).getByRole('button', { name: /^Karten(?!.* nach )/ })).toBeTruthy()
+    expect(within(list).getByRole('button', { name: /^Tabelle(?!.* nach )/ })).toBeTruthy()
   })
 
   it('falls back to the table when the plugin factory throws', async () => {
@@ -115,7 +115,7 @@ describe('BasesView plugin views', () => {
       <BasesView apiClient={makeApiClient()} vaultId="v1" source={pluginSource} readOnly={false} onOpenNote={() => {}} onSaveSource={() => {}} />,
     )
     fireEvent.click(screen.getByRole('button', { name: /Karten/ }))
-    fireEvent.click(within(screen.getByRole('list', { name: 'Ansichten' })).getByRole('button', { name: /Tabelle/ }))
+    fireEvent.click(within(screen.getByRole('list', { name: 'Ansichten' })).getByRole('button', { name: /^Tabelle(?!.* nach )/ }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Alpha' })).toBeTruthy())
   })
 })

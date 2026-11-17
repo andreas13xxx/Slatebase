@@ -996,6 +996,7 @@ function AppContent() {
     onFileClick: handleFileClick,
     onFootnoteClick: documentPanelData.onHeadingClick,
     onLinkMention: handleLinkMention,
+    activeFilePath: documentPath,
   }
 
   const searchProps: SidePanelSearchProps = {

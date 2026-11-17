@@ -27,6 +27,8 @@ export interface BasesPluginViewHostProps {
   doc: BaseDocument
   /** The active view (its `type` matches a registered plugin view). */
   view: BaseView
+  /** Vault-relative path of the host note `this` refers to (the embedding note, or the base file itself when opened on its own). Absent when there is no host. */
+  hostPath?: string
   /** Open a note by its vault-relative path (wired into the view's RenderContext). */
   onOpenNote: (path: string) => void
   /** Create a note scoped to this base (and open it); resolves to its path, or null on failure. */
@@ -52,7 +54,7 @@ interface MountedPluginView extends DrivableBasesView {
  * manages the mount/unmount lifecycle.
  */
 export function BasesPluginViewHost({
-  apiClient, vaultId, doc, view, onOpenNote, onAddItem, onError,
+  apiClient, vaultId, doc, view, hostPath, onOpenNote, onAddItem, onError,
 }: BasesPluginViewHostProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   // Kept in a ref: the mount effect below must not re-run (and remount the
@@ -151,7 +153,7 @@ export function BasesPluginViewHost({
 
       // Attach the data controller; its first query drives onDataUpdated().
       controller = new BasesQueryController({
-        apiClient, vaultId, doc, view, target: mounted,
+        apiClient, vaultId, doc, view, hostPath, target: mounted,
         onError,
       })
       void controller.start()
@@ -170,7 +172,7 @@ export function BasesPluginViewHost({
       container.textContent = ''
       container.removeAttribute('data-plugin-id')
     }
-  }, [apiClient, vaultId, doc, view, onOpenNote, onError])
+  }, [apiClient, vaultId, doc, view, hostPath, onOpenNote, onError])
 
   return <div ref={containerRef} className="bases-view__plugin-container" />
 }

@@ -814,6 +814,13 @@ export const en: TranslationShape = {
       refCount: '{count}×',
       ariaLabel: 'Document footnotes',
     },
+    base: {
+      selectLabel: 'Base:',
+      selectPlaceholder: '— select —',
+      none: 'No .base file in this vault.',
+      noneSelected: 'Pick a Base from the list.',
+      noVault: 'No vault selected.',
+    },
     propertyControls: {
       addItemPlaceholder: 'Add...',
       addItemAriaLabel: 'Add item',
@@ -843,6 +850,7 @@ export const en: TranslationShape = {
       search: 'Search',
       activity: 'Activity',
       footnotes: 'Footnotes',
+      base: 'Base',
     },
     tabListAriaLabel: 'Panel views',
   },

@@ -18,7 +18,7 @@
 import type { BaseDocument, BaseRow, BaseView } from './types.js'
 import { rowContext } from './base-eval.js'
 import type { FormulaValue } from './formula/functions.js'
-import { toDate } from './formula/functions.js'
+import { toDate, isDuration, durationMs } from './formula/functions.js'
 import { evaluateFormula } from './formula/evaluator.js'
 
 /** One computed summary: the function that was applied and its resulting value. */
@@ -102,6 +102,8 @@ function toNumbers(values: FormulaValue[]): number[] {
   for (const v of values) {
     if (typeof v === 'number' && Number.isFinite(v)) {
       nums.push(v)
+    } else if (isDuration(v)) {
+      nums.push(durationMs(v))
     } else if (typeof v === 'string' && v.trim() !== '') {
       const n = Number(v)
       if (Number.isFinite(n)) nums.push(n)

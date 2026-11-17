@@ -10,14 +10,14 @@
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X } from 'lucide-react'
+import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X, ListFilter } from 'lucide-react'
 import { rowValueKey } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause, BaseView } from '@slatebase/shared-contracts'
 import { ColumnTypeIcon } from './base-column-icon'
 import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
-  addFormula, addView, availableColumns, columnLabel, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
-  removeFormula, renameView, rootGroup,
+  addFormula, addView, availableColumns, columnEntry, columnLabel, deleteView, duplicateView, effectiveColumns, indexAfterMove, isValidFormulaName,
+  moveView, removeFormula, renameView, rootGroup, setDisplayName, setLimit, setViewSummary, SUMMARY_GROUPS, SUMMARY_LABELS,
   CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setBoardSize, setCardImageFit, setCardImageProperty, setCardSize, resetColumnSizes,
   setDocFilter, setGroupBy, setGroupOrder, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
@@ -38,6 +38,9 @@ import { groupLabel, groupRows, UNGROUPED } from './base-groups'
 function viewTypeLabel(type: string): string {
   return VIEW_TYPE_LABELS[type] ?? getBasesViewRegistration(type)?.name ?? type
 }
+
+/** Drag payload type for reordering views (a custom type, so the file drop zone ignores it). */
+const VIEW_DRAG_TYPE = 'application/x-slatebase-bases-view'
 
 export type BasesMode = 'view' | 'source'
 export type DocUpdate = (doc: BaseDocument) => BaseDocument
@@ -71,6 +74,10 @@ export interface BasesToolbarProps {
   searchQuery: string
   /** Change the quick-search text. */
   onSearchQueryChange: (query: string) => void
+  /** Copy the shown table to the clipboard (offered in the Results panel of a table view). */
+  onCopyTable?: () => void
+  /** Download the shown table as CSV (offered in the Results panel of a table view). */
+  onExportCsv?: () => void
 }
 
 // ─── Popover ────────────────────────────────────────────────────────────────
@@ -454,21 +461,77 @@ const PropertiesPanel = memo(function PropertiesPanel({ doc, index, columns, row
     if (item !== undefined) next.splice(i + by, 0, item)
     return next
   })
+  // One column at a time shows its options (header text, summary) under its row.
+  const [openOptions, setOpenOptions] = useState<string | null>(null)
+  const view = doc.views[index]
+  const customSummaries = Object.keys(doc.summaries ?? {})
 
   return (
     <div className="bases-tb__section">
       <ul className="bases-tb__list" aria-label="Angezeigte Eigenschaften">
-        {shown.map((id, i) => (
-          <li key={id} className="bases-tb__row">
-            <label className="bases-tb__check">
-              <input type="checkbox" checked disabled={disabled} onChange={() => edit((cur) => cur.filter((c) => c !== id))} />
-              <ColumnTypeIcon doc={doc} col={id} rows={rows} />
-              <ColumnOptionText choice={choiceOf(id)} />
-            </label>
-            <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
-            <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach unten`} disabled={disabled || i === shown.length - 1} onClick={() => move(i, 1)}>↓</button>
-          </li>
-        ))}
+        {shown.map((id, i) => {
+          const summary = columnEntry(view?.summaries, id) ?? ''
+          const known = customSummaries.includes(summary) || SUMMARY_GROUPS.some((g) => g.names.includes(summary))
+          return (
+            <li key={id} className="bases-tb__prop">
+              <div className="bases-tb__row">
+                <label className="bases-tb__check">
+                  <input type="checkbox" checked disabled={disabled} onChange={() => edit((cur) => cur.filter((c) => c !== id))} />
+                  <ColumnTypeIcon doc={doc} col={id} rows={rows} />
+                  <ColumnOptionText choice={choiceOf(id)} />
+                </label>
+                <button
+                  type="button"
+                  className={openOptions === id || summary ? 'bases-tb__icon-btn bases-tb__icon-btn--active' : 'bases-tb__icon-btn'}
+                  aria-label={`Optionen für ${labelOf(id)}`}
+                  aria-expanded={openOptions === id}
+                  onClick={() => setOpenOptions((cur) => (cur === id ? null : id))}
+                >
+                  <SlidersHorizontal size={14} aria-hidden="true" />
+                </button>
+                <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach oben`} disabled={disabled || i === 0} onClick={() => move(i, -1)}>↑</button>
+                <button type="button" className="bases-tb__icon-btn" aria-label={`${labelOf(id)} nach unten`} disabled={disabled || i === shown.length - 1} onClick={() => move(i, 1)}>↓</button>
+              </div>
+              {openOptions === id && (
+                <div className="bases-tb__prop-options">
+                  <div className="bases-tb__row">
+                    <span>Anzeigename</span>
+                    <CommitInput
+                      label={`Anzeigename für ${labelOf(id)}`}
+                      placeholder={id}
+                      value={columnEntry(doc.properties, id)?.displayName ?? ''}
+                      disabled={disabled}
+                      onCommit={(name) => onChange((d) => setDisplayName(d, id, name))}
+                    />
+                  </div>
+                  <label className="bases-tb__row">
+                    <span>Zusammenfassung</span>
+                    <select
+                      className="bases-tb__select"
+                      aria-label={`Zusammenfassung für ${labelOf(id)}`}
+                      value={summary}
+                      disabled={disabled}
+                      onChange={(e) => { const name = e.target.value || undefined; onChange((d) => setViewSummary(d, index, id, name)) }}
+                    >
+                      <option value="">Keine</option>
+                      {SUMMARY_GROUPS.map((g) => (
+                        <optgroup key={g.label} label={g.label}>
+                          {g.names.map((n) => <option key={n} value={n}>{SUMMARY_LABELS[n] ?? n}</option>)}
+                        </optgroup>
+                      ))}
+                      {customSummaries.length > 0 && (
+                        <optgroup label="Eigene">
+                          {customSummaries.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </optgroup>
+                      )}
+                      {summary && !known && <option value={summary}>{summary}</option>}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ul>
       {hidden.length > 0 && (
         <>
@@ -591,6 +654,44 @@ const FilterPanel = memo(function FilterPanel({ doc, index, columns, rows, disab
   )
 })
 
+/** Results: how many rows the view shows, plus copying and exporting what is shown. */
+const ResultsPanel = memo(function ResultsPanel({ doc, index, disabled, onChange, onCopyTable, onExportCsv }: {
+  doc: BaseDocument
+  index: number
+  disabled: boolean
+  onChange: (update: DocUpdate) => void
+  onCopyTable?: (() => void) | undefined
+  onExportCsv?: (() => void) | undefined
+}) {
+  const view = doc.views[index]
+  if (!view) return null
+  return (
+    <div className="bases-tb__section">
+      <div className="bases-tb__row">
+        <span>Limit</span>
+        <CommitInput
+          value={view.limit !== undefined ? String(view.limit) : ''}
+          label="Ergebnisse begrenzen"
+          placeholder="Kein Limit"
+          disabled={disabled}
+          onCommit={(text) => {
+            const n = Number(text.trim())
+            const limit = text.trim() !== '' && Number.isFinite(n) && n >= 1 ? n : undefined
+            onChange((d) => setLimit(d, index, limit))
+          }}
+        />
+      </div>
+      <p className="bases-tb__hint">Leer lassen, um alle Treffer zu zeigen.</p>
+      {(onCopyTable || onExportCsv) && (
+        <div className="bases-tb__row">
+          {onCopyTable && <button type="button" className="bases-tb__btn" onClick={onCopyTable}>In die Zwischenablage kopieren</button>}
+          {onExportCsv && <button type="button" className="bases-tb__btn" onClick={onExportCsv}>Als CSV exportieren</button>}
+        </div>
+      )}
+    </div>
+  )
+})
+
 function countConditions(node: BaseFilterNode | undefined): number {
   if (node === undefined) return 0
   if (typeof node === 'string') return node === '' ? 0 : 1
@@ -611,6 +712,18 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<string>('table')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // Reordering views: drag a row, or use its ↑/↓ buttons (the keyboard path).
+  const canReorder = !disabled && doc.views.length > 1
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const endDrag = () => { setDragIndex(null); setDropIndex(null) }
+  const moveViewTo = (from: number, to: number) => {
+    if (from === to) return
+    setConfirmDelete(false)
+    onChange((d) => moveView(d, from, to))
+    // The open view stays the open one, wherever it ends up.
+    onSelectView(indexAfterMove(activeIndex, from, to))
+  }
   // The Bases view registry fills asynchronously as plugins (Maps, Base Graph, …)
   // load, so subscribe to its version — otherwise a plugin-registered type never
   // appears in the "new view" / "change type" dropdowns until a `.base` already
@@ -635,19 +748,50 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
     <Popover label={<><Table2 aria-hidden="true" className="bases-tb__btn-icon" />{active?.name ?? 'Ansicht'}</>} title="Ansichten">
       <div className="bases-tb__section">
         <ul className="bases-tb__list" aria-label="Ansichten">
-          {doc.views.map((v, i) => (
-            <li key={`${v.type}-${i}`}>
-              <button
-                type="button"
-                className={i === activeIndex ? 'bases-tb__view-item bases-tb__view-item--active' : 'bases-tb__view-item'}
-                aria-current={i === activeIndex ? 'true' : undefined}
-                onClick={() => { setConfirmDelete(false); onSelectView(i) }}
+          {doc.views.map((v, i) => {
+            const label = v.name ?? v.type
+            return (
+              <li
+                key={`${v.type}-${i}`}
+                className={dropIndex === i && dragIndex !== null && dragIndex !== i ? 'bases-tb__row bases-tb__row--drop' : 'bases-tb__row'}
+                draggable={canReorder}
+                onDragStart={(e) => {
+                  if (!canReorder) return
+                  e.dataTransfer.setData(VIEW_DRAG_TYPE, String(i))
+                  e.dataTransfer.effectAllowed = 'move'
+                  setDragIndex(i)
+                }}
+                onDragOver={(e) => {
+                  if (dragIndex === null || !e.dataTransfer.types.includes(VIEW_DRAG_TYPE)) return
+                  e.preventDefault()
+                  setDropIndex(i)
+                }}
+                onDrop={(e) => {
+                  if (dragIndex === null) return
+                  e.preventDefault()
+                  moveViewTo(dragIndex, i)
+                  endDrag()
+                }}
+                onDragEnd={endDrag}
               >
-                <span>{v.name ?? v.type}</span>
-                <span className="bases-tb__type">{viewTypeLabel(v.type)}</span>
-              </button>
-            </li>
-          ))}
+                <button
+                  type="button"
+                  className={i === activeIndex ? 'bases-tb__view-item bases-tb__view-item--active' : 'bases-tb__view-item'}
+                  aria-current={i === activeIndex ? 'true' : undefined}
+                  onClick={() => { setConfirmDelete(false); onSelectView(i) }}
+                >
+                  <span>{label}</span>
+                  <span className="bases-tb__type">{viewTypeLabel(v.type)}</span>
+                </button>
+                {canReorder && (
+                  <>
+                    <button type="button" className="bases-tb__icon-btn" aria-label={`${label} nach oben`} disabled={i === 0} onClick={() => moveViewTo(i, i - 1)}>↑</button>
+                    <button type="button" className="bases-tb__icon-btn" aria-label={`${label} nach unten`} disabled={i === doc.views.length - 1} onClick={() => moveViewTo(i, i + 1)}>↓</button>
+                  </>
+                )}
+              </li>
+            )
+          })}
         </ul>
       </div>
       {active && (
@@ -717,7 +861,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
 // ─── Toolbar ────────────────────────────────────────────────────────────────
 
 export const BasesToolbar = memo(function BasesToolbar({
-  doc, rows, observedProperties, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange,
+  doc, rows, observedProperties, activeIndex, readOnly, mode, onSelectView, onChange, onAddItem, searchQuery, onSearchQueryChange, onCopyTable, onExportCsv,
 }: BasesToolbarProps) {
   const view = doc.views[activeIndex]
   const columns = availableColumns(doc, rows, view, observedProperties)
@@ -763,6 +907,16 @@ export const BasesToolbar = memo(function BasesToolbar({
               <Search aria-hidden="true" className="bases-tb__btn-icon" />
               Suchen
             </button>
+            <Popover label={<><ListFilter aria-hidden="true" className="bases-tb__btn-icon" />Ergebnisse</>} title="Ergebnisse" badge={view.limit !== undefined ? 1 : 0}>
+              <ResultsPanel
+                doc={doc}
+                index={activeIndex}
+                disabled={readOnly}
+                onChange={handleChange}
+                onCopyTable={view.type === 'table' ? onCopyTable : undefined}
+                onExportCsv={view.type === 'table' ? onExportCsv : undefined}
+              />
+            </Popover>
             <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
             <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
             <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>

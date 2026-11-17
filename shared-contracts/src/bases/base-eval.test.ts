@@ -108,6 +108,12 @@ describe('filters over formulas, lists and file fields', () => {
     expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['Projects/a.md'])
   })
 
+  it('file.file is the file itself, as a link', () => {
+    const rows = [wire('Projects/a.md', {}), wire('Other/b.md', {})]
+    const d: BaseDocument = { filters: 'file.file.path == "Projects/a.md" && file.file.isType("link")', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['Projects/a.md'])
+  })
+
   it('collects refs from note["..."] indexing', () => {
     const d: BaseDocument = { filters: 'note["due-date"] != ""', views: [] }
     expect(buildQuerySpec(d, { type: 'table', order: [] }).columns).toEqual(['due-date'])

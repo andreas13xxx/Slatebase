@@ -20,9 +20,8 @@ import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import type { PropertyType } from '../../state/propertyTypes'
 import { runBaseQuery } from '../../bases/query-engine'
-import { evaluateFormula, rowValueKey } from '@slatebase/shared-contracts'
+import { durationMs, evaluateFormulaColumn, formatFormulaValue, isDuration, rowValueKey } from '@slatebase/shared-contracts'
 import { groupRows, UNGROUPED } from '../../components/bases/base-groups'
-import type { FormulaContext } from '@slatebase/shared-contracts'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { extractErrorMessage } from '../../utils/error'
 import { toValue } from './bases-value-factory'
@@ -40,28 +39,22 @@ export interface DrivableBasesView {
   onDataUpdated?(): void
 }
 
-/** Builds a formula evaluation context from one row's raw values. */
-function rowFormulaContext(row: BaseRow): FormulaContext {
-  return {
-    resolve: (name) => {
-      if (name === 'file.name') return row.fileName
-      const v = row.values[name]
-      if (Array.isArray(v)) return v.length > 0 ? (v[0] ?? null) : null
-      if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v
-      return null
-    },
-  }
-}
-
-/** Wraps a formula interpreter result as a Value. */
-function formulaValue(src: string, row: BaseRow): Value {
-  const result = evaluateFormula(src, rowFormulaContext(row))
+/**
+ * Evaluates one formula column for a row via the shared engine (same as the
+ * built-in table), so a plugin view's formula columns see `file.*`, other
+ * formulas and `this` exactly like the table does — rather than a separate,
+ * narrower context.
+ */
+function formulaValue(doc: BaseDocument, row: BaseRow, formulaKey: string, thisRow: BaseRow | undefined): Value {
+  const result = evaluateFormulaColumn(doc, row, formulaKey, thisRow)
   if (!result.ok) return NullValue.value
   const v = result.value
   if (v === null || v === undefined) return NullValue.value
   if (typeof v === 'number') return new NumberValue(v)
   if (typeof v === 'boolean') return new BooleanValue(v)
-  return new StringValue(String(v))
+  // A duration reaches a plugin as its length in ms, like the arithmetic reads it.
+  if (isDuration(v)) return new NumberValue(durationMs(v))
+  return new StringValue(formatFormulaValue(v))
 }
 
 /** Normalizes a raw row value into a string[] for the value factory. */
@@ -96,6 +89,7 @@ export class BasesQueryController {
   private readonly vaultId: string
   private readonly doc: BaseDocument
   private readonly view: BaseView
+  private readonly hostPath: string | undefined
   private readonly target: DrivableBasesView
   private readonly onError: (message: string) => void
   private unsubscribe: (() => void) | null = null
@@ -107,6 +101,8 @@ export class BasesQueryController {
     vaultId: string
     doc: BaseDocument
     view: BaseView
+    /** Vault-relative path of the host note `this` refers to; absent when there is no host. */
+    hostPath?: string
     target: DrivableBasesView
     onError?: (message: string) => void
   }) {
@@ -114,6 +110,7 @@ export class BasesQueryController {
     this.vaultId = opts.vaultId
     this.doc = opts.doc
     this.view = opts.view
+    this.hostPath = opts.hostPath
     this.target = opts.target
     this.onError = opts.onError ?? (() => {})
   }
@@ -168,12 +165,12 @@ export class BasesQueryController {
   /** Re-runs the query and calls the view's onDataUpdated(). */
   async refresh(): Promise<void> {
     try {
-      const { rows } = await runBaseQuery(
-        this.apiClient, this.vaultId, this.doc, this.view, undefined, this.pluginConfigColumns(),
+      const { rows, thisRow } = await runBaseQuery(
+        this.apiClient, this.vaultId, this.doc, this.view, this.hostPath, this.pluginConfigColumns(),
       )
       if (this.stopped) return
       this.publishIndexedLinks(rows)
-      const entries = rows.map((row) => this.buildEntry(row))
+      const entries = rows.map((row) => this.buildEntry(row, thisRow))
       const columns = this.view.order ?? Object.keys(this.doc.properties ?? {})
       this.target.allProperties = columns
       const QueryResult = window.obsidian?.['BasesQueryResult'] as unknown as (new (e: unknown[], g?: unknown[], p?: string[]) => unknown) | undefined
@@ -212,7 +209,7 @@ export class BasesQueryController {
   }
 
   /** Builds a BasesEntry (via the global class) for one row, with Value columns. */
-  private buildEntry(row: BaseRow): unknown {
+  private buildEntry(row: BaseRow, thisRow: BaseRow | undefined): unknown {
     const EntryCtor = window.obsidian?.['BasesEntry'] as unknown as (new (app?: unknown) => {
       file: unknown
       setValue(key: string, value: unknown): void
@@ -233,7 +230,7 @@ export class BasesQueryController {
     for (const col of columns) {
       const formulaKey = col.startsWith('formula.') ? col.slice('formula.'.length) : col
       if (formulaKeys.has(formulaKey)) {
-        entry.setValue(col, formulaValue(this.doc.formulas?.[formulaKey] ?? '', row))
+        entry.setValue(col, formulaValue(this.doc, row, formulaKey, thisRow))
       } else if (col === 'file.name') {
         entry.setValue(col, new StringValue(row.fileName))
       } else {

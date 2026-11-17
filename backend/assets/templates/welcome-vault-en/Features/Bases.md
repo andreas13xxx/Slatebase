@@ -95,7 +95,9 @@ formulas:
 ```
 
 > [!note] Date difference
-> `date1 - date2` returns **milliseconds** (as in Obsidian). For days use `(a - b).days` as in Obsidian (also `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` exists as an extra.
+> `date1 - date2` returns a **duration** (as in Obsidian). For days use `(a - b).days` (also `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` exists as an extra. On its own in a column the duration shows as text, e.g. `9d` or `1d 2h 5m`. In arithmetic it still counts as milliseconds (`(a - b) / 86400000`).
+>
+> `duration("1d")` builds a duration by hand: `now() + duration("1d")`, `duration("5h") * 2`. Months and years follow the calendar: `date("2024-12-01") + "1M"` is January 1st, 2025.
 
 ---
 
@@ -144,7 +146,7 @@ Property cells are editable inline, using the same typed controls as the [[Featu
 
 Click a column header to sort; the sort is written back into the `.base` file. This also works for formula columns — they are sorted after loading by their computed values.
 
-**Column width:** drag the right edge of a column header to resize it; with the keyboard the arrow keys (←/→) change the width by 10 pixels (50 with `Shift`), and a double click resets the column to automatic. Widths are stored as `columnSize` in the view of the `.base` file (as in Obsidian); under **Display**, "Reset" returns all widths to automatic at once. With column widths set, overlong cell content is clipped instead of widening the column.
+**Column width:** drag the right edge of a column header to resize it; with the keyboard the arrow keys (←/→) change the width in steps, and `Delete` or a double click resets the column to automatic. Widths are stored as `columnSize` in the view of the `.base` file (as in Obsidian); under **Display**, "Reset" returns all widths to automatic at once.
 
 ---
 
@@ -205,6 +207,13 @@ views:
 `limit` caps a view's rows — applied **after** filtering. If the limit hides matches, "Zeigt N von M" (shows N of M) appears above the view.
 
 Other view types come from Obsidian plugins (see [[Advanced/Obsidian Plugins]]).
+
+You can set all of this without YAML, from the base's toolbar:
+
+- **Ergebnisse** (results) — set or clear the limit; in a table also "copy to clipboard" and "export as CSV".
+- **Eigenschaften** (properties) — the slider icon next to a column opens its options: **Anzeigename** (the header text, `properties.<column>.displayName`) and **Zusammenfassung** (the view's `summaries`).
+- **Views** — reorder them by dragging or with ↑/↓.
+- **Table** — drag a column header onto another to move the column. The handle on the header's right edge changes the width (`columnSize`, in pixels); a double click or Delete resets it, the arrow keys change it in steps.
 
 ### Display options per view
 
@@ -309,7 +318,8 @@ So nothing surprises you:
 
 **Expression language**
 - This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
-- Objects exist only as `file.properties` (see above), not as literals. `html()`, `icon()` and `image()` return text or a link; raw HTML is never inserted.
+- Objects exist only as `file.properties` (see above), not as literals.
+- `html()`, `icon()` and `image()` are rendered in formula columns: `html("<b>x</b>")` as sanitized HTML (no scripts, event attributes, inline CSS or forms), `icon("star")` as a Lucide icon, `image(cover)` as a picture from the vault or an `http(s)` address. CSV, clipboard and the MCP tool `query_base` carry the text behind it.
 - `file.embeds`, `file.size` and `file.backlinks` ARE supported. `file.embeds` holds `![[…]]` embeds only; on the first start after the update Slatebase rebuilds the link index once.
 - Not implemented: Obsidian's further display options beyond those listed above (for example column widths in lists); unknown keys in a view are kept unchanged when saving.
 

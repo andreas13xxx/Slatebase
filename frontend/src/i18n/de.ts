@@ -808,6 +808,13 @@ export const de = {
       refCount: '{count}×',
       ariaLabel: 'Fußnoten des Dokuments',
     },
+    base: {
+      selectLabel: 'Base:',
+      selectPlaceholder: '— auswählen —',
+      none: 'Keine .base-Datei in diesem Vault.',
+      noneSelected: 'Wähle eine Base aus der Liste.',
+      noVault: 'Kein Vault ausgewählt.',
+    },
     propertyControls: {
       addItemPlaceholder: 'Hinzufügen...',
       addItemAriaLabel: 'Eintrag hinzufügen',
@@ -837,6 +844,7 @@ export const de = {
       search: 'Suche',
       activity: 'Aktivität',
       footnotes: 'Fußnoten',
+      base: 'Base',
     },
     tabListAriaLabel: 'Panel-Ansichten',
   },

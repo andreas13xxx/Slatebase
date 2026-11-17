@@ -227,6 +227,7 @@ function resolveThis(name: string, thisRow: BaseRow | undefined): FormulaValue {
   if (name === 'this.file') return thisRow.path
   if (name === 'this.file.name' || name === 'this.file.basename') return thisRow.fileName
   if (name === 'this.file.path') return thisRow.path
+  if (name === 'this.file.file') return { kind: 'link', path: thisRow.path }
   if (name === 'this.file.properties') return propertiesObject(thisRow)
   if (name.startsWith('this.file.')) {
     const key = name.slice('this.'.length)
@@ -259,6 +260,8 @@ function buildContext(row: BaseRow, doc: BaseDocument | undefined, active: Reado
       }
       if (name === 'file.name' || name === 'file.basename') return row.fileName
       if (name === 'file.path') return row.path
+      // `file.file` is the file itself; a link doubles as the file reference in this value model.
+      if (name === 'file.file') return { kind: 'link', path: row.path }
       if (name === 'file.properties') return propertiesObject(row)
       if (name.startsWith('file.')) return toExprValue(name, values[name], listKeys)
       const key = name.startsWith('note.') ? name.slice('note.'.length) : name

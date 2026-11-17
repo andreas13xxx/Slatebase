@@ -35,7 +35,7 @@ import { BasesSourceView } from './BasesSourceView'
 import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
-import { setColumnSize, setGroupOrder } from './base-edit'
+import { effectiveColumns, moveItem, setColumnSize, setGroupOrder, setOrder } from './base-edit'
 import { sortRowsByFormula } from './base-formula-sort'
 import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
 import { filterRowsByText } from './base-row-search'
@@ -82,6 +82,8 @@ export const BasesView = memo(function BasesView({
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
+  // The row `this` stands for in filters and formulas (the host note); undefined when the base is opened on its own.
+  const [thisRow, setThisRow] = useState<BaseRow | undefined>(undefined)
   const [truncated, setTruncated] = useState(false)
   // Every frontmatter property key across the matched notes, so the toolbar can
   // offer the base's own properties as columns (Obsidian's behaviour) even when
@@ -153,8 +155,8 @@ export const BasesView = memo(function BasesView({
   // so when the active view's first sort clause targets a formula column we
   // sort the already-fetched rows here by the evaluated value, stable on ties.
   const sortedRows = useMemo(
-    () => (doc ? sortRowsByFormula(rows, doc, activeView) : rows),
-    [rows, doc, activeView],
+    () => (doc ? sortRowsByFormula(rows, doc, activeView, thisRow) : rows),
+    [rows, doc, activeView, thisRow],
   )
   // Quick-search narrows the rendered rows (file name + visible values), after
   // sorting so the order is stable; empty query passes everything through.
@@ -167,8 +169,9 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, total: resultTotal, truncated: resultTruncated, propertyKeys } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
+      const { rows: resultRows, total: resultTotal, truncated: resultTruncated, propertyKeys, thisRow: resultThisRow } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
+      setThisRow(resultThisRow)
       setTotalMatches(resultTotal)
       setTruncated(resultTruncated)
       setObservedProperties(propertyKeys)
@@ -350,6 +353,60 @@ export const BasesView = memo(function BasesView({
     handleDocChange((d) => setGroupOrder(d, safeIndex, groupOrder))
   }, [handleDocChange, safeIndex])
 
+  // Persist a new column width (`undefined` resets it) and a header drag-reorder into the view.
+  const handleColumnResize = useCallback((column: string, width: number | undefined) => {
+    handleDocChange((d) => setColumnSize(d, safeIndex, column, width))
+  }, [handleDocChange, safeIndex])
+  const handleReorderTableColumns = useCallback((from: number, to: number) => {
+    handleDocChange((d) => setOrder(d, safeIndex, moveItem(effectiveColumns(d, d.views[safeIndex]), from, to)))
+  }, [handleDocChange, safeIndex])
+
+  // Copy / export what the table shows. Shared by the `bases:*` commands (via the controller below)
+  // and the toolbar's Results panel, so they cannot drift.
+  const copyTable = useCallback(async (): Promise<boolean> => {
+    const table = rootRef.current?.querySelector<HTMLTableElement>('table.bases-table')
+    if (!table) return false
+    try {
+      await navigator.clipboard.writeText(tableToTsv(table))
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  const exportCsv = useCallback((): boolean => {
+    const table = rootRef.current?.querySelector<HTMLTableElement>('table.bases-table')
+    if (!table) return false
+    // BOM first: spreadsheets otherwise guess the encoding and mangle umlauts.
+    const blob = new Blob(['﻿', tableToCsv(table)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = csvFileName(hostPath)
+    // Attached while clicking, and revoked later: some browsers start the download asynchronously
+    // and would otherwise read an already-revoked URL.
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    // The file holds what the table shows. If the result was cut short, say so instead of
+    // letting a success toast pass for a complete export.
+    if (truncated) showToast('warning', 'Die Tabelle war gekürzt — die CSV enthält nur die angezeigten Zeilen')
+    return true
+  }, [hostPath, truncated])
+
+  // The toolbar buttons report the outcome themselves (the commands do so in `core-commands-app.ts`).
+  const handleCopyTable = useCallback(() => {
+    void copyTable().then((ok) => {
+      if (ok) showToast('success', 'Tabelle in die Zwischenablage kopiert')
+      else showToast('error', 'Die Tabelle konnte nicht kopiert werden')
+    })
+  }, [copyTable])
+  const handleExportCsv = useCallback(() => {
+    if (exportCsv()) showToast('success', 'Tabelle als CSV exportiert')
+    else showToast('error', 'Die Tabelle konnte nicht exportiert werden')
+  }, [exportCsv])
+
   useEffect(() => {
     const controller: ActiveBasesController = {
       nextView: () => {
@@ -366,41 +423,13 @@ export const BasesView = memo(function BasesView({
         showView()
         return true
       },
-      copyTable: async () => {
-        const table = rootRef.current?.querySelector<HTMLTableElement>('table.bases-table')
-        if (!table) return false
-        try {
-          await navigator.clipboard.writeText(tableToTsv(table))
-          return true
-        } catch {
-          return false
-        }
-      },
-      exportCsv: () => {
-        const table = rootRef.current?.querySelector<HTMLTableElement>('table.bases-table')
-        if (!table) return false
-        // BOM first: spreadsheets otherwise guess the encoding and mangle umlauts.
-        const blob = new Blob(['﻿', tableToCsv(table)], { type: 'text/csv;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = csvFileName(hostPath)
-        // Attached while clicking, and revoked later: some browsers start the download asynchronously
-        // and would otherwise read an already-revoked URL.
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
-        // The file holds what the table shows. If the result was cut short, say so instead of
-        // letting a success toast pass for a complete export.
-        if (truncated) showToast('warning', 'Die Tabelle war gekürzt — die CSV enthält nur die angezeigten Zeilen')
-        return true
-      },
+      copyTable,
+      exportCsv,
       addItem,
     }
     setActiveBasesController(controller)
     return () => clearActiveBasesController(controller)
-  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem, hostPath, truncated])
+  }, [views.length, safeIndex, doc, readOnly, onSaveSource, showView, addItem, copyTable, exportCsv])
 
   // Stable callback for the plugin host to report a render/query failure.
   const handlePluginViewError = useCallback((message: string) => {
@@ -432,6 +461,8 @@ export const BasesView = memo(function BasesView({
         onAddItem={handleAddItem}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
+        onCopyTable={handleCopyTable}
+        onExportCsv={handleExportCsv}
       />
 
       {queryError && <div className="bases-view__error" role="alert">{queryError}</div>}
@@ -476,6 +507,7 @@ export const BasesView = memo(function BasesView({
             vaultId={vaultId}
             doc={doc}
             view={activeView}
+            hostPath={hostPath}
             onOpenNote={onOpenNote}
             onAddItem={addItem}
             onError={handlePluginViewError}
@@ -504,6 +536,7 @@ export const BasesView = memo(function BasesView({
           rows={displayRows}
           vaultId={vaultId}
           readOnly={readOnly}
+          thisRow={thisRow}
           onOpenNote={onOpenNote}
         />
       )}
@@ -513,6 +546,8 @@ export const BasesView = memo(function BasesView({
           doc={doc}
           view={activeView}
           rows={displayRows}
+          vaultId={vaultId}
+          thisRow={thisRow}
           onOpenNote={onOpenNote}
         />
       )}
@@ -522,10 +557,12 @@ export const BasesView = memo(function BasesView({
           doc={doc}
           view={activeView}
           rows={displayRows}
+          vaultId={vaultId}
+          thisRow={thisRow}
           onOpenNote={onOpenNote}
           onCommitCell={handleCommitCell}
           onSortChange={handleSortChange}
-          onColumnResize={readOnly ? undefined : (column, width) => handleDocChange((d) => setColumnSize(d, safeIndex, column, width))}
+          {...(readOnly ? {} : { onColumnResize: handleColumnResize, onReorderColumns: handleReorderTableColumns })}
         />
       )}
 

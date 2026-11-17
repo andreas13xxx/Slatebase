@@ -72,6 +72,7 @@ const documentPanel: SidePanelDocumentProps = {
   onTagClick: () => {},
   onFileClick: () => {},
   onLinkMention: async () => {},
+  activeFilePath: null,
 } as unknown as SidePanelDocumentProps
 
 const search: SidePanelSearchProps = {

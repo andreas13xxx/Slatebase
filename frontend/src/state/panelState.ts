@@ -24,7 +24,7 @@ export const MIN_HEIGHT_FRACTION = 0.1
 export type BuiltinPanelViewId =
   | 'explorer' | 'favorites' | 'recent'
   | 'outline' | 'links' | 'tags' | 'properties' | 'footnotes' | 'search'
-  | 'activity'
+  | 'activity' | 'base'
 
 /** Plugin view identifiers use a `plugin:` prefix followed by the view type. */
 export type PluginViewId = `plugin:${string}`
@@ -43,7 +43,7 @@ export function isBuiltinViewId(viewId: string): viewId is BuiltinPanelViewId {
     viewId === 'explorer' || viewId === 'favorites' || viewId === 'recent' ||
     viewId === 'outline' || viewId === 'links' || viewId === 'tags' ||
     viewId === 'properties' || viewId === 'footnotes' || viewId === 'search' ||
-    viewId === 'activity'
+    viewId === 'activity' || viewId === 'base'
   )
 }
 

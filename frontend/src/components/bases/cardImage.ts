@@ -8,6 +8,11 @@ export type CardImage =
   | { kind: 'url'; src: string }
   | { kind: 'file'; target: string }
 
+/** Vault file URL for an image path (same raw endpoint the note viewer uses). */
+export function vaultImageSrc(vaultId: string, path: string): string {
+  return `/api/v1/vaults/${encodeURIComponent(vaultId)}/files?path=${encodeURIComponent(path)}&raw=true`
+}
+
 /** Classifies a raw image property value; null when there is nothing usable. */
 export function parseCardImage(raw: string): CardImage | null {
   const value = raw.trim()

@@ -51,7 +51,7 @@ describe('BasesToolbar — views', () => {
   it('selects another view', () => {
     const { onSelectView } = setup()
     open(/Offen/)
-    fireEvent.click(within(screen.getByRole('list', { name: 'Ansichten' })).getByRole('button', { name: /Liste/ }))
+    fireEvent.click(within(screen.getByRole('list', { name: 'Ansichten' })).getByRole('button', { name: /^Liste(?!.* nach )/ }))
     expect(onSelectView).toHaveBeenCalledWith(1)
   })
 

@@ -121,18 +121,67 @@ describe('lambdas', () => {
 
 describe('global functions', () => {
   it('duration / escapeHTML / html / icon / random', () => {
-    expect(ev('duration("2h")')).toBe(7_200_000)
-    expect(ev('duration("5h") * 2')).toBe(36_000_000)
+    expect(ev('duration("2h")')).toEqual({ kind: 'duration', months: 0, ms: 7_200_000 })
+    expect(ev('duration("5h") * 2')).toEqual({ kind: 'duration', months: 0, ms: 36_000_000 })
     expect(ev('escapeHTML("<a & \\"b\\">")')).toBe('&lt;a &amp; &quot;b&quot;&gt;')
-    expect(ev('html("<b>x</b>")')).toBe('<b>x</b>')
-    expect(ev('icon("star")')).toBe('star')
+    expect(ev('html("<b>x</b>")')).toEqual({ kind: 'html', html: '<b>x</b>' })
+    expect(ev('icon("star")')).toEqual({ kind: 'icon', name: 'star' })
     const r = ev('random()')
     expect(typeof r === 'number' && r >= 0 && r < 1).toBe(true)
   })
 
-  it('file() / image() build a link value', () => {
+  it('file() builds a link, image() an image value', () => {
     expect(ev('file("a/b.md").path')).toBe('a/b.md')
-    expect(ev('image("pic.png")')).toMatchObject({ kind: 'link', path: 'pic.png' })
+    expect(ev('image("pic.png")')).toEqual({ kind: 'image', path: 'pic.png' })
+    expect(ev('image(link("Covers/a.png"))')).toEqual({ kind: 'image', path: 'Covers/a.png' })
+  })
+
+  it('html / icon / image read as text wherever text is expected', () => {
+    expect(ev('html("<b>x</b>").contains("<b>")')).toBe(true)
+    expect(ev('"got " + icon("star")')).toBe('got star')
+    expect(ev('icon("star").isType("string")')).toBe(true)
+    expect(ev('if(html(""), 1, 2)')).toBe(2)
+  })
+})
+
+describe('durations', () => {
+  const local = (y: number, mo: number, d: number, h = 0, mi = 0): Date => new Date(y, mo - 1, d, h, mi)
+
+  it('adds a month by the calendar (the Obsidian docs example)', () => {
+    expect(ev('date("2024-12-01") + "1M" + "4h" + "3m"')).toEqual(local(2025, 1, 1, 4, 3))
+    expect(ev('date("2024-01-31") + "1M"')).toEqual(local(2024, 2, 29))
+    expect(ev('date("2024-03-15") - "1y"')).toEqual(local(2023, 3, 15))
+  })
+
+  it('moves a date by a duration value, on either side of +', () => {
+    expect(ev('date("2026-01-01") + duration("1d")')).toEqual(local(2026, 1, 2))
+    expect(ev('duration("1d") + date("2026-01-01")')).toEqual(local(2026, 1, 2))
+    expect(ev('date("2026-01-01") + (duration("1d") * 2)')).toEqual(local(2026, 1, 3))
+    expect(ev('date("2026-01-03") - duration("2 days")')).toEqual(local(2026, 1, 1))
+  })
+
+  it('scales and combines durations', () => {
+    expect(ev('(duration("1h") + duration("30m")).minutes')).toBe(90)
+    // Division gives a plain number (milliseconds), so `(a - b) / 86400000` stays a day count.
+    expect(ev('duration("3h") / 2')).toBe(5_400_000)
+    expect(ev('(2 * duration("1h")).hours')).toBe(2)
+    expect(ev('duration("1h") - "15m"')).toEqual({ kind: 'duration', months: 0, ms: 2_700_000 })
+  })
+
+  it('knows its type, truthiness and text form', () => {
+    expect(ev('duration("1d").isType("duration")')).toBe(true)
+    expect(ev('if(duration("0s"), "y", "n")')).toBe('n')
+    expect(ev('"" + duration("1y") ')).toBe('1y')
+    expect(ev('"" + (duration("26h") + duration("5m"))')).toBe('1d 2h 5m')
+    expect(ev('"" + (date("2026-01-01") - date("2026-01-03"))')).toBe('-2d')
+  })
+
+  it('reads an unknown member of a duration as an error, not as a date field', () => {
+    expect(evaluateFormula('duration("1d").year', ctxOf()).ok).toBe(false)
+  })
+
+  it('date.millisecond', () => {
+    expect(ev('d.millisecond', { d: new Date(2026, 0, 1, 10, 0, 0, 123) })).toBe(123)
   })
 })
 

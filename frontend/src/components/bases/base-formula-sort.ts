@@ -7,7 +7,7 @@
  * Kept out of BasesView so it is unit-testable without the component.
  */
 
-import { evaluateFormulaColumn, formatFormulaValue } from '@slatebase/shared-contracts'
+import { durationMs, evaluateFormulaColumn, formatFormulaValue, isDuration } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 
 /**
@@ -16,7 +16,7 @@ import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contract
  * file.* sort is already applied by the backend). Null/error values sort last
  * (ascending) or first (descending). Stable: equal keys keep input order.
  */
-export function sortRowsByFormula(rows: BaseRow[], doc: BaseDocument, view: BaseView | undefined): BaseRow[] {
+export function sortRowsByFormula(rows: BaseRow[], doc: BaseDocument, view: BaseView | undefined, thisRow?: BaseRow): BaseRow[] {
   if (!view) return rows
   const sort = view.sort?.[0]
   if (!sort) return rows
@@ -26,11 +26,13 @@ export function sortRowsByFormula(rows: BaseRow[], doc: BaseDocument, view: Base
 
   const dir = sort.direction === 'desc' ? -1 : 1
   const valueFor = (row: BaseRow): number | string => {
-    const r = evaluateFormulaColumn(doc, row, key)
+    const r = evaluateFormulaColumn(doc, row, key, thisRow)
     if (!r.ok || r.value === null) return dir === 1 ? Infinity : -Infinity
     const v = r.value
     if (typeof v === 'number') return v
     if (v instanceof Date) return v.getTime()
+    // A duration sorts by its length, not by its text form.
+    if (isDuration(v)) return durationMs(v)
     // An object has no useful String() ('[object Object]'): sort by the same text the cell shows.
     return typeof v === 'object' && !Array.isArray(v) && v.kind === 'object' ? formatFormulaValue(v) : String(v)
   }

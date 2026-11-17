@@ -8,7 +8,7 @@
  */
 
 import moment from 'moment'
-import { toDate, toNumber, stringify, isLink, isRegex, isObject, isTruthy, toRegExp, type FormulaValue } from './functions.js'
+import { toDate, toNumber, durationMs, stringify, isLink, isRegex, isObject, isDuration, isTruthy, toRegExp, type FormulaValue } from './functions.js'
 
 /** A method implementation: receiver + evaluated args → value. */
 export type MethodFn = (receiver: FormulaValue, args: FormulaValue[]) => FormulaValue
@@ -168,6 +168,7 @@ function compareValues(a: FormulaValue, b: FormulaValue): number {
   if (b === null) return -1
   if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime()
   if (typeof a === 'number' && typeof b === 'number') return a - b
+  if (isDuration(a) && isDuration(b)) return durationMs(a) - durationMs(b)
   return stringify(a).localeCompare(stringify(b))
 }
 
@@ -179,6 +180,9 @@ function typeName(v: FormulaValue): string {
   if (isLink(v)) return 'link'
   if (isRegex(v)) return 'regexp'
   if (isObject(v)) return 'object'
+  if (isDuration(v)) return 'duration'
+  // html / icon / image are strings with a rendering hint (Obsidian: subclasses of its string value).
+  if (typeof v === 'object') return 'string'
   return typeof v
 }
 
@@ -220,11 +224,13 @@ export const DATE_MEMBERS: Record<string, (d: Date) => number> = {
   hour: (d) => d.getHours(),
   minute: (d) => d.getMinutes(),
   second: (d) => d.getSeconds(),
+  millisecond: (d) => d.getMilliseconds(),
 }
 
 /**
  * Duration members (`(date(a) - today()).days`): Obsidian's duration type exposes its
- * length in each unit. Here a duration is the millisecond number a date difference yields.
+ * length in each unit. The argument is the duration as milliseconds (`durationMs`); a plain number
+ * is read the same way, so bases written before the duration type keep working.
  */
 export const DURATION_MEMBERS: Record<string, (ms: number) => number> = {
   days: (ms) => ms / 86_400_000,
@@ -253,6 +259,8 @@ export function callMethod(receiver: FormulaValue, method: string, args: Formula
   } else if (isLink(receiver)) {
     const fn = linkMethods[method] ?? stringMethods[method]
     if (fn) return fn(receiver, args)
+  } else if (isDuration(receiver)) {
+    // A duration has only the methods every value has (below).
   } else if (isObject(receiver)) {
     // No string/list fallback: `obj.contains(...)` must be a visible error, not a silent text match.
     const fn = objectMethods[method]
@@ -282,5 +290,6 @@ function describeType(v: FormulaValue): string {
   if (v instanceof Date) return 'date'
   if (isLink(v)) return 'link'
   if (isObject(v)) return 'object'
+  if (isDuration(v)) return 'duration'
   return typeof v
 }

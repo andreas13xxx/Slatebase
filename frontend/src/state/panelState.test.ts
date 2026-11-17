@@ -14,7 +14,7 @@ describe('isPluginViewId / isBuiltinViewId / getPluginViewType', () => {
     expect(isPluginViewId('explorer')).toBe(false)
   })
 
-  it('identifies all 8 built-in view IDs, usable on either side', () => {
+  it('identifies all built-in view IDs, usable on either side', () => {
     expect(isBuiltinViewId('explorer')).toBe(true)
     expect(isBuiltinViewId('favorites')).toBe(true)
     expect(isBuiltinViewId('recent')).toBe(true)
@@ -22,7 +22,10 @@ describe('isPluginViewId / isBuiltinViewId / getPluginViewType', () => {
     expect(isBuiltinViewId('links')).toBe(true)
     expect(isBuiltinViewId('tags')).toBe(true)
     expect(isBuiltinViewId('properties')).toBe(true)
+    expect(isBuiltinViewId('footnotes')).toBe(true)
     expect(isBuiltinViewId('search')).toBe(true)
+    expect(isBuiltinViewId('activity')).toBe(true)
+    expect(isBuiltinViewId('base')).toBe(true)
     expect(isBuiltinViewId('plugin:my-view')).toBe(false)
   })
 

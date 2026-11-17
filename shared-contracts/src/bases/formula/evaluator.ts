@@ -11,7 +11,7 @@
 
 import { parseFormula } from './parser.js'
 import type { ExprNode, BinaryOp } from './ast.js'
-import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, isObject, objectsEqual, parseDurationMs } from './functions.js'
+import { FORMULA_FUNCTIONS, toDate, toNumber, stringify, isTruthy, isLink, isObject, isDuration, objectsEqual, parseDuration, makeDuration, addDuration, durationMs } from './functions.js'
 import type { FormulaValue } from './functions.js'
 import { callMethod, DATE_MEMBERS, DURATION_MEMBERS } from './methods.js'
 
@@ -54,10 +54,11 @@ function memberOf(obj: FormulaValue, property: string): FormulaValue {
     if (Array.isArray(obj)) return obj.length
     if (typeof obj === 'string') return obj.length
   }
-  // A number is a duration (a date difference in ms): `.days`, `.hours`, …
-  if (typeof obj === 'number') {
+  // A duration — or a plain number read as milliseconds — has `.days`, `.hours`, …
+  if (typeof obj === 'number' || isDuration(obj)) {
     const unit = DURATION_MEMBERS[property]
-    if (unit) return unit(obj)
+    if (unit) return unit(typeof obj === 'number' ? obj : durationMs(obj))
+    if (isDuration(obj)) throw new EvalError(`Unknown member '${property}'`)
   }
   // Dates also arrive as epoch numbers (`file.ctime`) or ISO strings.
   const asDate = obj instanceof Date ? obj : typeof obj === 'number' || typeof obj === 'string' ? toDate(obj) : null
@@ -233,16 +234,32 @@ function evalBinary(op: BinaryOp, leftNode: ExprNode, rightNode: ExprNode, ctx: 
     }
   }
 
-  // Date ± duration string: `date + "1M"`, `now() - "1 week"`.
   if (op === '+' || op === '-') {
+    const sign = op === '+' ? 1 : -1
     const ld = left instanceof Date ? left : null
     const rd = right instanceof Date ? right : null
-    if (ld && typeof right === 'string') {
-      const ms = parseDurationMs(right)
-      if (ms !== null) return new Date(ld.getTime() + (op === '+' ? ms : -ms))
+    // Date ± duration: `date + "1M"`, `now() - "1 week"`, `now() + duration("1d")`.
+    if (ld) {
+      const d = isDuration(right) ? right : typeof right === 'string' ? parseDuration(right) : null
+      if (d) return addDuration(ld, d, sign)
     }
-    // Date - Date → millisecond difference (Obsidian semantics).
-    if (op === '-' && ld && rd) return ld.getTime() - rd.getTime()
+    // Duration + date (only `+` commutes).
+    if (op === '+' && rd && isDuration(left)) return addDuration(rd, left, 1)
+    // Date - Date → a duration (Obsidian semantics); in arithmetic it still reads as milliseconds.
+    if (op === '-' && ld && rd) return makeDuration(0, ld.getTime() - rd.getTime())
+    // Duration ± duration (the right side may be a duration string).
+    if (isDuration(left)) {
+      const d = isDuration(right) ? right : typeof right === 'string' ? parseDuration(right) : null
+      if (d) return makeDuration(left.months + sign * d.months, left.ms + sign * d.ms)
+    }
+  }
+
+  // A duration times a plain number stays a duration: `duration("5h") * 2`. Division does not: the
+  // long-standing `(a - b) / 86400000` must keep giving a plain number of days.
+  if (op === '*') {
+    const dur = isDuration(left) ? left : isDuration(right) ? right : null
+    const other = dur === left ? right : left
+    if (dur && typeof other === 'number') return makeDuration(dur.months * other, dur.ms * other)
   }
 
   // String concatenation when either side is a non-numeric string under `+`.

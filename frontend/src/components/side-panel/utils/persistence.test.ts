@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { savePanelLayout, loadPanelLayout } from './persistence'
+import { savePanelLayout, loadPanelLayout, saveBasePanelPath, loadBasePanelPath } from './persistence'
 import type { PersistedPanelLayout } from './persistence'
 import {
   _reset as resetVaultSettings,
@@ -35,7 +35,7 @@ describe('side panel persistence utilities', () => {
   describe('savePanelLayout', () => {
     it('saves a layout that loadPanelLayout reads back', () => {
       savePanelLayout('context', validLayout)
-      expect(loadPanelLayout('context')).toEqual(validLayout)
+      expect(loadPanelLayout('context')).toMatchObject(validLayout)
     })
 
     it('overwrites an existing layout', () => {
@@ -47,7 +47,7 @@ describe('side panel persistence utilities', () => {
       }
       savePanelLayout('context', updated)
 
-      expect(loadPanelLayout('context')).toEqual(updated)
+      expect(loadPanelLayout('context')).toMatchObject(updated)
     })
 
     it('keeps the left and right panels independent', () => {
@@ -58,13 +58,13 @@ describe('side panel persistence utilities', () => {
       savePanelLayout('context', validLayout)
       savePanelLayout('sidebar', leftLayout)
 
-      expect(loadPanelLayout('context')).toEqual(validLayout)
+      expect(loadPanelLayout('context')).toMatchObject(validLayout)
       expect(loadPanelLayout('sidebar')).toEqual(leftLayout)
     })
 
     it('keeps layouts separate per vault', async () => {
       savePanelLayout('context', validLayout)
-      expect(loadPanelLayout('context')).toEqual(validLayout)
+      expect(loadPanelLayout('context')).toMatchObject(validLayout)
 
       await setActiveVault('vault-2')
 
@@ -75,7 +75,7 @@ describe('side panel persistence utilities', () => {
   describe('loadPanelLayout', () => {
     it('returns the persisted layout for valid data', () => {
       seed(validLayout)
-      expect(loadPanelLayout('context')).toEqual(validLayout)
+      expect(loadPanelLayout('context')).toMatchObject(validLayout)
     })
 
     it('returns null when nothing is stored', () => {
@@ -176,6 +176,17 @@ describe('side panel persistence utilities', () => {
       expect(loadPanelLayout('context')).toBeNull()
     })
 
+    it('accepts a footnotes, activity or base built-in view ID (previously rejected as corrupt)', () => {
+      for (const viewId of ['footnotes', 'activity', 'base'] as const) {
+        const layout: PersistedPanelLayout = {
+          tabOrder: [viewId],
+          sections: [{ viewIds: [viewId], activeViewId: viewId, heightFraction: 1 }],
+        }
+        seed(layout)
+        expect(loadPanelLayout('context')).toEqual(layout)
+      }
+    })
+
     it('loads a multi-section layout correctly', () => {
       const multiSection: PersistedPanelLayout = {
         tabOrder: ['outline', 'links', 'tags'],
@@ -200,6 +211,54 @@ describe('side panel persistence utilities', () => {
       }
       savePanelLayout('context', layout)
       expect(loadPanelLayout('context')).toEqual(layout)
+    })
+  })
+
+  describe('saveBasePanelPath / loadBasePanelPath', () => {
+    it('keeps the pinned path across a layout save without keeping other stale keys', () => {
+      saveBasePanelPath('context', 'a.base')
+      savePanelLayout('context', { tabOrder: ['outline'], sections: [{ viewIds: ['outline'], activeViewId: 'outline', heightFraction: 1 }] })
+      expect(loadBasePanelPath('context')).toBe('a.base')
+    })
+
+    it('returns null when nothing is pinned', () => {
+      expect(loadBasePanelPath('context')).toBeNull()
+    })
+
+    it('round-trips a pinned path, independently per side', () => {
+      saveBasePanelPath('context', 'Dashboards/Tasks.base')
+      saveBasePanelPath('sidebar', 'Dashboards/Other.base')
+      expect(loadBasePanelPath('context')).toBe('Dashboards/Tasks.base')
+      expect(loadBasePanelPath('sidebar')).toBe('Dashboards/Other.base')
+    })
+
+    it('clears a pinned path with null', () => {
+      saveBasePanelPath('context', 'Dashboards/Tasks.base')
+      saveBasePanelPath('context', null)
+      expect(loadBasePanelPath('context')).toBeNull()
+    })
+
+    it('survives a layout save made before or after it, in either order', () => {
+      saveBasePanelPath('context', 'Dashboards/Tasks.base')
+      savePanelLayout('context', validLayout)
+      expect(loadBasePanelPath('context')).toBe('Dashboards/Tasks.base')
+      expect(loadPanelLayout('context')).toMatchObject(validLayout)
+
+      saveBasePanelPath('context', 'Dashboards/Other.base')
+      expect(loadBasePanelPath('context')).toBe('Dashboards/Other.base')
+      expect(loadPanelLayout('context')).toMatchObject(validLayout)
+    })
+
+    it('a second layout save keeps a path pinned earlier', () => {
+      savePanelLayout('context', validLayout)
+      saveBasePanelPath('context', 'Dashboards/Tasks.base')
+      const updated: PersistedPanelLayout = {
+        tabOrder: ['links'],
+        sections: [{ viewIds: ['links'], activeViewId: 'links', heightFraction: 1 }],
+      }
+      savePanelLayout('context', updated)
+      expect(loadBasePanelPath('context')).toBe('Dashboards/Tasks.base')
+      expect(loadPanelLayout('context')).toMatchObject(updated)
     })
   })
 })
