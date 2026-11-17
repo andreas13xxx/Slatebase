@@ -202,6 +202,10 @@ export class EditorSuggestManager {
 
   /** Confirm the currently selected suggestion. */
   confirmSelection(evt: KeyboardEvent | MouseEvent): boolean {
+    // A suggest may synthesize a keydown (Tasks' "empty" entry re-dispatches Enter
+    // to insert a newline) from inside selectSuggestion(). Decline it so the editor
+    // handles the key itself instead of re-entering selectSuggestion() forever.
+    if (this.confirming) return false
     if (!this.isOpen() || this.items.length === 0) return false
     this.confirmSelectionAt(this.selectedIndex, evt)
     return true
@@ -230,6 +234,7 @@ export class EditorSuggestManager {
   // ─── Private ───────────────────────────────────────────────────────────────
 
   private confirmSelectionAt(index: number, evt: KeyboardEvent | MouseEvent): void {
+    if (this.confirming) return
     if (!this.activeSuggest || index < 0 || index >= this.items.length) return
     const item = this.items[index]
     const suggest = this.activeSuggest
