@@ -32,6 +32,8 @@ export interface BasesCardsViewProps {
   rows: BaseRow[]
   vaultId: string
   readOnly?: boolean
+  /** The row `this` stands for in formulas (the host note), if any. */
+  thisRow?: BaseRow | undefined
   onOpenNote: (path: string) => void
 }
 
@@ -43,7 +45,7 @@ function firstValue(row: BaseRow, key: string): string {
   return String(v)
 }
 
-export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, vaultId, readOnly, onOpenNote }: BasesCardsViewProps) {
+export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, vaultId, readOnly, thisRow, onOpenNote }: BasesCardsViewProps) {
   const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, readOnly)
   const tree = useContext(AppContext)?.state.directoryTree ?? null
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
@@ -60,10 +62,10 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
     (row: BaseRow, col: string): FormulaValue | undefined => {
       const key = formulaKeyOf(col, formulaKeys)
       if (key === null) return undefined
-      const result = evaluateFormulaColumn(doc, row, key)
+      const result = evaluateFormulaColumn(doc, row, key, thisRow)
       return result.ok ? result.value : '#ERR'
     },
-    [formulaKeys, doc],
+    [formulaKeys, doc, thisRow],
   )
 
   const cellText = useCallback(

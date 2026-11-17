@@ -155,6 +155,13 @@ describe('expression language — methods', () => {
   })
 })
 
+describe('formatDuration with mixed signs', () => {
+  it('folds a month and a negative rest into one signed fixed-time value', () => {
+    const text = formatFormulaValue({ kind: 'duration', months: 1, ms: -45 * 86_400_000 })
+    expect(text).toBe('-15d')
+  })
+})
+
 describe('expression language — members, index, durations', () => {
   it('date member field', () => {
     expect(evaluateFormula('now().year', ctxOf({})).ok).toBe(true)

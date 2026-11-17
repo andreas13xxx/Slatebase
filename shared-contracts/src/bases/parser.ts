@@ -189,11 +189,11 @@ function parseGroupBy(raw: unknown, path: string, errors: BaseValidationError[])
   return group
 }
 
-/** A `columnSize` map with only positive finite numbers, or undefined when it is anything else. */
+/** A `columnSize` map of its positive finite numbers (other entries are dropped), or undefined when none is left. */
 function parseColumnSize(raw: unknown): Record<string, number> | undefined {
   if (!isObject(raw)) return undefined
-  const entries = Object.entries(raw)
-  if (!entries.every(([, v]) => typeof v === 'number' && Number.isFinite(v) && v > 0)) return undefined
+  const entries = Object.entries(raw).filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v > 0)
+  if (entries.length === 0) return undefined
   // A prototype-less copy: a column named `__proto__` is an ordinary key.
   return Object.assign(Object.create(null) as Record<string, number>, Object.fromEntries(entries))
 }

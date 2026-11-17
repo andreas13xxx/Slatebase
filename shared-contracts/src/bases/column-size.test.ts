@@ -41,6 +41,11 @@ describe('columnSize', () => {
     expect(serializeBase(result.document!)).toContain('file.name: wide')
   })
 
+  it('keeps the valid widths when one entry is malformed', () => {
+    const view = parseBase('views:\n  - type: table\n    columnSize:\n      a: 120\n      b: auto\n').document!.views[0]!
+    expect({ ...view.columnSize }).toEqual({ a: 120 })
+  })
+
   it('treats a column named __proto__ as an ordinary key', () => {
     const view = parseBase('views:\n  - type: table\n    columnSize:\n      __proto__: 90\n').document!.views[0]!
     expect(Object.keys(view.columnSize ?? {})).toEqual(['__proto__'])

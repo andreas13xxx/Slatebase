@@ -38,6 +38,8 @@ export interface BasesTableViewProps {
   rows: BaseRow[]
   /** Vault of the rows, so an `image(...)` formula value can load a vault file. */
   vaultId?: string
+  /** The row `this` stands for in formulas (the host note), if any. */
+  thisRow?: BaseRow | undefined
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /** Commit new values for one property on one note. */
@@ -51,12 +53,12 @@ export interface BasesTableViewProps {
 }
 
 export const BasesTableView = memo(function BasesTableView({
-  doc, view, rows, vaultId, onOpenNote, onCommitCell, onSortChange, onColumnResize, onReorderColumns,
+  doc, view, rows, vaultId, thisRow, onOpenNote, onCommitCell, onSortChange, onColumnResize, onReorderColumns,
 }: BasesTableViewProps) {
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
   const columns = useMemo(() => view.order ?? Object.keys(doc.properties ?? {}), [view.order, doc.properties])
 
-  const numericCols = useMemo(() => computeNumericColumns(doc, columns, rows), [doc, columns, rows])
+  const numericCols = useMemo(() => computeNumericColumns(doc, columns, rows, thisRow), [doc, columns, rows, thisRow])
 
   const sortByColumn = useMemo(() => {
     const map = new Map<string, 'asc' | 'desc'>()
@@ -176,7 +178,7 @@ export const BasesTableView = memo(function BasesTableView({
 
           const formulaKey = formulaKeyOf(col, formulaKeys)
           if (formulaKey !== null) {
-            const result = evaluateFormulaColumn(doc, row, formulaKey)
+            const result = evaluateFormulaColumn(doc, row, formulaKey, thisRow)
             return (
               <td key={col} className={cellClass('bases-table__cell bases-table__cell--formula', numericCols.has(col), widthOf(col) !== undefined)} style={sizeStyle(col)}>
                 {result.ok
@@ -257,8 +259,16 @@ export const BasesTableView = memo(function BasesTableView({
                   <button
                     type="button"
                     className="bases-table__header-btn"
-                    title="Klick: nach dieser Spalte sortieren. Umschalt+Klick: zur Mehrfach-Sortierung hinzufügen."
+                    title="Klick: nach dieser Spalte sortieren. Umschalt+Klick: zur Mehrfach-Sortierung hinzufügen. Alt+Pfeil links/rechts: Spalte verschieben."
                     onClick={(e) => handleHeaderClick(col, e.shiftKey)}
+                    onKeyDown={(e) => {
+                      // Keyboard path for the header drag: Alt+←/→ moves the column one place.
+                      if (!canDrag || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
+                      const to = colIndex + (e.key === 'ArrowRight' ? 1 : -1)
+                      if (to < 0 || to >= columns.length) return
+                      e.preventDefault()
+                      onReorderColumns?.(colIndex, to)
+                    }}
                   >
                     <ColumnTypeIcon doc={doc} col={col} rows={rows} />
                     {headerLabel(col)}

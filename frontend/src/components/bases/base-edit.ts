@@ -170,7 +170,7 @@ export function setDisplayName(doc: BaseDocument, id: string, name: string): Bas
   if (trimmed) properties[key] = { ...meta, displayName: trimmed }
   else properties[key] = meta
   const views = isNewKey
-    ? doc.views.map((v) => (v.order ? v : { ...v, order: Object.keys(doc.properties ?? {}) }))
+    ? doc.views.map((v) => (v.order ? v : { ...v, order: effectiveColumns(doc, v) }))
     : doc.views
   return { ...doc, properties, views }
 }

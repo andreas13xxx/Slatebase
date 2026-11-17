@@ -28,6 +28,8 @@ export interface BasesListViewProps {
   rows: BaseRow[]
   /** Vault of the rows, so an `image(...)` formula value can load a vault file. */
   vaultId?: string
+  /** The row `this` stands for in formulas (the host note), if any. */
+  thisRow?: BaseRow | undefined
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
 }
@@ -42,7 +44,7 @@ function firstValue(row: BaseRow, key: string): string {
 }
 
 export const BasesListView = memo(function BasesListView({
-  doc, view, rows, vaultId, onOpenNote,
+  doc, view, rows, vaultId, thisRow, onOpenNote,
 }: BasesListViewProps) {
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
 
@@ -65,10 +67,10 @@ export const BasesListView = memo(function BasesListView({
     (row: BaseRow, col: string): FormulaValue | undefined => {
       const key = formulaKeyOf(col, formulaKeys)
       if (key === null) return undefined
-      const result = evaluateFormulaColumn(doc, row, key)
+      const result = evaluateFormulaColumn(doc, row, key, thisRow)
       return result.ok ? result.value : '#ERR'
     },
-    [formulaKeys, doc],
+    [formulaKeys, doc, thisRow],
   )
 
   const cellText = useCallback(

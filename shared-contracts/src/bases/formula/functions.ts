@@ -326,9 +326,12 @@ export function addDuration(date: Date, d: DurationValue, sign: 1 | -1): Date {
  * The text form of a duration. Slatebase's own choice (Obsidian's docs do not give one): the units
  * that are not zero, largest first, e.g. `1y 2M 3d 4h`; an empty duration is `0s`.
  */
-export function formatDuration(d: DurationValue): string {
-  const total = durationMs(d)
+export function formatDuration(source: DurationValue): string {
+  const total = durationMs(source)
   if (total === 0) return '0s'
+  // Months and the fixed-time rest with opposite signs (`1M + -45d`) cannot be shown as separate
+  // unsigned parts under one sign: fold them into fixed time, whose sign is the total's.
+  const d = source.months * source.ms < 0 ? makeDuration(0, total) : source
   const parts: string[] = []
   const months = Math.trunc(Math.abs(d.months))
   if (months >= 12) parts.push(`${Math.trunc(months / 12)}y`)

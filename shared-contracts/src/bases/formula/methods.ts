@@ -8,7 +8,7 @@
  */
 
 import moment from 'moment'
-import { toDate, toNumber, stringify, isLink, isRegex, isObject, isDuration, isTruthy, toRegExp, type FormulaValue } from './functions.js'
+import { toDate, toNumber, durationMs, stringify, isLink, isRegex, isObject, isDuration, isTruthy, toRegExp, type FormulaValue } from './functions.js'
 
 /** A method implementation: receiver + evaluated args → value. */
 export type MethodFn = (receiver: FormulaValue, args: FormulaValue[]) => FormulaValue
@@ -168,6 +168,7 @@ function compareValues(a: FormulaValue, b: FormulaValue): number {
   if (b === null) return -1
   if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime()
   if (typeof a === 'number' && typeof b === 'number') return a - b
+  if (isDuration(a) && isDuration(b)) return durationMs(a) - durationMs(b)
   return stringify(a).localeCompare(stringify(b))
 }
 

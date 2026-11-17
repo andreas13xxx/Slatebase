@@ -9,7 +9,7 @@
  * Which `.base` file is pinned is this panel instance's own choice, not vault
  * content or document-derived data: it is persisted alongside the panel's
  * layout (see `side-panel/utils/persistence.ts`'s `saveBasePanelPath`), one
- * choice per side.
+ * choice per side and vault.
  */
 
 import { useContext, useMemo, useState } from 'react'
@@ -32,15 +32,18 @@ export interface BasePanelViewProps {
   onOpenNote: (path: string) => void
 }
 
-export function BasePanelView({ panel, vaultId, activeFilePath, onOpenNote }: BasePanelViewProps) {
+export function BasePanelView(props: BasePanelViewProps) {
+  // The pinned path lives in the vault's settings blob, so a vault switch must re-read it: keying on the
+  // vault remounts the view instead of keeping the previous vault's choice in state.
+  return <BasePanelViewInner key={props.vaultId ?? ''} {...props} />
+}
+
+function BasePanelViewInner({ panel, vaultId, activeFilePath, onOpenNote }: BasePanelViewProps) {
   const { t } = useTranslation()
   const { isEnabled } = useFeatureContext()
   const tree = useContext(AppContext)?.state.directoryTree ?? null
 
-  // One pinned path per panel instance — read once per mount (changing vaults
-  // keeps the same panel-side choice, matching how the rest of the panel's
-  // layout is per-side, not per-vault; the vault switch is what actually
-  // changes which notes a relative `.base` path like this can resolve).
+  // One pinned path per panel side and vault — read once per mount (the wrapper remounts on a vault switch).
   const [path, setPath] = useState<string | null>(() => loadBasePanelPath(panel))
 
   const choosePath = (next: string): void => {

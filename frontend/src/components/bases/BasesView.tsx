@@ -82,6 +82,8 @@ export const BasesView = memo(function BasesView({
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
+  // The row `this` stands for in filters and formulas (the host note); undefined when the base is opened on its own.
+  const [thisRow, setThisRow] = useState<BaseRow | undefined>(undefined)
   const [truncated, setTruncated] = useState(false)
   // Every frontmatter property key across the matched notes, so the toolbar can
   // offer the base's own properties as columns (Obsidian's behaviour) even when
@@ -153,8 +155,8 @@ export const BasesView = memo(function BasesView({
   // so when the active view's first sort clause targets a formula column we
   // sort the already-fetched rows here by the evaluated value, stable on ties.
   const sortedRows = useMemo(
-    () => (doc ? sortRowsByFormula(rows, doc, activeView) : rows),
-    [rows, doc, activeView],
+    () => (doc ? sortRowsByFormula(rows, doc, activeView, thisRow) : rows),
+    [rows, doc, activeView, thisRow],
   )
   // Quick-search narrows the rendered rows (file name + visible values), after
   // sorting so the order is stable; empty query passes everything through.
@@ -167,8 +169,9 @@ export const BasesView = memo(function BasesView({
     if (!doc || !activeView) return
     setLoading(true)
     try {
-      const { rows: resultRows, total: resultTotal, truncated: resultTruncated, propertyKeys } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
+      const { rows: resultRows, total: resultTotal, truncated: resultTruncated, propertyKeys, thisRow: resultThisRow } = await runBaseQuery(apiClient, vaultId, doc, activeView, hostPath)
       setRows(resultRows)
+      setThisRow(resultThisRow)
       setTotalMatches(resultTotal)
       setTruncated(resultTruncated)
       setObservedProperties(propertyKeys)
@@ -533,6 +536,7 @@ export const BasesView = memo(function BasesView({
           rows={displayRows}
           vaultId={vaultId}
           readOnly={readOnly}
+          thisRow={thisRow}
           onOpenNote={onOpenNote}
         />
       )}
@@ -543,6 +547,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={displayRows}
           vaultId={vaultId}
+          thisRow={thisRow}
           onOpenNote={onOpenNote}
         />
       )}
@@ -553,6 +558,7 @@ export const BasesView = memo(function BasesView({
           view={activeView}
           rows={displayRows}
           vaultId={vaultId}
+          thisRow={thisRow}
           onOpenNote={onOpenNote}
           onCommitCell={handleCommitCell}
           onSortChange={handleSortChange}

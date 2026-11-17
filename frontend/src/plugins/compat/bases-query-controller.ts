@@ -20,7 +20,7 @@ import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import type { PropertyType } from '../../state/propertyTypes'
 import { runBaseQuery } from '../../bases/query-engine'
-import { evaluateFormulaColumn, rowValueKey } from '@slatebase/shared-contracts'
+import { durationMs, evaluateFormulaColumn, formatFormulaValue, isDuration, rowValueKey } from '@slatebase/shared-contracts'
 import { groupRows, UNGROUPED } from '../../components/bases/base-groups'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { extractErrorMessage } from '../../utils/error'
@@ -52,7 +52,9 @@ function formulaValue(doc: BaseDocument, row: BaseRow, formulaKey: string, thisR
   if (v === null || v === undefined) return NullValue.value
   if (typeof v === 'number') return new NumberValue(v)
   if (typeof v === 'boolean') return new BooleanValue(v)
-  return new StringValue(String(v))
+  // A duration reaches a plugin as its length in ms, like the arithmetic reads it.
+  if (isDuration(v)) return new NumberValue(durationMs(v))
+  return new StringValue(formatFormulaValue(v))
 }
 
 /** Normalizes a raw row value into a string[] for the value factory. */

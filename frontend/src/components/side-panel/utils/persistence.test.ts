@@ -215,6 +215,12 @@ describe('side panel persistence utilities', () => {
   })
 
   describe('saveBasePanelPath / loadBasePanelPath', () => {
+    it('keeps the pinned path across a layout save without keeping other stale keys', () => {
+      saveBasePanelPath('context', 'a.base')
+      savePanelLayout('context', { tabOrder: ['outline'], sections: [{ viewIds: ['outline'], activeViewId: 'outline', heightFraction: 1 }] })
+      expect(loadBasePanelPath('context')).toBe('a.base')
+    })
+
     it('returns null when nothing is pinned', () => {
       expect(loadBasePanelPath('context')).toBeNull()
     })

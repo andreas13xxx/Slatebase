@@ -136,11 +136,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Saves a side panel layout to localStorage.
  * Silently fails if localStorage is unavailable.
  *
- * Merges onto whatever is already stored rather than replacing it outright:
- * the blob is shared with per-view extras that are not part of the layout
- * itself (e.g. which `.base` file a pinned Base tab shows, see
+ * Replaces the stored layout but carries over `basePath`, the one per-view
+ * extra sharing the blob (which `.base` file a pinned Base tab shows, see
  * `saveBasePanelPath`/`loadBasePanelPath`) — a plain layout write must not
- * wipe those out just because the user dragged a tab.
+ * wipe it just because the user dragged a tab. Any other stored key is dropped,
+ * so removed layout fields do not linger.
  *
  * @param prefix - Storage-key prefix identifying which panel (left/right)
  * @param userId - The current user's ID
@@ -151,9 +151,12 @@ export function savePanelLayout(
   layout: PersistedPanelLayout
 ): void {
   const current = getVaultSettings()[PANEL_SETTING_KEY[panel]]
-  const extra = isRecord(current) ? current : {}
+  const basePath = isRecord(current) ? current['basePath'] : undefined
   updateVaultSettings({
-    [PANEL_SETTING_KEY[panel]]: { ...extra, ...layout } as unknown as Record<string, unknown>,
+    [PANEL_SETTING_KEY[panel]]: {
+      ...layout,
+      ...(typeof basePath === 'string' ? { basePath } : {}),
+    } as unknown as Record<string, unknown>,
   })
 }
 
