@@ -10,7 +10,7 @@ properties:
   estimate:
     displayName: "Aufwand (h)"
 views:
-  - type: cards
+  - type: kanban
     name: "Nach Status"
     groupBy:
       property: status

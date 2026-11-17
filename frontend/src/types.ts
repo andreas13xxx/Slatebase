@@ -209,4 +209,5 @@ export type AppAction =
   | { type: 'ERROR_OCCURRED'; payload: AppError }
   | { type: 'VAULT_CREATED'; payload: VaultInfo }
   | { type: 'VAULT_DELETED'; payload: string }
+  | { type: 'VAULT_RENAMED'; payload: { vaultId: string; name: string } }
   | { type: 'CONTENT_DELETED'; payload: string }

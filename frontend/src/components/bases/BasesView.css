@@ -136,6 +136,34 @@
   white-space: nowrap;
 }
 
+/* Column widths (view columnSize): fixed layout, long values are clipped instead of widening the column. */
+.bases-table--sized .bases-table__cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bases-table__resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+
+.bases-table__resize:hover,
+.bases-table__resize:focus-visible {
+  background: var(--accent);
+  outline: none;
+}
+
+/* Cover image on a board card (Kanban / grouped cards). */
+.bases-kanban__card .bases-cards__cover {
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+}
 /* Row height (view `rowHeight`): short is the default above. Taller rows wrap the text. */
 .bases-table-view--row-medium .bases-table__cell,
 .bases-table-view--row-tall .bases-table__cell,
@@ -489,7 +517,7 @@
 
 .bases-kanban--rows .bases-kanban__card {
   flex: 0 0 auto;
-  width: 220px;
+  width: var(--bases-board-size, 220px);
 }
 
 .bases-kanban--error,
@@ -502,8 +530,8 @@
 .bases-kanban__column {
   display: flex;
   flex-direction: column;
-  min-width: 220px;
-  max-width: 300px;
+  min-width: var(--bases-board-size, 220px);
+  max-width: var(--bases-board-size, 300px);
   flex: 0 0 auto;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);

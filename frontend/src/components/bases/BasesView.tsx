@@ -35,7 +35,7 @@ import { BasesSourceView } from './BasesSourceView'
 import { BasesToolbar } from './BasesToolbar'
 import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { deriveBaseScopeFolder, buildBlankFrontmatter, resolveNewNotePath } from './base-add-item'
-import { setGroupOrder } from './base-edit'
+import { setColumnSize, setGroupOrder } from './base-edit'
 import { sortRowsByFormula } from './base-formula-sort'
 import { FOLDER_GROUP_PROPERTY, folderMoveTarget } from './base-folder-move'
 import { filterRowsByText } from './base-row-search'
@@ -525,6 +525,7 @@ export const BasesView = memo(function BasesView({
           onOpenNote={onOpenNote}
           onCommitCell={handleCommitCell}
           onSortChange={handleSortChange}
+          onColumnResize={readOnly ? undefined : (column, width) => handleDocChange((d) => setColumnSize(d, safeIndex, column, width))}
         />
       )}
 

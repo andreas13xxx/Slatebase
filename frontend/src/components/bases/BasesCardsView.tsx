@@ -12,16 +12,12 @@
  * ungrouped case.
  */
 
-import { memo, useCallback, useContext, useMemo } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import { memo, useCallback, useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
-import { formatFormulaValue, evaluateFormula, rowContext } from '@slatebase/shared-contracts'
-import { AppContext } from '../../state'
-import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { useCardContextMenu } from './base-card-menu'
-import { parseCardImage } from './cardImage'
-import type { CardImage } from './cardImage'
-import { CARD_RATIO, CARD_SIZE, clampTo, columnLabel as baseColumnLabel } from './base-edit'
+import { useCardCovers } from './CardCover'
+import { CARD_SIZE, clampTo, columnLabel as baseColumnLabel } from './base-edit'
 
 export interface BasesCardsViewProps {
   doc: BaseDocument
@@ -32,23 +28,9 @@ export interface BasesCardsViewProps {
   onOpenNote: (path: string) => void
 }
 
-/** Vault file URL for an image path (same raw endpoint the note viewer uses). */
-function vaultImageSrc(vaultId: string, path: string): string {
-  return `/api/v1/vaults/${encodeURIComponent(vaultId)}/files?path=${encodeURIComponent(path)}&raw=true`
-}
-
-function firstValue(row: BaseRow, key: string): string {
-  if (key === 'file.name') return row.fileName
-  const v = row.values[key.startsWith('note.') ? key.slice('note.'.length) : key]
-  if (Array.isArray(v)) return v.map((x) => String(x)).join(', ')
-  if (v === undefined || v === null) return ''
-  return String(v)
-}
-
 export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, vaultId, readOnly, onOpenNote }: BasesCardsViewProps) {
   const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, readOnly)
-  const tree = useContext(AppContext)?.state.directoryTree ?? null
-  const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
+  const { cellText, coverFor } = useCardCovers(doc, view, vaultId)
 
   const detailColumns = useMemo(() => {
     const configured = view.order ?? Object.keys(doc.properties ?? {})
@@ -57,32 +39,7 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
 
   const columnLabel = useCallback((col: string) => baseColumnLabel(doc, col), [doc])
 
-  const cellText = useCallback(
-    (row: BaseRow, col: string): string => {
-      if (formulaKeys.has(col)) {
-        const result = evaluateFormula(doc.formulas?.[col] ?? '', rowContext(row))
-        return result.ok ? formatFormulaValue(result.value) : '#ERR'
-      }
-      return firstValue(row, col)
-    },
-    [formulaKeys, doc],
-  )
-
-  // `file.file` is the note itself: the card shows it when it is an image.
-  const imageFor = useCallback(
-    (row: BaseRow): CardImage | null => {
-      if (!view.image) return null
-      if (view.image === 'file.file') return /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(row.path) ? { kind: 'file', target: row.path } : null
-      return parseCardImage(cellText(row, view.image))
-    },
-    [view.image, cellText],
-  )
-
   const cardSize = (view.cardSize !== undefined ? clampTo(view.cardSize, CARD_SIZE.min, CARD_SIZE.max) : undefined) ?? CARD_SIZE.default
-  const ratio = (view.imageAspectRatio !== undefined ? clampTo(view.imageAspectRatio, CARD_RATIO.min, CARD_RATIO.max) : undefined) ?? CARD_RATIO.default
-  // Obsidian writes `contain` for "fit in"; a missing key is "fill". Tolerates a stray trailing comma.
-  const fit = view.imageFit?.trim().startsWith('contain') ? 'contain' : 'cover'
-
   if (rows.length === 0) return <p className="bases-list__empty">Keine Einträge</p>
 
   const gridStyle = { '--bases-card-size': `${cardSize}px` } as CSSProperties
@@ -91,22 +48,7 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
     <>
     <ul className="bases-cards" role="list" aria-label="Karten-Ansicht" style={gridStyle}>
       {rows.map((row) => {
-        const image = imageFor(row)
-        let cover: ReactNode = null
-        if (image) {
-          const coverStyle: CSSProperties = { aspectRatio: String(ratio) }
-          if (image.kind === 'color') {
-            cover = <div className="bases-cards__cover" style={{ ...coverStyle, background: image.color }} aria-hidden="true" />
-          } else {
-            const path = image.kind === 'file' ? resolveWikilinkTarget(image.target, tree, row.path) ?? image.target : null
-            const src = image.kind === 'url' ? image.src : vaultImageSrc(vaultId, path!)
-            cover = (
-              <div className="bases-cards__cover" style={coverStyle}>
-                <img src={src} alt="" loading="lazy" style={{ objectFit: fit }} />
-              </div>
-            )
-          }
-        }
+        const cover = coverFor(row)
         return (
           <li key={row.path} className="bases-cards__item">
             <button type="button" className="bases-cards__card" onClick={() => onOpenNote(row.path)} onContextMenu={(e) => openMenu(e, row.path)}>

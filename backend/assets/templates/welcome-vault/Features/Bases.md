@@ -20,7 +20,7 @@ Stell es dir als gespeicherte, strukturierte Ansicht über deine Notizen vor —
 | **`filters`** | Welche Notizen erscheinen — als Ausdruck, kombinierbar mit `and` / `or` / `not` |
 | **`properties`** | Anzeigenamen der Spalten |
 | **`formulas`** | Berechnete Spalten (schreibgeschützt), z. B. Tage bis zur Deadline |
-| **`views`** | Eine oder mehrere benannte Ansichten: **Tabelle**, **Karten** (Kanban), **Liste** oder **Karte** (Map), je mit eigener Spaltenreihenfolge, Sortierung, Filter und `limit` |
+| **`views`** | Eine oder mehrere benannte Ansichten: **Tabelle**, **Galerie**, **Kanban**, **Liste** oder **Karte** (Map, nur mit Plugin), je mit eigener Spaltenreihenfolge, Sortierung, Filter und `limit` |
 | **`summaries`** | Zusammenfassungen je Spalte (Summe, Anzahl, Durchschnitt, Min/Max …) — unter der Tabelle bzw. im Kanban-Kopf |
 
 ---
@@ -79,7 +79,7 @@ formulas:
 | Text | `contains`, `containsAll`, `containsAny`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `title`, `repeat`, `reverse`, `slice`, `replace`, `split`, `length`, `isEmpty` |
 | Zahl | `toFixed`, `round`, `abs`, `ceil`, `floor`, `isEmpty` |
 | Datum | `format`, `date`, `time`, `relative` sowie `year`, `month`, `day`, `hour`, `minute`, `second` |
-| Liste | `contains`, `containsAll`, `containsAny`, `length`, `join`, `first`, `last`, `flat`, `reverse`, `slice`, `sort`, `unique`, `isEmpty`, `map`, `filter`, `reduce` |
+| Liste | `contains`, `containsAll`, `containsAny`, `length`, `join`, `first`, `last`, `flat`, `reverse`, `slice`, `sort`, `unique`, `sum`, `mean`, `min`, `max`, `isEmpty`, `map`, `filter`, `reduce` |
 | Regexp | `matches` — Literale wie `/abc/gi`; `replace` und `split` akzeptieren sie ebenfalls (`g` ersetzt alle Treffer, sonst nur den ersten) |
 | Link | `asFile`, `linksTo` |
 | Datei | `file.hasTag`, `file.inFolder`, `file.hasLink`, `file.hasProperty`, `file.asLink` |
@@ -101,7 +101,7 @@ formulas:
 
 ## Zusammenfassungen (`summaries`)
 
-Pro Spalte lässt sich eine Zusammenfassung über die angezeigten Zeilen berechnen. Sie steht unter `summaries:` der Ansicht als `Spalte: Funktion` und erscheint in der Tabelle als Zeile unter dem Inhalt, in der Karten-Ansicht als Leiste über dem Board.
+Pro Spalte lässt sich eine Zusammenfassung über die angezeigten Zeilen berechnen. Sie steht unter `summaries:` der Ansicht als `Spalte: Funktion` und erscheint in der Tabelle als Zeile unter dem Inhalt, in der Kanban-Ansicht als Leiste über dem Board.
 
 ```yaml
 views:
@@ -144,6 +144,8 @@ Property-Zellen sind inline editierbar, über dieselben typisierten Controls wie
 
 Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Datei zurückgeschrieben. Das gilt auch für Formel-Spalten — die werden nach dem Laden anhand ihrer berechneten Werte sortiert.
 
+**Spaltenbreite:** Ziehe den rechten Rand einer Spaltenüberschrift, um die Breite zu ändern; per Tastatur ändern die Pfeiltasten (←/→) die Breite um 10 Pixel (mit `Umschalt` um 50), ein Doppelklick setzt die Spalte zurück auf automatisch. Die Breiten stehen als `columnSize` in der Ansicht der `.base`-Datei (wie in Obsidian); unter **Anzeige** setzt „Zurücksetzen" alle Breiten auf einmal zurück. Mit Spaltenbreiten wird zu lange Zellinhalt abgeschnitten statt die Spalte aufzuweiten.
+
 ---
 
 ## Werkzeugleiste: Ansichten, Filter, Sortierung, Gruppen, Eigenschaften
@@ -152,22 +154,27 @@ Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Date
 
 - **Ansichtenmenü** (Name der Ansicht ▾): zwischen Ansichten wechseln, eine **neue Ansicht** mit Name und Typ anlegen, die aktuelle **umbenennen**, ihren **Typ ändern**, **duplizieren** oder **löschen** (die letzte Ansicht bleibt immer erhalten).
 - **Sortieren:** mehrere Sortierungen mit Eigenschaft und Richtung, in der Reihenfolge verschiebbar.
-- **Gruppieren:** eine Eigenschaft, nach der Karten- und Kanban-Ansichten ihre Spalten bilden.
-- **Filtern:** Bedingungen aus Eigenschaft, Operator und Wert (ist, enthält, beginnt mit, ist leer, größer/kleiner, hat Tag, liegt in Ordner …), beliebig zu **und / oder / nicht**-Gruppen verschachtelt. Der Reiter **Diese Ansicht** wirkt nur auf die aktuelle Ansicht, **Alle Ansichten** auf die ganze Base. Was sich nicht als Baukasten-Bedingung darstellen lässt, bleibt als Ausdruck editierbar (`</>`).
+- **Gruppieren:** eine Eigenschaft, nach der Galerie-, Kanban- und Tabellenansichten ihre Gruppen bilden.
+- **Filtern:** Bedingungen aus Eigenschaft, Operator und Wert (ist, enthält, beginnt mit, ist leer, größer/kleiner, hat Tag, liegt in Ordner …), beliebig zu **und / oder / nicht**-Gruppen verschachtelt; die Bedingungen lassen sich per Griff oder mit ↑/↓ umsortieren und zwischen „Diese Ansicht" und „Alle Ansichten" verschieben. Der Reiter **Diese Ansicht** wirkt nur auf die aktuelle Ansicht, **Alle Ansichten** auf die ganze Base. Was sich nicht als Baukasten-Bedingung darstellen lässt, bleibt als Ausdruck editierbar (`</>`).
 - **Eigenschaften:** festlegen, welche Spalten angezeigt werden und in welcher Reihenfolge — auch Datei-Felder (`file.ctime` …) und Formeln; eigene Eigenschaften trägst du per Namen ein.
+- **Anzeige:** Darstellungsoptionen, die zum Typ der Ansicht passen — siehe [[#Anzeige-Optionen je Ansicht]].
+- **Suchen:** filtert die angezeigten Einträge nach Dateiname und sichtbaren Werten (Akzente und Groß-/Kleinschreibung egal), ohne die Base zu ändern.
+- **Neuer Eintrag:** legt eine neue Notiz im Geltungsbereich der Base an (wie „Bases: Add item").
 
 Das Symbol rechts in der Pfadzeile (Breadcrumb) wechselt zwischen Ansicht und Quelltext (rohes YAML, das den ganzen verfügbaren Platz nutzt).
 
 ---
 
-## Ansichten: Tabelle, Karten, Liste und Karte
+## Ansichten: Tabelle, Galerie, Kanban, Liste und Karte
 
-Eine Base kann mehrere Ansichten enthalten; oben erscheint dann ein Umschalter.
+Eine Base kann mehrere Ansichten enthalten; oben erscheint dann ein Umschalter. Den Typ einer Ansicht wählst du im Ansichtenmenü (Tabelle, Galerie, Kanban, Liste); in der `.base`-Datei steht er als `type`.
 
-- **Tabelle** — eine Zeile pro Notiz, editierbare Zellen.
-- **Karten** (`type: cards` ohne `groupBy`) — ein Raster aus Karten, eine pro Notiz, wie in Obsidian. Optionen: `image` (Property mit dem Titelbild: `[[Anhang]]`-Link, http(s)-URL oder Farbe wie `#ff8800`), `imageFit` (`cover` schneidet zu, `contain` nicht), `imageAspectRatio` (Breite / Höhe, Standard 1) und `cardSize` (Kartenbreite in Pixeln, Standard 200).
-- **Karten (Kanban)** (`type: kanban`, oder `type: cards` **mit** `groupBy`) — Notizen nach einer Property in Spalten gruppiert. Mit `groupOrder` (Liste von Werten, `null` steht für „Ohne …") zeigst du nur die genannten Spalten in dieser Reihenfolge; eine leere Liste blendet alle aus. Jeder Wert wird eine Spalte, Notizen ohne Wert landen in „Ohne …". Spalten sind einklappbar, ein Klick auf eine Karte öffnet die Notiz.
-  **Ziehe eine Karte in eine andere Spalte**, um den Wert der Gruppierungs-Property in der Notiz zu ändern; das Ziehen in „Ohne …" entfernt die Property. (Nur mit Schreibrecht auf den Vault.)
+- **Tabelle** (`type: table`) — eine Zeile pro Notiz, editierbare Zellen, Spaltenbreiten und Zeilenhöhe einstellbar.
+- **Galerie** (`type: cards` ohne `groupBy`) — ein Raster aus Karten, eine pro Notiz, wie in Obsidian (dort heißt die Ansicht „Cards", Slatebase nennt sie in der Oberfläche **Galerie**). Optionen: `image` (Property mit dem Titelbild: `[[Anhang]]`-Link, http(s)-URL oder Farbe wie `#ff8800`), `imageFit` (`cover` schneidet zu, `contain` nicht), `imageAspectRatio` (Breite / Höhe, Standard 1) und `cardSize` (Kartenbreite in Pixeln, Standard 200).
+- **Gruppierte Galerie** (`type: cards` **mit** `groupBy`) — jede Gruppe ist eine eigene Zeile aus Karten, untereinander gestapelt. `cardSize` ist hier die Kartenbreite; `image`, `imageFit` und `imageAspectRatio` wirken wie in der Galerie.
+- **Kanban** (`type: kanban`, ein Slatebase-Typ — Obsidian kennt ihn nicht) — Notizen nach einer Property in **Spalten** nebeneinander gruppiert. Mit `groupOrder` (Liste von Werten, `null` steht für „Ohne …") zeigst du nur die genannten Spalten in dieser Reihenfolge; eine leere Liste blendet alle aus. Jeder Wert wird eine Spalte, Notizen ohne Wert landen in „Ohne …". Spalten sind einklappbar und lassen sich per Griff umsortieren (das schreibt `groupOrder`), das **+** in der Spaltenüberschrift legt einen Eintrag direkt in dieser Spalte an, und ein Klick auf eine Karte öffnet die Notiz. Karten können ein Titelbild tragen (`image`, `imageFit`, `imageAspectRatio` wie in der Galerie); `cardSize` ist hier die **Spaltenbreite** (ohne Angabe passt sich die Breite an).
+  **Ziehe eine Karte in eine andere Spalte**, um den Wert der Gruppierungs-Property in der Notiz zu ändern; das Ziehen in „Ohne …" entfernt die Property. Gruppierst du nach `file.folder`, verschiebt das Ziehen die Notiz in den Ordner der Spalte (die Spalte „(Wurzel)" ist der Vault-Hauptordner). (Nur mit Schreibrecht auf den Vault.)
+  Ein Rechtsklick auf eine Karte (auch in der Galerie) öffnet ein Menü: in Tab oder geteiltem Bereich öffnen, umbenennen, verschieben, löschen, Lesezeichen setzen, im Explorer zeigen, Link kopieren.
 - **Liste** (`type: list`) — eine einfache, schreibgeschützte Liste mit einem Eintrag pro Notiz. Formelspalten werden ausgewertet, Zusammenfassungen erscheinen als Leiste über der Liste.
 - **Gruppen in Tabelle und Liste** — ein `groupBy` an einer Tabellen- oder Listenansicht teilt die Zeilen in Gruppen mit Kopfzeile (Name und Anzahl). Ein Klick auf die Kopfzeile klappt die Gruppe ein oder aus. `groupOrder` wirkt wie in der Kanban-Ansicht: nur die genannten Gruppen erscheinen, in dieser Reihenfolge; `null` steht für Notizen ohne Wert; eine leere Liste blendet alle Gruppen aus. Ohne `groupOrder` sind die Gruppen nach Wert sortiert (`direction: DESC` kehrt um), die Gruppe „Ohne …" steht zuletzt. Das Einklappen wird nicht gespeichert.
 - **Karte** (`type: map`) — Slatebase bringt keine eingebaute Kartenansicht mit; sie kommt vom Obsidian-Community-Plugin **Maps** (aktiviere die Obsidian-Plugin-Kompatibilität und installiere das Plugin). Das Plugin registriert die Ansicht `type: map` und zeichnet Notizen mit Geokoordinaten als Pins auf eine Karte. Die Demo-Base „Beispiel-Orte" nutzt diese Ansicht; ohne das Plugin fällt sie auf die Tabelle zurück.
@@ -179,6 +186,7 @@ Diese Ansichten liefern Community-Plugins (siehe [[Fortgeschritten/Obsidian Plug
 - **Graph** (`type: base-graph`, Plugin **Base Graph**) — zeichnet die Notizen der Base als kräftegesteuerten Graph; Kanten sind die Wikilinks zwischen den Notizen. Die Aufgaben-Demo [[Features/Beispiel-Aufgaben (Base)]] enthält diese Ansicht; die Beispiel-Aufgaben verlinken aufeinander, sodass Kanten entstehen.
 - **Diagramm** (`type: chart-bar` / `chart-line` / `chart-scatter`, Plugin **Bases Charts**) — Balken-, Linien- oder Streudiagramm. Die X-Achse (`x`) wählst du als Property/Formel, die Y-Werte kommen aus den Zahlen-Spalten der Ansicht. Die Demo [[Features/Beispiel-Aufgaben (Base)]] zeigt den Aufwand je Aufgabe als Balkendiagramm (X = Aufgabe, Y = `estimate`).
 - **Zeitleiste** (`type: timeline-view`, Plugin **Bases Timeline View**) — trägt Notizen mit Start- und End-Datum auf einer Zeitachse als Balken ab. Die Felder legst du über `startField` / `endField` / `contentField` fest. Die Demo [[Features/Beispiel-Projekte (Base)]] zeigt vier Beispielprojekte entlang des Jahres.
+- **Aufgaben** (`type: tasknotesTaskList`, `tasknotesKanban`, `tasknotesCalendar`, `tasknotesMiniCalendar`, Plugin **TaskNotes**) — behandelt Notizen mit dem Tag `task` als Aufgaben (Status, Priorität, Fälligkeit und Plan stehen in der Frontmatter) und zeigt sie als gruppierte Liste, Kanban-Board, Kalender oder Mini-Kalender. Die Demo [[Features/Beispiel-TaskNotes (Base)]] bündelt alle vier Ansichten über sechs Beispielaufgaben; das Kanban-Board und die Liste gruppieren nach `status`, der Kalender zeigt `due` (fällig) und `scheduled` (geplant). Die Termine der Beispielaufgaben liegen im Spätherbst 2026 — im Kalender blätterst du dorthin, in Liste und Board spielt das Datum keine Rolle.
 
 ```yaml
 views:
@@ -186,7 +194,7 @@ views:
     name: Alle Aufgaben
     order: [file.name, status, priority]
     limit: 50
-  - type: cards
+  - type: kanban
     name: Board
     groupBy:
       property: status
@@ -194,9 +202,44 @@ views:
     order: [file.name, priority]
 ```
 
-`limit` begrenzt die Zeilen einer Ansicht — und zwar **nach** dem Filtern.
+`limit` begrenzt die Zeilen einer Ansicht — und zwar **nach** dem Filtern. Blendet das Limit Treffer aus, steht „Zeigt N von M" über der Ansicht.
 
 Andere Ansichtstypen kommen von Obsidian-Plugins (siehe [[Fortgeschritten/Obsidian Plugins]]).
+
+### Anzeige-Optionen je Ansicht
+
+Die Werkzeugleiste hat eine Schaltfläche **Anzeige** für Tabelle, Galerie, Kanban und Liste. Sie zeigt nur, was zum Typ der aktuellen Ansicht passt, und schreibt jede Änderung als Schlüssel in die Ansicht der `.base`-Datei — ein Wert, der dem Standard entspricht, wird gar nicht erst geschrieben.
+
+| Ansicht | Option | YAML-Schlüssel | Standard |
+|---------|--------|----------------|----------|
+| Tabelle | **Zeilenhöhe** (Kurz, Mittel, Hoch, Extra hoch) | `rowHeight: medium / tall / extra` | Kurz |
+| Tabelle | **Spaltenbreiten** — per Ziehen am Spaltenrand, hier zurücksetzbar | `columnSize` (Spalte → Pixel) | automatisch |
+| Galerie | **Kartengröße** (Kartenbreite, 50–800 px) | `cardSize` | 200 |
+| Galerie, gruppierte Galerie, Kanban | **Bild-Eigenschaft** (Property mit Link, URL oder Farbe) | `image` | keine |
+| Galerie, gruppierte Galerie, Kanban | **Bildanpassung** (Ausfüllen / Einpassen) | `imageFit: contain` | Ausfüllen |
+| Galerie, gruppierte Galerie, Kanban | **Bildformat** (Breite / Höhe, 0,25–2,5) | `imageAspectRatio` | 1 |
+| Kanban | **Spaltenbreite** (50–800 px) | `cardSize` | automatisch (220–300 px) |
+| gruppierte Galerie | **Kartenbreite** (50–800 px) | `cardSize` | 220 |
+| Liste | **Markierung** (Aufzählungszeichen, Nummern, Keine) | `markers: number / none` | Aufzählungszeichen |
+| Liste | **Eigenschaften einrücken** | `indentProperties: true` | aus |
+| Liste | **Trennzeichen** zwischen den Werten | `separator` | `,` |
+
+```yaml
+views:
+  - type: table
+    name: Aufgaben
+    rowHeight: medium
+    columnSize:
+      file.name: 280
+      note.status: 120
+  - type: kanban
+    name: Board
+    groupBy:
+      property: status
+    image: cover
+    imageFit: contain
+    cardSize: 300
+```
 
 ---
 
@@ -268,14 +311,14 @@ Damit du nicht überrascht wirst:
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
 - Objekte gibt es nur als `file.properties` (siehe oben), nicht als Literal. `html()`, `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
 - `file.embeds`, `file.size` und `file.backlinks` werden unterstützt. `file.embeds` enthält nur `![[…]]`-Einbettungen; beim ersten Start nach dem Update baut Slatebase den Link-Index einmal neu auf.
-- Nicht umgesetzt: Zeilenhöhe der Tabelle und die Listen-Optionen (Marker, Einrückung, Trennzeichen) — ihre YAML-Schlüssel sind nicht belegt.
+- Nicht umgesetzt: Obsidians weitere Darstellungsoptionen jenseits der oben aufgeführten (z. B. die Spaltenbreite in Listen); unbekannte Schlüssel in einer Ansicht bleiben beim Speichern unverändert erhalten.
 
 **Listen vs. Einzelwerte**
 - Der Index liefert jede Property als Liste. Eine Property, die in deinem Vault **irgendwo mehrere Werte** hat — oder in der Property-Typ-Registry als Liste/Tags deklariert ist — wird auch mit nur einem Wert als Liste behandelt. Nur bei einer Property, die nirgends als Liste auftaucht und nicht so deklariert ist, wird eine Ein-Element-Liste wie ein Einzelwert gelesen.
 
 **Ansichten und Einbettung**
-- Eingebaut sind **Tabelle**, **Karten**, **Liste** und **Karte** (Map); andere Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
-- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützt). Eingebettet zeigt sie **eine** Ansicht — die erste oder die per `#Ansichtsname` gewählte — in ihrem eigenen Typ: Tabelle, Karten, Kanban oder Liste. Nur eine **Karte** (Map) und Plugin-Ansichten erscheinen eingebettet als Tabelle.
+- Eingebaut sind **Tabelle**, **Galerie** (`cards`), **Kanban** und **Liste**; die **Karte** (Map) und alle anderen Ansichtstypen brauchen ein Plugin, und Plugin-Ansichten laufen nur im Browser, nicht auf dem Server.
+- Eine Base lässt sich **als eigene `.base`-Datei öffnen, per `![[…]]` einbetten oder als ```` ```base ````-Codeblock direkt in eine Notiz schreiben** (jeweils schreibgeschützt). Eingebettet zeigt sie **eine** Ansicht — die erste oder die per `#Ansichtsname` gewählte — in ihrem eigenen Typ: Tabelle, Galerie, Kanban oder Liste. Nur Plugin-Ansichten (auch die Karte) erscheinen eingebettet als Tabelle.
 - Eine eingebettete Base aktualisiert sich bei Änderungen im Vault von selbst (auch wenn sich die einbettende Notiz und damit `this` ändert); die alte Anzeige bleibt stehen, bis die neue Abfrage fertig ist.
 - `this` gilt in der eingebauten Tabelle, nicht in Ansichten, die ein Plugin liefert. Im MCP-Werkzeug `query_base` gilt es nur mit dem Parameter `thisPath`, sonst ergibt `this.…` einen leeren Wert.
 
@@ -289,7 +332,7 @@ Damit du nicht überrascht wirst:
 Dieser Vault bringt zwei fertige Beispiele mit, die auf denselben Aufgaben-Notizen arbeiten:
 
 - [[Features/Beispiel-Aufgaben (Base)]] — eine **Tabelle** mit Filter, Formel-Spalte „Tage übrig", der Aufwands-Spalte und einer **Zusammenfassungszeile** (Anzahl, Summe des Aufwands, Durchschnitt der Resttage).
-- [[Features/Beispiel-Board (Base)]] — ein **Karten-Board**, nach `status` gruppiert, mit einer Summary-Leiste über den Spalten.
+- [[Features/Beispiel-Board (Base)]] — ein **Kanban-Board**, nach `status` gruppiert, mit einer Summary-Leiste über den Spalten.
 
 Dieselben Aufgaben als **Inline-Base** — das ist ein ```` ```base ````-Block, der direkt in dieser Notiz steht:
 

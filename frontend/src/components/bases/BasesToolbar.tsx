@@ -18,7 +18,7 @@ import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
   addFormula, addView, availableColumns, columnLabel, deleteView, duplicateView, effectiveColumns, isValidFormulaName,
   removeFormula, renameView, rootGroup,
-  CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setCardImageFit, setCardImageProperty, setCardSize,
+  CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setBoardSize, setCardImageFit, setCardImageProperty, setCardSize, resetColumnSizes,
   setDocFilter, setGroupBy, setGroupOrder, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
@@ -188,23 +188,44 @@ const SortPanel = memo(function SortPanel({ doc, index, columns, rows, disabled,
 const DisplayPanel = memo(function DisplayPanel({ doc, index, columns, rows, disabled, onChange }: PanelProps) {
   const view = doc.views[index]
   if (!view) return null
-  if (view.type === 'cards') {
+  if (view.type === 'cards' || view.type === 'kanban') {
     const numberOr = (text: string): number | undefined => {
       const n = Number(text.replace(',', '.'))
       return text.trim() !== '' && Number.isFinite(n) ? n : undefined
     }
+    // Kanban and grouped cards are board layouts: cardSize is the column (Kanban) or card width there.
+    const board = view.type === 'kanban' || !!view.groupBy
+    const sizeLabel = view.type === 'kanban' ? 'Spaltenbreite' : 'Kartenbreite'
     return (
       <div className="bases-tb__section">
-        <div className="bases-tb__row">
-          <span>Kartengröße</span>
-          <CommitInput
-            value={String(view.cardSize ?? CARD_SIZE.default)}
-            label="Kartengröße"
-            disabled={disabled}
-            onCommit={(text) => { const n = numberOr(text); if (n !== undefined) onChange((d) => setCardSize(d, index, n)) }}
-          />
-          <span className="bases-tb__hint">{CARD_SIZE.min}–{CARD_SIZE.max}</span>
-        </div>
+        {board ? (
+          <div className="bases-tb__row">
+            <span>{sizeLabel}</span>
+            <CommitInput
+              value={view.cardSize !== undefined ? String(view.cardSize) : ''}
+              label={sizeLabel}
+              placeholder="automatisch"
+              disabled={disabled}
+              onCommit={(text) => {
+                if (text.trim() === '') { onChange((d) => setBoardSize(d, index, undefined)); return }
+                const n = numberOr(text)
+                if (n !== undefined) onChange((d) => setBoardSize(d, index, n))
+              }}
+            />
+            <span className="bases-tb__hint">{CARD_SIZE.min}–{CARD_SIZE.max}</span>
+          </div>
+        ) : (
+          <div className="bases-tb__row">
+            <span>Kartengröße</span>
+            <CommitInput
+              value={String(view.cardSize ?? CARD_SIZE.default)}
+              label="Kartengröße"
+              disabled={disabled}
+              onCommit={(text) => { const n = numberOr(text); if (n !== undefined) onChange((d) => setCardSize(d, index, n)) }}
+            />
+            <span className="bases-tb__hint">{CARD_SIZE.min}–{CARD_SIZE.max}</span>
+          </div>
+        )}
         <div className="bases-tb__row">
           <span>Bild-Eigenschaft</span>
           <ColumnDropdown
@@ -264,6 +285,18 @@ const DisplayPanel = memo(function DisplayPanel({ doc, index, columns, rows, dis
             {view.rowHeight && !['medium', 'tall', 'extra'].includes(view.rowHeight) && <option value={view.rowHeight}>{view.rowHeight}</option>}
           </select>
         </label>
+        <div className="bases-tb__row">
+          <span>Spaltenbreiten</span>
+          <button
+            type="button"
+            className="bases-tb__link-btn"
+            disabled={disabled || !view.columnSize}
+            onClick={() => onChange((d) => resetColumnSizes(d, index))}
+          >
+            Zurücksetzen
+          </button>
+          <span className="bases-tb__hint">Ziehen am Spaltenrand</span>
+        </div>
       </div>
     )
   }
@@ -733,7 +766,7 @@ export const BasesToolbar = memo(function BasesToolbar({
             <Popover label={<><ArrowUpDown aria-hidden="true" className="bases-tb__btn-icon" />Sortieren</>} title="Sortierung" badge={view.sort?.length ?? 0}><SortPanel {...panelProps} /></Popover>
             <Popover label={<><Rows3 aria-hidden="true" className="bases-tb__btn-icon" />Gruppieren</>} title="Gruppierung" badge={view.groupBy ? 1 : 0}><GroupPanel {...panelProps} /></Popover>
             <Popover label={<><Filter aria-hidden="true" className="bases-tb__btn-icon" />Filtern</>} title="Filter" badge={filterCount}><FilterPanel {...panelProps} /></Popover>
-            {(view.type === 'table' || view.type === 'list' || view.type === 'cards') && (
+            {(view.type === 'table' || view.type === 'list' || view.type === 'cards' || view.type === 'kanban') && (
               <Popover label={<><SlidersHorizontal aria-hidden="true" className="bases-tb__btn-icon" />Anzeige</>} title="Anzeige"><DisplayPanel {...panelProps} /></Popover>
             )}
             <Popover label={<><Columns3 aria-hidden="true" className="bases-tb__btn-icon" />Eigenschaften</>} title="Eigenschaften"><PropertiesPanel {...panelProps} /></Popover>

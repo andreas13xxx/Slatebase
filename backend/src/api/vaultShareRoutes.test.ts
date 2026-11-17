@@ -45,6 +45,7 @@ function createMockVaultService(overrides?: Partial<IVaultService>): IVaultServi
     saveFile: async () => ({ path: '', name: '', size: 0, etag: '', created: false }),
     createVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVault: async () => {},
+    renameVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVaultWithChecks: async () => {},
     transferOwnership: async () => {},
     deleteContent: async () => {},

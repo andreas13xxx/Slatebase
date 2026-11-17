@@ -1,0 +1,90 @@
+filters:
+  and:
+    - file.inFolder("Features/Beispiel-TaskNotes")
+    - file.hasTag("task")
+properties:
+  file.name:
+    displayName: "Aufgabe"
+  status:
+    displayName: "Status"
+  priority:
+    displayName: "Priorität"
+  due:
+    displayName: "Fällig"
+  scheduled:
+    displayName: "Geplant"
+  contexts:
+    displayName: "Kontext"
+  timeEstimate:
+    displayName: "Aufwand (min)"
+views:
+  - type: table
+    name: "Tabelle"
+    order:
+      - file.name
+      - status
+      - priority
+      - due
+      - scheduled
+      - contexts
+      - timeEstimate
+    sort:
+      - property: due
+        direction: ASC
+    summaries:
+      file.name: Filled
+      timeEstimate: Sum
+  - type: tasknotesTaskList
+    name: "Aufgabenliste"
+    order:
+      - status
+      - priority
+      - due
+      - scheduled
+      - contexts
+      - file.name
+    sort:
+      - column: due
+        direction: ASC
+    groupBy:
+      property: status
+      direction: ASC
+  - type: tasknotesKanban
+    name: "Kanban-Board"
+    order:
+      - status
+      - priority
+      - due
+      - scheduled
+      - contexts
+      - file.name
+    groupBy:
+      property: status
+      direction: ASC
+    columnWidth: 280
+    hideEmptyColumns: false
+  - type: tasknotesCalendar
+    name: "Kalender"
+    order:
+      - status
+      - priority
+      - due
+      - scheduled
+      - contexts
+      - file.name
+    calendarView: "dayGridMonth"
+    showDue: true
+    showScheduled: true
+    showRecurring: false
+    showTimeEntries: false
+    showTimeblocks: false
+    showPropertyBasedEvents: false
+    firstDay: 1
+  - type: tasknotesMiniCalendar
+    name: "Mini-Kalender (fällig)"
+    order:
+      - status
+      - priority
+      - due
+      - file.name
+    dateProperty: due

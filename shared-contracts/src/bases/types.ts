@@ -128,6 +128,8 @@ export interface BaseView {
   cardSize?: number
   /** Column id → named summary aggregation. */
   summaries?: BaseSummaries
+  /** Table: column id → width in px (Obsidian `columnSize`); unlisted columns keep the automatic width. */
+  columnSize?: Record<string, number>
   /**
    * Table: row height. Obsidian writes `medium`, `tall` or `extra`; absent is the
    * default (short). Unknown values are kept as written and shown as the default.

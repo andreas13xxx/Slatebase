@@ -82,6 +82,7 @@ function serializeView(view: BaseView): Record<string, unknown> {
   if (view.imageAspectRatio !== undefined) out['imageAspectRatio'] = view.imageAspectRatio
   if (view.cardSize !== undefined) out['cardSize'] = view.cardSize
   if (view.rowHeight !== undefined) out['rowHeight'] = view.rowHeight
+  if (view.columnSize !== undefined) out['columnSize'] = { ...view.columnSize }
   if (view.separator !== undefined) out['separator'] = view.separator
   if (view.markers !== undefined) out['markers'] = view.markers
   if (view.indentProperties !== undefined) out['indentProperties'] = view.indentProperties
