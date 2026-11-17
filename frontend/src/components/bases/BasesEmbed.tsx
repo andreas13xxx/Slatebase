@@ -6,8 +6,12 @@
  * query against the vault, and renders a read-only table. Deliberately a
  * trimmed variant of BasesView: no view switcher, no cell editing, no sort
  * write-back — an embed is a snapshot inside another note, not the full editor.
- * Scope is the table view only (R5.1); a card/other view falls back to its
- * table-equivalent columns.
+ * A view whose type a plugin registered (Maps, Base Graph, …) renders via that
+ * plugin's view, same as the full `BasesView` — but only when the resolved
+ * client is the real `IApiClient` (reading view, via `AppContext`); the Live
+ * Preview path's detached client is too limited to drive a plugin's Component
+ * lifecycle, so there it always falls back to the table-equivalent rendering
+ * `embedViewKind()` picks (kanban/cards/list/table).
  *
  * `apiClient` is passed explicitly rather than only read from `AppContext`,
  * because the Live Preview path mounts this in a detached React root (a CM6
@@ -16,18 +20,34 @@
  * `AppContext` client.
  */
 
-import { memo, useContext, useEffect, useRef, useState } from 'react'
+import { memo, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { BaseDocument, BaseQueryResultWire, BaseQuerySpecWire, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import { parseBase, runBaseQuery } from '../../bases'
+import type { IApiClient } from '../../api'
 import { AppContext } from '../../state'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { ErrorBoundary } from '../ErrorBoundary'
 import { BasesKanbanView } from './BasesKanbanView'
 import { BasesListView } from './BasesListView'
 import { BasesCardsView } from './BasesCardsView'
 import { embedViewKind } from './pickEmbedView'
 import { BasesTableView } from './BasesTableView'
+import { BasesPluginViewHost } from './BasesPluginViewHost'
 import { pickEmbedView } from './pickEmbedView'
+import { hasBasesViewRegistration, subscribeBasesViewRegistry, getBasesViewRegistryVersion } from '../../plugins/compat/bases-view-registry'
 import './BasesView.css'
+
+/** View types the embed's own renderers cover; anything else may go to a plugin view instead. */
+const BUILT_IN_EMBED_TYPES = new Set(['table', 'cards', 'kanban', 'list'])
+
+/**
+ * True when `client` is the real `IApiClient` (not the Live Preview widget's
+ * narrower `IBasesEmbedApiClient`) — the minimum a plugin's Bases view needs
+ * (property types, the full read/write surface its Component lifecycle may touch).
+ */
+function isFullApiClient(client: IBasesEmbedApiClient | null): client is IApiClient {
+  return typeof (client as Partial<IApiClient> | null)?.getPropertyTypes === 'function'
+}
 
 /** The minimal API surface BasesEmbed needs — a subset of IApiClient. */
 export interface IBasesEmbedApiClient {
@@ -107,6 +127,9 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
           setLoading(false)
           return
         }
+        // Always fetch rows here too, even though a plugin view (below) runs its own query via
+        // BasesQueryController: keeping this one extra round-trip is what lets the embed fall back
+        // to the table-equivalent rendering on a plugin-view error without a second, reactive fetch.
         const result = await runBaseQuery(apiClient, vaultId, parsed.document, picked.view, hostPath)
         if (cancelled) return
         setDoc(parsed.document)
@@ -133,6 +156,26 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
     })
   }, [vaultId])
 
+  const [pluginViewError, setPluginViewError] = useState<string | null>(null)
+  // Reset a stale plugin-view error when a REFETCH (not the initial load) changes the view's type
+  // underneath us — e.g. the .base file was edited to swap `map` for `table`. Must not fire on the
+  // very first time `view` is populated (undefined → its real type), which is not a change at all
+  // and would otherwise clear an error the plugin host legitimately raised on this same mount.
+  const prevViewTypeRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (prevViewTypeRef.current !== undefined && prevViewTypeRef.current !== view?.type) {
+      setPluginViewError(null)
+    }
+    prevViewTypeRef.current = view?.type
+  }, [view?.type])
+  // The plugin registry fills asynchronously as plugins load — subscribe so a `map` (or other
+  // plugin-only) embed switches from the table fallback to the real view once it registers.
+  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
+  const isPluginView = useMemo(
+    () => !!view && !BUILT_IN_EMBED_TYPES.has(view.type) && hasBasesViewRegistration(view.type) && isFullApiClient(apiClient) && !pluginViewError,
+    [view, apiClient, pluginViewError, registryVersion],
+  )
+
   if (error) {
     return <div className="view-mode-embed view-mode-embed--missing bases-embed">{error}</div>
   }
@@ -153,16 +196,32 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
           <span className="view-mode-embed-title">{viewName ? `${target} › ${view?.name ?? viewName}` : target}</span>
         </span>
       )}
-      {kind === 'kanban' && (
+      {isPluginView && isFullApiClient(apiClient) && (
+        <ErrorBoundary
+          onError={(err) => setPluginViewError(err.message)}
+          fallback={<BasesTableView doc={doc} view={{ ...view, type: 'table' }} rows={rows} onOpenNote={onOpenNote} onCommitCell={() => {}} onSortChange={() => {}} />}
+        >
+          <BasesPluginViewHost
+            apiClient={apiClient}
+            vaultId={vaultId}
+            doc={doc}
+            view={view}
+            hostPath={hostPath}
+            onOpenNote={onOpenNote}
+            onError={setPluginViewError}
+          />
+        </ErrorBoundary>
+      )}
+      {!isPluginView && kind === 'kanban' && (
         <BasesKanbanView doc={doc} view={view} rows={rows} vaultId={vaultId} onOpenNote={onOpenNote} />
       )}
-      {kind === 'cards' && (
+      {!isPluginView && kind === 'cards' && (
         <BasesCardsView doc={doc} view={view} rows={rows} vaultId={vaultId} onOpenNote={onOpenNote} />
       )}
-      {kind === 'list' && (
-        <BasesListView doc={doc} view={view} rows={rows} onOpenNote={onOpenNote} />
+      {!isPluginView && kind === 'list' && (
+        <BasesListView doc={doc} view={view} rows={rows} vaultId={vaultId} onOpenNote={onOpenNote} />
       )}
-      {kind === 'table' && (
+      {!isPluginView && kind === 'table' && (
         <BasesTableView
           doc={doc}
           view={{ ...view, type: 'table' }}

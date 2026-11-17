@@ -123,6 +123,32 @@ describe('BasesQueryController', () => {
     ctrl.stop()
   })
 
+  it('resolves `this` in a formula column when a hostPath is given', async () => {
+    const doc2: BaseDocument = {
+      formulas: { fromHost: 'this.project' },
+      views: [{ type: 'cards', order: ['title', 'fromHost'] }],
+    }
+    const view2: BaseView = doc2.views[0] as BaseView
+    const api = {
+      queryBase: vi.fn()
+        // The data query (candidate rows), then the host-row query (buildHostQuerySpec picks `project`).
+        .mockResolvedValueOnce({
+          rows: [{ path: 'a.md', fileName: 'a', values: { title: ['Alpha'] } }],
+          total: 1,
+        } satisfies BaseQueryResultWire)
+        .mockResolvedValueOnce({
+          rows: [{ path: 'Host.md', fileName: 'Host', values: { project: ['Apollo'] } }],
+          total: 1,
+        } satisfies BaseQueryResultWire),
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }),
+    } as unknown as IApiClient
+    const ctrl = new BasesQueryController({ apiClient: api, vaultId: 'v1', doc: doc2, view: view2, hostPath: 'Host.md', target })
+    await ctrl.start()
+    const data = target.data as { get(i: number): { getValue(k: string): { toString(): string } } }
+    expect(data.get(0).getValue('fromHost').toString()).toBe('Apollo')
+    ctrl.stop()
+  })
+
   it('reports a query error through onError', async () => {
     const api = { queryBase: vi.fn().mockRejectedValue(new Error('boom')), getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }) } as unknown as IApiClient
     const onError = vi.fn()

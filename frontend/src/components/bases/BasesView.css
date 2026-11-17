@@ -136,29 +136,6 @@
   white-space: nowrap;
 }
 
-/* Column widths (view columnSize): fixed layout, long values are clipped instead of widening the column. */
-.bases-table--sized .bases-table__cell {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.bases-table__resize {
-  position: absolute;
-  top: 0;
-  right: -3px;
-  bottom: 0;
-  width: 7px;
-  cursor: col-resize;
-  touch-action: none;
-  z-index: 2;
-}
-
-.bases-table__resize:hover,
-.bases-table__resize:focus-visible {
-  background: var(--accent);
-  outline: none;
-}
-
 /* Cover image on a board card (Kanban / grouped cards). */
 .bases-kanban__card .bases-cards__cover {
   border-radius: var(--radius-sm);
@@ -1504,4 +1481,105 @@
   display: inline-flex;
   align-items: center;
   opacity: 0.7;
+}
+
+/* ─── Column width + header drag (table) ───────────────────────────────── */
+/* A column with a stored width (`columnSize`) keeps it: header and cells share the variable. */
+.bases-table__header--sized,
+.bases-table__cell--sized {
+  width: var(--bases-col-width);
+  min-width: var(--bases-col-width);
+  max-width: var(--bases-col-width);
+}
+
+.bases-table__header--sized .bases-table__header-btn {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bases-table__header[draggable='true'] {
+  cursor: grab;
+}
+
+/* Drop target while a header is dragged: a marker on the leading edge. */
+.bases-table__header--drop {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Resize handle on the trailing edge of a header; wider hit area on touch devices. */
+.bases-table__resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.bases-table__resizer:hover,
+.bases-table__resizer:focus-visible {
+  background: var(--accent);
+  outline: none;
+}
+
+@media (pointer: coarse) {
+  .bases-table__resizer {
+    width: 16px;
+  }
+}
+
+/* ─── Rendered formula values: html(), icon(), image() ─────────────────── */
+.bases-value-icon {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.bases-value-image {
+  display: inline-block;
+  max-height: 28px;
+  max-width: 100%;
+  vertical-align: middle;
+  border-radius: var(--radius-sm);
+}
+
+.bases-table-view--row-medium .bases-value-image { max-height: 48px; }
+.bases-table-view--row-tall .bases-value-image { max-height: 76px; }
+.bases-table-view--row-extra .bases-value-image { max-height: 112px; }
+
+.bases-value-html img {
+  max-height: 28px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+/* ─── Toolbar: view reorder + per-column options ───────────────────────── */
+.bases-tb__row > .bases-tb__view-item {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.bases-tb__row[draggable='true'] {
+  cursor: grab;
+}
+
+.bases-tb__row--drop {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.bases-tb__icon-btn--active {
+  color: var(--accent);
+}
+
+.bases-tb__prop-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin: 2px 0 var(--spacing-xs) var(--spacing-lg);
+  padding-left: var(--spacing-sm);
+  border-left: 2px solid var(--border-default);
+  font-size: 0.9em;
 }

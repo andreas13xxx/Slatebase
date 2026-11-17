@@ -13,16 +13,21 @@
  * already-fetched, already-sorted `rows`.
  */
 
-import { memo, useCallback, useMemo } from 'react'
-import type { BaseDocument, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
+import { Fragment, memo, useCallback, useMemo } from 'react'
+import type { ReactNode } from 'react'
+import type { BaseDocument, BaseRow, BaseView, ComputedSummaries, FormulaValue } from '@slatebase/shared-contracts'
 import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
-import { computeSummaries, formatFormulaValue, evaluateFormula, rowContext } from '@slatebase/shared-contracts'
+import { computeSummaries, formatFormulaValue, evaluateFormulaColumn } from '@slatebase/shared-contracts'
 import { columnLabel as baseColumnLabel } from './base-edit'
+import { formulaKeyOf } from './base-numeric-columns'
+import { BaseFormulaValue } from './BaseFormulaValue'
 
 export interface BasesListViewProps {
   doc: BaseDocument
   view: BaseView
   rows: BaseRow[]
+  /** Vault of the rows, so an `image(...)` formula value can load a vault file. */
+  vaultId?: string
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
 }
@@ -37,7 +42,7 @@ function firstValue(row: BaseRow, key: string): string {
 }
 
 export const BasesListView = memo(function BasesListView({
-  doc, view, rows, onOpenNote,
+  doc, view, rows, vaultId, onOpenNote,
 }: BasesListViewProps) {
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
 
@@ -56,16 +61,31 @@ export const BasesListView = memo(function BasesListView({
 
   // Value for one detail column: a formula column is evaluated per row; any
   // other column reads the row's property value.
-  const cellText = useCallback(
-    (row: BaseRow, col: string): string => {
-      if (formulaKeys.has(col)) {
-        const src = doc.formulas?.[col] ?? ''
-        const result = evaluateFormula(src, rowContext(row))
-        return result.ok ? formatFormulaValue(result.value) : '#ERR'
-      }
-      return firstValue(row, col)
+  const formulaValue = useCallback(
+    (row: BaseRow, col: string): FormulaValue | undefined => {
+      const key = formulaKeyOf(col, formulaKeys)
+      if (key === null) return undefined
+      const result = evaluateFormulaColumn(doc, row, key)
+      return result.ok ? result.value : '#ERR'
     },
     [formulaKeys, doc],
+  )
+
+  const cellText = useCallback(
+    (row: BaseRow, col: string): string => {
+      const value = formulaValue(row, col)
+      return value !== undefined ? formatFormulaValue(value) : firstValue(row, col)
+    },
+    [formulaValue],
+  )
+
+  // What a non-empty cell shows: a formula value may be an icon, an image or HTML; everything else is its text.
+  const cellNode = useCallback(
+    (row: BaseRow, col: string, text: string): ReactNode => {
+      const value = formulaValue(row, col)
+      return value !== undefined ? <BaseFormulaValue value={value} vaultId={vaultId} sourcePath={row.path} /> : text
+    },
+    [formulaValue, vaultId],
   )
 
   const summaries: ComputedSummaries = useMemo(
@@ -107,14 +127,17 @@ export const BasesListView = memo(function BasesListView({
                       return (
                         <span key={col} className="bases-list__chip">
                           <span className="bases-list__chip-key">{columnLabel(col)}</span>
-                          <span className="bases-list__chip-val">{text}</span>
+                          <span className="bases-list__chip-val">{cellNode(row, col, text)}</span>
                         </span>
                       )
                     })}
                   </span>
                 ) : (
                   <span className="bases-list__details bases-list__details--joined">
-                    {detailColumns.map((col) => cellText(row, col)).filter((t) => t !== '').join(joiner)}
+                    {detailColumns
+                      .map((col) => ({ col, text: cellText(row, col) }))
+                      .filter((c) => c.text !== '')
+                      .map((c, i) => <Fragment key={c.col}>{i > 0 && joiner}{cellNode(row, c.col, c.text)}</Fragment>)}
                   </span>
                 )
               )}

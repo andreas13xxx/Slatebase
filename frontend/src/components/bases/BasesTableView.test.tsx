@@ -77,14 +77,41 @@ describe('BasesTableView', () => {
     expect(screen.getByText('3').closest('td')?.className).toContain('bases-table__cell--num')
   })
 
-  it('reports a sort toggle on a header click', () => {
+  it('reports a sort toggle on a header click, replacing any other sort', () => {
     const onSortChange = vi.fn()
+    const multiSort: BaseView = { ...view, sort: [{ column: 'status', direction: 'asc' }, { column: 'file.name', direction: 'desc' }] }
     render(
-      <BasesTableView doc={doc} view={view} rows={rows} onOpenNote={() => {}} onCommitCell={() => {}} onSortChange={onSortChange} />,
+      <BasesTableView doc={doc} view={multiSort} rows={rows} onOpenNote={() => {}} onCommitCell={() => {}} onSortChange={onSortChange} />,
     )
     fireEvent.click(screen.getByRole('button', { name: /Status/ }))
-    // status was asc → toggles to desc
+    // status was asc → toggles to desc, and the other sort clause (file.name) is dropped (plain click replaces)
     expect(onSortChange).toHaveBeenCalledWith([{ column: 'status', direction: 'desc' }])
+  })
+
+  it('shift-click extends an existing multi-sort instead of replacing it', () => {
+    const onSortChange = vi.fn()
+    const multiSort: BaseView = { ...view, sort: [{ column: 'status', direction: 'asc' }] }
+    render(
+      <BasesTableView doc={doc} view={multiSort} rows={rows} onOpenNote={() => {}} onCommitCell={() => {}} onSortChange={onSortChange} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Days left/ }), { shiftKey: true })
+    expect(onSortChange).toHaveBeenCalledWith([
+      { column: 'status', direction: 'asc' },
+      { column: 'days_left', direction: 'asc' },
+    ])
+  })
+
+  it('shift-click on an existing sort column toggles its direction in place', () => {
+    const onSortChange = vi.fn()
+    const multiSort: BaseView = { ...view, sort: [{ column: 'status', direction: 'asc' }, { column: 'file.name', direction: 'desc' }] }
+    render(
+      <BasesTableView doc={doc} view={multiSort} rows={rows} onOpenNote={() => {}} onCommitCell={() => {}} onSortChange={onSortChange} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Status/ }), { shiftKey: true })
+    expect(onSortChange).toHaveBeenCalledWith([
+      { column: 'status', direction: 'desc' },
+      { column: 'file.name', direction: 'desc' },
+    ])
   })
 
   it('opens a note when the link is clicked', () => {

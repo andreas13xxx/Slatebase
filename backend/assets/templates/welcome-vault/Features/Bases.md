@@ -95,7 +95,9 @@ formulas:
 ```
 
 > [!note] Datumsdifferenz
-> `date1 - date2` liefert **Millisekunden** (wie in Obsidian). Willst du Tage, nimm wie in Obsidian `(a - b).days` (auch `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` gibt es zusätzlich.
+> `date1 - date2` liefert eine **Dauer** (wie in Obsidian). Willst du Tage, nimm `(a - b).days` (auch `.hours`, `.minutes`, `.seconds`, `.milliseconds`); `days(a, b)` gibt es zusätzlich. Allein in einer Spalte steht die Dauer als Text, z. B. `9d` oder `1d 2h 5m`. In Rechnungen zählt sie weiter als Millisekunden (`(a - b) / 86400000`).
+>
+> `duration("1d")` baut eine Dauer von Hand: `now() + duration("1d")`, `duration("5h") * 2`. Monate und Jahre gehen nach dem Kalender: `date("2024-12-01") + "1M"` ist der 1. Januar 2025.
 
 ---
 
@@ -144,7 +146,7 @@ Property-Zellen sind inline editierbar, über dieselben typisierten Controls wie
 
 Klick auf einen Spalten-Header sortiert; die Sortierung wird in die `.base`-Datei zurückgeschrieben. Das gilt auch für Formel-Spalten — die werden nach dem Laden anhand ihrer berechneten Werte sortiert.
 
-**Spaltenbreite:** Ziehe den rechten Rand einer Spaltenüberschrift, um die Breite zu ändern; per Tastatur ändern die Pfeiltasten (←/→) die Breite um 10 Pixel (mit `Umschalt` um 50), ein Doppelklick setzt die Spalte zurück auf automatisch. Die Breiten stehen als `columnSize` in der Ansicht der `.base`-Datei (wie in Obsidian); unter **Anzeige** setzt „Zurücksetzen" alle Breiten auf einmal zurück. Mit Spaltenbreiten wird zu lange Zellinhalt abgeschnitten statt die Spalte aufzuweiten.
+**Spaltenbreite:** Ziehe den rechten Rand einer Spaltenüberschrift, um die Breite zu ändern; per Tastatur ändern die Pfeiltasten (←/→) die Breite in Schritten, `Entf` oder ein Doppelklick setzt die Spalte zurück auf automatisch. Die Breiten stehen als `columnSize` in der Ansicht der `.base`-Datei (wie in Obsidian); unter **Anzeige** setzt „Zurücksetzen" alle Breiten auf einmal zurück.
 
 ---
 
@@ -203,6 +205,13 @@ views:
 ```
 
 `limit` begrenzt die Zeilen einer Ansicht — und zwar **nach** dem Filtern. Blendet das Limit Treffer aus, steht „Zeigt N von M" über der Ansicht.
+
+All das stellst du auch ohne YAML ein, über die Werkzeugleiste der Base:
+
+- **Ergebnisse** — das Limit setzen oder leeren; in einer Tabelle zusätzlich „In die Zwischenablage kopieren" und „Als CSV exportieren".
+- **Eigenschaften** — das Regler-Symbol neben einer Spalte öffnet ihre Optionen: **Anzeigename** (die Überschrift, `properties.<Spalte>.displayName`) und **Zusammenfassung** (`summaries` der Ansicht).
+- **Ansichten** — die Reihenfolge änderst du per Ziehen oder mit ↑/↓.
+- **Tabelle** — eine Spaltenüberschrift auf eine andere ziehen verschiebt die Spalte. Der Griff am rechten Rand der Überschrift ändert die Breite (`columnSize`, in Pixeln); Doppelklick oder Entf setzt sie zurück, die Pfeiltasten ändern sie in Schritten.
 
 Andere Ansichtstypen kommen von Obsidian-Plugins (siehe [[Fortgeschritten/Obsidian Plugins]]).
 
@@ -309,7 +318,8 @@ Damit du nicht überrascht wirst:
 
 **Ausdruckssprache**
 - Es ist eine **pragmatische Teilmenge** von Obsidians Funktionen (siehe Liste oben), nicht die vollständige Bibliothek. Eine unbekannte Funktion ergibt in einer Formelspalte `#ERR` und lässt in einem Filter die Notiz weg.
-- Objekte gibt es nur als `file.properties` (siehe oben), nicht als Literal. `html()`, `icon()` und `image()` liefern Text bzw. einen Link, es wird nie rohes HTML eingefügt.
+- Objekte gibt es nur als `file.properties` (siehe oben), nicht als Literal.
+- `html()`, `icon()` und `image()` werden in Formelspalten dargestellt: `html("<b>x</b>")` als bereinigtes HTML (ohne Skripte, Ereignis-Attribute, Inline-CSS und Formulare), `icon("star")` als Lucide-Icon, `image(cover)` als Bild aus dem Vault oder von einer `http(s)`-Adresse. In CSV, Zwischenablage und im MCP-Werkzeug `query_base` steht der Text dahinter.
 - `file.embeds`, `file.size` und `file.backlinks` werden unterstützt. `file.embeds` enthält nur `![[…]]`-Einbettungen; beim ersten Start nach dem Update baut Slatebase den Link-Index einmal neu auf.
 - Nicht umgesetzt: Obsidians weitere Darstellungsoptionen jenseits der oben aufgeführten (z. B. die Spaltenbreite in Listen); unbekannte Schlüssel in einer Ansicht bleiben beim Speichern unverändert erhalten.
 

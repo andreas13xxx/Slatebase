@@ -3,48 +3,56 @@
  *
  * One row per note, one column per configured property/formula, the first
  * column linking to the note. Property cells are editable (BaseCell); formula
- * columns are evaluated client-side and read-only. Clicking a header toggles
- * the sort and reports it upward (the container writes it back into the
- * `.base` file). With `view.groupBy` the rows are split into collapsible groups
- * (ordered/hidden by `view.groupOrder`).
+ * columns are evaluated client-side and read-only. Clicking a header sorts by
+ * that column alone; Shift-clicking extends the existing multi-column sort
+ * instead of replacing it. Either way the result is reported upward (the
+ * container writes it back into the `.base` file). With `view.groupBy` the
+ * rows are split into collapsible groups (ordered/hidden by `view.groupOrder`).
  */
 
-import { Fragment, memo, useCallback, useMemo, useState } from 'react'
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
 import { evaluateFormulaColumn, formatFormulaValue, computeSummaries } from '@slatebase/shared-contracts'
 import type { ComputedSummaries } from '@slatebase/shared-contracts'
 import { BaseCell } from './BaseCell'
+import { BaseFormulaValue } from './BaseFormulaValue'
 import { inferCellType } from './base-cell-type'
 import { groupRows, groupLabel, useCollapsedGroups } from './base-groups'
 import { computeNumericColumns, formulaKeyOf } from './base-numeric-columns'
-import { columnLabel, COLUMN_WIDTH } from './base-edit'
+import { COLUMN_WIDTH, clampTo, columnEntry, columnLabel } from './base-edit'
 import { ColumnTypeIcon } from './base-column-icon'
 
-/** Width assumed for a column without a saved width when the table total is computed (px). */
-const AUTO_COLUMN_WIDTH = 160
+const cellClass = (base: string, numeric: boolean, sized: boolean): string =>
+  `${base}${numeric ? ' bases-table__cell--num' : ''}${sized ? ' bases-table__cell--sized' : ''}`
 
-const cellClass = (base: string, numeric: boolean): string => (numeric ? `${base} bases-table__cell--num` : base)
+/** Drag payload type for reordering columns (a custom type, so the file drop zone ignores it). */
+const COLUMN_DRAG_TYPE = 'application/x-slatebase-bases-column'
+
+/** Width a column starts from when the keyboard resizes it and its real width cannot be measured. */
+const FALLBACK_COLUMN_WIDTH = 160
 
 export interface BasesTableViewProps {
   doc: BaseDocument
   view: BaseView
   rows: BaseRow[]
+  /** Vault of the rows, so an `image(...)` formula value can load a vault file. */
+  vaultId?: string
   /** Open a note by its vault-relative path. */
   onOpenNote: (path: string) => void
   /** Commit new values for one property on one note. */
   onCommitCell: (path: string, property: string, values: string[]) => void
   /** Toggle sort on a column; the container persists it. */
   onSortChange: (sort: BaseSortClause[]) => void
-  /** Persist a column's new width in px (`undefined` = back to automatic). Absent = widths are not editable. */
+  /** Set a column's width in px (`undefined` resets it). Without it the columns cannot be resized. */
   onColumnResize?: (column: string, width: number | undefined) => void
+  /** Move the column at index `from` to index `to`. Without it the columns cannot be dragged. */
+  onReorderColumns?: (from: number, to: number) => void
 }
 
 export const BasesTableView = memo(function BasesTableView({
-  doc, view, rows, onOpenNote, onCommitCell, onSortChange, onColumnResize,
+  doc, view, rows, vaultId, onOpenNote, onCommitCell, onSortChange, onColumnResize, onReorderColumns,
 }: BasesTableViewProps) {
-  // Width while a drag is in progress; committed (and written to the file) on release.
-  const [liveWidth, setLiveWidth] = useState<{ column: string; width: number } | null>(null)
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
   const columns = useMemo(() => view.order ?? Object.keys(doc.properties ?? {}), [view.order, doc.properties])
 
@@ -61,11 +69,26 @@ export const BasesTableView = memo(function BasesTableView({
     [doc],
   )
 
-  const handleHeaderClick = useCallback((col: string) => {
-    const current = sortByColumn.get(col)
-    const next: BaseSortClause = { column: col, direction: current === 'asc' ? 'desc' : 'asc' }
-    onSortChange([next])
-  }, [sortByColumn, onSortChange])
+  // A plain click sorts by that column alone (replaces any existing multi-sort — the
+  // common single-click convention). Shift-click EXTENDS the current multi-sort instead:
+  // toggling the clicked column's direction in place if it is already a sort key, else
+  // appending it ascending, so a carefully built multi-column sort is never lost by accident.
+  const handleHeaderClick = useCallback((col: string, additive: boolean) => {
+    if (!additive) {
+      const current = sortByColumn.get(col)
+      const next: BaseSortClause = { column: col, direction: current === 'asc' ? 'desc' : 'asc' }
+      onSortChange([next])
+      return
+    }
+    const existing = view.sort ?? []
+    const idx = existing.findIndex((s) => s.column === col)
+    if (idx === -1) {
+      onSortChange([...existing, { column: col, direction: 'asc' }])
+      return
+    }
+    const nextDirection: BaseSortClause['direction'] = (existing[idx]!.direction ?? 'asc') === 'asc' ? 'desc' : 'asc'
+    onSortChange(existing.map((s, i) => (i === idx ? { ...s, direction: nextDirection } : s)))
+  }, [sortByColumn, onSortChange, view.sort])
 
   // Column summaries (Sum/Average/Count/…) over the currently shown rows.
   const summaries: ComputedSummaries = useMemo(
@@ -79,53 +102,59 @@ export const BasesTableView = memo(function BasesTableView({
   const groupPropertyLabel = headerLabel(view.groupBy?.property ?? '')
   const hasSummaries = Object.keys(summaries).length > 0
 
-  // Column widths (`columnSize`). A drag shows its live width at once; the file write follows on release.
-  // The live value is dropped as soon as the saved sizes change, so the file stays the source of truth.
-  const [prevColumnSize, setPrevColumnSize] = useState(view.columnSize)
-  if (prevColumnSize !== view.columnSize) {
-    setPrevColumnSize(view.columnSize)
-    setLiveWidth(null)
-  }
-  const widthOf = (col: string): number | undefined => (liveWidth?.column === col ? liveWidth.width : view.columnSize?.[col])
-  const hasWidths = columns.some((c) => widthOf(c) !== undefined)
-  const tableStyle: CSSProperties | undefined = hasWidths
-    ? { tableLayout: 'fixed', width: columns.reduce((sum, c) => sum + (widthOf(c) ?? AUTO_COLUMN_WIDTH), 0), minWidth: '100%' }
-    : undefined
-  const clampWidth = (w: number): number => Math.min(COLUMN_WIDTH.max, Math.max(COLUMN_WIDTH.min, w))
+  // ── Column widths ──────────────────────────────────────────────────────────
+  // While a handle is dragged the width lives here; it is written to the file once, on release.
+  const [liveWidth, setLiveWidth] = useState<{ column: string; width: number } | null>(null)
+  const resizeRef = useRef<{ column: string; startX: number; startWidth: number } | null>(null)
 
-  const startResize = (e: ReactPointerEvent<HTMLElement>, col: string) => {
+  const widthOf = (col: string): number | undefined =>
+    liveWidth?.column === col ? liveWidth.width : columnEntry(view.columnSize, col)
+  const sizeStyle = (col: string): CSSProperties | undefined => {
+    const width = widthOf(col)
+    return width === undefined ? undefined : ({ '--bases-col-width': `${width}px` } as CSSProperties)
+  }
+  const clampWidth = (width: number): number => Math.round(clampTo(width, COLUMN_WIDTH.min, COLUMN_WIDTH.max) ?? COLUMN_WIDTH.min)
+
+  const handleResizeStart = (e: ReactPointerEvent<HTMLSpanElement>, col: string) => {
     if (!onColumnResize || e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
-    const startWidth = e.currentTarget.closest('th')?.getBoundingClientRect().width ?? AUTO_COLUMN_WIDTH
-    const startX = e.clientX
-    let current = startWidth
-    let moved = false
-    const onMove = (ev: PointerEvent) => {
-      moved = true
-      current = clampWidth(startWidth + ev.clientX - startX)
-      setLiveWidth({ column: col, width: current })
+    const header = e.currentTarget.closest('th')
+    const startWidth = widthOf(col) ?? (header?.getBoundingClientRect().width || FALLBACK_COLUMN_WIDTH)
+    resizeRef.current = { column: col, startX: e.clientX, startWidth }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  const handleResizeMove = (e: ReactPointerEvent<HTMLSpanElement>) => {
+    const drag = resizeRef.current
+    if (!drag) return
+    setLiveWidth({ column: drag.column, width: clampWidth(drag.startWidth + e.clientX - drag.startX) })
+  }
+  const handleResizeEnd = (e: ReactPointerEvent<HTMLSpanElement>, commit: boolean) => {
+    const drag = resizeRef.current
+    if (!drag) return
+    resizeRef.current = null
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+    const width = clampWidth(drag.startWidth + e.clientX - drag.startX)
+    setLiveWidth(null)
+    if (commit && width !== Math.round(drag.startWidth)) onColumnResize?.(drag.column, width)
+  }
+  const handleResizeKey = (e: ReactKeyboardEvent<HTMLSpanElement>, col: string) => {
+    if (!onColumnResize) return
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const header = e.currentTarget.closest('th')
+      const current = widthOf(col) ?? (header?.getBoundingClientRect().width || FALLBACK_COLUMN_WIDTH)
+      onColumnResize(col, clampWidth(current + (e.key === 'ArrowRight' ? COLUMN_WIDTH.step : -COLUMN_WIDTH.step)))
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      onColumnResize(col, undefined)
     }
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-      if (moved) onColumnResize(col, Math.round(current))
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
   }
 
-  const handleResizeKey = (e: ReactKeyboardEvent<HTMLElement>, col: string) => {
-    if (!onColumnResize) return
-    const step = e.shiftKey ? 50 : 10
-    const delta = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0
-    if (delta === 0) return
-    e.preventDefault()
-    const width = e.currentTarget.closest('th')?.getBoundingClientRect().width ?? AUTO_COLUMN_WIDTH
-    onColumnResize(col, Math.round(clampWidth(width + delta)))
-  }
+  // ── Column order (drag a header onto another) ─────────────────────────────
+  const [dragColumn, setDragColumn] = useState<number | null>(null)
+  const [dropColumn, setDropColumn] = useState<number | null>(null)
+  const endColumnDrag = () => { setDragColumn(null); setDropColumn(null) }
 
   const renderRow = (row: BaseRow) => (
       <tr key={row.path} className="bases-table__row">
@@ -137,7 +166,7 @@ export const BasesTableView = memo(function BasesTableView({
               ? row.fileName
               : (Array.isArray(firstVal) ? (firstVal[0] as string | undefined) : undefined) ?? row.fileName
             return (
-              <td key={col} className="bases-table__cell bases-table__cell--link">
+              <td key={col} className={cellClass('bases-table__cell bases-table__cell--link', false, widthOf(col) !== undefined)} style={sizeStyle(col)}>
                 <button type="button" className="bases-table__link" onClick={() => onOpenNote(row.path)}>
                   {linkText}
                 </button>
@@ -149,9 +178,9 @@ export const BasesTableView = memo(function BasesTableView({
           if (formulaKey !== null) {
             const result = evaluateFormulaColumn(doc, row, formulaKey)
             return (
-              <td key={col} className={cellClass('bases-table__cell bases-table__cell--formula', numericCols.has(col))}>
+              <td key={col} className={cellClass('bases-table__cell bases-table__cell--formula', numericCols.has(col), widthOf(col) !== undefined)} style={sizeStyle(col)}>
                 {result.ok
-                  ? formatFormulaValue(result.value)
+                  ? <BaseFormulaValue value={result.value} vaultId={vaultId} sourcePath={row.path} />
                   : <span className="bases-table__formula-error" title={result.error}>#ERR</span>}
               </td>
             )
@@ -162,7 +191,7 @@ export const BasesTableView = memo(function BasesTableView({
             const text = col === 'file.name'
               ? row.fileName
               : String((Array.isArray(raw) ? raw[0] : raw) ?? '')
-            return <td key={col} className="bases-table__cell"><span className="base-cell base-cell--readonly">{text}</span></td>
+            return <td key={col} className={cellClass('bases-table__cell', false, widthOf(col) !== undefined)} style={sizeStyle(col)}><span className="base-cell base-cell--readonly">{text}</span></td>
           }
 
           const raw = row.values[col]
@@ -172,7 +201,7 @@ export const BasesTableView = memo(function BasesTableView({
               ? []
               : [String(raw)]
           return (
-            <td key={col} className={cellClass('bases-table__cell', numericCols.has(col))}>
+            <td key={col} className={cellClass('bases-table__cell', numericCols.has(col), widthOf(col) !== undefined)} style={sizeStyle(col)}>
               <BaseCell
                 values={strValues}
                 type={inferCellType(strValues)}
@@ -187,26 +216,49 @@ export const BasesTableView = memo(function BasesTableView({
 
   return (
     <div className={rowHeightClass ? `bases-table-view ${rowHeightClass}` : 'bases-table-view'}>
-      <table className={hasWidths ? 'bases-table data-table bases-table--sized' : 'bases-table data-table'} style={tableStyle}>
-        {hasWidths && (
-          <colgroup>
-            {columns.map((col) => <col key={col} style={widthOf(col) !== undefined ? { width: widthOf(col) } : undefined} />)}
-          </colgroup>
-        )}
+      <table className="bases-table data-table">
         <thead>
           <tr>
-            {columns.map((col) => {
+            {columns.map((col, colIndex) => {
               const dir = sortByColumn.get(col)
+              const width = widthOf(col)
+              const canDrag = !!onReorderColumns && columns.length > 1
+              const classes = ['bases-table__header']
+              if (numericCols.has(col)) classes.push('bases-table__header--num')
+              if (width !== undefined) classes.push('bases-table__header--sized')
+              if (dragColumn !== null && dropColumn === colIndex && dragColumn !== colIndex) classes.push('bases-table__header--drop')
               return (
                 <th
                   key={col}
-                  className={numericCols.has(col) ? 'bases-table__header bases-table__header--num' : 'bases-table__header'}
+                  className={classes.join(' ')}
+                  style={sizeStyle(col)}
                   aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}
+                  draggable={canDrag}
+                  onDragStart={(e) => {
+                    // A drag that starts on the resize handle resizes; it must not also move the column.
+                    if (!canDrag || resizeRef.current) { e.preventDefault(); return }
+                    e.dataTransfer.setData(COLUMN_DRAG_TYPE, String(colIndex))
+                    e.dataTransfer.effectAllowed = 'move'
+                    setDragColumn(colIndex)
+                  }}
+                  onDragOver={(e) => {
+                    if (dragColumn === null || !e.dataTransfer.types.includes(COLUMN_DRAG_TYPE)) return
+                    e.preventDefault()
+                    setDropColumn(colIndex)
+                  }}
+                  onDrop={(e) => {
+                    if (dragColumn === null) return
+                    e.preventDefault()
+                    if (dragColumn !== colIndex) onReorderColumns?.(dragColumn, colIndex)
+                    endColumnDrag()
+                  }}
+                  onDragEnd={endColumnDrag}
                 >
                   <button
                     type="button"
                     className="bases-table__header-btn"
-                    onClick={() => handleHeaderClick(col)}
+                    title="Klick: nach dieser Spalte sortieren. Umschalt+Klick: zur Mehrfach-Sortierung hinzufügen."
+                    onClick={(e) => handleHeaderClick(col, e.shiftKey)}
                   >
                     <ColumnTypeIcon doc={doc} col={col} rows={rows} />
                     {headerLabel(col)}
@@ -215,18 +267,21 @@ export const BasesTableView = memo(function BasesTableView({
                   </button>
                   {onColumnResize && (
                     <span
-                      className="bases-table__resize"
+                      className="bases-table__resizer"
                       role="separator"
                       aria-orientation="vertical"
-                      aria-label={`Spaltenbreite ${headerLabel(col)}`}
+                      aria-label={`Breite der Spalte ${headerLabel(col)}`}
+                      aria-valuenow={width ?? FALLBACK_COLUMN_WIDTH}
                       aria-valuemin={COLUMN_WIDTH.min}
                       aria-valuemax={COLUMN_WIDTH.max}
-                      aria-valuenow={widthOf(col)}
                       tabIndex={0}
-                      title="Ziehen: Breite ändern, Doppelklick: automatisch"
-                      onPointerDown={(e) => startResize(e, col)}
-                      onKeyDown={(e) => handleResizeKey(e, col)}
+                      title="Ziehen ändert die Breite, Doppelklick setzt sie zurück"
+                      onPointerDown={(e) => handleResizeStart(e, col)}
+                      onPointerMove={handleResizeMove}
+                      onPointerUp={(e) => handleResizeEnd(e, true)}
+                      onPointerCancel={(e) => handleResizeEnd(e, false)}
                       onDoubleClick={() => onColumnResize(col, undefined)}
+                      onKeyDown={(e) => handleResizeKey(e, col)}
                     />
                   )}
                 </th>
@@ -263,7 +318,7 @@ export const BasesTableView = memo(function BasesTableView({
               {columns.map((col) => {
                 const s = summaries[col]
                 return (
-                  <td key={col} className={cellClass('bases-table__cell bases-table__summary-cell', numericCols.has(col))}>
+                  <td key={col} className={cellClass('bases-table__cell bases-table__summary-cell', numericCols.has(col), widthOf(col) !== undefined)} style={sizeStyle(col)}>
                     {s && (
                       <span className="bases-table__summary">
                         <span className="bases-table__summary-label">{s.summary}</span>

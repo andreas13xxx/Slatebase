@@ -11,6 +11,7 @@
  * stay independent.
  */
 
+import { isBuiltinViewId } from '../../../state/panelState'
 import type { PanelViewId } from '../../../state/panelState'
 import { getVaultSettings, updateVaultSettings } from '../../../state/vaultSettingsStore'
 
@@ -33,18 +34,18 @@ export interface PersistedPanelLayout {
   }>
 }
 
-const VALID_BUILTIN_VIEW_IDS: ReadonlySet<string> = new Set([
-  'explorer', 'favorites', 'recent',
-  'outline', 'links', 'tags', 'properties', 'search',
-])
-
 /**
  * Validates that a value is a valid PanelViewId.
  * Accepts built-in IDs and plugin IDs (prefixed with 'plugin:').
+ *
+ * Delegates the built-in check to `panelState.ts`'s own `isBuiltinViewId()` rather than a second,
+ * hand-maintained list — a prior duplicate list here had silently drifted behind it (missing
+ * 'footnotes' and 'activity'), which rejected any persisted layout naming either as corrupt the
+ * moment a user's panel held one of those two tabs.
  */
 function isValidViewId(value: unknown): value is PanelViewId {
   if (typeof value !== 'string') return false
-  if (VALID_BUILTIN_VIEW_IDS.has(value)) return true
+  if (isBuiltinViewId(value)) return true
   if (value.startsWith('plugin:') && value.length > 7) return true
   return false
 }
@@ -127,9 +128,19 @@ function isValidLayout(data: unknown): data is PersistedPanelLayout {
   return true
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 /**
  * Saves a side panel layout to localStorage.
  * Silently fails if localStorage is unavailable.
+ *
+ * Merges onto whatever is already stored rather than replacing it outright:
+ * the blob is shared with per-view extras that are not part of the layout
+ * itself (e.g. which `.base` file a pinned Base tab shows, see
+ * `saveBasePanelPath`/`loadBasePanelPath`) — a plain layout write must not
+ * wipe those out just because the user dragged a tab.
  *
  * @param prefix - Storage-key prefix identifying which panel (left/right)
  * @param userId - The current user's ID
@@ -139,9 +150,34 @@ export function savePanelLayout(
   panel: PanelSide,
   layout: PersistedPanelLayout
 ): void {
+  const current = getVaultSettings()[PANEL_SETTING_KEY[panel]]
+  const extra = isRecord(current) ? current : {}
   updateVaultSettings({
-    [PANEL_SETTING_KEY[panel]]: layout as unknown as Record<string, unknown>,
+    [PANEL_SETTING_KEY[panel]]: { ...extra, ...layout } as unknown as Record<string, unknown>,
   })
+}
+
+/**
+ * Persists which `.base` file a panel's "Base" tab shows (a per-view extra,
+ * not part of the layout) — `null` clears the pinned file. Stored as a
+ * sibling field in the same opaque per-panel blob `savePanelLayout` writes
+ * (shape is client-owned, see `vaultSettingsStore`'s module doc), so no
+ * backend schema change is needed for it.
+ */
+export function saveBasePanelPath(panel: PanelSide, path: string | null): void {
+  const current = getVaultSettings()[PANEL_SETTING_KEY[panel]]
+  const extra = isRecord(current) ? current : {}
+  updateVaultSettings({
+    [PANEL_SETTING_KEY[panel]]: { ...extra, basePath: path } as unknown as Record<string, unknown>,
+  })
+}
+
+/** Reads the `.base` path a panel's "Base" tab was last showing, or null when none was pinned. */
+export function loadBasePanelPath(panel: PanelSide): string | null {
+  const current = getVaultSettings()[PANEL_SETTING_KEY[panel]]
+  if (!isRecord(current)) return null
+  const path = current['basePath']
+  return typeof path === 'string' ? path : null
 }
 
 /**

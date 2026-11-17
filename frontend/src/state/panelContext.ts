@@ -153,7 +153,7 @@ export function useLeftPanelContext(): PanelContextValue {
 
 // ─── Right panel ───────────────────────────────────────────────────────────
 
-const RIGHT_DEFAULT_VIEW_IDS: PanelViewId[] = ['outline', 'links', 'tags', 'properties', 'footnotes', 'search']
+const RIGHT_DEFAULT_VIEW_IDS: PanelViewId[] = ['outline', 'links', 'tags', 'properties', 'footnotes', 'search', 'base']
 
 export const RightPanelContext = createContext<PanelContextValue | null>(null)
 

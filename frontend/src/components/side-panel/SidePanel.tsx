@@ -19,6 +19,7 @@ import { LinksView } from '../context-panel/LinksView'
 import { TagsView } from '../context-panel/TagsView'
 import { PropertiesOverview } from '../context-panel/PropertiesOverview'
 import { FootnotesView } from '../context-panel/FootnotesView'
+import { BasePanelView } from '../context-panel/BasePanelView'
 import { SearchPanel } from '../SearchPanel'
 import { ActivityTimelineView } from '../activity/ActivityTimelineView'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
@@ -47,6 +48,8 @@ export interface SidePanelDocumentProps {
   onFootnoteClick: (anchor: string) => void
   /** Converts an Ungelinkte_Erwähnung into a real wikilink (Requirement 2.7). */
   onLinkMention: (entry: UnlinkedMentionEntry) => Promise<void>
+  /** Vault-relative path of the file open in the main content area — what `this` resolves to in a pinned Base tab. Null for a non-file tab. */
+  activeFilePath: string | null
 }
 
 export interface SidePanelSearchProps {
@@ -294,6 +297,18 @@ export function SidePanel({
             />
           </div>
         )
+      case 'base':
+        return (
+          <div className="side-panel__view-wrapper" key={viewId}>
+            <h3 className="side-panel__view-header">{t('sidePanel.tabs.base')}</h3>
+            <BasePanelView
+              panel={side === 'left' ? 'sidebar' : 'context'}
+              vaultId={vaultId}
+              activeFilePath={documentPanel.activeFilePath}
+              onOpenNote={(path) => { if (vaultId) onOpenFile(vaultId, path) }}
+            />
+          </div>
+        )
       case 'search':
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
@@ -350,7 +365,7 @@ export function SidePanel({
     }
 
     return null
-  }, [vaultId, onOpenFile, renderExplorer, refreshKey, state, dispatch, documentPanel, search, pluginViews, t])
+  }, [vaultId, onOpenFile, renderExplorer, refreshKey, state, dispatch, documentPanel, search, pluginViews, t, side])
 
   // ─── Single-Section Body Drop (split trigger) ──────────────────────────────
 

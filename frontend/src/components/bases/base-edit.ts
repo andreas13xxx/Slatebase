@@ -71,6 +71,126 @@ export function setViewType(doc: BaseDocument, index: number, type: string): Bas
   return withView(doc, index, (v) => ({ ...v, type }))
 }
 
+/** A copy of `list` with the item at `from` moved to position `to`; the list itself when either index is out of range. */
+export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list]
+  if (from === to || from < 0 || to < 0 || from >= next.length || to >= next.length) return next
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item as T)
+  return next
+}
+
+/** Moves a view to another position in the view list. */
+export function moveView(doc: BaseDocument, from: number, to: number): BaseDocument {
+  if (!doc.views[from] || !doc.views[to] || from === to) return doc
+  return { ...doc, views: moveItem(doc.views, from, to) }
+}
+
+/** Where the view at `selected` ends up after `moveView(doc, from, to)`. */
+export function indexAfterMove(selected: number, from: number, to: number): number {
+  if (selected === from) return to
+  if (from < selected && to >= selected) return selected - 1
+  if (from > selected && to <= selected) return selected + 1
+  return selected
+}
+
+/** Largest result limit the toolbar writes. */
+export const MAX_VIEW_LIMIT = 100_000
+
+/** Sets how many rows the view shows; `undefined` (or anything that is not a positive number) removes the limit. */
+export function setLimit(doc: BaseDocument, index: number, limit: number | undefined): BaseDocument {
+  const value = limit !== undefined && Number.isFinite(limit) && limit >= 1 ? Math.min(MAX_VIEW_LIMIT, Math.floor(limit)) : undefined
+  return withView(doc, index, (v) => {
+    const { limit: _old, ...rest } = v
+    return value !== undefined ? { ...rest, limit: value } : rest
+  })
+}
+
+// ─── Column summaries / display names / widths ──────────────────────────────
+
+/** The summary functions Obsidian offers, by the kind of value they fit. */
+export const SUMMARY_GROUPS: ReadonlyArray<{ label: string; names: readonly string[] }> = [
+  { label: 'Alle', names: ['Empty', 'Filled', 'Unique'] },
+  { label: 'Zahlen', names: ['Sum', 'Average', 'Median', 'Min', 'Max', 'Range', 'Stddev'] },
+  { label: 'Datum', names: ['Earliest', 'Latest'] },
+  { label: 'Kontrollkästchen', names: ['Checked', 'Unchecked'] },
+]
+
+/** German labels of the built-in summary names (the file keeps Obsidian's English names). */
+export const SUMMARY_LABELS: Record<string, string> = {
+  Empty: 'Leer', Filled: 'Gefüllt', Unique: 'Eindeutig',
+  Sum: 'Summe', Average: 'Durchschnitt', Median: 'Median', Min: 'Minimum', Max: 'Maximum', Range: 'Spanne', Stddev: 'Standardabweichung',
+  Earliest: 'Frühestes', Latest: 'Spätestes',
+  Checked: 'Angehakt', Unchecked: 'Nicht angehakt',
+}
+
+/**
+ * The key a per-column map (`summaries`, `columnSize`, `properties`) already uses for a column, else
+ * the id as given. A file may name the same column `status` or `note.status`.
+ */
+function existingColumnKey(map: Record<string, unknown> | undefined, id: string): string {
+  if (!map) return id
+  for (const key of [id, rowValueKey(id), `note.${rowValueKey(id)}`]) {
+    if (Object.hasOwn(map, key)) return key
+  }
+  return id
+}
+
+/** The entry a per-column map holds for a column, whichever of its spellings the file uses. */
+export function columnEntry<T>(map: Record<string, T> | undefined, id: string): T | undefined {
+  if (!map) return undefined
+  const key = existingColumnKey(map, id)
+  return Object.hasOwn(map, key) ? map[key] : undefined
+}
+
+/** Assigns a summary to a column of the view; an empty name removes it (and the key once no summary is left). */
+export function setViewSummary(doc: BaseDocument, index: number, column: string, name: string | undefined): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { summaries: old, ...rest } = v
+    const next: Record<string, string> = { ...(old ?? {}) }
+    const key = existingColumnKey(next, column)
+    if (name) next[key] = name
+    else delete next[key]
+    return Object.keys(next).length > 0 ? { ...rest, summaries: next } : rest
+  })
+}
+
+/**
+ * Sets the header text of a column (`properties.<id>.displayName`); an empty name removes it. A view
+ * without its own `order` shows the declared properties, so before a NEW key is declared every such
+ * view gets its current columns written down — renaming a column must not add it to another view.
+ */
+export function setDisplayName(doc: BaseDocument, id: string, name: string): BaseDocument {
+  const trimmed = name.trim()
+  const properties = { ...(doc.properties ?? {}) }
+  const key = existingColumnKey(properties, id)
+  const isNewKey = !Object.hasOwn(properties, key)
+  if (!trimmed && isNewKey) return doc
+  const { displayName: _old, ...meta } = properties[key] ?? {}
+  if (trimmed) properties[key] = { ...meta, displayName: trimmed }
+  else properties[key] = meta
+  const views = isNewKey
+    ? doc.views.map((v) => (v.order ? v : { ...v, order: Object.keys(doc.properties ?? {}) }))
+    : doc.views
+  return { ...doc, properties, views }
+}
+
+/** Column widths the table accepts, in px. */
+export const COLUMN_WIDTH = { min: 40, max: 2000, step: 16 } as const
+
+/** Sets a column's width in px (`columnSize`); `undefined` lets the column size itself again. */
+export function setColumnSize(doc: BaseDocument, index: number, column: string, width: number | undefined): BaseDocument {
+  const clamped = width === undefined ? undefined : clampTo(width, COLUMN_WIDTH.min, COLUMN_WIDTH.max)
+  return withView(doc, index, (v) => {
+    const { columnSize: old, ...rest } = v
+    const next: Record<string, number> = { ...(old ?? {}) }
+    const key = existingColumnKey(next, column)
+    if (clamped !== undefined) next[key] = Math.round(clamped)
+    else delete next[key]
+    return Object.keys(next).length > 0 ? { ...rest, columnSize: next } : rest
+  })
+}
+
 // ─── Sort / group / properties ──────────────────────────────────────────────
 
 /** An empty clause list removes the key instead of writing `sort: []`. */
@@ -145,21 +265,6 @@ export function setBoardSize(doc: BaseDocument, index: number, size: number | un
   return withView(doc, index, (v) => {
     const { cardSize: _old, ...rest } = v
     return clamped !== undefined ? { ...rest, cardSize: Math.round(clamped) } : rest
-  })
-}
-
-/** Table column width in px (Obsidian `columnSize`). */
-export const COLUMN_WIDTH = { min: 60, max: 800 } as const
-
-/** Sets one table column's width; `undefined` removes it (back to automatic). Removes the map when it empties. */
-export function setColumnSize(doc: BaseDocument, index: number, column: string, width: number | undefined): BaseDocument {
-  const clamped = width === undefined ? undefined : clampTo(width, COLUMN_WIDTH.min, COLUMN_WIDTH.max)
-  return withView(doc, index, (v) => {
-    const { columnSize: current, ...rest } = v
-    const next: Record<string, number> = { ...(current ?? {}) }
-    if (clamped === undefined) delete next[column]
-    else next[column] = Math.round(clamped)
-    return Object.keys(next).length > 0 ? { ...rest, columnSize: next } : rest
   })
 }
 
@@ -289,7 +394,8 @@ export const FILE_COLUMN_LABELS: Record<string, string> = {
  * id verbatim (a user property).
  */
 export function columnLabel(doc: BaseDocument, id: string): string {
-  const declared = doc.properties?.[id]?.displayName
+  // `status` and `note.status` name the same column: a display name declared under either spelling counts.
+  const declared = columnEntry(doc.properties, id)?.displayName
   if (declared) return declared
   if (id in FILE_COLUMN_LABELS) return FILE_COLUMN_LABELS[id]!
   if (id.startsWith('formula.')) return id.slice('formula.'.length)

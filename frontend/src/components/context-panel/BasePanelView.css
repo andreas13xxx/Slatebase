@@ -1,0 +1,50 @@
+/* ===== Base Panel View ===== */
+
+.base-panel-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.base-panel-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.base-panel-view__picker {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.base-panel-view__picker-label {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  white-space: nowrap;
+}
+
+.base-panel-view__select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.base-panel-view__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.base-panel-view__placeholder {
+  font-size: 0.8125rem;
+  color: var(--right-panel-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 0.75rem;
+}

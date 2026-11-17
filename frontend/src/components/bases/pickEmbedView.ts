@@ -16,10 +16,12 @@ export function pickEmbedView(doc: BaseDocument, viewName: string | undefined): 
 }
 
 /**
- * Which renderer an embedded view uses. Mirrors `BasesView`: a `kanban` or a
- * grouped `cards` view is the board, an ungrouped `cards` view the card grid,
- * `list` the list. Everything else (`table`, `map` — it needs the operator's
- * tile config —, unknown or plugin types) falls back to the read-only table.
+ * Which BUILT-IN renderer an embedded view falls back to when no plugin view
+ * handles its type (`BasesEmbed` checks that separately, same as `BasesView`).
+ * Mirrors `BasesView`: a `kanban` or a grouped `cards` view is the board, an
+ * ungrouped `cards` view the card grid, `list` the list. Everything else
+ * (`table`, `map` with no Maps plugin installed, an unregistered plugin type)
+ * falls back to the read-only table.
  */
 export function embedViewKind(view: BaseView): 'table' | 'kanban' | 'cards' | 'list' {
   if (view.type === 'kanban' || (view.type === 'cards' && view.groupBy)) return 'kanban'
