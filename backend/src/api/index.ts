@@ -395,7 +395,17 @@ export class VaultController implements IVaultController {
         return c.json(createApiError('VALIDATION_ERROR', parsed.error.issues[0]?.message ?? 'Invalid request body'), 400)
       }
 
-      const vaultInfo = await this.vaultService.renameVault(vaultId, session.userId, parsed.data.name)
+      const clientIp = (c.get('clientIp') as string | undefined) ?? '0.0.0.0'
+      const vaultInfo = await this.vaultService.renameVault(vaultId, session.userId, parsed.data.name, clientIp)
+
+      // Tell every user with access (the renaming tab included; the update is idempotent)
+      if (this.eventBus) {
+        this.eventBus.publish({
+          type: 'vault:renamed',
+          payload: { vaultId, name: vaultInfo.name },
+          target: { kind: 'users' as const, userIds: await this.accessControl.getUsersWithAccess(vaultId) },
+        })
+      }
       const { path: _path, ...publicVault } = vaultInfo
       return c.json(publicVault, 200)
     } catch (error) {

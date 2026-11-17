@@ -9,6 +9,7 @@ export type SseEventType =
   | 'presence:update'
   | 'presence:init'
   | 'vault:change'
+  | 'vault:renamed'
   | 'plugin-settings:change'
   | 'preferences:change'
   | 'notification:toast'

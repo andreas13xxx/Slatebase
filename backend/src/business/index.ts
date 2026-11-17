@@ -196,7 +196,7 @@ export interface IVaultService {
   createVault(name: string, ownerId: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
   /** Renames a vault (owner only, name unique among the owner's vaults). */
-  renameVault(vaultId: string, ownerId: string, newName: string): Promise<VaultInfo>
+  renameVault(vaultId: string, ownerId: string, newName: string, ipAddress?: string): Promise<VaultInfo>
   deleteVaultWithChecks(vaultId: string, ownerId: string, force?: boolean): Promise<void>
   transferOwnership(vaultId: string, currentOwnerId: string, newOwnerId: string): Promise<void>
   deleteContent(vaultId: string, relativePath: string): Promise<void>
@@ -818,7 +818,7 @@ export class VaultService implements IVaultService {
    * @throws VaultNotFoundError - Vault missing or caller is not the owner
    * @throws VaultValidationError - Invalid or conflicting name
    */
-  async renameVault(vaultId: string, ownerId: string, newName: string): Promise<VaultInfo> {
+  async renameVault(vaultId: string, ownerId: string, newName: string, ipAddress = '0.0.0.0'): Promise<VaultInfo> {
     if (!this.registry) {
       throw new StorageError('VaultRegistry is not configured')
     }
@@ -845,8 +845,18 @@ export class VaultService implements IVaultService {
       target.name = newName
     })
 
+    const oldName = vault.info.name
     vault.info.name = newName
     this.logger.info('Vault renamed', { vaultId, name: newName })
+
+    await this.auditService?.log({
+      userId: ownerId,
+      action: 'VAULT_RENAMED',
+      target: vaultId,
+      ipAddress,
+      success: true,
+      details: JSON.stringify({ oldName, newName }),
+    })
     return vault.info
   }
 

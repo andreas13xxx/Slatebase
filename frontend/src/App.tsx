@@ -55,6 +55,7 @@ import type { VaultChangeEvent } from './state/realtimeVaultBridge'
 import { onVaultTreeRefreshRequest } from './state/vaultTreeRefreshBridge'
 import { refreshAliasMap, clearAliasMap } from './state/aliasStore'
 import { dispatchPluginSettingsChange } from './state/pluginSettingsChangeBridge'
+import { dispatchVaultRenamed, onVaultRenamed } from './state/vaultRenamedBridge'
 import { FileExplorer } from './components/FileExplorer'
 import { TabContent } from './components/TabContent'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -337,6 +338,13 @@ function AppContent() {
   }, [])
 
   // Register the vault change callback with the realtime bridge
+  // A vault was renamed by its owner (maybe on another device): update the name in the vault list.
+  useEffect(() => {
+    return onVaultRenamed(({ vaultId, name }) => {
+      dispatch({ type: 'VAULT_RENAMED', payload: { vaultId, name } })
+    })
+  }, [dispatch])
+
   // Refreshes the file explorer tree and reloads affected open tabs
   useEffect(() => {
     return onRealtimeVaultChange((event) => {
@@ -1786,6 +1794,9 @@ function RealtimeBridge({ children }: { children: React.ReactNode }) {
     },
     onPluginSettingsChange: (vaultId: string, pluginId: string) => {
       dispatchPluginSettingsChange({ vaultId, pluginId })
+    },
+    onVaultRenamed: (vaultId: string, name: string) => {
+      dispatchVaultRenamed({ vaultId, name })
     },
     onPreferencesChange: (scope: string, vaultId?: string) => {
       // Another device changed a preference of this account. Re-read the one

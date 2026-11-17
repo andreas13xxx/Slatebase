@@ -22,6 +22,8 @@ export interface RealtimeEventHandlers {
   onChatUnread?: (totalUnread: number) => void
   /** Called when a vault:change event is received. */
   onVaultChange?: (vaultId: string, data?: Record<string, unknown>) => void
+  /** Called when a vault:renamed event is received. */
+  onVaultRenamed?: (vaultId: string, name: string) => void
   /** Called when a plugin-settings:change event is received. */
   onPluginSettingsChange?: (vaultId: string, pluginId: string) => void
   /**
@@ -169,6 +171,15 @@ function RealtimeInner({
             ? vaultPath.slice(0, 50) + '\u2026'
             : vaultPath
           showToast('info', `${vaultUsername} hat ${fileName} geändert`)
+        }
+        break
+      }
+
+      case 'vault:renamed': {
+        const vaultId = payload.vaultId as string | undefined
+        const name = payload.name as string | undefined
+        if (vaultId && name) {
+          handlersRef.current?.onVaultRenamed?.(vaultId, name)
         }
         break
       }

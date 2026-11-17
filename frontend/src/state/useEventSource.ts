@@ -48,6 +48,7 @@ const SSE_EVENT_TYPES = [
   'presence:update',
   'presence:init',
   'vault:change',
+  'vault:renamed',
   'plugin-settings:change',
   'sync:conflict',
   'notification:toast',

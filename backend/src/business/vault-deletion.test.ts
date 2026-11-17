@@ -700,3 +700,25 @@ describe('VaultService — renameVault', () => {
     await expect(service.renameVault('v1', ownerId, 'X')).rejects.toThrow(StorageError)
   })
 })
+
+describe('VaultService — renameVault audit', () => {
+  it('writes an audit entry with old and new name', async () => {
+    const ownerId = 'owner-123'
+    const vaults = [{ info: { id: 'v1', name: 'Alpha', path: '/p/v1', status: 'loaded' as const, ownerId } }]
+    const registry = createMockRegistry([
+      { id: 'v1', name: 'Alpha', storagePath: '/p/v1', createdAt: '2025-01-01T00:00:00.000Z', ownerId },
+    ])
+    const logged: Array<{ action: string; target: string; ipAddress: string; details?: string }> = []
+    const service = new VaultService(
+      createMockVaultManager(vaults), createMockVaultReader(), createMockConfigService(), createMockLogger(),
+      registry, createMockShareRegistry(), createMockUserRepository(),
+      { log: async (e: { action: string; target: string; ipAddress: string; details?: string }) => { logged.push(e) } } as never,
+    )
+
+    await service.renameVault('v1', ownerId, 'Neu', '10.0.0.5')
+
+    expect(logged).toHaveLength(1)
+    expect(logged[0]).toMatchObject({ action: 'VAULT_RENAMED', target: 'v1', ipAddress: '10.0.0.5' })
+    expect(JSON.parse(logged[0]!.details!)).toEqual({ oldName: 'Alpha', newName: 'Neu' })
+  })
+})
