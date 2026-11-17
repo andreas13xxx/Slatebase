@@ -22,6 +22,8 @@ export { GitSyncStatusStore } from './status-store.js'
 export type { IGitSyncStatusStore } from './status-store.js'
 
 export { GitCli } from './git-cli.js'
+export { SyncSideEffects, MAX_PER_FILE_ACTIVITY } from './sync-side-effects.js'
+export type { SyncSideEffectsDeps, SyncSideEffectsResult, SyncLinkIndexHook } from './sync-side-effects.js'
 export type { IGitCli, GitFileChange } from './git-cli.js'
 
 export { SshKeyGenerator } from './ssh-keygen.js'
