@@ -109,10 +109,12 @@ export const BasesTableView = memo(function BasesTableView({
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
       if (moved) onColumnResize(col, Math.round(current))
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   const handleResizeKey = (e: ReactKeyboardEvent<HTMLElement>, col: string) => {
