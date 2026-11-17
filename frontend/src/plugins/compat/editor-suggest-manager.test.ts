@@ -143,6 +143,47 @@ describe('EditorSuggestManager context lifecycle', () => {
     })
   })
 
+  it('declines a re-entrant Enter synthesized from inside selectSuggestion (Tasks "empty" entry)', () => {
+    const editor = makeEditor(3)
+    const view = makeView()
+    const manager = getEditorSuggestManager({
+      getActiveEditorView: () => view,
+      getEditor: () => editor,
+      getActiveFile: () => file,
+    })!
+
+    let selectCount = 0
+    let reentrantResult: boolean | undefined
+    const suggest: EditorSuggestInstance = {
+      context: null,
+      limit: 20,
+      onTrigger: (): EditorSuggestTriggerInfo => ({
+        start: { line: 0, ch: 0 },
+        end: { line: 0, ch: 3 },
+        query: 'x',
+      }),
+      getSuggestions: () => ['empty'],
+      renderSuggestion: (v, el) => { el.textContent = String(v) },
+      selectSuggestion() {
+        selectCount++
+        // Like Tasks: close() (not wired to the manager), then re-dispatch Enter,
+        // which reaches the keymap → manager.confirmSelection() again.
+        reentrantResult = manager.confirmSelection(new KeyboardEvent('keydown', { key: 'Enter' }))
+      },
+      open() {},
+      close() {},
+    }
+
+    manager.register(suggest)
+    manager.handleUpdate(view)
+    return Promise.resolve().then(() => {
+      expect(manager.confirmSelection(new KeyboardEvent('keydown', { key: 'Enter' }))).toBe(true)
+      expect(selectCount).toBe(1)
+      // false → the keymap lets the editor insert the newline itself.
+      expect(reentrantResult).toBe(false)
+    })
+  })
+
   it('confirmSelection is a no-op when nothing is open', () => {
     const manager = getEditorSuggestManager({
       getActiveEditorView: () => makeView(),
