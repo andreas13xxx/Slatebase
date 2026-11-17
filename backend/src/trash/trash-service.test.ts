@@ -358,4 +358,31 @@ describe('TrashService', () => {
       expect(index.entries[0]!.originalPath).toBe('c.md')
     })
   })
+  describe('addFromContent', () => {
+    it('creates a restorable entry for a file that is already gone', async () => {
+      const entry = await service.addFromContent('v1', 'notes/old.md', Buffer.from('old body'))
+
+      expect(entry.originalPath).toBe('notes/old.md')
+      expect(entry.isDirectory).toBe(false)
+      const listed = await service.listTrash('v1')
+      expect(listed.map((e) => e.id)).toEqual([entry.id])
+
+      const { restoredPath } = await service.restore('v1', entry.id)
+      expect(restoredPath).toBe('notes/old.md')
+      expect(await fs.readFile(path.join(vaultDir, 'notes/old.md'), 'utf-8')).toBe('old body')
+    })
+
+    it('keeps binary content byte for byte', async () => {
+      const bytes = Buffer.from([0x00, 0xff, 0x10, 0x80])
+      const entry = await service.addFromContent('v1', 'img.png', bytes)
+      await service.restore('v1', entry.id)
+      expect((await fs.readFile(path.join(vaultDir, 'img.png'))).equals(bytes)).toBe(true)
+    })
+
+    it('leaves no temp files behind', async () => {
+      const entry = await service.addFromContent('v1', 'a.md', Buffer.from('x'))
+      const files = await fs.readdir(path.join(vaultDir, '.slatebase', 'trash', entry.id))
+      expect(files).toEqual(['a.md'])
+    })
+  })
 })

@@ -61,6 +61,7 @@ function createMockEventBus(): IEventBus & { publishCalls: PublishOptions[] } {
 function createMockTrashService(overrides: Partial<ITrashService> = {}): ITrashService {
   return {
     moveToTrash: async () => ({ id: 'entry-1', originalPath: 'notes/test.md', deletedAt: '2024-01-20T14:30:00.000Z', isDirectory: false }),
+    addFromContent: async () => ({ id: 'entry-1', originalPath: 'notes/test.md', deletedAt: '2024-01-20T14:30:00.000Z', isDirectory: false }),
     listTrash: async () => [],
     restore: async () => ({ restoredPath: 'notes/test.md' }),
     deletePermanently: async () => {},

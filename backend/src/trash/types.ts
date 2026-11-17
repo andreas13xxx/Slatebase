@@ -32,6 +32,9 @@ export interface ITrashService {
   /** Moves a file or folder into the `.trash/` directory and records metadata. */
   moveToTrash(vaultId: string, relativePath: string): Promise<TrashEntry>
 
+  /** Adds a trash entry for a file already gone from disk, from its previous content (git-sync deletions). */
+  addFromContent(vaultId: string, relativePath: string, content: Buffer): Promise<TrashEntry>
+
   /** Lists all trash entries for a vault, sorted by `deletedAt` descending. */
   listTrash(vaultId: string): Promise<TrashEntry[]>
 
