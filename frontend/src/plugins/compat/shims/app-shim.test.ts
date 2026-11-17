@@ -471,6 +471,22 @@ describe('AppShim', () => {
     });
   });
 
+  describe('metadataTypeManager through the plugin-facing proxy', () => {
+    it('resolves widgets and type info (Nested Properties needs getWidget/getTypeInfo)', () => {
+      const app = AppShim.wrapWithProxy(new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' }));
+      const mgr = app.metadataTypeManager;
+      expect(mgr.getWidget('text')?.type).toBe('text');
+      expect(mgr.getWidget('nope')?.type).toBe('unknown');
+      expect(mgr.getTypeInfo('x', 5).inferred?.type).toBe('number');
+      expect(mgr.getTypeInfo('x', { a: 1 }).inferred?.type).toBe('unknown');
+      mgr.setType('x', 'date');
+      expect(mgr.getAssignedWidget('x')?.type).toBe('date');
+      expect(mgr.getTypeInfo('x', 'a').expected?.type).toBe('date');
+      mgr.unsetType('x');
+      expect(mgr.getAssignedWidget('x')).toBeNull();
+    });
+  });
+
   describe('theme helpers through the plugin-facing proxy', () => {
     afterEach(() => {
       document.documentElement.removeAttribute('data-theme');
