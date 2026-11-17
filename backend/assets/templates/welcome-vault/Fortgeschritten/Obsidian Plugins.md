@@ -116,6 +116,7 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Base Graph | Gut | Fügt Bases eine Graph-Ansicht (`type: base-graph`) hinzu — Notizen als kräftegesteuerter Graph. Demo: [[Features/Beispiel-Aufgaben (Base)]] |
 | Bases Charts | Gut | Fügt Bases Balken-/Linien-/Streudiagramme hinzu (`type: chart-bar` usw.). Demo: [[Features/Beispiel-Aufgaben (Base)]] |
 | Bases Timeline View | Gut | Fügt Bases eine Zeitleiste (`type: timeline-view`) hinzu — Notizen mit Start-/Enddatum als Balken. Demo: [[Features/Beispiel-Projekte (Base)]] |
+| TaskNotes | Teilweise | Aufgaben als Notizen (Status, Priorität und Termine in der Frontmatter) mit Bases-Ansichten für Aufgabenliste, Kanban, Kalender und Mini-Kalender (`type: tasknotesTaskList` usw.). Funktionen, die einen lokalen Server brauchen (HTTP-API, Kalender-Synchronisation), laufen im Browser nicht. Demo: [[Features/Beispiel-TaskNotes (Base)]] |
 
 Siehe die einzelnen [[Fortgeschritten/Plugins/Calendar|Plugin-Guides]] für detaillierte Kompatibilitäts-Informationen.
 

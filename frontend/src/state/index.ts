@@ -104,6 +104,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         vaults: [...state.vaults, action.payload],
         loading: false,
       }
+    case 'VAULT_RENAMED':
+      return {
+        ...state,
+        vaults: state.vaults.map((v) => (v.id === action.payload.vaultId ? { ...v, name: action.payload.name } : v)),
+      }
     case 'VAULT_DELETED': {
       const deletedId = action.payload
       const isSelectedDeleted = state.selectedVaultId === deletedId

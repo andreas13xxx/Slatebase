@@ -7,7 +7,7 @@
  * Row 2: Filter pills + Category dropdown
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, ArrowUpDown } from 'lucide-react'
+import { Search, ArrowUpDown, X } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { PluginStoreSortField, PluginStoreSortDirection } from './types'
 import './PluginStoreSearch.css'
@@ -103,6 +103,15 @@ export function PluginStoreSearch({
     }, DEBOUNCE_MS)
   }, [onSearchChange])
 
+  const handleClear = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    setLocalValue('')
+    onSearchChange('')
+  }, [onSearchChange])
+
   return (
     <div className="plugin-store-search">
       {/* Row 1: Search + Counter */}
@@ -117,6 +126,17 @@ export function PluginStoreSearch({
             value={localValue}
             onChange={handleInputChange}
           />
+          {localValue !== '' && (
+            <button
+              type="button"
+              className="plugin-store-search__clear"
+              onClick={handleClear}
+              aria-label={t('pluginStore.searchClear')}
+              title={t('pluginStore.searchClear')}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
         <span className="plugin-store-search__counter">
           {t('pluginStore.resultCounter', {

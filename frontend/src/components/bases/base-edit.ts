@@ -139,6 +139,38 @@ export function setCardSize(doc: BaseDocument, index: number, size: number | und
   })
 }
 
+/** Board layouts (Kanban, grouped cards) take the width from `cardSize` too, but unset means "automatic". */
+export function setBoardSize(doc: BaseDocument, index: number, size: number | undefined): BaseDocument {
+  const clamped = size === undefined ? undefined : clampTo(size, CARD_SIZE.min, CARD_SIZE.max)
+  return withView(doc, index, (v) => {
+    const { cardSize: _old, ...rest } = v
+    return clamped !== undefined ? { ...rest, cardSize: Math.round(clamped) } : rest
+  })
+}
+
+/** Table column width in px (Obsidian `columnSize`). */
+export const COLUMN_WIDTH = { min: 60, max: 800 } as const
+
+/** Sets one table column's width; `undefined` removes it (back to automatic). Removes the map when it empties. */
+export function setColumnSize(doc: BaseDocument, index: number, column: string, width: number | undefined): BaseDocument {
+  const clamped = width === undefined ? undefined : clampTo(width, COLUMN_WIDTH.min, COLUMN_WIDTH.max)
+  return withView(doc, index, (v) => {
+    const { columnSize: current, ...rest } = v
+    const next: Record<string, number> = { ...(current ?? {}) }
+    if (clamped === undefined) delete next[column]
+    else next[column] = Math.round(clamped)
+    return Object.keys(next).length > 0 ? { ...rest, columnSize: next } : rest
+  })
+}
+
+/** Back to automatic widths for every column of the view. */
+export function resetColumnSizes(doc: BaseDocument, index: number): BaseDocument {
+  return withView(doc, index, (v) => {
+    const { columnSize: _old, ...rest } = v
+    return rest
+  })
+}
+
 /** An empty id removes the key (no image property is the default). */
 export function setCardImageProperty(doc: BaseDocument, index: number, property: string): BaseDocument {
   return withView(doc, index, (v) => {

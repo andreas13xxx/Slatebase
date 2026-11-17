@@ -15,12 +15,13 @@
  */
 
 import { memo, useCallback, useMemo, useState } from 'react'
-import type { DragEvent } from 'react'
+import type { CSSProperties, DragEvent } from 'react'
 import { ChevronDown, ChevronRight, Plus, GripVertical } from 'lucide-react'
 import type { BaseDocument, BaseGroupValue, BaseRow, BaseView, ComputedSummaries } from '@slatebase/shared-contracts'
 import { computeSummaries, formatFormulaValue, rowValueKey } from '@slatebase/shared-contracts'
-import { columnLabel as baseColumnLabel } from './base-edit'
+import { CARD_SIZE, clampTo, columnLabel as baseColumnLabel } from './base-edit'
 import { useCardContextMenu } from './base-card-menu'
+import { useCardCovers } from './CardCover'
 import { FOLDER_GROUP_PROPERTY, ROOT_FOLDER_LABEL } from './base-folder-move'
 
 export interface BasesKanbanViewProps {
@@ -81,6 +82,11 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   doc, view, rows, layout = 'columns', vaultId, onOpenNote, onMoveCard, onAddCard, onReorderColumns,
 }: BasesKanbanViewProps) {
   const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, !onMoveCard)
+  const { coverFor } = useCardCovers(doc, view, vaultId ?? '')
+  // View `cardSize`: the column width of the board, or the card width of grouped cards laid out as
+  // rows. Unset keeps the stylesheet defaults.
+  const boardSize = view.cardSize !== undefined ? clampTo(view.cardSize, CARD_SIZE.min, CARD_SIZE.max) : undefined
+  const boardStyle = boardSize === undefined ? undefined : ({ '--bases-board-size': `${boardSize}px` } as CSSProperties)
   // The grouping property name (the new `groupBy` is an object `{property, direction}`).
   const groupBy = view.groupBy?.property
   // The frontmatter key to write when moving/adding a card: the row-value key
@@ -95,8 +101,8 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   const chipColumns = useMemo(() => {
     const configured = view.order ?? Object.keys(doc.properties ?? {})
     const groupKey = groupBy ? rowValueKey(groupBy) : undefined
-    return configured.filter((c) => rowValueKey(c) !== groupKey && c !== 'file.name' && !formulaKeys.has(c))
-  }, [view.order, doc.properties, groupBy, formulaKeys])
+    return configured.filter((c) => rowValueKey(c) !== groupKey && c !== 'file.name' && c !== view.image && !formulaKeys.has(c))
+  }, [view.order, view.image, doc.properties, groupBy, formulaKeys])
 
   const columnLabel = useCallback(
     (col: string): string => baseColumnLabel(doc, col),
@@ -293,7 +299,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
           ))}
         </div>
       )}
-      <div className={layout === 'rows' ? 'bases-kanban bases-kanban--rows' : 'bases-kanban'} role="list" aria-label="Karten-Ansicht">
+      <div className={layout === 'rows' ? 'bases-kanban bases-kanban--rows' : 'bases-kanban'} role="list" aria-label="Karten-Ansicht" style={boardStyle}>
         {columns.map((column) => {
         const isCollapsed = collapsed[column.key] ?? false
         const isCardDropTarget = draggable && dragOverKey === column.key && dragFromKey !== column.key
@@ -375,6 +381,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
                     onClick={() => onOpenNote(row.path)}
                     onContextMenu={(e) => openMenu(e, row.path)}
                   >
+                    {coverFor(row)}
                     <span className="bases-kanban__card-title">{row.fileName}</span>
                     {chipColumns.map((col) => {
                       const text = firstValue(row, col)

@@ -77,6 +77,11 @@ export const renameRequestSchema = z.object({
   newName: z.string().min(1, 'newName must not be empty').max(255, 'newName must be at most 255 characters'),
 })
 
+/** Schema for the vault rename body (PATCH /vaults/:vaultId). Business rules run in validateVaultName. */
+export const renameVaultRequestSchema = z.object({
+  name: z.string().min(1, 'name must not be empty').max(128, 'name must be at most 128 characters'),
+})
+
 // --- Link Index Hook Interface ---
 
 /**
@@ -131,6 +136,7 @@ export interface IVaultController {
   saveFile(c: Context): Promise<Response>
   createVault(c: Context): Promise<Response>
   deleteVault(c: Context): Promise<Response>
+  renameVault(c: Context): Promise<Response>
   importFile(c: Context): Promise<Response>
   importFolder(c: Context): Promise<Response>
   deleteContent(c: Context): Promise<Response>
@@ -370,6 +376,28 @@ export class VaultController implements IVaultController {
       // Strip internal `path` field from response
       const { path: _path, ...publicVault } = vaultInfo
       return c.json(publicVault, 201)
+    } catch (error) {
+      return this.handleError(c, error)
+    }
+  }
+
+  /**
+   * PATCH /vaults/:vaultId — Renames a vault (owner only; enforced by the
+   * authorization middleware and again in VaultService.renameVault).
+   */
+  async renameVault(c: Context): Promise<Response> {
+    const vaultId = c.req.param('vaultId') as string
+    const session = c.get('session') as SessionContext
+
+    try {
+      const parsed = renameVaultRequestSchema.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) {
+        return c.json(createApiError('VALIDATION_ERROR', parsed.error.issues[0]?.message ?? 'Invalid request body'), 400)
+      }
+
+      const vaultInfo = await this.vaultService.renameVault(vaultId, session.userId, parsed.data.name)
+      const { path: _path, ...publicVault } = vaultInfo
+      return c.json(publicVault, 200)
     } catch (error) {
       return this.handleError(c, error)
     }
@@ -914,6 +942,7 @@ export class VaultRouteModule implements RouteModule {
     router.get('/vaults/:vaultId/files', (c) => this.controller.getFileContent(c))
 
     // PUT routes
+    router.patch('/vaults/:vaultId', (c) => this.controller.renameVault(c))
     router.put('/vaults/:vaultId/files', (c) => this.controller.saveFile(c))
     router.put('/vaults/:vaultId/move', (c) => this.controller.moveContent(c))
     router.put('/vaults/:vaultId/rename', (c) => this.controller.renameContent(c))

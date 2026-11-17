@@ -146,7 +146,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'rowHeight', 'markers', 'indentProperties', 'separator']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'columnSize', 'rowHeight', 'markers', 'indentProperties', 'separator']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -234,6 +234,16 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   if (typeof raw['imageAspectRatio'] === 'number') view.imageAspectRatio = raw['imageAspectRatio']
   if (typeof raw['cardSize'] === 'number') view.cardSize = raw['cardSize']
   if (isString(raw['rowHeight'])) view.rowHeight = raw['rowHeight']
+  if (isObject(raw['columnSize'])) {
+    const sizes: Record<string, number> = {}
+    for (const [column, width] of Object.entries(raw['columnSize'])) {
+      if (typeof width === 'number' && Number.isFinite(width) && width > 0) sizes[column] = width
+      else errors.push({ message: 'column width must be a positive number', path: `views[${index}].columnSize.${column}` })
+    }
+    if (Object.keys(sizes).length > 0) view.columnSize = sizes
+  } else if (raw['columnSize'] !== undefined) {
+    errors.push({ message: 'view "columnSize" must be an object of column widths', path: `views[${index}].columnSize` })
+  }
   if (isString(raw['markers'])) view.markers = raw['markers']
   if (typeof raw['indentProperties'] === 'boolean') view.indentProperties = raw['indentProperties']
   if (isString(raw['separator'])) view.separator = raw['separator']

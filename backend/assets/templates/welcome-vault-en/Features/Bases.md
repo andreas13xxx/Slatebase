@@ -20,7 +20,7 @@ Think of it as a saved, structured view over your notes — the database layer t
 | **`filters`** | Which notes appear — as an expression, combinable with `and` / `or` / `not` |
 | **`properties`** | Display names of the columns |
 | **`formulas`** | Calculated columns (read-only), e.g. days until a deadline |
-| **`views`** | One or more named views: **table**, **cards** (Kanban), **list** or **map**, each with its own column order, sort, filter and `limit` |
+| **`views`** | One or more named views: **table**, **gallery**, **Kanban**, **list** or **map** (plugin only), each with its own column order, sort, filter and `limit` |
 | **`summaries`** | Per-column summaries (sum, count, average, min/max …) — under the table or in the Kanban header |
 
 ---
@@ -79,7 +79,7 @@ formulas:
 | Text | `contains`, `containsAll`, `containsAny`, `startsWith`, `endsWith`, `lower`, `upper`, `trim`, `title`, `repeat`, `reverse`, `slice`, `replace`, `split`, `length`, `isEmpty` |
 | Number | `toFixed`, `round`, `abs`, `ceil`, `floor`, `isEmpty` |
 | Date | `format`, `date`, `time`, `relative`, plus `year`, `month`, `day`, `hour`, `minute`, `second` |
-| List | `contains`, `containsAll`, `containsAny`, `length`, `join`, `first`, `last`, `flat`, `reverse`, `slice`, `sort`, `unique`, `isEmpty`, `map`, `filter`, `reduce` |
+| List | `contains`, `containsAll`, `containsAny`, `length`, `join`, `first`, `last`, `flat`, `reverse`, `slice`, `sort`, `unique`, `sum`, `mean`, `min`, `max`, `isEmpty`, `map`, `filter`, `reduce` |
 | Regexp | `matches` — literals like `/abc/gi`; `replace` and `split` accept them too (`g` replaces every match, otherwise only the first) |
 | Link | `asFile`, `linksTo` |
 | File | `file.hasTag`, `file.inFolder`, `file.hasLink`, `file.hasProperty`, `file.asLink` |
@@ -144,6 +144,8 @@ Property cells are editable inline, using the same typed controls as the [[Featu
 
 Click a column header to sort; the sort is written back into the `.base` file. This also works for formula columns — they are sorted after loading by their computed values.
 
+**Column width:** drag the right edge of a column header to resize it; with the keyboard the arrow keys (←/→) change the width by 10 pixels (50 with `Shift`), and a double click resets the column to automatic. Widths are stored as `columnSize` in the view of the `.base` file (as in Obsidian); under **Display**, "Reset" returns all widths to automatic at once. With column widths set, overlong cell content is clipped instead of widening the column.
+
 ---
 
 ## Toolbar: views, filters, sorting, groups, properties
@@ -152,22 +154,27 @@ A toolbar sits above the table — you don't have to write the YAML by hand. Eve
 
 - **View menu** (view name ▾): switch between views, create a **new view** with a name and type, **rename** the current one, **change its type**, **duplicate** or **delete** it (the last view always stays).
 - **Sort:** several sorts with property and direction, reorderable.
-- **Group:** the property that cards and Kanban views build their columns from.
-- **Filter:** conditions of property, operator and value (is, contains, starts with, is empty, greater/less than, has tag, in folder …), nested into **and / or / not** groups as you like. The **This view** tab affects only the current view, **All views** the whole base. Anything that can't be shown as a builder condition stays editable as an expression (`</>`).
+- **Group:** the property that gallery, Kanban and table views build their groups from.
+- **Filter:** conditions of property, operator and value (is, contains, starts with, is empty, greater/less than, has tag, in folder …), nested into **and / or / not** groups as you like; conditions can be reordered with the grip or ↑/↓ and moved between "This view" and "All views". The **This view** tab affects only the current view, **All views** the whole base. Anything that can't be shown as a builder condition stays editable as an expression (`</>`).
 - **Properties:** choose which columns show and in which order — including file fields (`file.ctime` …) and formulas; type the name of a custom property to add it.
+- **Display:** display options that fit the type of the view — see [[#Display options per view]].
+- **Search:** filters the shown entries by file name and visible values (accents and case ignored) without changing the base.
+- **New item:** creates a new note in the base's scope (like "Bases: Add item").
 
 The icon on the right of the path bar (breadcrumb) toggles between the view and the source (raw YAML, which now uses all the available space).
 
 ---
 
-## Views: table, cards, list and map
+## Views: table, gallery, Kanban, list and map
 
-A base can hold several views; a view switcher appears at the top.
+A base can hold several views; a view switcher appears at the top. You choose a view's type in the view menu (table, gallery, Kanban, list); in the `.base` file it is stored as `type`.
 
-- **Table** — one row per note, editable cells.
-- **Cards** (`type: cards` without `groupBy`) — a grid of cards, one per note, as in Obsidian. Options: `image` (the property holding the cover image: an `[[attachment]]` link, an http(s) URL or a colour like `#ff8800`), `imageFit` (`cover` crops, `contain` does not), `imageAspectRatio` (width / height, default 1) and `cardSize` (card width in pixels, default 200).
-- **Cards (Kanban)** (`type: kanban`, or `type: cards` **with** `groupBy`) — notes grouped into columns by a property. With `groupOrder` (a list of values; `null` stands for "No …") only the listed columns show, in that order; an empty list hides them all. Each value becomes a column; notes without a value land in a "No …" column. Columns collapse, and clicking a card opens the note.
-  **Drag a card to another column** to change the grouping property's value in the note; dropping on "No …" removes the property. (Requires write access to the vault.)
+- **Table** (`type: table`) — one row per note, editable cells, adjustable column widths and row height.
+- **Gallery** (`type: cards` without `groupBy`) — a grid of cards, one per note, as in Obsidian (called "Cards" there; Slatebase names it **Gallery** in the interface). Options: `image` (the property holding the cover image: an `[[attachment]]` link, an http(s) URL or a colour like `#ff8800`), `imageFit` (`cover` crops, `contain` does not), `imageAspectRatio` (width / height, default 1) and `cardSize` (card width in pixels, default 200).
+- **Grouped gallery** (`type: cards` **with** `groupBy`) — each group is its own row of cards, stacked one below the other. `cardSize` is the card width here; `image`, `imageFit` and `imageAspectRatio` work as in the gallery.
+- **Kanban** (`type: kanban`, a Slatebase type — Obsidian does not know it) — notes grouped by a property into **columns** side by side. With `groupOrder` (a list of values; `null` stands for "No …") only the listed columns show, in that order; an empty list hides them all. Each value becomes a column; notes without a value land in a "No …" column. Columns collapse and can be reordered by their grip (this writes `groupOrder`), the **+** in a column header creates an item right in that column, and clicking a card opens the note. Cards can carry a cover image (`image`, `imageFit`, `imageAspectRatio` as in the gallery); `cardSize` is the **column width** here (unset: the width adapts).
+  **Drag a card to another column** to change the grouping property's value in the note; dropping on "No …" removes the property. If you group by `file.folder`, dragging moves the note into the column's folder (the "(Root)" column is the vault's top folder). (Requires write access to the vault.)
+  Right-clicking a card (in the gallery too) opens a menu: open in a tab or split pane, rename, move, delete, bookmark, reveal in the explorer, copy link.
 - **List** (`type: list`) — a simple read-only list with one entry per note. Formula columns are evaluated, and summaries appear as a bar above the list.
 - **Groups in table and list** — a `groupBy` on a table or list view splits the rows into groups with a header (name and count). Click a header to collapse or expand its group. `groupOrder` works as in the Kanban view: only the listed groups show, in that order; `null` is the group of notes without a value; an empty list hides all groups. Without `groupOrder` the groups are sorted by value (`direction: DESC` reverses it) and the "No …" group comes last. Collapsing is not saved.
 - **Map** (`type: map`) — Slatebase has no built-in map view; it comes from the Obsidian community plugin **Maps** (enable Obsidian plugin compatibility and install the plugin). The plugin registers the `type: map` view and plots notes with geo coordinates as pins on a map. The "Example Places" demo base uses this view; without the plugin it falls back to the table.
@@ -179,6 +186,7 @@ These views come from community plugins (see [[Advanced/Obsidian Plugins]]). Eac
 - **Graph** (`type: base-graph`, plugin **Base Graph**) - draws the base's notes as a force-directed graph; edges are the wikilinks between notes. The tasks demo [[Features/Example Tasks (Base)]] contains this view; the example tasks link to each other so edges appear.
 - **Chart** (`type: chart-bar` / `chart-line` / `chart-scatter`, plugin **Bases Charts**) - bar, line or scatter chart. Pick the X axis (`x`) as a property/formula; Y values come from the numeric columns of the view. The tasks demo shows effort per task as a bar chart (X = task, Y = `estimate`).
 - **Timeline** (`type: timeline-view`, plugin **Bases Timeline View**) - plots notes with start and end dates as bars on a time axis. Set the fields via `startField` / `endField` / `contentField`. The demo [[Features/Example Projects (Base)]] shows four example projects across the year.
+- **Tasks** (`type: tasknotesTaskList`, `tasknotesKanban`, `tasknotesCalendar`, `tasknotesMiniCalendar`, plugin **TaskNotes**) - treats notes with the `task` tag as tasks (status, priority, due and scheduled dates live in the frontmatter) and shows them as a grouped list, Kanban board, calendar or mini calendar. The demo [[Features/Example TaskNotes (Base)]] bundles all four views over six example tasks; the list and board group by `status`, the calendar shows `due` and `scheduled`. The example tasks' dates lie in late autumn 2026 - in the calendar you page there, in the list and board the date does not matter.
 
 ```yaml
 views:
@@ -186,7 +194,7 @@ views:
     name: All tasks
     order: [file.name, status, priority]
     limit: 50
-  - type: cards
+  - type: kanban
     name: Board
     groupBy:
       property: status
@@ -194,9 +202,44 @@ views:
     order: [file.name, priority]
 ```
 
-`limit` caps a view's rows — applied **after** filtering.
+`limit` caps a view's rows — applied **after** filtering. If the limit hides matches, "Zeigt N von M" (shows N of M) appears above the view.
 
-Other view types come from Obsidian plugins.
+Other view types come from Obsidian plugins (see [[Advanced/Obsidian Plugins]]).
+
+### Display options per view
+
+The toolbar has a **Display** button for table, gallery, Kanban and list. It shows only what fits the type of the current view and writes every change as a key into the view in the `.base` file — a value equal to the default is not written at all.
+
+| View | Option | YAML key | Default |
+|------|--------|----------|---------|
+| Table | **Row height** (Short, Medium, Tall, Extra tall) | `rowHeight: medium / tall / extra` | Short |
+| Table | **Column widths** — drag the column edge, reset here | `columnSize` (column → pixels) | automatic |
+| Gallery | **Card size** (card width, 50–800 px) | `cardSize` | 200 |
+| Gallery, grouped gallery, Kanban | **Image property** (property with a link, URL or colour) | `image` | none |
+| Gallery, grouped gallery, Kanban | **Image fit** (Fill / Fit in) | `imageFit: contain` | Fill |
+| Gallery, grouped gallery, Kanban | **Image ratio** (width / height, 0.25–2.5) | `imageAspectRatio` | 1 |
+| Kanban | **Column width** (50–800 px) | `cardSize` | automatic (220–300 px) |
+| Grouped gallery | **Card width** (50–800 px) | `cardSize` | 220 |
+| List | **Marker** (Bullets, Numbers, None) | `markers: number / none` | Bullets |
+| List | **Indent properties** | `indentProperties: true` | off |
+| List | **Separator** between the values | `separator` | `,` |
+
+```yaml
+views:
+  - type: table
+    name: Tasks
+    rowHeight: medium
+    columnSize:
+      file.name: 280
+      note.status: 120
+  - type: kanban
+    name: Board
+    groupBy:
+      property: status
+    image: cover
+    imageFit: contain
+    cardSize: 300
+```
 
 ---
 
@@ -268,14 +311,14 @@ So nothing surprises you:
 - This is a **pragmatic subset** of Obsidian's functions (see the lists above), not the full library. An unknown function yields `#ERR` in a formula column and drops the note in a filter.
 - Objects exist only as `file.properties` (see above), not as literals. `html()`, `icon()` and `image()` return text or a link; raw HTML is never inserted.
 - `file.embeds`, `file.size` and `file.backlinks` ARE supported. `file.embeds` holds `![[…]]` embeds only; on the first start after the update Slatebase rebuilds the link index once.
-- Not implemented: table row height and the list options (markers, indent, separator) — their YAML keys are not documented.
+- Not implemented: Obsidian's further display options beyond those listed above (for example column widths in lists); unknown keys in a view are kept unchanged when saving.
 
 **Lists vs. single values**
 - The index hands over every property as a list. A property that has **more than one value somewhere** in your vault — or is declared as a list/tags in the property-type registry — is treated as a list even with a single value. Only for a property that never appears as a list and is not declared one is a one-element list read like a single value.
 
 **Views and embedding**
-- **Table**, **cards**, **list** and **map** are built in; other view types need a plugin, and plugin views run in the browser only, never on the server.
-- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (read-only each). Embedded, it shows **one** view — the first, or the one chosen with `#View name` — in its own type: table, cards, Kanban or list. Only a **map** and plugin views appear as a table when embedded.
+- **Table**, **gallery** (`cards`), **Kanban** and **list** are built in; the **map** and all other view types need a plugin, and plugin views run in the browser only, never on the server.
+- A base can be **opened as its own `.base` file, embedded via `![[…]]`, or written as a ```` ```base ```` code block right in a note** (read-only each). Embedded, it shows **one** view — the first, or the one chosen with `#View name` — in its own type: table, gallery, Kanban or list. Only plugin views (the map included) appear as a table when embedded.
 - An embedded base refreshes itself on vault changes (including a change to the embedding note, and so to `this`); the old display stays until the new query is done.
 - `this` works in the built-in table, not in views a plugin provides. In the MCP `query_base` tool it applies only with the `thisPath` parameter, otherwise `this.…` is empty.
 
@@ -289,7 +332,7 @@ So nothing surprises you:
 This vault ships two ready-made examples that work on the same task notes:
 
 - [[Features/Example Tasks (Base)]] — a **table** with a filter, a "Days left" formula column, the estimate column and a **summary row** (count, sum of estimate, average of days left).
-- [[Features/Example Board (Base)]] — a **card board** grouped by `status`, with a summary bar above the columns.
+- [[Features/Example Board (Base)]] — a **Kanban board** grouped by `status`, with a summary bar above the columns.
 
 The same tasks as an **inline base** — a ```` ```base ```` block that sits directly in this note:
 

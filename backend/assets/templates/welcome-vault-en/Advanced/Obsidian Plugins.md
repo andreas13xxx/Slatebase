@@ -140,6 +140,7 @@ These plugins have been tested and work with Slatebase:
 | Base Graph | Good | Adds a graph view (`type: base-graph`) to Bases - notes as a force-directed graph. Demo: [[Features/Example Tasks (Base)]] |
 | Bases Charts | Good | Adds bar/line/scatter chart views (`type: chart-bar` etc.) to Bases. Demo: [[Features/Example Tasks (Base)]] |
 | Bases Timeline View | Good | Adds a timeline view (`type: timeline-view`) to Bases - notes with start/end dates as bars. Demo: [[Features/Example Projects (Base)]] |
+| TaskNotes | Partial | Tasks as notes (status, priority and dates in the frontmatter) with Bases views for task list, Kanban, calendar and mini calendar (`type: tasknotesTaskList` etc.). Features that need a local server (HTTP API, calendar sync) do not run in the browser. Demo: [[Features/Example TaskNotes (Base)]] |
 
 See the individual [[Advanced/Plugins/Calendar|plugin guides]] for detailed compatibility information.
 

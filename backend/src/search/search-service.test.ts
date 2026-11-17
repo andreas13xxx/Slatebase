@@ -73,6 +73,7 @@ function createMockVaultService(opts: MockVaultServiceOptions = {}): IVaultServi
     }),
     createVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVault: async () => {},
+    renameVault: async () => ({ id: '', name: '', path: '', status: 'loaded' as const }),
     deleteVaultWithChecks: async () => {},
     transferOwnership: async () => {},
     deleteContent: async () => {},

@@ -394,6 +394,12 @@ describe('keychain routes', () => {
   })
 })
 
+describe('resolveRequiredLevel — vault rename', () => {
+  it('requires owner for PATCH on the bare vault path', () => {
+    expect(resolveRequiredLevel('PATCH', '')).toBe('owner')
+  })
+})
+
 describe('bookmarks-config routes', () => {
   it('reads with read access and changes with write access, like app-config', () => {
     expect(resolveRequiredLevel('GET', '/bookmarks-config')).toBe('read')

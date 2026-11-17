@@ -70,6 +70,8 @@ export const VAULT_ROUTE_LEVEL_EXCEPTIONS: VaultRouteLevelException[] = [
   { method: 'PUT', pathPattern: '/config', level: 'owner' },
   // index.ts:925 — deleteVaultWithChecks() requires ownership (business/index.ts:818).
   { method: 'DELETE', pathPattern: '', level: 'owner' },
+  // PATCH /vaults/:vaultId renames the vault — renameVault() requires ownership.
+  { method: 'PATCH', pathPattern: '', level: 'owner' },
 ]
 
 interface CompiledException {

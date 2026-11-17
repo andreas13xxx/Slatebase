@@ -10,7 +10,7 @@ properties:
   estimate:
     displayName: "Estimate (h)"
 views:
-  - type: cards
+  - type: kanban
     name: "By status"
     groupBy:
       property: status

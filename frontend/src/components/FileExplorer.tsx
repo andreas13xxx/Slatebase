@@ -13,6 +13,7 @@ import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { InlineInput } from './InlineInput'
 import { ConfirmModal } from './ConfirmModal'
+import { RenameVaultModal } from './RenameVaultModal'
 import { validateFileName, normalizeFileName } from '../utils/fileValidation'
 import { showToast } from './ToastNotification'
 import { favoritesStore } from '../state/favoritesStore'
@@ -92,6 +93,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedPaths))
   const [expandedVaults, setExpandedVaults] = useState<Set<string>>(() => new Set(getWorkspaceState().expandedVaults))
   const [showCreateVaultForm, setShowCreateVaultForm] = useState(false)
+  const [renameVaultDialog, setRenameVaultDialog] = useState<{ vaultId: string; name: string; error: string | null } | null>(null)
   const [moveDialog, setMoveDialog] = useState<{ node: DirectoryTree; vaultId: string } | null>(null)
   // Folders the item of the open "Move to…" dialog may go into; empty (not a stuck dialog) if the tree was unloaded meanwhile.
   const moveTree = moveDialog ? state.vaultTrees[moveDialog.vaultId] : undefined
@@ -939,6 +941,18 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
     setDeleteConfirm({ open: false, node: null, vaultId: null })
   }
 
+  /** Renames a vault via PATCH; the dialog stays open with the error on conflict. */
+  async function handleRenameVault(vaultId: string, name: string) {
+    if (!apiClient) return
+    try {
+      await apiClient.renameVault(vaultId, name)
+      dispatch({ type: 'VAULT_RENAMED', payload: { vaultId, name } })
+      setRenameVaultDialog(null)
+    } catch (err: unknown) {
+      setRenameVaultDialog((prev) => (prev ? { ...prev, error: extractErrorMessage(err, t('common.error')) } : prev))
+    }
+  }
+
   /** Handles a context menu action selection for the currently targeted node. */
   function handleMenuSelect(action: string) {
     const node = contextMenuState.targetNode
@@ -980,6 +994,11 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       case 'newVault':
         setShowCreateVaultForm(true)
         break
+      case 'renameVault': {
+        const vault = state.vaults.find((v) => v.id === contextMenuState.vaultId)
+        if (vault) setRenameVaultDialog({ vaultId: vault.id, name: vault.name, error: null })
+        break
+      }
       case 'rename':
         handleRename(node)
         break
@@ -1637,6 +1656,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             ...(basesEnabled ? [{ id: 'newBase', label: 'Neue Base', icon: <Database size={14} /> }] : []),
             { id: 'newFromTemplate', label: 'Neue Notiz aus Vorlage', icon: <FileText size={14} /> },
             { id: 'separator-1', label: '', separator: true },
+            ...(permission === 'owner' ? [{ id: 'renameVault', label: t('vault.renameVault'), icon: <Pencil size={14} /> }] : []),
             { id: 'export', label: t('contextMenu.export'), icon: <Download size={14} /> },
           ]
         }
@@ -1660,6 +1680,16 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
           />
         )
       })()}
+
+      {renameVaultDialog && (
+        <RenameVaultModal
+          open
+          currentName={renameVaultDialog.name}
+          error={renameVaultDialog.error}
+          onCancel={() => setRenameVaultDialog(null)}
+          onSubmit={(name) => { void handleRenameVault(renameVaultDialog.vaultId, name) }}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

@@ -671,6 +671,8 @@ export interface IApiClient {
   fetchFileContent(vaultId: string, filePath: string): Promise<FileContent>
   createVault(name: string): Promise<VaultInfo>
   deleteVault(vaultId: string): Promise<void>
+  /** Renames a vault (owner only). */
+  renameVault(vaultId: string, name: string): Promise<VaultInfo>
   importFile(vaultId: string, file: File): Promise<void>
   importFolder(vaultId: string, files: FileList): Promise<void>
   deleteContent(vaultId: string, path: string): Promise<void>
@@ -1097,6 +1099,10 @@ export class ApiClient implements IApiClient {
 
   async deleteVault(vaultId: string): Promise<void> {
     await this.request<void>('DELETE', `/api/v1/vaults/${vaultId}`)
+  }
+
+  async renameVault(vaultId: string, name: string): Promise<VaultInfo> {
+    return this.request<VaultInfo>('PATCH', `/api/v1/vaults/${vaultId}`, { name })
   }
 
   async importFile(vaultId: string, file: File): Promise<void> {

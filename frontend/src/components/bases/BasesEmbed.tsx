@@ -154,7 +154,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
         </span>
       )}
       {kind === 'kanban' && (
-        <BasesKanbanView doc={doc} view={view} rows={rows} onOpenNote={onOpenNote} />
+        <BasesKanbanView doc={doc} view={view} rows={rows} vaultId={vaultId} onOpenNote={onOpenNote} />
       )}
       {kind === 'cards' && (
         <BasesCardsView doc={doc} view={view} rows={rows} vaultId={vaultId} onOpenNote={onOpenNote} />
