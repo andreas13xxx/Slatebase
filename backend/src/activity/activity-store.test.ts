@@ -126,6 +126,20 @@ describe('ActivityStore', () => {
     expect(events).toHaveLength(2)
   })
 
+  it('never folds a git-sync edit into an open window, nor opens one for it', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-10T02:00:00.000Z'))
+    await store.record(VAULT_ID, { type: 'note.edited', path: 'A.md', user: 'andreas' })
+
+    vi.setSystemTime(new Date('2026-10-10T02:00:10.000Z'))
+    await store.record(VAULT_ID, { type: 'note.edited', path: 'A.md', user: 'Git-Sync', origin: 'git-sync' })
+    await store.record(VAULT_ID, { type: 'note.edited', path: 'A.md', user: 'Git-Sync', origin: 'git-sync' })
+
+    const events = await readAll()
+    expect(events).toHaveLength(3)
+    expect(events.filter((event) => event.origin === 'git-sync')).toHaveLength(2)
+  })
+
   it('does not coalesce edits of different files', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-10T02:00:00.000Z'))

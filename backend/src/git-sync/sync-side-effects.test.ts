@@ -127,6 +127,52 @@ describe('SyncSideEffects', () => {
     expect(activity).toEqual([{ type: 'note.moved', path: 'b.md', oldPath: 'a.md', user: 'Git-Sync', origin: 'git-sync' }])
   })
 
+  it('keeps the old content of a renamed file that was also edited as a version', async () => {
+    changes = [{ status: 'R', path: 'b.md', oldPath: 'a.md' }]
+    oldContent['a.md'] = Buffer.from('old body')
+    await writeFile(join(cwd, 'b.md'), 'new body')
+
+    const result = await sideEffects.apply('v1', cwd, 'a', 'b')
+
+    expect(versions).toEqual([{ path: 'b.md', content: 'old body' }])
+    expect(result.versioned).toBe(1)
+  })
+
+  it('creates no extra version for a pure rename', async () => {
+    changes = [{ status: 'R', path: 'b.md', oldPath: 'a.md' }]
+    oldContent['a.md'] = Buffer.from('same')
+    await writeFile(join(cwd, 'b.md'), 'same')
+
+    await sideEffects.apply('v1', cwd, 'a', 'b')
+
+    expect(versions).toEqual([])
+  })
+
+  it('skips paths that would leave the vault and logs them', async () => {
+    changes = [
+      { status: 'D', path: '../outside.md' },
+      { status: 'D', path: 'a/../../outside.md' },
+      { status: 'A', path: '/etc/passwd' },
+      { status: 'D', path: 'ok.md' },
+    ]
+    for (const change of changes) oldContent[change.path] = Buffer.from('x')
+
+    await sideEffects.apply('v1', cwd, 'a', 'b')
+
+    expect(trashed.map((entry) => entry.path)).toEqual(['ok.md'])
+    expect(activity.map((event) => event.path)).toEqual(['ok.md'])
+    expect(logger.warnings.filter((message) => message === 'Skipped an unsafe path from the remote')).toHaveLength(3)
+  })
+
+  it('accepts legitimate names with percent signs and dots', async () => {
+    changes = [{ status: 'D', path: 'notes/100%.md' }, { status: 'D', path: 'a..b/file.md' }]
+    for (const change of changes) oldContent[change.path] = Buffer.from('x')
+
+    await sideEffects.apply('v1', cwd, 'a', 'b')
+
+    expect(trashed.map((entry) => entry.path)).toEqual(['notes/100%.md', 'a..b/file.md'])
+  })
+
   it('maps canvas and base files to their own event types', async () => {
     changes = [{ status: 'A', path: 'board.canvas' }, { status: 'M', path: 'tasks.base' }]
     oldContent['tasks.base'] = Buffer.from('x')

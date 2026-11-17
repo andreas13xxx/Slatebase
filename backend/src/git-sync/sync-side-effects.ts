@@ -53,6 +53,17 @@ function isHiddenPath(path: string): boolean {
   return path.split('/').some((segment) => segment.startsWith('.'))
 }
 
+/**
+ * Paths come from a remote repository, so they are untrusted. A trash entry is later restored to
+ * its `originalPath`, so a `..` segment would write outside the vault. Not `validateFilePath()`:
+ * that URL-decodes, which would throw on a legitimate name like `100%.md` and turn `a%20b.md`
+ * into a different file.
+ */
+function isSafeRelativePath(path: string): boolean {
+  if (path === '' || path.includes('\0') || path.startsWith('/') || /^[A-Za-z]:/.test(path)) return false
+  return !path.split(/[\\/]/).some((segment) => segment === '..')
+}
+
 function eventTypeFor(status: 'A' | 'M' | 'D', path: string): ActivityEventType {
   const prefix = extname(path) === '.canvas' ? 'canvas' : extname(path) === '.base' ? 'base' : 'note'
   const suffix = status === 'A' ? 'created' : status === 'M' ? 'edited' : 'deleted'
@@ -73,6 +84,11 @@ export class SyncSideEffects {
     let changes: GitFileChange[]
     try {
       changes = (await this.deps.gitCli.diffNameStatus(cwd, fromRef, toRef))
+        .filter((change) => {
+          const safe = isSafeRelativePath(change.path) && (change.oldPath === undefined || isSafeRelativePath(change.oldPath))
+          if (!safe) this.warn('Skipped an unsafe path from the remote', vaultId, new Error('path escapes the vault'), change.path)
+          return safe
+        })
         .filter((change) => !isHiddenPath(change.path) && !(change.oldPath !== undefined && isHiddenPath(change.oldPath)))
     } catch (error) {
       this.warn('Could not list the files changed by the sync', vaultId, error)
@@ -116,6 +132,16 @@ export class SyncSideEffects {
     if (change.status === 'R' && change.oldPath !== undefined) {
       const oldPath = change.oldPath
       await this.guard(vaultId, change.path, async () => { await versionService.moveVersions(vaultId, oldPath, change.path) })
+      // A rename with edits (git reports similar content as `R`) replaces the old content. Keep it
+      // as a version of the new path, otherwise it would only survive in git.
+      await this.guard(vaultId, change.path, async () => {
+        const previous = fromRef === null ? null : await gitCli.showFileAt(cwd, fromRef, oldPath)
+        if (!previous || previous.length > MAX_VERSION_BYTES) return
+        const current = await readFile(join(cwd, change.path))
+        if (current.equals(previous)) return
+        await versionService.createVersion(vaultId, change.path, previous)
+        result.versioned++
+      })
       await this.guard(vaultId, change.path, async () => { await linkIndexHook?.onFileRenamed(vaultId, oldPath, change.path) })
       result.moved++
       this.record(result, vaultId, { type: 'note.moved', path: change.path, oldPath })
