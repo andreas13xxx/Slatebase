@@ -63,6 +63,15 @@ The token or SSH key is stored encrypted and never returned to the browser in pl
 
 Each run first commits local changes, then fetches the remote's state, merges, and pushes the result. The status badge shows the outcome of the last run: **Success**, **Error**, or **Conflict**.
 
+### What a pull does to your files
+
+Git changes files directly on disk, but Slatebase treats a pull like a normal edit:
+
+- A file **deleted** by the sync goes into the **trash** and can be restored.
+- A file **changed** by the sync gets a **new version** holding its content from before the sync.
+- Every created, changed, deleted or moved file appears as its own entry in the **Activity timeline** (origin *Git-Sync*), plus one summary entry per sync. Above 500 files only the summary is shown.
+- Hidden files and folders (starting with a dot, like `.obsidian/`) are skipped.
+
 ---
 
 ## Resolving conflicts

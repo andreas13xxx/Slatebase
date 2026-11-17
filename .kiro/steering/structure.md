@@ -302,6 +302,7 @@ src/
 │   ├── status-store.ts        — GitSyncStatusStore (last run, result, error per remote)
 │   ├── git-cli.ts             — GitCli (spawns the system `git`, argument arrays only — never a shell string)
 │   ├── ssh-keygen.ts          — SshKeyGenerator (generates a keypair, derives the public half via `ssh-keygen -y` so it can be shown for copying into GitHub as a deploy key)
+│   ├── sync-side-effects.ts   — SyncSideEffects: after a merge, reads each touched file's previous content back with `git show <preMergeHead>:<path>` and applies trash (deleted), version (modified), activity event per file (≤ 500, origin `git-sync`) and link-index updates; renames move versions + index; hidden paths skipped; every effect isolated and never fails the sync
 │   ├── sync-engine.ts         — GitSyncEngine (pull/rebase/push cycle, conflict detection, credentials read from ModuleSecretStore under GIT_SYNC_SECRET_MODULE_ID)
 │   └── git-sync-scheduler.ts  — GitSyncScheduler (per-remote interval timer, lifecycle owned by the composition root)
 ├── account/                   — Passkeys and mail recovery (toggles `passkeys`, `mail-recovery`, hot, default-on). Spec: `.kiro/specs/passkeys/`.
