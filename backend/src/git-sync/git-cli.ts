@@ -66,6 +66,16 @@ export const CONFLICT_STATUS_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'UD'
 /** Git's well-known empty-tree object hash — valid in every repository, used to diff a ref against "nothing" (e.g. a repo's very first commit). */
 const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
+/** One file touched between two commits (`git diff --name-status`). */
+export interface GitFileChange {
+  /** A = added, M = modified (incl. type change), D = deleted, R = renamed (copies count as A). */
+  status: 'A' | 'M' | 'D' | 'R'
+  /** Path after the change (the new path for a rename). */
+  path: string
+  /** Previous path. Present only for `R`. */
+  oldPath?: string
+}
+
 export interface IGitCli {
   isRepo(cwd: string): Promise<boolean>
   init(cwd: string, initialBranch: string): Promise<void>
@@ -82,6 +92,10 @@ export interface IGitCli {
   getHead(cwd: string): Promise<string | null>
   /** Names of files that differ between two commits. `fromRef: null` diffs against the empty tree (e.g. a fresh first commit). */
   diffNameOnly(cwd: string, fromRef: string | null, toRef: string): Promise<string[]>
+  /** Files touched between two refs with their change kind; renames detected. `fromRef` null = empty tree. */
+  diffNameStatus(cwd: string, fromRef: string | null, toRef: string): Promise<GitFileChange[]>
+  /** Raw content of `file` at `ref` (binary-safe, at most 16 MB). `null` if it does not exist there or cannot be read. */
+  showFileAt(cwd: string, ref: string, file: string): Promise<Buffer | null>
   /** Content of `file` in a conflicted merge: stage 1 = common base, 2 = ours, 3 = theirs. `null` if that side has no such file. */
   showStage(cwd: string, stage: 1 | 2 | 3, file: string): Promise<string | null>
   /** Stages `file` as it is in the working tree (marks a conflict as resolved). */
@@ -202,6 +216,46 @@ export class GitCli implements IGitCli {
   async diffNameOnly(cwd: string, fromRef: string | null, toRef: string): Promise<string[]> {
     const { stdout } = await this.run(cwd, ['diff', '--name-only', fromRef ?? EMPTY_TREE_HASH, toRef])
     return stdout.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+  }
+
+  async diffNameStatus(cwd: string, fromRef: string | null, toRef: string): Promise<GitFileChange[]> {
+    // -z: NUL-separated, paths never quoted/escaped. core.quotepath would otherwise mangle umlauts.
+    const { stdout } = await this.run(cwd, ['diff', '--name-status', '-z', '-M', fromRef ?? EMPTY_TREE_HASH, toRef])
+    const parts = stdout.split('\0')
+    const changes: GitFileChange[] = []
+    let i = 0
+    while (i < parts.length) {
+      const code = parts[i++] ?? ''
+      if (code === '') continue
+      const letter = code.charAt(0)
+      if (letter === 'R' || letter === 'C') {
+        const oldPath = parts[i++]
+        const path = parts[i++]
+        if (oldPath === undefined || path === undefined) break
+        changes.push(letter === 'R' ? { status: 'R', path, oldPath } : { status: 'A', path })
+      } else {
+        const path = parts[i++]
+        if (path === undefined) break
+        if (letter === 'A' || letter === 'D') changes.push({ status: letter, path })
+        else changes.push({ status: 'M', path })
+      }
+    }
+    return changes
+  }
+
+  async showFileAt(cwd: string, ref: string, file: string): Promise<Buffer | null> {
+    try {
+      const { stdout } = await execFileAsync('git', [...GLOBAL_CONFIG_ARGS, 'show', `${ref}:${file}`], {
+        cwd,
+        timeout: GIT_TIMEOUT_MS,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+        maxBuffer: 16 * 1024 * 1024,
+        encoding: 'buffer',
+      })
+      return stdout
+    } catch {
+      return null
+    }
   }
 
   async showStage(cwd: string, stage: 1 | 2 | 3, file: string): Promise<string | null> {

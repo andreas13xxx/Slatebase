@@ -298,4 +298,64 @@ describe('GitCli — symlinks from a remote', { timeout: 30000 }, () => {
     expect(await git(workDir, ['ls-files', '-s', 'link.md'])).toMatch(/^120000 /)
     expect(await cli.hasUncommittedChanges(workDir)).toBe(false)
   })
+  describe('diffNameStatus / showFileAt', () => {
+    async function commitState(message: string): Promise<string> {
+      await cli.commitAll(workDir, message)
+      const head = await cli.getHead(workDir)
+      if (!head) throw new Error('no head')
+      return head
+    }
+
+    beforeEach(async () => {
+      await cli.init(workDir, 'main')
+      await cli.configureIdentity(workDir)
+    })
+
+    it('reports added, modified, deleted and renamed files', async () => {
+      await writeFile(join(workDir, 'keep.md'), 'keep\n')
+      await writeFile(join(workDir, 'edit.md'), 'one\n')
+      await writeFile(join(workDir, 'gone.md'), 'gone\n')
+      await writeFile(join(workDir, 'old name.md'), 'a long enough body so rename detection works\nline2\nline3\n')
+      const first = await commitState('first')
+
+      await writeFile(join(workDir, 'edit.md'), 'two\n')
+      await rm(join(workDir, 'gone.md'))
+      await writeFile(join(workDir, 'new.md'), 'new\n')
+      await mkdir(join(workDir, 'dir'))
+      await execFileAsync('git', ['mv', 'old name.md', 'dir/Übersicht.md'], { cwd: workDir })
+      const second = await commitState('second')
+
+      const changes = await cli.diffNameStatus(workDir, first, second)
+      const byPath = new Map(changes.map((c) => [c.path, c]))
+      expect(byPath.get('edit.md')?.status).toBe('M')
+      expect(byPath.get('gone.md')?.status).toBe('D')
+      expect(byPath.get('new.md')?.status).toBe('A')
+      expect(byPath.get('dir/Übersicht.md')).toEqual({ status: 'R', path: 'dir/Übersicht.md', oldPath: 'old name.md' })
+      expect(byPath.has('keep.md')).toBe(false)
+    })
+
+    it('diffs against the empty tree when fromRef is null', async () => {
+      await writeFile(join(workDir, 'a.md'), 'a\n')
+      const head = await commitState('first')
+      expect(await cli.diffNameStatus(workDir, null, head)).toEqual([{ status: 'A', path: 'a.md' }])
+    })
+
+    it('returns the file content at a ref, binary-safe', async () => {
+      const bytes = Buffer.from([0x00, 0xff, 0x10, 0x80, 0x0a, 0x00])
+      await writeFile(join(workDir, 'img.bin'), bytes)
+      await writeFile(join(workDir, 'n.md'), 'old\n')
+      const first = await commitState('first')
+      await writeFile(join(workDir, 'n.md'), 'new\n')
+      await commitState('second')
+
+      expect((await cli.showFileAt(workDir, first, 'img.bin'))?.equals(bytes)).toBe(true)
+      expect((await cli.showFileAt(workDir, first, 'n.md'))?.toString('utf-8')).toBe('old\n')
+    })
+
+    it('returns null when the file does not exist at the ref', async () => {
+      await writeFile(join(workDir, 'a.md'), 'a\n')
+      const head = await commitState('first')
+      expect(await cli.showFileAt(workDir, head, 'missing.md')).toBeNull()
+    })
+  })
 })

@@ -22,7 +22,7 @@ export { GitSyncStatusStore } from './status-store.js'
 export type { IGitSyncStatusStore } from './status-store.js'
 
 export { GitCli } from './git-cli.js'
-export type { IGitCli } from './git-cli.js'
+export type { IGitCli, GitFileChange } from './git-cli.js'
 
 export { SshKeyGenerator } from './ssh-keygen.js'
 export type { ISshKeyGenerator } from './ssh-keygen.js'

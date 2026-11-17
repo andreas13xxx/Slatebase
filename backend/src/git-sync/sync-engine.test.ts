@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { GitSyncEngine } from './sync-engine.js'
-import type { IGitCli } from './git-cli.js'
+import type { IGitCli, GitFileChange } from './git-cli.js'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry.js'
 import type { IGitSyncConfigStore } from './config-store.js'
 import type { IGitSyncStatusStore } from './status-store.js'
@@ -70,6 +70,12 @@ class FakeGitCli implements IGitCli {
     return value
   }
   async diffNameOnly(): Promise<string[]> { this.calls.push('diffNameOnly'); return this.diffResult }
+  /** Returned by every `diffNameStatus()` call; deliberately not recorded in `calls`. */
+  public statusResult: GitFileChange[] = []
+  /** Old file contents by path, returned by `showFileAt()`. */
+  public fileContents: Record<string, Buffer> = {}
+  async diffNameStatus(): Promise<GitFileChange[]> { return this.statusResult }
+  async showFileAt(_cwd: string, _ref: string, file: string): Promise<Buffer | null> { return this.fileContents[file] ?? null }
   /** Content of the three conflict stages, by stage number; a missing one means "no such file". */
   public stages: Partial<Record<1 | 2 | 3, string>> = {}
   async showStage(_cwd: string, stage: 1 | 2 | 3): Promise<string | null> { return this.stages[stage] ?? null }
