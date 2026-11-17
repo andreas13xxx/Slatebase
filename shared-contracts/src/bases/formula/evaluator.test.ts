@@ -75,10 +75,14 @@ describe('evaluateFormula', () => {
     expect(r).toEqual({ ok: true, value: '✓' })
   })
 
-  it('computes a millisecond difference between two dates (Obsidian semantics)', () => {
+  it('subtracting two dates gives a duration (Obsidian semantics)', () => {
     const r = evaluateFormula('date("2026-01-10") - date("2026-01-01")', ctxOf({}))
-    // 9 days in milliseconds
-    expect(r).toEqual({ ok: true, value: 9 * 86_400_000 })
+    expect(r).toEqual({ ok: true, value: { kind: 'duration', months: 0, ms: 9 * 86_400_000 } })
+    // It still reads as milliseconds in arithmetic and comparisons, and has the unit members.
+    expect(evaluateFormula('(date("2026-01-10") - date("2026-01-01")) / 86400000', ctxOf({}))).toEqual({ ok: true, value: 9 })
+    expect(evaluateFormula('(date("2026-01-10") - date("2026-01-01")).days', ctxOf({}))).toEqual({ ok: true, value: 9 })
+    expect(evaluateFormula('(date("2026-01-10") - date("2026-01-01")) > 1000', ctxOf({}))).toEqual({ ok: true, value: true })
+    expect(formatFormulaValue(r.ok ? r.value : null)).toBe('9d')
   })
 
   it('returns an error on division by zero (no crash)', () => {
