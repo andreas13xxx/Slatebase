@@ -27,6 +27,15 @@ if (shareToken === null) {
   })
 }
 
+// Safety net next to `overflow: clip` (index.css): the app shell never scrolls the document, so
+// reset it if a browser still moves it (focus()/scrollIntoView() on a partly hidden element).
+if (shareToken === null) {
+  document.addEventListener('scroll', () => {
+    const el = document.scrollingElement
+    if (el && (el.scrollTop !== 0 || el.scrollLeft !== 0)) el.scrollTo(0, 0)
+  })
+}
+
 // Offline fallback only (public/sw.js): the worker answers a failed page navigation with
 // /offline.html and touches nothing else, so no signed-in content is ever cached.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
