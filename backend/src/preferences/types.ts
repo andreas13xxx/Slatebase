@@ -50,20 +50,6 @@ export interface FavoriteEntry {
   searchRegex?: boolean | undefined
 }
 
-// ─── Keybindings ─────────────────────────────────────────────────────────────
-
-/**
- * A single keybinding override.
- * Shortcut format: modifier keys joined with `+`, e.g. "Ctrl+Shift+P", "Ctrl+S".
- * Use "Meta" for Cmd on macOS.
- */
-export interface KeybindingEntry {
-  /** The command ID this binding applies to, e.g. "slatebase:open-command-palette". */
-  commandId: string
-  /** The shortcut string, e.g. "Ctrl+P" or "Ctrl+Shift+F". Empty string means unbound. */
-  shortcut: string
-}
-
 // ─── UI Settings ─────────────────────────────────────────────────────────────
 
 /**
@@ -71,7 +57,7 @@ export interface KeybindingEntry {
  *
  * These were device-local `localStorage` values, which meant "my settings"
  * silently differed per browser. They are stored here so they follow the
- * account, exactly like keybindings do.
+ * account.
  *
  * The shape is deliberately open (`Record<string, unknown>` for the toolbar's
  * per-entry maps) only where the client owns the vocabulary — plugin ribbon
@@ -157,13 +143,6 @@ export interface UserVaultSettings {
    * reader's browser fetch URLs an author put there. Off = render a plain link.
    */
   webEmbedEnabled: boolean
-  /**
-   * Named workspace layouts (saved pane trees + tab lists + panel layouts).
-   * Content-free snapshots owned by the client; the server stores them as
-   * opaque objects (size/type bounded, no shape check — the pane-tree internals
-   * belong to the client, like `graph`/`sidebarPanel`).
-   */
-  workspaces: Record<string, unknown>[]
 }
 
 // ─── Patch Types ─────────────────────────────────────────────────────────────
@@ -209,7 +188,6 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
   contextPanel: null,
   activityRange: null,
   webEmbedEnabled: false,
-  workspaces: [],
 }
 
 // ─── Aggregate ───────────────────────────────────────────────────────────────
@@ -218,7 +196,6 @@ export const DEFAULT_VAULT_SETTINGS: UserVaultSettings = {
 export interface UserPreferences {
   recentFiles: RecentFileEntry[]
   favorites: FavoriteEntry[]
-  keybindings: KeybindingEntry[]
   /** Account-wide UI settings. Absent on files written before this existed. */
   uiSettings: UserUiSettings
   /** Per-vault settings, keyed by vault ID. */
@@ -239,10 +216,6 @@ export interface IPreferencesService {
   /** Save the favorites for a user. Capped at 50 entries per vault. */
   saveFavorites(userId: string, entries: FavoriteEntry[]): Promise<void>
 
-  /** Get the keybinding overrides for a user. */
-  getKeybindings(userId: string): Promise<KeybindingEntry[]>
-  /** Save the keybinding overrides for a user. */
-  saveKeybindings(userId: string, entries: KeybindingEntry[]): Promise<void>
 
   /** Get the account-wide UI settings, merged over the defaults. */
   getUiSettings(userId: string): Promise<UserUiSettings>

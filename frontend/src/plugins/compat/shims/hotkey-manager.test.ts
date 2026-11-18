@@ -18,7 +18,6 @@ describe('app.hotkeyManager mirrors hotkeys.json', () => {
     await initialize({
       getHotkeysConfig: async () => ({ ...file }),
       patchHotkeysConfig: async () => ({ ...file }),
-      getKeybindings: async () => ({ entries: [] }),
     } as unknown as IApiClient)
     await loadVaultHotkeys('v1')
   })
@@ -57,7 +56,6 @@ describe('app.hotkeyManager — writes and bad input', () => {
     await initialize({
       getHotkeysConfig: async () => ({}),
       patchHotkeysConfig: async (_v: string, patch: Record<string, unknown>) => { patches.push(patch); return {} },
-      getKeybindings: async () => ({ entries: [] }),
     } as unknown as IApiClient)
     await loadVaultHotkeys('v1')
   })

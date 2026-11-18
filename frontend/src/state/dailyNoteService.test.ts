@@ -86,8 +86,6 @@ function createMockApiClient(overrides: Partial<IApiClient> = {}): IApiClient {
     saveRecentFiles: vi.fn().mockResolvedValue({ entries: [] }),
     getFavorites: vi.fn().mockResolvedValue({ entries: [] }),
     saveFavorites: vi.fn().mockResolvedValue({ entries: [] }),
-    getKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
-    saveKeybindings: vi.fn().mockResolvedValue({ entries: [] }),
     getVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: 'Templates/daily.md', dailyNoteFormat: null }),
     saveVaultConfig: vi.fn().mockResolvedValue({ templatesDirectory: 'Templates', dailyNotesDirectory: '', dailyNoteTemplate: 'Templates/daily.md', dailyNoteFormat: null }),
     ...overrides,

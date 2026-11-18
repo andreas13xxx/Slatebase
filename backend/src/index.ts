@@ -53,9 +53,9 @@ import { LinkIndexCache, LinkMigrationService } from './link-index/index.js'
 import type { ILinkIndex } from './link-index/index.js'
 import { createGraphRoutes } from './api/graphRoutes.js'
 import { createVaultAuthorizationMiddleware } from './api/vault-authorization-middleware.js'
-import { InstalledPluginStore, PluginInstaller, PluginService, migrateLegacyPlugins, PluginSecretKeyManager } from './plugin/index.js'
+import { InstalledPluginStore, PluginInstaller, PluginService } from './plugin/index.js'
 import { createPluginRoutes } from './api/pluginRoutes.js'
-import { SnippetStore, migrateLegacySnippets } from './snippets/index.js'
+import { SnippetStore } from './snippets/index.js'
 import { ThemeService } from './themes/index.js'
 import { createThemeRoutes } from './api/themeRoutes.js'
 import { ThemeStoreCache, ThemeStoreClient, ThemeStoreService, warmThemeStoreCatalog } from './theme-store/index.js'
@@ -90,7 +90,7 @@ import { PreferencesStore } from './preferences/index.js'
 import { createPreferencesRoutes } from './api/preferencesRoutes.js'
 import { VaultConfigStore } from './vault-config/index.js'
 import { createVaultConfigRoutes } from './api/vaultConfigRoutes.js'
-import { PropertyTypeStore, migratePropertyTypesToObsidian } from './property-type/index.js'
+import { PropertyTypeStore } from './property-type/index.js'
 import { createPropertyTypeRoutes } from './api/propertyTypeRoutes.js'
 import { SpellcheckDictionaryStore } from './spellcheck-dictionary/index.js'
 import { createSpellcheckDictionaryRoutes } from './api/spellcheckDictionaryRoutes.js'
@@ -109,9 +109,9 @@ import { createPublicShareService, createPublicShareStore, createPublicShareVaul
 import { WelcomeVaultService } from './welcome-vault/index.js'
 import { createWelcomeVaultRoutes, deduplicateVaultName } from './api/welcomeVaultRoutes.js'
 import { ModuleSecretKeyManager, ModuleSecretStore } from './shared-secrets/index.js'
-import { KeychainService, migratePluginSecretsToKeychain } from './keychain/index.js'
+import { KeychainService } from './keychain/index.js'
 import { createKeychainRoutes } from './api/keychainRoutes.js'
-import { AppConfigService, DeviationReporter, NoteConfigService, migrateAppConfigDefaults, migrateVaultConfigToObsidianFiles, migrateUserVaultSettingsToAppConfig } from './obsidian-config/index.js'
+import { AppConfigService, DeviationReporter, NoteConfigService } from './obsidian-config/index.js'
 import { createAppConfigRoutes } from './api/appConfigRoutes.js'
 import { createAppearanceConfigRoutes } from './api/appearanceConfigRoutes.js'
 import { AppearanceConfigService } from './obsidian-config/appearance-config.js'
@@ -196,18 +196,6 @@ if (!process.env['SLATEBASE_CSRF_SECRET']) {
     'Set this environment variable in production for stable session persistence.',
   )
 }
-// --- Plugin Secret Key Manager ---
-const pluginSecretKeyManager = new PluginSecretKeyManager(serverConfig.dataDir, logger)
-await pluginSecretKeyManager.loadOrCreate()
-
-if (!process.env['SLATEBASE_PLUGIN_SECRET_KEY']) {
-  logger.warn(
-    'SLATEBASE_PLUGIN_SECRET_KEY is not set — plugin secrets are encrypted with an auto-generated key. ' +
-    'Secrets will be unreadable if the key is lost (container rebuild, volume reset). ' +
-    'Set this environment variable in production for stable plugin secret persistence.',
-  )
-}
-
 // --- Module Secret Key Manager (git-sync, mail-import) ---
 const moduleSecretKeyManager = new ModuleSecretKeyManager(serverConfig.dataDir, logger)
 await moduleSecretKeyManager.loadOrCreate()
@@ -1262,21 +1250,6 @@ await vaultService.initializeVaults()
 await vaultRegistry.load()
 vaultRegistryReady = true
 
-// Snippets used to live in data/snippets/<vaultId>/; Obsidian keeps them in the vault's .obsidian/snippets/.
-await migrateLegacySnippets({ dataDir: serverConfig.dataDir, vaultRegistry, snippetStore, logger })
-// Plugins used to live in data/plugins/<vaultId>/; Obsidian keeps them in the vault's .obsidian/plugins/.
-await migrateLegacyPlugins({ dataDir: serverConfig.dataDir, vaultRegistry, pluginStore, logger })
-// app.json defaults follow Obsidian now; vaults that exist at the first start keep the previous ones. Must run before the other app.json migrations, which create the file.
-await migrateAppConfigDefaults({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
-// Property types used to live only in .slatebase/property-types.json; Obsidian's types.json holds them now.
-await migratePropertyTypesToObsidian({ dataDir: serverConfig.dataDir, vaultRegistry, store: propertyTypeStore, logger })
-// Settings that .slatebase/config.json held and Obsidian's files now own move over (attachments folder).
-await migrateVaultConfigToObsidianFiles({ vaultRegistry, appConfigService, noteConfigService, defaultTemplatesDirectory: templatesConfig.directory, logger })
-// Line numbers, readable line length and spellcheck used to be per user; the vault's app.json owns them now.
-await migrateUserVaultSettingsToAppConfig({ dataDir: serverConfig.dataDir, vaultRegistry, appConfigService, logger })
-// Plugin secrets used to be per plugin (data/plugins/<vaultId>/<pluginId>/secrets.json); they now live in the vault keychain.
-await migratePluginSecretsToKeychain({ dataDir: serverConfig.dataDir, keychain: keychainService, keyManager: pluginSecretKeyManager, logger })
-
 // Set up link index hook on VaultController for incremental updates.
 // Held in a named const because the MCP tool handlers (4c above) reuse it via
 // closure — an MCP write/delete has to keep the index in sync just like a REST
@@ -1426,7 +1399,7 @@ const server = createHttpServer(async (req, res) => {
   // (Hono's response handler tries to write headers after nodeRes.writeHead() in the SSE route)
   const parsedUrl = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`)
   if (parsedUrl.pathname === '/api/v1/events' && req.method === 'GET') {
-    // Authenticate: ticket-based (preferred) or token-based (legacy fallback)
+    // Authenticate: ticket-based (preferred) or Authorization header / session cookie
     let userId: string | undefined
 
     const ticket = parsedUrl.searchParams.get('ticket')

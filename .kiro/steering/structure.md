@@ -182,10 +182,8 @@ src/
 │   ├── types.ts              — IInstalledPluginStore, PluginManifest, PluginFiles, PluginRegistryData interfaces
 │   ├── errors.ts             — PluginNotFoundError, PluginFileTooLargeError, PluginSettingsTooLargeError
 │   ├── validation.ts         — Zod schemas (pluginManifestSchema, pluginRegistrySchema)
-│   ├── secret-key-manager.ts — PluginSecretKeyManager (legacy: only decrypts the former per-plugin secrets for `keychain/legacy-migration.ts`; encryption key: env `SLATEBASE_PLUGIN_SECRET_KEY` → file → generate, same pattern as CsrfSecretManager; HKDF-SHA256 down to an AES-256 key)
 │   ├── installed-plugin-store.ts — InstalledPluginStore (plugin files + `data.json` in the vault at `.obsidian/plugins/<id>/`, enabled ids in `.obsidian/community-plugins.json`; the registry stays under `data/plugins/<vaultId>/`; symlinks leaving the vault are treated as absent; takes a vault-path resolver; atomic writes); `loadManifest` normalizes `manifest.id` to the directory name, since every other lookup is keyed by that and a manifest's self-declared id is upstream-controlled and can drift. The atomic write retries on EPERM/EACCES (Windows file locking from OneDrive sync or antivirus), then unlinks and retries, then falls back to a direct write — a transient lock must never surface as a lost write
 │   ├── installed-plugin-store.test.ts — Unit tests for InstalledPluginStore
-│   ├── legacy-migration.ts   — One-time, non-destructive copy of the old `data/plugins/<vaultId>/<id>/` files into the vault (marker file `.migrated-to-vault`; the registry is not moved)
 │   ├── plugin-installer.ts   — PluginInstaller (ZIP extraction, manifest validation, bundle integrity, version comparison)
 │   ├── plugin-installer.test.ts — Unit tests for PluginInstaller
 │   ├── plugin-service.ts     — PluginService (routes→service→store layer wrapping InstalledPluginStore + PluginInstaller; mirrors activation into the vault's `community-plugins.json`: a plugin counts as active only while approved in the registry AND listed there); `saveSettings()` publishes a `plugin-settings:change` broadcast so other tabs/devices reload instead of drifting
@@ -205,7 +203,6 @@ src/
 │   ├── errors.ts             — SnippetNotFoundError, SnippetTooLargeError, InvalidSnippetFilenameError
 │   ├── validation.ts         — Zod schemas + `SNIPPET_FILENAME_PATTERN` (Obsidian-style names: spaces and dots allowed; no `/ \ % : * ? " < > |`, no leading dot), `MAX_SNIPPET_SIZE` (512 KB)
 │   ├── snippet-store.ts      — SnippetStore (atomic writes into the vault; takes the vault path, not the vault id)
-│   ├── legacy-migration.ts   — One-time, non-destructive copy of the old `data/snippets/<vaultId>/` into the vault (marker file `.migrated-to-vault` in the old folder)
 │   └── snippet-store.test.ts — Unit tests for SnippetStore
 ├── themes/                   — Obsidian themes. Vault content, not Slatebase data: `<vault>/.obsidian/themes/<id>/{theme.css,manifest.json}`; the active theme is `cssTheme` in `<vault>/.obsidian/appearance.json`. Symlinks are never followed.
 ├── theme-store/              — Community theme marketplace (browse/install/update from the Obsidian catalog `community-css-themes.json`). Fetches only from `raw.githubusercontent.com` and the download statistics `releases.obsidian.md/stats/theme` (merged into the catalog as `downloads`; optional, never blocks it) via `shared/guarded-fetch.ts` (host allowlist re-checked on every redirect, streaming size limit, no credentials, never the GitHub token). Installs through `ThemeService.saveTheme`; installed themes are matched to catalog entries by `manifest.name`. Catalog warmed at startup (not awaited) and persisted to `data/theme-store-cache.json`. Behind the `obsidian-theme-store` feature toggle.
@@ -278,7 +275,6 @@ src/
 ├── keychain/                  — Vault keychain: named secrets shared by all plugins of a vault (Obsidian's `app.secretStorage`), stored through ModuleSecretStore with `moduleId` `keychain`.
 │   ├── index.ts               — Barrel export for keychain module
 │   ├── keychain-service.ts    — KeychainService (IDs `[a-z0-9]` with single hyphens, max 128 chars; max 200 entries per vault, 10 KB per value; `deleteAllForVault` on vault deletion)
-│   └── legacy-migration.ts    — migratePluginSecretsToKeychain (startup: moves `data/plugins/<vaultId>/<pluginId>/secrets.json` into the keychain; normalizes IDs, shares equal values, prefixes colliding names with `<pluginId>-`, idempotent, deletes the old file only after success)
 ├── obsidian-config/           — Typed access to JSON config files Obsidian keeps in `<vault>/.obsidian/` (the vault is the single source of truth; no per-user copy of a setting that exists here).
 │   ├── index.ts               — Barrel export
 │   ├── app-config.ts          — AppConfigService + Zod request schema for `app.json` (newFileLocation, newFileFolderPath, attachmentFolderPath, useMarkdownLinks, newLinkFormat, alwaysUpdateLinks, readableLineLength, defaultViewMode, livePreview, strictLineBreaks, showFrontmatter, foldHeading, foldIndent, spellcheck, showLineNumber; `null` removes a key; unknown keys are kept). Key names come from a real Obsidian file; enum members beyond those it shows are unverified.
@@ -290,9 +286,6 @@ src/
 │   ├── workspaces-config.ts   — WorkspacesConfigService for `workspaces.json` (`workspaces` name → layout, `active`; a PATCH sets/deletes single layouts, nested merge on a prototype-less copy)
 │   ├── config-schema.ts       — configRequestSchema(table): the Zod PATCH schema of a config file, built from its key table in `shared-contracts` (`config-table.ts`)
 │   ├── deviation-reporter.ts  — DeviationReporter: logs once per process where a real `.obsidian/` file differs from the tables (unknown key, wrong type, value outside an enum)
-│   ├── defaults-migration.ts  — migrateAppConfigDefaults (first start only: pins the old `alwaysUpdateLinks: true` into vaults Slatebase created or worked in; marker `migrations/app-config-defaults.done`)
-│   ├── legacy-migration.ts    — migrateVaultConfigToObsidianFiles (startup: `.slatebase/config.json` → Obsidian files: `attachmentsDirectory` → `app.json` `attachmentFolderPath` (`""` → `"./"`), `templatesDirectory` → `templates.json`, `dailyNotesDirectory` and `dailyNoteTemplateName` → `daily-notes.json`; every value is written, also one equal to the default; an existing Obsidian value wins, the old fields are removed only afterwards)
-│   └── user-settings-migration.ts — migrateUserVaultSettingsToAppConfig (startup: per-user `lineNumbers`/`readableLineLength`/`spellcheck` in `data/users/<userId>-preferences.json` → `app.json` `showLineNumber`/`readableLineLength`/`spellcheck`; the most recently changed preference file wins, an existing `app.json` value wins, the old keys are removed from the preference file only afterwards)
 ├── git-sync/                  — Per-vault git synchronization with external remotes. Feature toggle `git-sync` (cold).
 │   ├── index.ts               — Barrel export for git-sync module
 │   ├── types.ts               — GitSyncRemoteConfig, GitSyncVaultData, GitSyncRemoteStatus, GitAuthMethod ('https-token' | 'ssh-key'). The branch is vault-level (one working directory = one checkout), each remote has its own URL, credentials and interval
@@ -1014,7 +1007,6 @@ data/plugins/
 - **Plugin Files**: Atomic writes (temp → rename). Symlinks leaving the vault are treated as absent.
 - **Settings**: Preserved across version upgrades (savePlugin only touches manifest/bundle/styles).
 - **Vault Deletion Hook**: `deleteAllForVault(vaultId)` removes the server-side `data/plugins/<vaultId>/` directory only; the plugins in the vault go with the vault.
-- **Migration**: At startup `plugin/legacy-migration.ts` copies old `data/plugins/<vaultId>/<id>/` files into the vault (vault wins, nothing deleted, marker `.migrated-to-vault`).
 
 ### Vault Internal Data (per vault directory)
 

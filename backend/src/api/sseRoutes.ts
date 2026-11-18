@@ -49,7 +49,7 @@ function serializeEvent(event: SseEvent): string {
  *
  * The endpoint:
  * 1. Accepts tickets from `?ticket=` (preferred, short-lived one-time nonce)
- * 2. Falls back to `Authorization: Bearer <token>` or `?token=` query param (legacy)
+ * 2. Falls back to the standard auth middleware (`Authorization: Bearer <token>` or session cookie)
  * 3. Registers the connection with ConnectionManager
  * 4. Sends initial `presence:init` event with visible online users
  * 5. Replays missed events if `Last-Event-ID` header is present
@@ -67,7 +67,7 @@ export function createSseRoutes(deps: SseRouteDeps): Hono {
   // Ticket-based auth middleware for SSE.
   // If a `?ticket=` param is present, redeem it and set the userId directly.
   // This avoids passing the full session token in the URL.
-  // Falls back to the standard token-based auth if no ticket is provided.
+  // Falls back to the standard auth middleware if no ticket is provided.
   const ticketOrTokenMiddleware: MiddlewareHandler = async (c, next) => {
     // 1. Try ticket-based auth first (preferred)
     const ticket = c.req.query('ticket')
@@ -85,20 +85,7 @@ export function createSseRoutes(deps: SseRouteDeps): Hono {
       )
     }
 
-    // 2. Fall back to legacy token-based auth (Authorization header or ?token= query param)
-    const authHeader = c.req.header('Authorization')
-    if (!authHeader) {
-      const queryToken = c.req.query('token')
-      if (queryToken && queryToken.length > 0) {
-        const headers = new Headers(c.req.raw.headers)
-        headers.set('Authorization', `Bearer ${queryToken}`)
-        c.req.raw = new Request(c.req.raw.url, {
-          method: c.req.raw.method,
-          headers,
-          body: c.req.raw.body,
-        })
-      }
-    }
+    // 2. Otherwise the standard auth middleware (Authorization header or session cookie)
     // Delegate to standard auth middleware
     return authMiddleware(c, next)
   }

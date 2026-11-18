@@ -5,8 +5,6 @@
 export { PropertyTypeStore, PropertyTypeReservedKeyError, PropertyTypeMaxEntriesError } from './property-type-store.js'
 export type { VaultPathResolver } from './property-type-store.js'
 export { DEFAULT_PROPERTY_TYPE_REGISTRY, MAX_PROPERTY_TYPE_ENTRIES, RESERVED_PROPERTY_KEYS } from './types.js'
-export { migratePropertyTypesToObsidian } from './migration.js'
-export type { PropertyTypesMigrationResult } from './migration.js'
 export type {
   IPropertyTypeService,
   PropertyType,

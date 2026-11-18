@@ -9,7 +9,6 @@ export type {
   UserPreferences,
   RecentFileEntry,
   FavoriteEntry,
-  KeybindingEntry,
   UserUiSettings,
   UserVaultSettings,
   UserUiSettingsPatch,

@@ -78,25 +78,8 @@ Andreas zur Umsetzung freigegeben hat. Entscheidungen des Abgleichs:
   (`runBaseQuery`) und Formel-Sortierung (`displayRows`) wie die Tabelle — keine neue Dependency.
   5 Tests (`BasesListView.test.tsx`).
 
-### R6 — Bases Map-View (Geo) ✅ ERLEDIGT (Branch feature/obsidian-feature-gaps)
-- Umgesetzt: vierter eingebauter View-Typ `map` neben `table`/`cards`/`list`. `BasesMapView.tsx`
-  plottet jede Notiz mit Geo-Koordinate als Pin auf einer Leaflet-Karte; Klick auf einen Pin
-  öffnet die Notiz. Koordinaten-Konvention (aus `view._unknown`, mit Fallbacks): `coordinates`
-  (eine Property `"lat,lng"`, Default `location`) ODER `latProperty`+`lngProperty` (zwei numerische
-  Properties, Default `lat`/`lng`). Notizen ohne auswertbare Koordinate werden nicht geplottet,
-  ein Zähler meldet die übersprungenen. Reine Helfer (`readMapConfig`/`extractPins`/Range-Checks)
-  in `bases-map-coords.ts` (9 Tests).
-- **Leaflet direkt, KEIN react-leaflet** (Entscheidung Andreas 2026-10-21 nach Lizenzprüfung:
-  react-leaflet@5 ist Hippocratic-2.1, nicht in der `tech.md`-MIT/Apache/BSD-Liste). `leaflet@1.9.4`
-  (BSD-2) + `@types/leaflet@1.9.22` (dev, MIT), gepinnt. Imperativer `useEffect`-Wrapper (Map bei
-  Mount erzeugen/zerstören, Marker bei Zeilenänderung neu aufbauen). Lazy-importiert in `BasesView`,
-  sodass Leaflet+CSS nur beim Öffnen einer Map-View laden.
-- **Tile-Quelle als Betreiber-Config (Default leer → View inaktiv):** neue Public-Route
-  `GET /api/v1/map-config` (`mapConfigRoutes.ts`, 3 Tests) liest `SLATEBASE_MAP_TILE_URL` +
-  `SLATEBASE_MAP_TILE_ATTRIBUTION` env-only (wie die Whisper-Backend-URL). `IApiClient.getMapConfig`.
-  Ohne Tile-URL zeigt die View einen Inaktiv-Hinweis. Env-Vars in README + docker.env.example
-  dokumentiert (inkl. IP-Leak-Begründung).
-- Verifiziert: Backend+Frontend `tsc` sauber, map-coords 9/9, mapConfigRoutes 3/3 grün, ESLint 0.
+### R6 — Bases Map-View (Geo) ❌ ENTFERNT
+- Die eingebaute Karten-Ansicht (Leaflet, `map-config`-Route, `SLATEBASE_MAP_TILE_URL`) wurde wieder entfernt; `type: map` kommt vom Obsidian-Plugin „Maps" über `registerBasesView()`.
 
 ## Multi-Cursor (Teil-Gap, Verifizierung + Vervollständigung)
 

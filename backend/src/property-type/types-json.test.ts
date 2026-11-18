@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtemp, rm, mkdir, readFile, writeFile, stat } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ILogger } from '../logger/index.js'
 import { PropertyTypeStore } from './property-type-store.js'
-import { MAX_PROPERTY_TYPE_ENTRIES } from './types.js'
-import { migratePropertyTypesToObsidian } from './migration.js'
 
 const logger: ILogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 
@@ -122,93 +120,5 @@ describe('PropertyTypeStore on .obsidian/types.json', () => {
     await seedTypes({ types: ['a'] })
     expect((await store.getRegistry('v1')).entries).toEqual([])
     expect(reported.at(-1)).toEqual({ file: 'types.json', paths: ['types'] })
-  })
-})
-
-describe('migratePropertyTypesToObsidian', () => {
-  let root: string
-  let dataDir: string
-
-  const vaultAt = async (id: string, legacy?: unknown, types?: unknown) => {
-    const storagePath = join(root, id)
-    await mkdir(join(storagePath, '.slatebase'), { recursive: true })
-    await mkdir(join(storagePath, '.obsidian'), { recursive: true })
-    if (legacy !== undefined) await writeFile(join(storagePath, '.slatebase', 'property-types.json'), JSON.stringify(legacy))
-    if (types !== undefined) await writeFile(join(storagePath, '.obsidian', 'types.json'), JSON.stringify(types))
-    return { id, storagePath }
-  }
-  const storeFor = (vaults: Array<{ id: string, storagePath: string }>) =>
-    new PropertyTypeStore((id) => vaults.find((v) => v.id === id)?.storagePath ?? null, logger)
-  const run = (vaults: Array<{ id: string, storagePath: string }>) =>
-    migratePropertyTypesToObsidian({ dataDir, vaultRegistry: { load: async () => vaults as never }, store: storeFor(vaults), logger })
-  const types = async (storagePath: string) => (JSON.parse(await readFile(join(storagePath, '.obsidian', 'types.json'), 'utf-8')) as { types: Record<string, string> }).types
-
-  beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'types-migration-'))
-    dataDir = join(root, 'data')
-    vi.clearAllMocks()
-  })
-  afterEach(async () => { await rm(root, { recursive: true, force: true }) })
-
-  it('copies the old entries into types.json and keeps only the entries with options in the old file', async () => {
-    const vault = await vaultAt('v1', { entries: [
-      { key: 'status', type: 'text', options: { allowedValues: ['a'] } },
-      { key: 'due', type: 'date' },
-      { key: 'related', type: 'list' },
-      { key: 'aliases', type: 'aliases' },
-    ] })
-
-    expect(await run([vault])).toMatchObject({ migrated: 1, entries: 4, failed: 0 })
-    expect(await types(vault.storagePath)).toEqual({ status: 'text', due: 'date', related: 'multitext', aliases: 'multitext' })
-    expect(JSON.parse(await readFile(join(vault.storagePath, '.slatebase', 'property-types.json'), 'utf-8'))).toEqual({
-      entries: [{ key: 'status', type: 'text', options: { allowedValues: ['a'] } }],
-    })
-  })
-
-  it('lets Obsidian\'s file win for a key both have', async () => {
-    const vault = await vaultAt('v1', { entries: [{ key: 'due', type: 'text' }, { key: 'new', type: 'number' }] }, { types: { due: 'date' } })
-    await run([vault])
-    expect(await types(vault.storagePath)).toEqual({ due: 'date', new: 'number' })
-  })
-
-  it('runs once: a key removed from types.json later does not come back', async () => {
-    const vault = await vaultAt('v1', { entries: [{ key: 'status', type: 'text', options: { allowedValues: ['a'] } }] })
-    await run([vault])
-    await writeFile(join(vault.storagePath, '.obsidian', 'types.json'), JSON.stringify({ types: {} }))
-
-    expect(await run([vault])).toMatchObject({ alreadyDone: true })
-    expect(await types(vault.storagePath)).toEqual({})
-    await stat(join(dataDir, 'migrations', 'property-types-to-obsidian.json'))
-  })
-
-  it('names a vault it cannot handle, leaves its files, carries on, and retries only that vault at the next start', async () => {
-    const broken = await vaultAt('v-broken', { entries: [{ key: 'a', type: 'text' }] })
-    await writeFile(join(broken.storagePath, '.obsidian', 'types.json'), '<<<<<<<')
-    const fine = await vaultAt('v-fine', { entries: [{ key: 'b', type: 'text' }] })
-
-    expect(await run([broken, fine])).toMatchObject({ migrated: 1, failed: 1 })
-    expect(await readFile(join(broken.storagePath, '.obsidian', 'types.json'), 'utf-8')).toBe('<<<<<<<')
-    expect(await types(fine.storagePath)).toEqual({ b: 'text' })
-    expect(logger.warn).toHaveBeenCalled()
-
-    // Next start: the finished vault is not touched again, the broken one is, once it is usable.
-    await writeFile(join(fine.storagePath, '.obsidian', 'types.json'), JSON.stringify({ types: {} }))
-    await writeFile(join(broken.storagePath, '.obsidian', 'types.json'), JSON.stringify({ types: {} }))
-    expect(await run([broken, fine])).toMatchObject({ migrated: 1, failed: 0, alreadyDone: false })
-    expect(await types(broken.storagePath)).toEqual({ a: 'text' })
-    expect(await types(fine.storagePath)).toEqual({})
-    expect(await run([broken, fine])).toMatchObject({ alreadyDone: true })
-  })
-
-  it('does not add more entries than the guard limit allows', async () => {
-    const many = Array.from({ length: MAX_PROPERTY_TYPE_ENTRIES + 5 }, (_, i) => ({ key: `k${i}`, type: 'text' }))
-    const vault = await vaultAt('v-many', { entries: [...many, { key: '__proto__', type: 'text' }] })
-    await run([vault])
-    expect(Object.keys(await types(vault.storagePath))).toHaveLength(MAX_PROPERTY_TYPE_ENTRIES)
-  }, 30_000)
-
-  it('does nothing for a vault without an old file', async () => {
-    const vault = await vaultAt('v-empty')
-    expect(await run([vault])).toMatchObject({ migrated: 0, failed: 0 })
   })
 })

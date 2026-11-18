@@ -526,12 +526,6 @@ export interface FavoriteEntry {
   searchRegex?: boolean
 }
 
-/** A keybinding override entry persisted on the server. */
-export interface KeybindingEntry {
-  commandId: string
-  shortcut: string
-}
-
 /** Which side of the editor the toolbar docks to. */
 export type ToolbarPosition = 'left' | 'right'
 
@@ -586,12 +580,6 @@ export interface UserVaultSettings {
   activityRange: string | null
   /** Whether `![](url)` in a note auto-embeds the page in a sandboxed iframe (default off). */
   webEmbedEnabled: boolean
-  /**
-   * Named workspace snapshots of earlier versions (content-free pane tree + tabs + panel layouts).
-   * Read only now: the first time a vault is opened on a version with workspaces.json they are moved
-   * into that file (see `state/workspacesStore.ts`) and this list is emptied.
-   */
-  workspaces: Record<string, unknown>[]
 }
 
 /** Partial per-vault settings update. */
@@ -982,10 +970,6 @@ export interface IApiClient {
   getFavorites(): Promise<{ entries: FavoriteEntry[] }>
   /** Save the current user's favorites. */
   saveFavorites(entries: FavoriteEntry[]): Promise<{ entries: FavoriteEntry[] }>
-  /** Get the current user's keybinding overrides. */
-  getKeybindings(): Promise<{ entries: KeybindingEntry[] }>
-  /** Save the current user's keybinding overrides. */
-  saveKeybindings(entries: KeybindingEntry[]): Promise<{ entries: KeybindingEntry[] }>
 
   // --- UI / per-vault settings methods ---
   /** Get the current user's account-wide UI settings. */
@@ -2056,16 +2040,6 @@ export class ApiClient implements IApiClient {
   /** Save the current user's favorites. */
   async saveFavorites(entries: FavoriteEntry[]): Promise<{ entries: FavoriteEntry[] }> {
     return this.request<{ entries: FavoriteEntry[] }>('PUT', '/api/v1/users/me/favorites', { entries })
-  }
-
-  /** Get the current user's keybinding overrides. */
-  async getKeybindings(): Promise<{ entries: KeybindingEntry[] }> {
-    return this.request<{ entries: KeybindingEntry[] }>('GET', '/api/v1/users/me/keybindings')
-  }
-
-  /** Save the current user's keybinding overrides. */
-  async saveKeybindings(entries: KeybindingEntry[]): Promise<{ entries: KeybindingEntry[] }> {
-    return this.request<{ entries: KeybindingEntry[] }>('PUT', '/api/v1/users/me/keybindings', { entries })
   }
 
   /** Get the current user's account-wide UI settings. */

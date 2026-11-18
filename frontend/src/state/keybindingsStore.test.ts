@@ -24,7 +24,7 @@ vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 const mod = (key: string, ...modifiers: string[]) => ({ modifiers: ['Mod', ...modifiers], key })
 
 /** An API client over an in-memory hotkeys.json, applying PATCH like the server does. */
-function createClient(initialFile: Record<string, unknown> = {}, legacy: Array<{ commandId: string; shortcut: string }> = []) {
+function createClient(initialFile: Record<string, unknown> = {}) {
   let file = { ...initialFile }
   const client = {
     getHotkeysConfig: vi.fn(async () => ({ ...file })),
@@ -35,7 +35,6 @@ function createClient(initialFile: Record<string, unknown> = {}, legacy: Array<{
       }
       return { ...file }
     }),
-    getKeybindings: vi.fn(async () => ({ entries: legacy })),
   }
   return { client: client as unknown as IApiClient, mocks: client, file: () => file, setFile: (f: Record<string, unknown>) => { file = f } }
 }
@@ -183,61 +182,6 @@ describe('keybindingsStore — hotkeys.json', () => {
   })
 })
 
-describe('keybindingsStore — taking over the per-user bindings', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-    _reset()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('writes the old bindings the file does not name, once, and the file wins', async () => {
-    const { client, mocks, file } = createClient(
-      { 'app:open-settings': [mod('J')] },
-      [
-        { commandId: 'slatebase:open-settings', shortcut: 'Ctrl+X' },
-        { commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' },
-        { commandId: 'slatebase:navigate-back', shortcut: '' },
-      ],
-    )
-    await initialize(client)
-    await loadVaultHotkeys('v1')
-
-    expect(mocks.patchHotkeysConfig).toHaveBeenCalledWith('v1', {
-      'slatebase:toggle-theme': [{ modifiers: ['Mod', 'Shift'], key: 'L' }],
-      'app:go-back': [],
-    })
-    expect(file()['app:open-settings']).toEqual([mod('J')])
-    expect(getShortcut('slatebase:toggle-theme')).toBe('Mod+Shift+L')
-    expect(getShortcut('slatebase:open-settings')).toBe('Mod+J')
-
-    mocks.patchHotkeysConfig.mockClear()
-    await loadVaultHotkeys('v1')
-    expect(mocks.patchHotkeysConfig).not.toHaveBeenCalled()
-  })
-
-  it('tries again next time when the file cannot be written', async () => {
-    const { client, mocks } = createClient({}, [{ commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' }])
-    mocks.patchHotkeysConfig.mockRejectedValueOnce(new Error('403'))
-    await initialize(client)
-    await loadVaultHotkeys('v1')
-    expect(getShortcut('slatebase:toggle-theme')).toBe('')
-
-    await loadVaultHotkeys('v1')
-    expect(getShortcut('slatebase:toggle-theme')).toBe('Mod+Shift+L')
-  })
-
-  it('reads the browser cache of the old store when the server list is unavailable', async () => {
-    localStorage.setItem('slatebase:keybindings', JSON.stringify([{ commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' }]))
-    const { client, mocks } = createClient()
-    mocks.getKeybindings.mockRejectedValueOnce(new Error('offline'))
-    await initialize(client)
-    await loadVaultHotkeys('v1')
-    expect(getShortcut('slatebase:toggle-theme')).toBe('Mod+Shift+L')
-  })
-})
-
 describe('keybindingsStore — matching and conflicts', () => {
   beforeEach(async () => {
     _reset()
@@ -287,7 +231,7 @@ describe('keybindingsStore — safety', () => {
 
     const b = createClient()
     // Same store, another vault: switch the client the way the app does (one client per session).
-    await initialize({ ...a.mocks, getHotkeysConfig: b.mocks.getHotkeysConfig, getKeybindings: b.mocks.getKeybindings } as unknown as IApiClient)
+    await initialize({ ...a.mocks, getHotkeysConfig: b.mocks.getHotkeysConfig } as unknown as IApiClient)
     await loadVaultHotkeys('b')
     await vi.advanceTimersByTimeAsync(600)
 
@@ -317,15 +261,13 @@ describe('keybindingsStore — safety', () => {
     expect(getShortcut('slatebase:navigate-back')).toBe('Mod+Q')
   })
 
-  it('forgets the caches and markers of the account on disconnect', async () => {
-    const { client } = createClient({ 'app:go-back': [] }, [{ commandId: 'slatebase:toggle-theme', shortcut: 'Mod+Shift+L' }])
+  it('forgets the cache of the account on disconnect', async () => {
+    const { client } = createClient({ 'app:go-back': [] })
     await initialize(client)
     await loadVaultHotkeys('v1')
     expect(localStorage.getItem('slatebase:hotkeys:v1')).not.toBeNull()
-    expect(localStorage.getItem('slatebase:hotkeys-taken-over:v1')).not.toBeNull()
     disconnect()
     expect(localStorage.getItem('slatebase:hotkeys:v1')).toBeNull()
-    expect(localStorage.getItem('slatebase:hotkeys-taken-over:v1')).toBeNull()
   })
 })
 

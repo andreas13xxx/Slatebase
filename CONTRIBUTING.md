@@ -357,7 +357,6 @@ Backend configuration via `backend/config/default.json`, overridden by `SLATEBAS
 | `SLATEBASE_TRUSTED_PROXIES` | *(empty)* | Trusted reverse proxy IPs/CIDRs |
 | `SLATEBASE_CSRF_SECRET` | *(random)* | Persistent CSRF secret |
 | `SLATEBASE_MODULE_SECRET_KEY` | *(auto)* | Encrypts the vault keychain (plugin secrets), Git-Sync remote credentials and Mail-Import mailbox passwords. Falls back to a key file in the data directory if unset |
-| `SLATEBASE_PLUGIN_SECRET_KEY` | *(auto)* | Legacy: decrypts secrets of the former per-plugin store once, to move them into the vault keychain at startup. Not needed afterwards |
 | `SLATEBASE_VAULT_PATHS` | *(from config)* | Comma-separated pre-configured vault paths (overrides `config/default.json` vaults) |
 | `SLATEBASE_TEMPLATES_DIR` | `./assets/templates` | Custom directory for welcome vault templates |
 | `SLATEBASE_GITHUB_TOKEN` | *(none)* | Optional GitHub token for the community plugin store, used to raise API rate limits |
