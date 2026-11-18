@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation, type TranslationKey } from '../../i18n'
 import type { IApiClient } from '../../api'
 import { useFeatureContext } from '../../state/featureContext'
 import { loadFeatures, toggleFeature } from '../../state/featureActions'
@@ -16,12 +17,8 @@ export interface FeatureTogglesSectionProps {
  * voice-transcription feature, whose real cost (compute/GPU) and prerequisite
  * (a configured Whisper backend) an admin must understand before enabling it.
  */
-const FEATURE_WARNINGS: Record<string, string> = {
-  'voice-transcription':
-    'Rechenintensiv: Die Spracherkennung (Whisper) läuft auf dem eigenen Server. ' +
-    'Ohne GPU ist die Umwandlung spürbar langsam. Zusätzlich muss ein Whisper-Backend ' +
-    'konfiguriert sein (SLATEBASE_TRANSCRIPTION_BACKEND_URL) — sonst bleibt die Funktion ' +
-    'trotz aktiviertem Schalter ohne Wirkung.',
+const FEATURE_WARNINGS: Record<string, TranslationKey> = {
+  'voice-transcription': 'settingsUi.voiceWarning',
 }
 
 /**
@@ -36,6 +33,7 @@ const FEATURE_WARNINGS: Record<string, string> = {
  * placed inside SettingsContent.
  */
 export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps) {
+  const { t } = useTranslation()
   const { state, dispatch: featureDispatch } = useFeatureContext()
 
   useEffect(() => {
@@ -51,7 +49,7 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
     return (
       <div className="feature-toggle-loading">
         <Loader size={16} className="feature-toggle-spinner" />
-        <span>Laden…</span>
+        <span>{t('settingsUi.loading')}</span>
       </div>
     )
   }
@@ -66,7 +64,7 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
           className="feature-toggle-retry-btn"
           onClick={() => void loadFeatures(featureDispatch, apiClient)}
         >
-          Erneut versuchen
+          {t('settingsUi.retry')}
         </button>
       </div>
     )
@@ -82,7 +80,7 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
             type="button"
             className="feature-toggle-toast-close"
             onClick={() => featureDispatch({ type: 'FEATURE_ERROR_CLEARED' })}
-            aria-label="Schließen"
+            aria-label={t('settingsUi.close')}
           >
             ×
           </button>
@@ -99,13 +97,13 @@ export function FeatureTogglesSection({ apiClient }: FeatureTogglesSectionProps)
             {feature.type === 'cold' && (
               <div className="feature-toggle-cold-hint">
                 <AlertTriangle size={12} />
-                Neustart erforderlich
+                {t('settingsUi.restartRequired')}
               </div>
             )}
             {FEATURE_WARNINGS[feature.name] && (
               <div className="feature-toggle-warning" role="note">
                 <AlertTriangle size={12} />
-                <span>{FEATURE_WARNINGS[feature.name]}</span>
+                <span>{t(FEATURE_WARNINGS[feature.name]!)}</span>
               </div>
             )}
           </div>

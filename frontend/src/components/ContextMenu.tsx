@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from '../i18n'
 import ReactDOM from 'react-dom'
 import { ChevronRight, Check } from 'lucide-react'
 import { clampMenuPosition } from '../utils/pathUtils'
@@ -79,6 +80,7 @@ export interface ContextMenuProps {
  * - Named export only (no default export)
  */
 export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps) {
+  const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<Map<number, HTMLElement>>(new Map())
   const [position, setPosition] = useState<{ x: number; y: number }>({ x, y })
@@ -262,7 +264,7 @@ export function ContextMenu({ x, y, items, onClose, onSelect }: ContextMenuProps
         top: position.y,
       }}
       role="menu"
-      aria-label="Kontextmenü"
+      aria-label={t('commonUi.c_contextMenu')}
       onContextMenu={handleContextMenu}
       tabIndex={-1}
     >
@@ -344,6 +346,7 @@ function ContextSubmenu({
   onSelect: (action: string) => void
   onCloseAll: () => void
 }) {
+  const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<Map<number, HTMLElement>>(new Map())
   const [position, setPosition] = useState<{ x: number; y: number }>({ x, y })
@@ -385,7 +388,7 @@ function ContextSubmenu({
       className="context-menu"
       style={{ left: position.x, top: position.y }}
       role="menu"
-      aria-label="Untermenü"
+      aria-label={t('commonUi.c_submenu')}
       onContextMenu={(e) => e.preventDefault()}
       tabIndex={-1}
     >

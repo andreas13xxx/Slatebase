@@ -7,6 +7,7 @@
  * @module components/settings/VaultConfigSection
  */
 
+import { useTranslation, translateNow } from '../../i18n'
 import { useState, useEffect, useCallback } from 'react'
 import type { IApiClient, VaultConfig } from '../../api'
 import { showToast } from '../ToastNotification'
@@ -30,6 +31,7 @@ interface VaultConfigSectionProps {
  * Loads current config from backend and saves on change (with save button).
  */
 export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionProps) {
+  const { t } = useTranslation()
   const { enabled: webEmbedEnabled, setEnabled: setWebEmbedEnabled } = useWebEmbed()
   const [config, setConfig] = useState<VaultConfig | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,7 +68,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
         if (cancelled) return
         const msg = err && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
-          : 'Fehler beim Laden der Vault-Konfiguration'
+          : translateNow('settingsUi.misc_vcLoadFailed')
         setError(msg)
       } finally {
         if (!cancelled) setLoading(false)
@@ -98,11 +100,11 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
       setDailyNoteTemplate(updated.dailyNoteTemplate)
       setDailyNoteFormat(effectiveDailyNoteFormat(updated.dailyNoteFormat))
       setUniqueNoteDir(updated.uniqueNoteDirectory ?? '')
-      showToast('success', 'Vault-Konfiguration gespeichert')
+      showToast('success', translateNow('settingsUi.misc_vcSaved'))
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
-        : 'Fehler beim Speichern'
+        : translateNow('settingsUi.misc_vcSaveFailed')
       setError(msg)
       showToast('error', msg)
     } finally {
@@ -119,7 +121,7 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
   )
 
   if (loading) {
-    return <p className="settings-loading">Lade Vault-Konfiguration…</p>
+    return <p className="settings-loading">{t('settingsUi.misc_vcLoading')}</p>
   }
 
   return (
@@ -127,15 +129,15 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
       {error && <p className="settings-error">{error}</p>}
 
       <SettingSection
-        title="Verzeichnisse"
-        description="Vorlagen- und Tagesnotizen-Ordner und die Tagesnotiz-Vorlage stehen in den Obsidian-Dateien .obsidian/templates.json und .obsidian/daily-notes.json, der Rest in .slatebase/config.json."
+        title={t('settingsUi.misc_directories')}
+        description={t('settingsUi.misc_directoriesDesc')}
       >
         <div className="settings-field">
           <label htmlFor="vault-templates-dir" className="settings-field-label">
-            Vorlagen-Verzeichnis
+            {t('settingsUi.misc_templatesDir')}
           </label>
           <p className="settings-field-hint">
-            Relativer Pfad im Vault für Markdown-Vorlagen. Standard: <code>Templates</code>
+            {t('settingsUi.misc_vcTplHint')} <code>Templates</code>
           </p>
           <input
             id="vault-templates-dir"
@@ -150,10 +152,10 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
 
         <div className="settings-field">
           <label htmlFor="vault-daily-notes-dir" className="settings-field-label">
-            Tagesnotizen-Verzeichnis
+            {t('settingsUi.misc_dailyDir')}
           </label>
           <p className="settings-field-hint">
-            Relativer Pfad im Vault für Tagesnotizen. Leer = Vault-Wurzel.
+            {t('settingsUi.misc_dailyDirHint')}
           </p>
           <input
             id="vault-daily-notes-dir"
@@ -168,10 +170,10 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
 
         <div className="settings-field">
           <label htmlFor="vault-daily-note-template" className="settings-field-label">
-            Tagesnotiz-Vorlage
+            {t('settingsUi.misc_dailyTemplate')}
           </label>
           <p className="settings-field-hint">
-            Pfad der Vorlage im Vault für neue Tagesnotizen, zum Beispiel <code>Templates/daily.md</code>. Leer = keine Vorlage.
+            {t('settingsUi.misc_vcDailyTplHint1')} <code>Templates/daily.md</code>{t('settingsUi.misc_vcDailyTplHint2')}
           </p>
           <input
             id="vault-daily-note-template"
@@ -186,10 +188,10 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
 
         <div className="settings-field">
           <label htmlFor="vault-daily-note-format" className="settings-field-label">
-            Tagesnotiz-Datumsformat
+            {t('settingsUi.misc_dailyFormat')}
           </label>
           <p className="settings-field-hint">
-            Moment-Format wie in Obsidian, zum Beispiel <code>YYYY-MM-DD</code> oder <code>YYYY/MM/YYYY-MM-DD</code> (ein <code>/</code> legt Unterordner an). Vorhandene Notizen werden nicht umbenannt.
+            {t('settingsUi.misc_vcFmtHint1')} <code>YYYY-MM-DD</code> {t('settingsUi.misc_vcFmtHint2')} <code>YYYY/MM/YYYY-MM-DD</code> {t('settingsUi.misc_vcFmtHint3')} <code>/</code> {t('settingsUi.misc_vcFmtHint4')}
           </p>
           <input
             id="vault-daily-note-format"
@@ -203,16 +205,16 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
             disabled={saving}
           />
           <p id="vault-daily-note-format-preview" className={formatProblem === null ? 'settings-field-hint' : 'settings-error'} role="status">
-            {formatProblem ?? <>Heute: <code>{formatPreview}.md</code></>}
+            {formatProblem ?? <>{t('settingsUi.misc_vcToday')} <code>{formatPreview}.md</code></>}
           </p>
         </div>
 
         <div className="settings-field">
           <label htmlFor="vault-unique-note-dir" className="settings-field-label">
-            Verzeichnis für eindeutige Notizen
+            {t('settingsUi.misc_uniqueDir')}
           </label>
           <p className="settings-field-hint">
-            Relativer Pfad im Vault, in dem der Befehl „Eindeutige Notiz anlegen“ neue Notizen mit Zeitstempel-Namen (<code>JJJJMMTThhmmss</code>) erstellt. Leer = Vault-Wurzel.
+            {t('settingsUi.misc_vcUniqueHint1')}<code>JJJJMMTThhmmss</code>{t('settingsUi.misc_vcUniqueHint2')}
           </p>
           <input
             id="vault-unique-note-dir"
@@ -227,16 +229,16 @@ export function VaultConfigSection({ apiClient, vaultId }: VaultConfigSectionPro
 
         <div className="settings-actions">
           <Button variant="primary" onClick={handleSave} disabled={saving || !hasChanges || (formatChanged && formatProblem !== null)}>
-            {saving ? 'Speichern…' : 'Speichern'}
+            {saving ? t('settingsUi.misc_saving') : t('settingsUi.misc_save')}
           </Button>
         </div>
       </SettingSection>
 
-      <SettingSection title="Web-Embeds">
+      <SettingSection title={t('settingsUi.misc_webEmbeds')}>
         <SettingRow
-          label="Webseiten in Notizen einbetten"
+          label={t('settingsUi.misc_webEmbedLabel')}
           htmlFor="vault-web-embed-toggle"
-          hint="Wenn aktiviert, wird `![](https://…)` in einer Notiz als eingebettete Webseite (sandboxed iframe) angezeigt. Standard aus: Das automatische Laden fremder URLs aus einem Dokument ist eine Tracking-/Clickjacking-Fläche und lädt in einem geteilten Vault beim Lesen ungefragt fremde Seiten. Aus = als normaler Link anzeigen."
+          hint={t('settingsUi.misc_webEmbedHint')}
         >
           <input
             id="vault-web-embed-toggle"

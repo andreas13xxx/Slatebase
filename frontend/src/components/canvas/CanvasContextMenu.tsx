@@ -4,6 +4,7 @@
  * and edit, duplicate, color, delete (node-specific).
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useCallback } from 'react'
 import {
   Type, FileText, Link2, SquareDashed, Copy, ClipboardPaste,
@@ -67,6 +68,7 @@ export type CanvasContextAction =
 export const CanvasContextMenu = memo(function CanvasContextMenu({
   x, y, targetNodeId, targetIsMarkdownFile, readOnly, canUndo, canRedo, canPaste, hasSelection, onClose, onAction,
 }: CanvasContextMenuProps) {
+  const { t } = useTranslation()
 
   const handleSelect = useCallback((action: string) => {
     onAction(action as CanvasContextAction)
@@ -78,61 +80,61 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
     // ─── Node Context Menu ────────────────────────────────────────────────
     if (!readOnly) {
       items.push(
-        { id: 'edit-node', label: 'Bearbeiten', icon: <Pencil size={14} /> },
+        { id: 'edit-node', label: t('canvasUi.edit'), icon: <Pencil size={14} /> },
       )
       // Markdown file nodes: "Bearbeiten" edits the content, so offer a
       // dedicated action to change the referenced file path.
       if (targetIsMarkdownFile) {
         items.push(
-          { id: 'edit-file-path', label: 'Dateipfad ändern', icon: <FileText size={14} /> },
+          { id: 'edit-file-path', label: t('canvasUi.editFilePath'), icon: <FileText size={14} /> },
         )
       }
       items.push(
         { id: 'separator-0', label: '', separator: true },
-        { id: 'copy', label: 'Kopieren', icon: <Copy size={14} /> },
-        { id: 'duplicate', label: 'Duplizieren', icon: <Copy size={14} /> },
+        { id: 'copy', label: t('canvasUi.copy'), icon: <Copy size={14} /> },
+        { id: 'duplicate', label: t('canvasUi.duplicate'), icon: <Copy size={14} /> },
         { id: 'separator-1', label: '', separator: true },
-        { id: 'color-1', label: '🔴 Rot', icon: <Palette size={14} /> },
-        { id: 'color-2', label: '🟠 Orange', icon: <Palette size={14} /> },
-        { id: 'color-3', label: '🟡 Gelb', icon: <Palette size={14} /> },
-        { id: 'color-4', label: '🟢 Grün', icon: <Palette size={14} /> },
-        { id: 'color-5', label: '🔵 Blau', icon: <Palette size={14} /> },
-        { id: 'color-6', label: '🟣 Lila', icon: <Palette size={14} /> },
-        { id: 'color-none', label: '⚪ Keine Farbe', icon: <Palette size={14} /> },
+        { id: 'color-1', label: '🔴 ' + t('canvasUi.red'), icon: <Palette size={14} /> },
+        { id: 'color-2', label: '🟠 ' + t('canvasUi.orange'), icon: <Palette size={14} /> },
+        { id: 'color-3', label: '🟡 ' + t('canvasUi.yellow'), icon: <Palette size={14} /> },
+        { id: 'color-4', label: '🟢 ' + t('canvasUi.green'), icon: <Palette size={14} /> },
+        { id: 'color-5', label: '🔵 ' + t('canvasUi.blue'), icon: <Palette size={14} /> },
+        { id: 'color-6', label: '🟣 ' + t('canvasUi.purple'), icon: <Palette size={14} /> },
+        { id: 'color-none', label: '⚪ ' + t('canvasUi.noColor'), icon: <Palette size={14} /> },
         { id: 'separator-2', label: '', separator: true },
-        { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} /> },
+        { id: 'delete', label: t('canvasUi.delete'), icon: <Trash2 size={14} /> },
       )
     } else {
       items.push(
-        { id: 'copy', label: 'Kopieren', icon: <Copy size={14} /> },
+        { id: 'copy', label: t('canvasUi.copy'), icon: <Copy size={14} /> },
       )
     }
   } else {
     // ─── Background Context Menu ──────────────────────────────────────────
     if (!readOnly) {
       items.push(
-        { id: 'add-text', label: 'Textknoten hinzufügen', icon: <Type size={14} /> },
-        { id: 'add-file', label: 'Dateiknoten hinzufügen', icon: <FileText size={14} /> },
-        { id: 'add-link', label: 'Linkknoten hinzufügen', icon: <Link2 size={14} /> },
-        { id: 'add-group', label: 'Gruppe hinzufügen', icon: <SquareDashed size={14} /> },
+        { id: 'add-text', label: t('canvasUi.addTextNode'), icon: <Type size={14} /> },
+        { id: 'add-file', label: t('canvasUi.addFileNode'), icon: <FileText size={14} /> },
+        { id: 'add-link', label: t('canvasUi.addLinkNode'), icon: <Link2 size={14} /> },
+        { id: 'add-group', label: t('canvasUi.addGroup'), icon: <SquareDashed size={14} /> },
         { id: 'separator-add', label: '', separator: true },
-        { id: 'paste', label: 'Einfügen', icon: <ClipboardPaste size={14} />, disabled: !canPaste },
+        { id: 'paste', label: t('canvasUi.paste'), icon: <ClipboardPaste size={14} />, disabled: !canPaste },
         { id: 'separator-edit', label: '', separator: true },
-        { id: 'undo', label: 'Rückgängig', icon: <Undo2 size={14} />, disabled: !canUndo },
-        { id: 'redo', label: 'Wiederherstellen', icon: <Redo2 size={14} />, disabled: !canRedo },
+        { id: 'undo', label: t('canvasUi.undo'), icon: <Undo2 size={14} />, disabled: !canUndo },
+        { id: 'redo', label: t('canvasUi.redo'), icon: <Redo2 size={14} />, disabled: !canRedo },
         { id: 'separator-view', label: '', separator: true },
       )
     }
 
     items.push(
-      { id: 'select-all', label: 'Alles auswählen', icon: <MousePointerSquareDashed size={14} />, disabled: readOnly },
-      { id: 'fit-view', label: 'Alles einpassen', icon: <Maximize size={14} /> },
+      { id: 'select-all', label: t('canvasUi.selectAll'), icon: <MousePointerSquareDashed size={14} />, disabled: readOnly },
+      { id: 'fit-view', label: t('canvasUi.fitView'), icon: <Maximize size={14} /> },
     )
 
     if (!readOnly && hasSelection) {
       items.push(
         { id: 'separator-delete', label: '', separator: true },
-        { id: 'delete', label: 'Auswahl löschen', icon: <Trash2 size={14} /> },
+        { id: 'delete', label: t('canvasUi.deleteSelection'), icon: <Trash2 size={14} /> },
       )
     }
   }

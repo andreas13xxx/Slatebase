@@ -10,6 +10,7 @@
  * rows are split into collapsible groups (ordered/hidden by `view.groupOrder`).
  */
 
+import { useTranslation } from '../../i18n'
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { BaseDocument, BaseRow, BaseView, BaseSortClause } from '@slatebase/shared-contracts'
@@ -55,6 +56,7 @@ export interface BasesTableViewProps {
 export const BasesTableView = memo(function BasesTableView({
   doc, view, rows, vaultId, thisRow, onOpenNote, onCommitCell, onSortChange, onColumnResize, onReorderColumns,
 }: BasesTableViewProps) {
+  const { t } = useTranslation()
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
   const columns = useMemo(() => view.order ?? Object.keys(doc.properties ?? {}), [view.order, doc.properties])
 
@@ -259,7 +261,7 @@ export const BasesTableView = memo(function BasesTableView({
                   <button
                     type="button"
                     className="bases-table__header-btn"
-                    title="Klick: nach dieser Spalte sortieren. Umschalt+Klick: zur Mehrfach-Sortierung hinzufügen. Alt+Pfeil links/rechts: Spalte verschieben."
+                    title={t('basesUi.headerHint')}
                     onClick={(e) => handleHeaderClick(col, e.shiftKey)}
                     onKeyDown={(e) => {
                       // Keyboard path for the header drag: Alt+←/→ moves the column one place.
@@ -285,7 +287,7 @@ export const BasesTableView = memo(function BasesTableView({
                       aria-valuemin={COLUMN_WIDTH.min}
                       aria-valuemax={COLUMN_WIDTH.max}
                       tabIndex={0}
-                      title="Ziehen ändert die Breite, Doppelklick setzt sie zurück"
+                      title={t('basesUi.resizeHint')}
                       onPointerDown={(e) => handleResizeStart(e, col)}
                       onPointerMove={handleResizeMove}
                       onPointerUp={(e) => handleResizeEnd(e, true)}
@@ -342,7 +344,7 @@ export const BasesTableView = memo(function BasesTableView({
           </tfoot>
         )}
       </table>
-      {rows.length === 0 && <p className="bases-table-view__empty">Keine Einträge</p>}
+      {rows.length === 0 && <p className="bases-table-view__empty">{t('basesUi.noEntries')}</p>}
     </div>
   )
 })

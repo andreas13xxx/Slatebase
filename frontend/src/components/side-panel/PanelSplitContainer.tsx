@@ -13,6 +13,7 @@
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react'
+import { useTranslation } from '../../i18n'
 import { PanelTabBar } from './PanelTabBar'
 import type { PluginViewMeta } from './PanelTabBar'
 import type { PanelSplitSection, PanelViewId } from '../../state/panelState'
@@ -67,6 +68,7 @@ export function PanelSplitContainer({
   renderView,
   pluginViewMeta,
 }: PanelSplitContainerProps) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const [resizingIndex, setResizingIndex] = useState<number | null>(null)
   /** The pointer that owns the running resize drag; other pointers are ignored meanwhile. */
@@ -237,7 +239,7 @@ export function PanelSplitContainer({
                 aria-valuenow={Math.round(sections[index - 1]!.heightFraction * 100)}
                 aria-valuemin={Math.round((MIN_SECTION_HEIGHT / (panelHeight || 1)) * 100)}
                 aria-valuemax={100 - Math.round((MIN_SECTION_HEIGHT / (panelHeight || 1)) * 100)}
-                aria-label="Bereichsgröße anpassen"
+                aria-label={t('commonUi.c_resizeArea')}
                 tabIndex={0}
               />
             )}

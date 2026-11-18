@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { translateNow } from '../../i18n'
 import { ChevronDown, ChevronRight, Copy, Link2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { OutlineHeading } from '../../state/documentPanelData'
@@ -83,8 +84,8 @@ export function OutlineView({ headings, activeAnchor, onHeadingClick, onHeadingJ
    */
   function buildHeadingMenuItems(heading: OutlineHeading): ContextMenuItem[] {
     return [
-      { id: 'copy-text', label: 'Überschrift kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(heading.text).catch(() => {}) } },
-      { id: 'copy-link', label: 'Link zur Überschrift kopieren', icon: <Link2 size={14} />, run: () => { void navigator.clipboard.writeText(`#${heading.anchor}`).catch(() => {}) } },
+      { id: 'copy-text', label: translateNow('commonUi.c_ov_copyHeading'), icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(heading.text).catch(() => {}) } },
+      { id: 'copy-link', label: translateNow('commonUi.c_ov_copyHeadingLink'), icon: <Link2 size={14} />, run: () => { void navigator.clipboard.writeText(`#${heading.anchor}`).catch(() => {}) } },
     ]
   }
 

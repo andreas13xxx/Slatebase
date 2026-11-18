@@ -1,3 +1,4 @@
+import { translateNow } from '../i18n'
 /**
  * Filename validation and normalization utilities for the FileExplorer.
  * Used by InlineInput (new file, rename) to validate user input client-side.
@@ -26,7 +27,7 @@ export function validateFileName(name: string, maxLength: number = DEFAULT_MAX_L
   }
 
   if (name.includes('\0')) {
-    return 'Dateiname enthält ungültige Zeichen'
+    return translateNow('commonUi.c_fv_badChars')
   }
 
   if (name.length > maxLength) {

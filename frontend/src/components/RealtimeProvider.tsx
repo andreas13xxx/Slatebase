@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { translateNow } from '../i18n'
 import React from 'react'
 import { RealtimeProvider as RealtimeStateProvider, useRealtimeContext } from '../state/realtimeContext'
 import { useEventSource, type SseEventData } from '../state/useEventSource'
@@ -170,7 +171,7 @@ function RealtimeInner({
           const fileName = vaultPath.length > 50
             ? vaultPath.slice(0, 50) + '\u2026'
             : vaultPath
-          showToast('info', `${vaultUsername} hat ${fileName} geändert`)
+          showToast('info', translateNow('commonUi.c_fileChangedBy', { user: vaultUsername, file: fileName }))
         }
         break
       }
@@ -220,7 +221,7 @@ function RealtimeInner({
       }
 
       case 'server:shutdown': {
-        showToast('warning', 'Server wird heruntergefahren. Verbindung wird getrennt.')
+        showToast('warning', translateNow('commonUi.c_serverShutdown'))
         break
       }
 

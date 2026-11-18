@@ -3,6 +3,7 @@
  * content (Requirement 8.3, 8.5). A plain textarea is sufficient here: this
  * is a small, self-contained settings dialog, not the main document editor.
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useState, useEffect, useCallback } from 'react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { extractErrorMessage } from '../../utils/error'
@@ -29,6 +30,7 @@ export function SnippetEditorModal({
   onSaved,
   onCancel,
 }: SnippetEditorModalProps) {
+  const { t } = useTranslation()
   const [content, setContent] = useState(initialContent ?? '')
   const [loading, setLoading] = useState(initialContent === undefined)
   const [saving, setSaving] = useState(false)
@@ -43,7 +45,7 @@ export function SnippetEditorModal({
     // SnippetManager), so these deps never change while it is open.
     snippetStore.loadContent(apiClient, vaultId, snippetId)
       .then((loaded) => { if (!cancelled) setContent(loaded) })
-      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, 'Snippet konnte nicht geladen werden')) })
+      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, translateNow('settingsUi.snippetLoadFailed'))) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [apiClient, vaultId, snippetId, initialContent])
@@ -55,7 +57,7 @@ export function SnippetEditorModal({
       await snippetStore.saveContent(apiClient, vaultId, snippetId, content)
       onSaved(content)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Snippet konnte nicht gespeichert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.snippetSaveFailed')))
     } finally {
       setSaving(false)
     }
@@ -68,7 +70,7 @@ export function SnippetEditorModal({
         className="snippet-editor-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={`CSS-Snippet bearbeiten: ${filename}`}
+        aria-label={t('settingsUi.editSnippet', { name: filename })}
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="snippet-editor-modal__title">{filename}</h2>
@@ -79,12 +81,12 @@ export function SnippetEditorModal({
           onChange={(e) => setContent(e.target.value)}
           disabled={loading || saving}
           spellCheck={false}
-          aria-label="CSS-Inhalt"
+          aria-label={t('settingsUi.cssContent')}
         />
         <div className="snippet-editor-modal__actions">
-          <button type="button" onClick={onCancel} disabled={saving}>Abbrechen</button>
+          <button type="button" onClick={onCancel} disabled={saving}>{t('settingsUi.cancel')}</button>
           <button type="button" onClick={handleSave} disabled={loading || saving}>
-            {saving ? 'Speichern…' : 'Speichern'}
+            {saving ? t('settingsUi.saving') : t('settingsUi.save')}
           </button>
         </div>
       </div>

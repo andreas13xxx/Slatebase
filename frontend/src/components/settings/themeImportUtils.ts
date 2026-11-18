@@ -1,3 +1,4 @@
+import { translateNow } from '../../i18n'
 /**
  * Helpers for importing an Obsidian theme from files picked or dropped by the user.
  * Kept out of ThemeManager.tsx so they can be unit-tested (and because non-component
@@ -23,11 +24,11 @@ export type ThemeFilesResult = { ok: true; files: ThemeFiles } | { ok: false; me
 export function pickThemeFiles(files: readonly File[]): ThemeFilesResult {
   const stylesheets = files.filter((f) => f.name.toLowerCase().endsWith('.css'))
   if (stylesheets.length === 0) {
-    return { ok: false, message: 'Bitte eine theme.css auswählen (optional zusammen mit manifest.json).' }
+    return { ok: false, message: translateNow('commonUi.c_ti_pick') }
   }
   const css = stylesheets.find((f) => f.name.toLowerCase() === 'theme.css') ?? stylesheets[0]!
   if (css.size > MAX_THEME_CSS_BYTES) {
-    return { ok: false, message: 'Die Datei überschreitet die maximale Größe von 6 MB.' }
+    return { ok: false, message: translateNow('commonUi.c_ti_tooBig') }
   }
   const manifest = files.find((f) => f.name.toLowerCase() === 'manifest.json') ?? null
   return { ok: true, files: { css, manifest } }

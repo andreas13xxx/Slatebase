@@ -401,9 +401,9 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
   if (!vaultId) {
     return (
-      <div className="favorites-view favorites-view--empty" role="region" aria-label="Favoriten">
+      <div className="favorites-view favorites-view--empty" role="region" aria-label={t('commonUi.c_fv_favorites')}>
         <Star size={24} className="favorites-view__empty-icon" />
-        <span className="favorites-view__empty-text">Kein Vault ausgewählt</span>
+        <span className="favorites-view__empty-text">{t('commonUi.c_fv_noVault')}</span>
       </div>
     )
   }
@@ -424,11 +424,11 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
 
   if (favorites.length === 0) {
     return (
-      <div className="favorites-view" role="region" aria-label="Favoriten">
+      <div className="favorites-view" role="region" aria-label={t('commonUi.c_fv_favorites')}>
         {toolbar}
         <div className="favorites-view--empty favorites-view__empty-body">
           <Star size={24} className="favorites-view__empty-icon" />
-          <span className="favorites-view__empty-text">Keine Favoriten in diesem Vault</span>
+          <span className="favorites-view__empty-text">{t('commonUi.c_fv_none')}</span>
         </div>
       </div>
     )
@@ -461,7 +461,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
   ] : []
 
   return (
-    <div className="favorites-view" role="region" aria-label="Favoriten">
+    <div className="favorites-view" role="region" aria-label={t('commonUi.c_fv_favorites')}>
       {toolbar}
       <ul
         className="favorites-view__list"

@@ -6,6 +6,7 @@
  * so a choice applies to everyone who opens the vault. The server's `vault:change` event excludes
  * the user who made the change, so this component applies the result locally right away.
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -23,6 +24,7 @@ import './ThemeManager.css'
 const DEFAULT_VALUE = ''
 
 export function ThemeManager() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
 
@@ -44,7 +46,7 @@ export function ThemeManager() {
       setThemes(result.themes)
       setActiveId(result.activeThemeId)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Themes konnten nicht geladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.themesLoadFailed')))
     } finally {
       setLoading(false)
     }
@@ -60,7 +62,7 @@ export function ThemeManager() {
         setThemes(result.themes)
         setActiveId(result.activeThemeId)
       })
-      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, 'Themes konnten nicht geladen werden')) })
+      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, translateNow('settingsUi.themesLoadFailed'))) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [vaultId, apiClient])
@@ -80,7 +82,7 @@ export function ThemeManager() {
     if (!themeInjector.apply(themeId, css)) {
       // Refused (over the size limit): leave no previously applied theme behind that no longer matches the selection.
       themeInjector.remove()
-      throw new Error('Das Theme ist zu groß und wird nicht angezeigt (Grenze: 6 MB)')
+      throw new Error(translateNow('settingsUi.themeTooLarge'))
     }
   }, [vaultId, apiClient])
 
@@ -94,7 +96,7 @@ export function ThemeManager() {
     } catch (err) {
       // Nothing was saved: the vault still uses the previous theme, so the radio goes back.
       setActiveId(previous)
-      setError(extractErrorMessage(err, 'Theme konnte nicht aktiviert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.themeActivateFailed')))
       return
     }
     // The choice is saved. If showing it here fails, the selection must stay — rolling it back would
@@ -102,7 +104,7 @@ export function ThemeManager() {
     try {
       await applyLocally(themeId)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Das Theme wurde gespeichert, konnte aber hier nicht angezeigt werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.themeSavedNotShown')))
     }
   }, [vaultId, apiClient, activeId, applyLocally])
 
@@ -118,7 +120,7 @@ export function ThemeManager() {
       }
       await load()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Theme konnte nicht gelöscht werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.themeDeleteFailed')))
     }
   }, [deleting, vaultId, apiClient, activeId, load])
 
@@ -127,18 +129,17 @@ export function ThemeManager() {
   return (
     <div className="theme-manager">
       <p className="theme-manager__note">
-        Das aktive Theme gilt für alle Nutzer dieses Vaults und liegt im Ordner <code>.obsidian/themes/</code>.
-        Unterstützt werden Themes, die über Obsidian-CSS-Variablen arbeiten (Farben, Schriften, Überschriften);
-        Layout-Anpassungen einzelner Themes greifen nicht.
+        {t('settingsUi.themeNote1')} <code>.obsidian/themes/</code>.
+        {t('settingsUi.themeNote2')}
       </p>
 
       {error && <p className="theme-manager__error" role="alert">{error}</p>}
       {!loading && anyStyleSettings && <StyleSettingsHint state={styleSettingsState} />}
-      {loading && <p className="theme-manager__loading">Lädt…</p>}
+      {loading && <p className="theme-manager__loading">{t('settingsUi.loadingShort')}</p>}
 
       {!loading && (
         <fieldset className="theme-manager__list">
-          <legend className="theme-manager__legend">Theme dieses Vaults</legend>
+          <legend className="theme-manager__legend">{t('settingsUi.themeLegend')}</legend>
 
           <label className="theme-manager__item">
             <input
@@ -148,7 +149,7 @@ export function ThemeManager() {
               checked={activeId === null}
               onChange={() => void handleSelect(null)}
             />
-            <span className="theme-manager__name">Slatebase (Standard)</span>
+            <span className="theme-manager__name">{t('settingsUi.themeDefault')}</span>
           </label>
 
           {BUILTIN_THEMES.map((theme) => (
@@ -178,7 +179,7 @@ export function ThemeManager() {
                 />
                 <span className="theme-manager__name">{theme.manifest.name}</span>
                 {theme.hasStyleSettings && (
-                  <span className="theme-manager__settings-icon" title="Hat eigene Einstellungen" aria-hidden="true">
+                  <span className="theme-manager__settings-icon" title={t('settingsUi.hasOwnSettings')} aria-hidden="true">
                     <SlidersHorizontal size={13} />
                   </span>
                 )}
@@ -188,15 +189,15 @@ export function ThemeManager() {
               </label>
               {theme.externalHosts.length > 0 && (
                 <p className="theme-manager__warning">
-                  <AlertTriangle size={13} aria-hidden="true" /> Lädt Inhalte von: {theme.externalHosts.join(', ')}
+                  <AlertTriangle size={13} aria-hidden="true" /> {t('settingsUi.loadsFrom', { hosts: theme.externalHosts.join(', ') })}
                 </p>
               )}
-              {theme.hasStyleSettings && <span id={`theme-settings-${theme.id}`} className="theme-manager__sr-only">Hat eigene Einstellungen</span>}
+              {theme.hasStyleSettings && <span id={`theme-settings-${theme.id}`} className="theme-manager__sr-only">{t('settingsUi.hasOwnSettings')}</span>}
               <button
                 type="button"
                 className="theme-manager__action-btn"
                 onClick={() => setDeleting(theme)}
-                aria-label={`${theme.manifest.name} löschen`}
+                aria-label={t('settingsUi.deleteNamed', { name: theme.manifest.name })}
               >
                 <Trash2 size={14} />
               </button>
@@ -206,14 +207,14 @@ export function ThemeManager() {
       )}
 
       {!loading && themes.length === 0 && (
-        <p className="theme-manager__empty">Keine Themes in diesem Vault. Importiere eine <code>theme.css</code> unter „Importieren“.</p>
+        <p className="theme-manager__empty">{t('settingsUi.noThemes1')} <code>theme.css</code> {t('settingsUi.noThemes2')}</p>
       )}
 
       <ConfirmModal
         open={deleting !== null}
-        title="Theme löschen"
-        message={deleting ? `"${deleting.manifest.name}" wirklich löschen? Der Ordner wird aus dem Vault entfernt.` : ''}
-        confirmLabel="Löschen"
+        title={t('settingsUi.themeDeleteTitle')}
+        message={deleting ? t('settingsUi.themeDeleteMessage', { name: deleting.manifest.name }) : ''}
+        confirmLabel={t('settingsUi.delete')}
         variant="danger"
         onConfirm={() => void handleDeleteConfirm()}
         onCancel={() => setDeleting(null)}

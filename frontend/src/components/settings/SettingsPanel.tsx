@@ -6,6 +6,7 @@
  * @module components/settings/SettingsPanel
  */
 
+import { useTranslation } from '../../i18n'
 import { useEffect, useCallback } from 'react'
 import React from 'react'
 import { useAuthContext } from '../../state/authContext'
@@ -44,6 +45,7 @@ export interface SettingsPanelProps {
  * @param props - Component props
  */
 export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps) {
+  const { t } = useTranslation()
   const { authState } = useAuthContext()
   const { state: appState } = useAppContext()
 
@@ -100,7 +102,7 @@ export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps)
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
-      aria-label="Einstellungen"
+      aria-label={t('settingsUi.settings')}
     >
       <div
         className="settings-panel"
@@ -108,11 +110,11 @@ export function SettingsPanel({ open, onClose, initialNav }: SettingsPanelProps)
         tabIndex={-1}
       >
         <header className="settings-panel-header">
-          <h1 className="settings-panel-title">Einstellungen</h1>
+          <h1 className="settings-panel-title">{t('settingsUi.settings')}</h1>
           <button
             className="settings-panel-close-btn"
             onClick={onClose}
-            aria-label="Einstellungen schließen"
+            aria-label={t('settingsUi.closeSettings')}
             type="button"
           >
             <svg
@@ -154,6 +156,7 @@ interface SettingsPanelLayoutProps {
  * Separated so it can access SettingsContext via hooks.
  */
 function SettingsPanelLayout({ initialNav }: SettingsPanelLayoutProps) {
+  const { t } = useTranslation()
   // Narrow layout (panel < 700px) is master-detail: the navigation first, then the chosen section
   // with a back button. `true` = navigation shown. The wide layout shows both and ignores this.
   const [mobileNavOpen, setMobileNavOpen] = React.useState(initialNav === undefined)
@@ -202,14 +205,14 @@ function SettingsPanelLayout({ initialNav }: SettingsPanelLayoutProps) {
         >
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        Navigation
+        {t('settingsUi.navigation')}
       </button>
 
       <aside
         id="settings-sidebar"
         className="settings-panel-sidebar"
         role="navigation"
-        aria-label="Einstellungen-Navigation"
+        aria-label={t('settingsUi.settingsNav')}
         data-mobile-open={String(mobileNavOpen)}
       >
         <SettingsSidebar onNavSelect={handleNavSelect} initialNav={initialNav} />
@@ -219,7 +222,7 @@ function SettingsPanelLayout({ initialNav }: SettingsPanelLayoutProps) {
         className="settings-panel-content"
         data-mobile-nav-open={String(mobileNavOpen)}
         role="main"
-        aria-label="Einstellungen-Inhalt"
+        aria-label={t('settingsUi.settingsContent')}
       >
         <SettingsContent />
       </section>

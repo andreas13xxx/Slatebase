@@ -8,6 +8,7 @@
  *
  * @module components/settings/VaultAppearanceSettings
  */
+import { useTranslation, translateNow, type TranslationKey } from '../../i18n'
 import { useState } from 'react'
 import {
   appearanceConfigValueProblem,
@@ -19,16 +20,16 @@ import { showToast } from '../ToastNotification'
 import { updateAppearance, useAppearanceSnapshot } from '../../state/vaultAppearanceStore'
 import { SettingSection, SettingRow, Button } from './ui'
 
-const THEME_LABELS: Record<AppearanceConfigValues['theme'], string> = {
-  system: 'Dem System folgen',
-  moonstone: 'Hell',
-  obsidian: 'Dunkel',
+const THEME_LABELS: Record<AppearanceConfigValues['theme'], TranslationKey> = {
+  system: 'settingsUi.misc_themeSystem',
+  moonstone: 'settingsUi.misc_light',
+  obsidian: 'settingsUi.misc_dark',
 }
 
 const FONT_FIELDS = [
-  { key: 'interfaceFontFamily', label: 'Schrift der Oberfläche' },
-  { key: 'textFontFamily', label: 'Schrift der Texte' },
-  { key: 'monospaceFontFamily', label: 'Schrift für Code' },
+  { key: 'interfaceFontFamily', labelKey: 'settingsUi.misc_fontInterface' },
+  { key: 'textFontFamily', labelKey: 'settingsUi.misc_fontText' },
+  { key: 'monospaceFontFamily', labelKey: 'settingsUi.misc_fontMono' },
 ] as const
 
 interface Draft {
@@ -53,10 +54,10 @@ function toDraft(stored: AppearanceConfigValues): Draft {
 function problems(draft: Draft): Partial<Record<keyof Draft, string>> {
   const found: Partial<Record<keyof Draft, string>> = {}
   const size = Number(draft.baseFontSize)
-  const sizeProblem = draft.baseFontSize.trim() === '' ? 'Bitte eine Zahl angeben.' : appearanceConfigValueProblem('baseFontSize', size)
-  if (sizeProblem) found.baseFontSize = 'Die Schriftgröße muss zwischen 10 und 30 liegen.'
+  const sizeProblem = draft.baseFontSize.trim() === '' ? translateNow('settingsUi.misc_needNumber') : appearanceConfigValueProblem('baseFontSize', size)
+  if (sizeProblem) found.baseFontSize = translateNow('settingsUi.misc_sizeRange')
   const colorProblem = appearanceConfigValueProblem('accentColor', draft.accentColor)
-  if (colorProblem) found.accentColor = 'Die Farbe muss als #rrggbb angegeben werden.'
+  if (colorProblem) found.accentColor = translateNow('settingsUi.misc_colorFormat')
   for (const { key } of FONT_FIELDS) {
     if (appearanceConfigValueProblem(key, draft[key])) {
       found[key] = 'Erlaubt sind Namen, Ziffern, Leerzeichen und , \' " . _ -'
@@ -74,6 +75,7 @@ function AppearanceForm({ stored, disabled, onSave }: {
   disabled: boolean
   onSave: (draft: Draft) => void
 }) {
+  const { t } = useTranslation()
   const storedDraft = JSON.stringify(toDraft(stored))
   const [draft, setDraft] = useState<Draft>(() => toDraft(stored))
   const [baseline, setBaseline] = useState(storedDraft)
@@ -89,21 +91,21 @@ function AppearanceForm({ stored, disabled, onSave }: {
 
   return (
     <>
-      <SettingRow label="Akzentfarbe" htmlFor="appearance-accent" hint={found.accentColor ?? 'Leer = Farbe des Themes.'}>
+      <SettingRow label={t('settingsUi.misc_accent')} htmlFor="appearance-accent" hint={found.accentColor ?? t('settingsUi.misc_accentHint')}>
         <input
           id="appearance-accent"
           type="color"
           value={draft.accentColor === '' ? '#7b6cd9' : draft.accentColor}
           onChange={(e) => set('accentColor')(e.target.value)}
           disabled={disabled}
-          aria-label="Akzentfarbe"
+          aria-label={t('settingsUi.misc_accent')}
         />
         <Button variant="secondary" disabled={disabled || draft.accentColor === ''} onClick={() => set('accentColor')('')}>
-          Zurücksetzen
+          {t('settingsUi.misc_reset')}
         </Button>
       </SettingRow>
 
-      <SettingRow label="Schriftgröße" htmlFor="appearance-size" hint={found.baseFontSize ?? 'In Pixeln, Standard 16.'}>
+      <SettingRow label={t('settingsUi.misc_fontSize')} htmlFor="appearance-size" hint={found.baseFontSize ?? t('settingsUi.misc_fontSizeHint')}>
         <input
           id="appearance-size"
           type="number"
@@ -117,8 +119,8 @@ function AppearanceForm({ stored, disabled, onSave }: {
         />
       </SettingRow>
 
-      {FONT_FIELDS.map(({ key, label }) => (
-        <SettingRow key={key} label={label} htmlFor={`appearance-${key}`} hint={found[key] ?? 'Schriftnamen mit Komma getrennt. Leer = Schrift des Themes.'}>
+      {FONT_FIELDS.map(({ key, labelKey }) => (
+        <SettingRow key={key} label={t(labelKey)} htmlFor={`appearance-${key}`} hint={found[key] ?? t('settingsUi.misc_fontNamesHint')}>
           <input
             id={`appearance-${key}`}
             type="text"
@@ -135,7 +137,7 @@ function AppearanceForm({ stored, disabled, onSave }: {
 
       <div className="settings-actions">
         <Button variant="primary" disabled={disabled || !changed || invalid} onClick={() => onSave(draft)}>
-          Speichern
+          {t('settingsUi.misc_save')}
         </Button>
       </div>
     </>
@@ -143,6 +145,7 @@ function AppearanceForm({ stored, disabled, onSave }: {
 }
 
 export function VaultAppearanceSettings() {
+  const { t } = useTranslation()
   const { state } = useAppContext()
   const vaultId = state.selectedVaultId
   const canWrite = state.vaults.find((vault) => vault.id === vaultId)?.permission !== 'read'
@@ -156,7 +159,7 @@ export function VaultAppearanceSettings() {
     try {
       await updateAppearance(change)
     } catch (error: unknown) {
-      showToast('error', `Einstellung konnte nicht gespeichert werden: ${extractErrorMessage(error)}`)
+      showToast('error', translateNow('settingsUi.misc_saveFailedWith', { detail: extractErrorMessage(error) }))
     } finally {
       setSaving(false)
     }
@@ -166,15 +169,15 @@ export function VaultAppearanceSettings() {
 
   return (
     <SettingSection
-      title="Darstellung des Vaults"
-      description="Basis-Theme, Akzentfarbe und Schriften. Gespeichert in .obsidian/appearance.json, wie in Obsidian, und gültig für alle, die den Vault öffnen."
+      title={t('settingsUi.misc_vaultLook')}
+      description={t('settingsUi.misc_vaultLookDesc')}
     >
-      {!canWrite && <p className="settings-field-hint">Ändern darf diese Einstellungen, wer den Vault bearbeiten darf.</p>}
+      {!canWrite && <p className="settings-field-hint">{t('settingsUi.misc_vaultLookReadOnly')}</p>}
 
       <SettingRow
-        label="Basis-Theme"
+        label={t('settingsUi.misc_baseTheme')}
         htmlFor="appearance-theme"
-        hint="Vorgabe des Vaults. Wer in seinem Profil Hell oder Dunkel gewählt hat, behält die eigene Wahl."
+        hint={t('settingsUi.misc_baseThemeHint')}
       >
         <select
           id="appearance-theme"
@@ -184,7 +187,7 @@ export function VaultAppearanceSettings() {
           disabled={disabled}
         >
           {(Object.keys(THEME_LABELS) as Array<AppearanceConfigValues['theme']>).map((key) => (
-            <option key={key} value={key}>{THEME_LABELS[key]}</option>
+            <option key={key} value={key}>{t(THEME_LABELS[key])}</option>
           ))}
         </select>
       </SettingRow>

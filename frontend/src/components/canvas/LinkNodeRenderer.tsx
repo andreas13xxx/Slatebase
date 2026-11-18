@@ -5,6 +5,7 @@
  * Supports drag/move, resize, and double-click to open URL externally.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useCallback, useState, useRef, useEffect } from 'react'
 import { ExternalLink, Globe } from 'lucide-react'
 import type { LinkNode } from '../../canvas/types'
@@ -30,6 +31,7 @@ export interface LinkNodeRendererProps {
 export const LinkNodeRenderer = memo(function LinkNodeRenderer({
   node, selected, onSelect, onUrlChange, readOnly, editing, onEditEnd,
 }: LinkNodeRendererProps) {
+  const { t } = useTranslation()
   const colorClass = getCanvasColorClass(node.color)
   const [editUrl, setEditUrl] = useState(node.url)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -122,7 +124,7 @@ export const LinkNodeRenderer = memo(function LinkNodeRenderer({
             onBlur={finishEditing}
             onKeyDown={handleEditKeyDown}
             placeholder="https://example.com"
-            aria-label="URL bearbeiten"
+            aria-label={t('canvasUi.editUrl')}
           />
         </div>
       </div>

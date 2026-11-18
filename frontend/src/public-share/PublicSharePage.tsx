@@ -8,6 +8,7 @@ import { PublicEmbedContext } from './PublicEmbedContext'
 import { loadPublicNote, unlockPublicNote } from './publicShareApi'
 import type { PublicLoadResult } from './publicShareApi'
 import { toPublicVaultId } from './publicVault'
+import { useTranslation } from '../i18n'
 
 /** Sets a `<meta name>` tag for the lifetime of the page. */
 function useMeta(name: string, content: string): void {
@@ -30,6 +31,7 @@ interface PublicSharePageProps {
  * as the app, with embeds resolved by the server.
  */
 export function PublicSharePage({ token }: PublicSharePageProps) {
+  const { t } = useTranslation()
   const [result, setResult] = useState<PublicLoadResult | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -49,34 +51,34 @@ export function PublicSharePage({ token }: PublicSharePageProps) {
     setReloadKey((n) => n + 1)
   }, [])
 
-  const title = result?.status === 'ok' ? result.view.title : 'Geteilte Notiz'
+  const title = result?.status === 'ok' ? result.view.title : t('publicShare.sharedNote')
   useEffect(() => {
     document.title = title
   }, [title])
 
   return (
     <main className="public-share">
-      {result === null && <p role="status" className="public-share-status">Wird geladen…</p>}
+      {result === null && <p role="status" className="public-share-status">{t('publicShare.loading')}</p>}
       {result?.status === 'ok' && <SharedNote token={token} view={result.view} />}
       {result?.status === 'password' && <PasswordForm token={token} onUnlocked={reload} />}
       {result?.status === 'notfound' && (
         <div className="public-share-message" role="alert">
-          <h1>Link nicht verfügbar</h1>
-          <p>Dieser Link existiert nicht (mehr) oder ist abgelaufen.</p>
+          <h1>{t('publicShare.notFoundTitle')}</h1>
+          <p>{t('publicShare.notFoundText')}</p>
         </div>
       )}
       {result?.status === 'limited' && (
         <div className="public-share-message" role="alert">
-          <h1>Zu viele Anfragen</h1>
-          <p>Bitte warte einen Moment und versuche es dann erneut.</p>
-          <button type="button" onClick={reload}>Erneut versuchen</button>
+          <h1>{t('publicShare.limitedTitle')}</h1>
+          <p>{t('publicShare.limitedText')}</p>
+          <button type="button" onClick={reload}>{t('publicShare.retry')}</button>
         </div>
       )}
       {result?.status === 'error' && (
         <div className="public-share-message" role="alert">
-          <h1>Die Notiz konnte nicht geladen werden</h1>
-          <p>Prüfe deine Verbindung und versuche es erneut.</p>
-          <button type="button" onClick={reload}>Erneut versuchen</button>
+          <h1>{t('publicShare.errorTitle')}</h1>
+          <p>{t('publicShare.errorText')}</p>
+          <button type="button" onClick={reload}>{t('publicShare.retry')}</button>
         </div>
       )}
     </main>
@@ -97,6 +99,7 @@ function SharedNote({ token, view }: { token: string; view: NonNullable<Extract<
 }
 
 function PasswordForm({ token, onUnlocked }: { token: string; onUnlocked: () => void }) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -115,18 +118,18 @@ function PasswordForm({ token, onUnlocked }: { token: string; onUnlocked: () => 
       return
     }
     setError(
-      outcome === 'wrong' ? 'Das Passwort ist falsch.'
-        : outcome === 'limited' ? 'Zu viele Versuche. Bitte warte einige Minuten.'
-          : outcome === 'notfound' ? 'Dieser Link ist nicht mehr verfügbar.'
-            : 'Das Passwort konnte nicht geprüft werden. Bitte versuche es erneut.',
+      outcome === 'wrong' ? t('publicShare.wrongPassword')
+        : outcome === 'limited' ? t('publicShare.tooManyAttempts')
+          : outcome === 'notfound' ? t('publicShare.linkGone')
+            : t('publicShare.passwordCheckFailed'),
     )
   }
 
   return (
     <form className="public-share-message" onSubmit={(e) => { void submit(e) }}>
-      <h1>Geschützte Notiz</h1>
-      <p>Für diese Notiz ist ein Passwort nötig.</p>
-      <label htmlFor={inputId}>Passwort</label>
+      <h1>{t('publicShare.passwordTitle')}</h1>
+      <p>{t('publicShare.passwordText')}</p>
+      <label htmlFor={inputId}>{t('publicShare.password')}</label>
       <input
         id={inputId}
         type="password"
@@ -137,7 +140,7 @@ function PasswordForm({ token, onUnlocked }: { token: string; onUnlocked: () => 
         aria-describedby={error !== null ? errorId : undefined}
       />
       {error !== null && <p id={errorId} role="alert" className="public-share-error">{error}</p>}
-      <button type="submit" disabled={busy || password === ''}>Öffnen</button>
+      <button type="submit" disabled={busy || password === ''}>{t('publicShare.open')}</button>
     </form>
   )
 }

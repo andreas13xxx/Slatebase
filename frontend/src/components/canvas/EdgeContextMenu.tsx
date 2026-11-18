@@ -3,6 +3,7 @@
  * Appears on right-click on an edge. Allows editing label and toggling arrow endpoints.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useState, useCallback, useRef, useEffect } from 'react'
 import type { CanvasEdge, EdgeEnd } from '../../canvas/types'
 
@@ -18,6 +19,7 @@ export interface EdgeContextMenuProps {
 export const EdgeContextMenu = memo(function EdgeContextMenu({
   edge, position, onClose, onUpdateLabel, onUpdateArrows, onDelete,
 }: EdgeContextMenuProps) {
+  const { t } = useTranslation()
   const [editingLabel, setEditingLabel] = useState(false)
   const [labelValue, setLabelValue] = useState(edge.label ?? '')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -94,7 +96,7 @@ export const EdgeContextMenu = memo(function EdgeContextMenu({
       className="canvas-edge-context-menu"
       style={{ left: position.x, top: position.y }}
       role="menu"
-      aria-label="Kantenmenü"
+      aria-label={t('canvasUi.edgeMenu')}
     >
       {/* Label editing */}
       <div className="canvas-edge-context-menu__section">
@@ -108,8 +110,8 @@ export const EdgeContextMenu = memo(function EdgeContextMenu({
               onChange={(e) => setLabelValue(e.target.value)}
               onKeyDown={handleLabelKeyDown}
               onBlur={handleLabelSave}
-              placeholder="Beschriftung…"
-              aria-label="Kantenbeschriftung"
+              placeholder={t('canvasUi.labelPlaceholder')}
+              aria-label={t('canvasUi.edgeLabel')}
             />
           </div>
         ) : (
@@ -119,7 +121,7 @@ export const EdgeContextMenu = memo(function EdgeContextMenu({
             onClick={() => setEditingLabel(true)}
             role="menuitem"
           >
-            {edge.label ? `Beschriftung: "${edge.label}"` : 'Beschriftung hinzufügen…'}
+            {edge.label ? t('canvasUi.labelNamed', { label: edge.label }) : t('canvasUi.addLabel')}
           </button>
         )}
       </div>
@@ -154,7 +156,7 @@ export const EdgeContextMenu = memo(function EdgeContextMenu({
           onClick={() => { onDelete(edge.id); onClose() }}
           role="menuitem"
         >
-          Kante löschen
+          {t('canvasUi.deleteEdge')}
         </button>
       </div>
     </div>

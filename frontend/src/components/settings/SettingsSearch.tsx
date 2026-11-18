@@ -6,6 +6,7 @@
  * the query is dispatched to the settings reducer via SET_SEARCH.
  * Clearing the field dispatches immediately (no debounce).
  */
+import { useTranslation } from '../../i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import type { SettingsAction } from '../../state/settingsState'
@@ -31,6 +32,7 @@ const DEBOUNCE_MS = 150
  * - Cleans up debounce timer on unmount
  */
 export function SettingsSearch({ searchQuery, dispatch }: SettingsSearchProps) {
+  const { t } = useTranslation()
   const [localValue, setLocalValue] = useState(searchQuery)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -90,17 +92,17 @@ export function SettingsSearch({ searchQuery, dispatch }: SettingsSearchProps) {
       <input
         type="text"
         className="settings-search__input"
-        placeholder="Einstellungen durchsuchen..."
+        placeholder={t('settingsUi.searchSettingsPh')}
         value={localValue}
         onChange={handleChange}
-        aria-label="Einstellungen durchsuchen"
+        aria-label={t('settingsUi.searchSettings')}
       />
       {localValue.length > 0 && (
         <button
           type="button"
           className="settings-search__clear"
           onClick={handleClear}
-          aria-label="Suche leeren"
+          aria-label={t('settingsUi.clearSearch')}
         >
           <X size={14} />
         </button>

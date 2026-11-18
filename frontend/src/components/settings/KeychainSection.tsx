@@ -6,6 +6,7 @@
  *
  * @module components/settings/KeychainSection
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -22,6 +23,7 @@ const SECRET_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 const SECRET_ID_MAX_LENGTH = 128
 
 export function KeychainSection() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
   const canWrite = state.vaults.find((vault) => vault.id === vaultId)?.permission !== 'read'
@@ -45,7 +47,7 @@ export function KeychainSection() {
       setIds(await apiClient.listKeychainSecrets(vaultId))
       setError(null)
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Schlüsselbund konnte nicht geladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.misc_kcLoadFailed')))
     } finally {
       setLoading(false)
     }
@@ -62,7 +64,7 @@ export function KeychainSection() {
         setRevealed({})
         setEditing(null)
       })
-      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, 'Schlüsselbund konnte nicht geladen werden')) })
+      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, translateNow('settingsUi.misc_kcLoadFailed'))) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [vaultId, apiClient])
@@ -83,7 +85,7 @@ export function KeychainSection() {
       showToast('success', successMessage)
       return true
     } catch (err: unknown) {
-      showToast('error', extractErrorMessage(err, 'Änderung am Schlüsselbund fehlgeschlagen'))
+      showToast('error', extractErrorMessage(err, translateNow('settingsUi.misc_kcChangeFailed')))
       return false
     } finally {
       setBusy(false)
@@ -99,13 +101,13 @@ export function KeychainSection() {
     try {
       const value = await apiClient.getKeychainSecret(vaultId, id)
       if (value === null) {
-        showToast('error', 'Der Eintrag existiert nicht mehr')
+        showToast('error', translateNow('settingsUi.misc_kcGone'))
         await load()
         return
       }
       setRevealed((current) => ({ ...current, [id]: value }))
     } catch (err: unknown) {
-      showToast('error', extractErrorMessage(err, 'Wert konnte nicht gelesen werden'))
+      showToast('error', extractErrorMessage(err, translateNow('settingsUi.misc_kcReadFailed')))
     }
   }, [vaultId, apiClient, revealed, load])
 
@@ -114,7 +116,7 @@ export function KeychainSection() {
     if (!vaultId || !apiClient) return
     const id = newId.trim()
     if (ids.includes(id)) return
-    const ok = await mutate(() => apiClient.setKeychainSecret(vaultId, id, newValue), `„${id}“ gespeichert`)
+    const ok = await mutate(() => apiClient.setKeychainSecret(vaultId, id, newValue), translateNow('settingsUi.misc_kcSaved', { id: id }))
     if (ok) {
       setNewId('')
       setNewValue('')
@@ -125,7 +127,7 @@ export function KeychainSection() {
     event.preventDefault()
     if (!vaultId || !apiClient || editing === null) return
     const id = editing
-    const ok = await mutate(() => apiClient.setKeychainSecret(vaultId, id, editValue), `„${id}“ aktualisiert`)
+    const ok = await mutate(() => apiClient.setKeychainSecret(vaultId, id, editValue), translateNow('settingsUi.misc_kcUpdated', { id: id }))
     if (ok) {
       setEditing(null)
       setEditValue('')
@@ -137,15 +139,15 @@ export function KeychainSection() {
     if (!vaultId || !apiClient || deleting === null) return
     const id = deleting
     setDeleting(null)
-    await mutate(() => apiClient.deleteKeychainSecret(vaultId, id), `„${id}“ gelöscht`)
+    await mutate(() => apiClient.deleteKeychainSecret(vaultId, id), translateNow('settingsUi.misc_kcDeleted', { id: id }))
   }, [vaultId, apiClient, deleting, mutate])
 
   if (!vaultId || !apiClient) {
-    return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+    return <p className="settings-content-no-vault">{t('settingsUi.misc_noVault')}</p>
   }
 
   if (loading) {
-    return <p className="settings-loading">Lade Schlüsselbund…</p>
+    return <p className="settings-loading">{t('settingsUi.misc_kcLoading')}</p>
   }
 
   const newIdTrimmed = newId.trim()
@@ -157,17 +159,17 @@ export function KeychainSection() {
       {error && <p className="settings-error" role="alert">{error}</p>}
 
       <SettingSection
-        title="Schlüsselbund"
-        description="Benannte Geheimnisse (API-Schlüssel, Tokens) dieses Vaults. Alle aktiven Plugins des Vaults können sie lesen. Sie liegen verschlüsselt auf dem Server, nicht im Vault, und werden nicht mit Git oder anderen Geräten synchronisiert."
+        title={t('settingsUi.misc_keychain')}
+        description={t('settingsUi.misc_keychainDesc')}
       >
         {!canWrite && (
-          <p className="settings-field-hint">Mit Lesezugriff siehst du nur die Namen. Werte lesen und ändern darf, wer den Vault bearbeiten darf.</p>
+          <p className="settings-field-hint">{t('settingsUi.misc_keychainReadOnly')}</p>
         )}
 
         {ids.length === 0 ? (
-          <p className="keychain-section__empty">Noch keine Einträge.</p>
+          <p className="keychain-section__empty">{t('settingsUi.misc_noEntries')}</p>
         ) : (
-          <ul className="keychain-section__list" aria-label="Einträge im Schlüsselbund">
+          <ul className="keychain-section__list" aria-label={t('settingsUi.misc_entriesLabel')}>
             {ids.map((id) => (
               <li key={id} className="keychain-section__item">
                 {editing === id ? (
@@ -178,13 +180,13 @@ export function KeychainSection() {
                       className="settings-field-input"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      placeholder="Neuer Wert"
+                      placeholder={t('settingsUi.misc_newValue')}
                       autoComplete="off"
                       disabled={busy}
                       ref={editInputRef}
                     />
-                    <Button type="submit" variant="primary" size="sm" disabled={busy || editValue === ''}>Speichern</Button>
-                    <Button size="sm" onClick={() => { setEditing(null); setEditValue('') }} disabled={busy}>Abbrechen</Button>
+                    <Button type="submit" variant="primary" size="sm" disabled={busy || editValue === ''}>{t('settingsUi.misc_save')}</Button>
+                    <Button size="sm" onClick={() => { setEditing(null); setEditValue('') }} disabled={busy}>{t('settingsUi.misc_cancel')}</Button>
                   </form>
                 ) : (
                   <>
@@ -198,7 +200,7 @@ export function KeychainSection() {
                           variant="ghost"
                           size="sm"
                           onClick={() => void toggleReveal(id)}
-                          aria-label={id in revealed ? `Wert von ${id} verbergen` : `Wert von ${id} anzeigen`}
+                          aria-label={id in revealed ? t('settingsUi.misc_kcHide', { id: id }) : t('settingsUi.misc_kcShow', { id: id })}
                           aria-pressed={id in revealed}
                         >
                           {id in revealed ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
@@ -207,7 +209,7 @@ export function KeychainSection() {
                           variant="ghost"
                           size="sm"
                           onClick={() => { setEditing(id); setEditValue('') }}
-                          aria-label={`Wert von ${id} ändern`}
+                          aria-label={t('settingsUi.misc_kcChange', { id: id })}
                           disabled={busy}
                         >
                           <Pencil size={14} aria-hidden="true" />
@@ -216,7 +218,7 @@ export function KeychainSection() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setDeleting(id)}
-                          aria-label={`${id} löschen`}
+                          aria-label={t('settingsUi.misc_kcDeleteNamed', { id: id })}
                           disabled={busy}
                         >
                           <Trash2 size={14} aria-hidden="true" />
@@ -232,12 +234,12 @@ export function KeychainSection() {
       </SettingSection>
 
       {canWrite && (
-        <SettingSection title="Eintrag hinzufügen">
+        <SettingSection title={t('settingsUi.misc_addEntry')}>
           <form onSubmit={handleAdd}>
             <div className="settings-field">
-              <label htmlFor="keychain-new-id" className="settings-field-label">Name</label>
+              <label htmlFor="keychain-new-id" className="settings-field-label">{t('settingsUi.misc_name')}</label>
               <p className="settings-field-hint" id="keychain-new-id-hint">
-                Kleinbuchstaben, Ziffern und einzelne Bindestriche, zum Beispiel <code>mein-api-schluessel</code>.
+                {t('settingsUi.misc_kcNameHint1')} <code>mein-api-schluessel</code>.
               </p>
               <input
                 id="keychain-new-id"
@@ -251,11 +253,11 @@ export function KeychainSection() {
                 spellCheck={false}
                 disabled={busy}
               />
-              {newIdInvalid && <p className="settings-error" role="alert">Ungültiger Name.</p>}
-              {newIdTaken && <p className="settings-error" role="alert">Dieser Name existiert schon. Ändere den Eintrag in der Liste.</p>}
+              {newIdInvalid && <p className="settings-error" role="alert">{t('settingsUi.misc_invalidName')}</p>}
+              {newIdTaken && <p className="settings-error" role="alert">{t('settingsUi.misc_nameTaken')}</p>}
             </div>
             <div className="settings-field">
-              <label htmlFor="keychain-new-value" className="settings-field-label">Wert</label>
+              <label htmlFor="keychain-new-value" className="settings-field-label">{t('settingsUi.misc_value')}</label>
               <PasswordInput
                 id="keychain-new-value"
                 className="settings-field-input"
@@ -267,7 +269,7 @@ export function KeychainSection() {
             </div>
             <div className="settings-actions">
               <Button type="submit" variant="primary" disabled={busy || newIdTrimmed === '' || newIdInvalid || newIdTaken || newValue === ''}>
-                Hinzufügen
+                {t('settingsUi.misc_add')}
               </Button>
             </div>
           </form>
@@ -276,9 +278,9 @@ export function KeychainSection() {
 
       <ConfirmModal
         open={deleting !== null}
-        title="Eintrag löschen?"
-        message={`„${deleting ?? ''}“ wird aus dem Schlüsselbund entfernt. Plugins, die ihn nutzen, verlieren den Zugriff. Das lässt sich nicht rückgängig machen.`}
-        confirmLabel="Löschen"
+        title={t('settingsUi.misc_deleteEntryTitle')}
+        message={t('settingsUi.misc_kcDeleteMessage', { id: deleting ?? '' })}
+        confirmLabel={t('settingsUi.misc_delete')}
         variant="danger"
         onConfirm={() => void handleDelete()}
         onCancel={() => setDeleting(null)}

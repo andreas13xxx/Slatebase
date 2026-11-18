@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from '../i18n'
 import { Search } from 'lucide-react'
 import type { Command } from '../plugins/compat/command-registry'
 import { useFocusTrap } from '../hooks/useFocusTrap'
@@ -36,6 +37,7 @@ const MAX_RESULTS = 300;
  * not inside this component.
  */
 export function CommandPalette({ commands, isOpen, onClose, onExecute }: CommandPaletteProps) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -137,7 +139,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
         className="command-palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Command Palette"
+        aria-label={t('commonUi.c_commandPalette')}
       >
         <div className="command-palette-search">
           <Search size={14} className="command-palette-search-icon" />
@@ -145,7 +147,7 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
             ref={inputRef}
             type="text"
             className="command-palette-input"
-            placeholder="Befehl suchen…"
+            placeholder={t('commonUi.c_searchCommand')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
@@ -165,11 +167,11 @@ export function CommandPalette({ commands, isOpen, onClose, onExecute }: Command
           id="command-palette-list"
           className="command-palette-list"
           role="listbox"
-          aria-label="Befehle"
+          aria-label={t('commonUi.c_commands')}
         >
           {filteredCommands.length === 0 ? (
             <li className="command-palette-empty" role="option" aria-selected={false}>
-              Keine Befehle gefunden
+              {t('commonUi.c_noCommands')}
             </li>
           ) : (
             filteredCommands.map((cmd, index) => {

@@ -20,6 +20,7 @@
  * `AppContext` client.
  */
 
+import { useTranslation, translateNow } from '../../i18n'
 import { memo, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { BaseDocument, BaseQueryResultWire, BaseQuerySpecWire, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import { parseBase, runBaseQuery } from '../../bases'
@@ -74,6 +75,7 @@ export interface BasesEmbedProps {
 }
 
 export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, target, viewName, hostPath, onOpenNote, apiClient: explicitClient }: BasesEmbedProps) {
+  const { t } = useTranslation()
   const appContext = useContext(AppContext)
   const apiClient: IBasesEmbedApiClient | null = explicitClient ?? appContext?.apiClient ?? null
 
@@ -90,7 +92,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
 
   useEffect(() => {
     if (!apiClient) {
-      setError('Kein API-Client verfügbar')
+      setError(translateNow('basesUi.noApiClient'))
       setLoading(false)
       return
     }
@@ -117,7 +119,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
         const parsed = parseBase(content)
         if (cancelled) return
         if (!parsed.success) {
-          setError(`Ungültige Base: ${parsed.errors.map((e) => e.message).join('; ')}`)
+          setError(translateNow('basesUi.invalidBase', { errors: parsed.errors.map((e) => e.message).join('; ') }))
           setLoading(false)
           return
         }
@@ -140,7 +142,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
       } catch {
         if (cancelled) return
         if (silent) return // a failed background refresh keeps the last good rows
-        setError(`Fehler beim Laden: ${target ?? 'Base'}`)
+        setError(translateNow('basesUi.loadFailed', { name: target ?? 'Base' }))
         setLoading(false)
       }
     })()
@@ -182,7 +184,7 @@ export const BasesEmbed = memo(function BasesEmbed({ vaultId, filePath, source, 
   if (loading || !doc || !view) {
     return (
       <div className="view-mode-embed bases-embed bases-embed--loading">
-        <span className="view-mode-embed-loading">Laden…</span>
+        <span className="view-mode-embed-loading">{t('basesUi.loading')}</span>
       </div>
     )
   }

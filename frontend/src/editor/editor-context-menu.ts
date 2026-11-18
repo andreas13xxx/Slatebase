@@ -18,6 +18,7 @@
  * @module editor-context-menu
  */
 import { createElement } from 'react'
+import { translateNow } from '../i18n'
 import {
   Scissors, Copy, Clipboard, Link2, MessageSquareQuote, MessageSquareOff,
   Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Pilcrow, Quote,
@@ -115,7 +116,7 @@ async function extractSelectionToNewNote(view: EditorView): Promise<void> {
   const currentPath = state.field(editorInfoField, false)?.file?.path
   if (!currentPath) return
 
-  const name = window.prompt('Name der neuen Notiz', '')
+  const name = window.prompt(translateNow('commonUi.c_ec_newNoteName'), '')
   if (!name || !name.trim()) return
 
   const dir = currentPath.includes('/') ? currentPath.slice(0, currentPath.lastIndexOf('/')) : ''
@@ -172,9 +173,9 @@ function buildSpellingItems(view: EditorView, spellcheck: SpellcheckMenuContext 
   const items: ContextMenuItem[] = []
 
   if (spellcheck.suggestions === null) {
-    items.push({ id: 'spell-loading', label: 'Vorschläge werden gesucht …', disabled: true })
+    items.push({ id: 'spell-loading', label: translateNow('commonUi.c_ec_searching'), disabled: true })
   } else if (spellcheck.suggestions.length === 0) {
-    items.push({ id: 'spell-none', label: 'Keine Vorschläge', disabled: true })
+    items.push({ id: 'spell-none', label: translateNow('commonUi.c_ec_noSuggestions'), disabled: true })
   } else {
     items.push(...spellcheck.suggestions.map((suggestion, index) => ({
       id: `spell-suggestion-${index}`,
@@ -191,7 +192,7 @@ function buildSpellingItems(view: EditorView, spellcheck: SpellcheckMenuContext 
     { id: 'sep-spell-actions', label: '', separator: true },
     {
       id: 'spell-learn',
-      label: 'Zum Wörterbuch hinzufügen',
+      label: translateNow('commonUi.c_ec_addDict'),
       icon: createElement(BookPlus, { size: ICON_SIZE }),
       run: () => {
         learnWord(misspelled.word)
@@ -200,7 +201,7 @@ function buildSpellingItems(view: EditorView, spellcheck: SpellcheckMenuContext 
     },
     {
       id: 'spell-ignore',
-      label: 'Alle ignorieren (diese Sitzung)',
+      label: translateNow('commonUi.c_ec_ignoreAll'),
       icon: createElement(Ban, { size: ICON_SIZE }),
       run: () => {
         ignoreWordForSession(misspelled.word)
@@ -234,12 +235,12 @@ function buildSpellcheckSettingsItem(spellcheck: SpellcheckMenuContext | undefin
 
   return {
     id: 'spellcheck',
-    label: 'Rechtschreibprüfung',
+    label: translateNow('commonUi.c_ec_spell'),
     icon: createElement(Languages, { size: ICON_SIZE }),
     submenu: [
       {
         id: 'toggle-spellcheck',
-        label: 'Rechtschreibprüfung aktiv',
+        label: translateNow('commonUi.c_ec_spellActive'),
         icon: createElement(SpellCheck, { size: ICON_SIZE }),
         checked: spellcheck?.enabled ?? false,
         run: () => window.dispatchEvent(new CustomEvent('slatebase:editor-command', { detail: { action: 'toggleSpellcheck' } })),
@@ -255,7 +256,7 @@ export function buildEditorContextMenuItems(
   showLineNumbers: boolean,
   readableLineLength: boolean,
   spellcheck?: SpellcheckMenuContext,
-  propertiesLabel = 'Frontmatter ein-/ausblenden',
+  propertiesLabel = translateNow('commonUi.c_ec_frontmatter'),
 ): ContextMenuItem[] {
   const { state } = view
   const sel = state.selection.main
@@ -266,7 +267,7 @@ export function buildEditorContextMenuItems(
     ...buildSpellingItems(view, spellcheck),
     {
       id: 'cut',
-      label: 'Ausschneiden',
+      label: translateNow('commonUi.c_ec_cut'),
       icon: createElement(Scissors, { size: ICON_SIZE }),
       disabled: !hasSelection,
       run: () => {
@@ -277,14 +278,14 @@ export function buildEditorContextMenuItems(
     },
     {
       id: 'copy',
-      label: 'Kopieren',
+      label: translateNow('commonUi.c_ec_copy'),
       icon: createElement(Copy, { size: ICON_SIZE }),
       disabled: !hasSelection,
       run: () => copyToClipboard(selectedText),
     },
     {
       id: 'paste',
-      label: 'Einfügen',
+      label: translateNow('commonUi.c_ec_paste'),
       icon: createElement(Clipboard, { size: ICON_SIZE }),
       run: () => {
         navigator.clipboard.readText().then((text) => {
@@ -296,7 +297,7 @@ export function buildEditorContextMenuItems(
     { id: 'sep-clipboard', label: '', separator: true },
     {
       id: 'link',
-      label: hasSelection ? 'Link erstellen' : 'Link einfügen',
+      label: hasSelection ? translateNow('commonUi.c_ec_createLink') : translateNow('commonUi.c_ec_insertLink'),
       icon: createElement(Link2, { size: ICON_SIZE }),
       run: () => { applyFormatting(view, 'link'); view.focus() },
     },
@@ -304,19 +305,19 @@ export function buildEditorContextMenuItems(
     // ── Textformatierung ──────────────────────────────────────────────
     {
       id: 'text-format',
-      label: 'Textformatierung',
+      label: translateNow('commonUi.c_ec_textFormat'),
       icon: createElement(Type, { size: ICON_SIZE }),
       submenu: [
-        { id: 'bold', label: 'Fett', icon: createElement(Bold, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-bold', view) },
-        { id: 'italic', label: 'Kursiv', icon: createElement(Italic, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-italics', view) },
-        { id: 'strikethrough', label: 'Durchgestrichen', icon: createElement(Strikethrough, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-strikethrough', view) },
-        { id: 'inline-code', label: 'Code', icon: createElement(Code, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-code', view) },
+        { id: 'bold', label: translateNow('commonUi.c_ec_bold'), icon: createElement(Bold, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-bold', view) },
+        { id: 'italic', label: translateNow('commonUi.c_ec_italic'), icon: createElement(Italic, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-italics', view) },
+        { id: 'strikethrough', label: translateNow('commonUi.c_ec_strike'), icon: createElement(Strikethrough, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-strikethrough', view) },
+        { id: 'inline-code', label: translateNow('commonUi.c_ec_code'), icon: createElement(Code, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-code', view) },
         {
           id: 'highlight',
-          label: 'Markieren',
+          label: translateNow('commonUi.c_ec_highlight'),
           icon: createElement(Highlighter, { size: ICON_SIZE }),
           submenu: [
-            { id: 'highlight-default', label: 'Markieren (Gelb)', icon: createElement(Highlighter, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-highlight', view) },
+            { id: 'highlight-default', label: translateNow('commonUi.c_ec_highlightYellow'), icon: createElement(Highlighter, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-highlight', view) },
             ...HIGHLIGHT_COLORS.filter((c) => c.emoji !== null).map((c) => ({
               id: `highlight-${c.name}`,
               label: `${c.emoji} ${c.label}`,
@@ -325,55 +326,55 @@ export function buildEditorContextMenuItems(
             })),
           ],
         },
-        { id: 'inline-math', label: 'Inline-Formel', icon: createElement(Sigma, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-inline-math', view) },
-        { id: 'comment', label: 'Kommentar', icon: createElement(MessageSquareOff, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-comments', view) },
+        { id: 'inline-math', label: translateNow('commonUi.c_ec_inlineMath'), icon: createElement(Sigma, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-inline-math', view) },
+        { id: 'comment', label: translateNow('commonUi.c_ec_comment'), icon: createElement(MessageSquareOff, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-comments', view) },
         { id: 'sep-clear', label: '', separator: true },
-        { id: 'clear-formatting', label: 'Formatierung entfernen', icon: createElement(RemoveFormatting, { size: ICON_SIZE }), disabled: !hasSelection, run: () => runCoreCommand('clear-formatting', view) },
+        { id: 'clear-formatting', label: translateNow('commonUi.c_ec_clearFormat'), icon: createElement(RemoveFormatting, { size: ICON_SIZE }), disabled: !hasSelection, run: () => runCoreCommand('clear-formatting', view) },
       ],
     },
 
     // ── Absatzformat ───────────────────────────────────────────────────
     {
       id: 'paragraph-format',
-      label: 'Absatzformat',
+      label: translateNow('commonUi.c_ec_paragraphFormat'),
       icon: createElement(Pilcrow, { size: ICON_SIZE }),
       submenu: [
-        { id: 'heading1', label: 'Überschrift 1', icon: createElement(Heading1, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-1', view) },
-        { id: 'heading2', label: 'Überschrift 2', icon: createElement(Heading2, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-2', view) },
-        { id: 'heading3', label: 'Überschrift 3', icon: createElement(Heading3, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-3', view) },
-        { id: 'heading4', label: 'Überschrift 4', icon: createElement(Heading4, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-4', view) },
-        { id: 'heading5', label: 'Überschrift 5', icon: createElement(Heading5, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-5', view) },
-        { id: 'heading6', label: 'Überschrift 6', icon: createElement(Heading6, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-6', view) },
-        { id: 'heading0', label: 'Überschrift entfernen', icon: createElement(Pilcrow, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-0', view) },
+        { id: 'heading1', label: translateNow('commonUi.c_ec_h1'), icon: createElement(Heading1, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-1', view) },
+        { id: 'heading2', label: translateNow('commonUi.c_ec_h2'), icon: createElement(Heading2, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-2', view) },
+        { id: 'heading3', label: translateNow('commonUi.c_ec_h3'), icon: createElement(Heading3, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-3', view) },
+        { id: 'heading4', label: translateNow('commonUi.c_ec_h4'), icon: createElement(Heading4, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-4', view) },
+        { id: 'heading5', label: translateNow('commonUi.c_ec_h5'), icon: createElement(Heading5, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-5', view) },
+        { id: 'heading6', label: translateNow('commonUi.c_ec_h6'), icon: createElement(Heading6, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-6', view) },
+        { id: 'heading0', label: translateNow('commonUi.c_ec_h0'), icon: createElement(Pilcrow, { size: ICON_SIZE }), run: () => runCoreCommand('set-heading-0', view) },
         { id: 'sep-quote', label: '', separator: true },
-        { id: 'blockquote', label: 'Zitat', icon: createElement(Quote, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-blockquote', view) },
+        { id: 'blockquote', label: translateNow('commonUi.c_ec_quote'), icon: createElement(Quote, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-blockquote', view) },
       ],
     },
 
     // ── Element einfügen ───────────────────────────────────────────────
     {
       id: 'insert-element',
-      label: 'Element einfügen',
+      label: translateNow('commonUi.c_ec_insertElement'),
       icon: createElement(Plus, { size: ICON_SIZE }),
       submenu: [
-        { id: 'insert-table', label: 'Tabelle', icon: createElement(Table, { size: ICON_SIZE }), run: () => runCoreCommand('insert-table', view) },
-        { id: 'bullet-list', label: 'Aufzählungsliste', icon: createElement(List, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-bullet-list', view) },
-        { id: 'numbered-list', label: 'Nummerierte Liste', icon: createElement(ListOrdered, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-numbered-list', view) },
-        { id: 'task-list', label: 'Aufgabenliste', icon: createElement(ListChecks, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-checklist-status', view) },
-        { id: 'codeblock', label: 'Codeblock', icon: createElement(FileCode, { size: ICON_SIZE }), run: () => runCoreCommand('insert-codeblock', view) },
-        { id: 'mathblock', label: 'Mathe-Block', icon: createElement(Sigma, { size: ICON_SIZE }), run: () => runCoreCommand('insert-mathblock', view) },
+        { id: 'insert-table', label: translateNow('commonUi.c_ec_table'), icon: createElement(Table, { size: ICON_SIZE }), run: () => runCoreCommand('insert-table', view) },
+        { id: 'bullet-list', label: translateNow('commonUi.c_ec_bullets'), icon: createElement(List, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-bullet-list', view) },
+        { id: 'numbered-list', label: translateNow('commonUi.c_ec_numbered'), icon: createElement(ListOrdered, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-numbered-list', view) },
+        { id: 'task-list', label: translateNow('commonUi.c_ec_tasks'), icon: createElement(ListChecks, { size: ICON_SIZE }), run: () => runCoreCommand('toggle-checklist-status', view) },
+        { id: 'codeblock', label: translateNow('commonUi.c_ec_codeBlock'), icon: createElement(FileCode, { size: ICON_SIZE }), run: () => runCoreCommand('insert-codeblock', view) },
+        { id: 'mathblock', label: translateNow('commonUi.c_ec_mathBlock'), icon: createElement(Sigma, { size: ICON_SIZE }), run: () => runCoreCommand('insert-mathblock', view) },
         {
           id: 'callout',
-          label: 'Callout',
+          label: translateNow('commonUi.c_ec_callout'),
           icon: createElement(MessageSquareQuote, { size: ICON_SIZE }),
           run: () => { applyFormatting(view, 'callout'); view.focus() },
         },
-        { id: 'footnote', label: 'Fußnote', icon: createElement(Asterisk, { size: ICON_SIZE }), run: () => runCoreCommand('insert-footnote', view) },
-        { id: 'horizontal-rule', label: 'Trennlinie', icon: createElement(Minus, { size: ICON_SIZE }), run: () => runCoreCommand('insert-horizontal-rule', view) },
+        { id: 'footnote', label: translateNow('commonUi.c_ec_footnote'), icon: createElement(Asterisk, { size: ICON_SIZE }), run: () => runCoreCommand('insert-footnote', view) },
+        { id: 'horizontal-rule', label: translateNow('commonUi.c_ec_rule'), icon: createElement(Minus, { size: ICON_SIZE }), run: () => runCoreCommand('insert-horizontal-rule', view) },
         { id: 'sep-links', label: '', separator: true },
-        { id: 'wikilink', label: 'Wikilink', icon: createElement(Brackets, { size: ICON_SIZE }), run: () => runCoreCommand('insert-wikilink', view) },
-        { id: 'embed', label: 'Einbettung', icon: createElement(Image, { size: ICON_SIZE }), run: () => runCoreCommand('insert-embed', view) },
-        { id: 'tag', label: 'Tag', icon: createElement(Hash, { size: ICON_SIZE }), run: () => runCoreCommand('insert-tag', view) },
+        { id: 'wikilink', label: translateNow('commonUi.c_ec_wikilink'), icon: createElement(Brackets, { size: ICON_SIZE }), run: () => runCoreCommand('insert-wikilink', view) },
+        { id: 'embed', label: translateNow('commonUi.c_ec_embed'), icon: createElement(Image, { size: ICON_SIZE }), run: () => runCoreCommand('insert-embed', view) },
+        { id: 'tag', label: translateNow('commonUi.c_ec_tag'), icon: createElement(Hash, { size: ICON_SIZE }), run: () => runCoreCommand('insert-tag', view) },
       ],
     },
   ]
@@ -382,45 +383,45 @@ export function buildEditorContextMenuItems(
   if (isLikelyInTable(view)) {
     items.push({
       id: 'table-edit',
-      label: 'Tabelle bearbeiten',
+      label: translateNow('commonUi.c_ec_editTable'),
       icon: createElement(TableProperties, { size: ICON_SIZE }),
       submenu: [
         {
           id: 'table-column',
-          label: 'Spalte',
+          label: translateNow('commonUi.c_ec_column'),
           icon: createElement(Columns3, { size: ICON_SIZE }),
           submenu: [
-            { id: 'col-before', label: 'Davor einfügen', run: () => runCoreCommand('table-col-before', view) },
-            { id: 'col-after', label: 'Danach einfügen', run: () => runCoreCommand('table-col-after', view) },
-            { id: 'col-duplicate', label: 'Duplizieren', run: () => runCoreCommand('table-col-copy', view) },
-            { id: 'col-delete', label: 'Löschen', icon: createElement(Trash2, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-delete', view) },
+            { id: 'col-before', label: translateNow('commonUi.c_ec_insertBefore'), run: () => runCoreCommand('table-col-before', view) },
+            { id: 'col-after', label: translateNow('commonUi.c_ec_insertAfter'), run: () => runCoreCommand('table-col-after', view) },
+            { id: 'col-duplicate', label: translateNow('commonUi.c_ec_duplicate'), run: () => runCoreCommand('table-col-copy', view) },
+            { id: 'col-delete', label: translateNow('commonUi.c_ec_delete'), icon: createElement(Trash2, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-delete', view) },
             { id: 'sep-col-move', label: '', separator: true },
-            { id: 'col-left', label: 'Nach links verschieben', run: () => runCoreCommand('table-col-left', view) },
-            { id: 'col-right', label: 'Nach rechts verschieben', run: () => runCoreCommand('table-col-right', view) },
+            { id: 'col-left', label: translateNow('commonUi.c_ec_moveLeft'), run: () => runCoreCommand('table-col-left', view) },
+            { id: 'col-right', label: translateNow('commonUi.c_ec_moveRight'), run: () => runCoreCommand('table-col-right', view) },
           ],
         },
         {
           id: 'table-row',
-          label: 'Zeile',
+          label: translateNow('commonUi.c_ec_row'),
           icon: createElement(Rows3, { size: ICON_SIZE }),
           submenu: [
-            { id: 'row-before', label: 'Davor einfügen', run: () => runCoreCommand('table-row-before', view) },
-            { id: 'row-after', label: 'Danach einfügen', run: () => runCoreCommand('table-row-after', view) },
-            { id: 'row-duplicate', label: 'Duplizieren', run: () => runCoreCommand('table-row-copy', view) },
-            { id: 'row-delete', label: 'Löschen', icon: createElement(Trash2, { size: ICON_SIZE }), run: () => runCoreCommand('table-row-delete', view) },
+            { id: 'row-before', label: translateNow('commonUi.c_ec_insertBefore'), run: () => runCoreCommand('table-row-before', view) },
+            { id: 'row-after', label: translateNow('commonUi.c_ec_insertAfter'), run: () => runCoreCommand('table-row-after', view) },
+            { id: 'row-duplicate', label: translateNow('commonUi.c_ec_duplicate'), run: () => runCoreCommand('table-row-copy', view) },
+            { id: 'row-delete', label: translateNow('commonUi.c_ec_delete'), icon: createElement(Trash2, { size: ICON_SIZE }), run: () => runCoreCommand('table-row-delete', view) },
             { id: 'sep-row-move', label: '', separator: true },
-            { id: 'row-up', label: 'Nach oben verschieben', run: () => runCoreCommand('table-row-up', view) },
-            { id: 'row-down', label: 'Nach unten verschieben', run: () => runCoreCommand('table-row-down', view) },
+            { id: 'row-up', label: translateNow('commonUi.c_ec_moveUp'), run: () => runCoreCommand('table-row-up', view) },
+            { id: 'row-down', label: translateNow('commonUi.c_ec_moveDown'), run: () => runCoreCommand('table-row-down', view) },
           ],
         },
         {
           id: 'table-align',
-          label: 'Ausrichtung',
+          label: translateNow('commonUi.c_ec_align'),
           icon: createElement(AlignLeft, { size: ICON_SIZE }),
           submenu: [
-            { id: 'align-left', label: 'Links', icon: createElement(AlignLeft, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-align-left', view) },
-            { id: 'align-center', label: 'Zentriert', icon: createElement(AlignCenter, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-align-center', view) },
-            { id: 'align-right', label: 'Rechts', icon: createElement(AlignRight, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-align-right', view) },
+            { id: 'align-left', label: translateNow('commonUi.c_ec_left'), icon: createElement(AlignLeft, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-align-left', view) },
+            { id: 'align-center', label: translateNow('commonUi.c_ec_center'), icon: createElement(AlignCenter, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-align-center', view) },
+            { id: 'align-right', label: translateNow('commonUi.c_ec_right'), icon: createElement(AlignRight, { size: ICON_SIZE }), run: () => runCoreCommand('table-col-align-right', view) },
           ],
         },
       ],
@@ -431,19 +432,19 @@ export function buildEditorContextMenuItems(
     // ── Zeile ────────────────────────────────────────────────────────
     {
       id: 'line-ops',
-      label: 'Zeile',
+      label: translateNow('commonUi.c_ec_row'),
       icon: createElement(GripVertical, { size: ICON_SIZE }),
       submenu: [
-        { id: 'line-up', label: 'Nach oben verschieben', icon: createElement(ArrowUp, { size: ICON_SIZE }), run: () => runCoreCommand('swap-line-up', view) },
-        { id: 'line-down', label: 'Nach unten verschieben', icon: createElement(ArrowDown, { size: ICON_SIZE }), run: () => runCoreCommand('swap-line-down', view) },
+        { id: 'line-up', label: translateNow('commonUi.c_ec_moveUp'), icon: createElement(ArrowUp, { size: ICON_SIZE }), run: () => runCoreCommand('swap-line-up', view) },
+        { id: 'line-down', label: translateNow('commonUi.c_ec_moveDown'), icon: createElement(ArrowDown, { size: ICON_SIZE }), run: () => runCoreCommand('swap-line-down', view) },
         { id: 'sep-delete', label: '', separator: true },
-        { id: 'delete-paragraph', label: 'Absatz löschen', icon: createElement(Trash2, { size: ICON_SIZE }), run: () => runCoreCommand('delete-paragraph', view) },
+        { id: 'delete-paragraph', label: translateNow('commonUi.c_ec_deleteParagraph'), icon: createElement(Trash2, { size: ICON_SIZE }), run: () => runCoreCommand('delete-paragraph', view) },
       ],
     },
     { id: 'sep-extract', label: '', separator: true },
     {
       id: 'extract-selection',
-      label: 'Ausgewählten Text extrahieren…',
+      label: translateNow('commonUi.c_ec_extract'),
       icon: createElement(FileOutput, { size: ICON_SIZE }),
       disabled: !hasSelection,
       run: () => { void extractSelectionToNewNote(view) },
@@ -451,14 +452,14 @@ export function buildEditorContextMenuItems(
     { id: 'sep-copy-md', label: '', separator: true },
     {
       id: 'copy-md',
-      label: 'Als Markdown kopieren',
+      label: translateNow('commonUi.c_ec_copyMarkdown'),
       icon: createElement(FileText, { size: ICON_SIZE }),
       run: () => copyToClipboard(hasSelection ? selectedText : state.doc.toString()),
     },
     { id: 'sep-line-numbers', label: '', separator: true },
     {
       id: 'toggle-line-numbers',
-      label: 'Zeilennummern anzeigen',
+      label: translateNow('commonUi.c_ec_lineNumbers'),
       icon: createElement(Hash, { size: ICON_SIZE }),
       checked: showLineNumbers,
       // Reuses the same 'editor:toggle-line-numbers' core command the
@@ -470,7 +471,7 @@ export function buildEditorContextMenuItems(
     },
     {
       id: 'toggle-readable-line-length',
-      label: 'Lesbare Zeilenlänge',
+      label: translateNow('commonUi.c_ec_readable'),
       icon: createElement(StretchHorizontal, { size: ICON_SIZE }),
       checked: readableLineLength,
       // Same pattern as toggle-line-numbers above: the actual toggle state

@@ -14,6 +14,7 @@
  * @module components/toolbar-context-menu
  */
 import { createElement } from 'react'
+import { translateNow } from '../i18n'
 import {
   EyeOff, Eye, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine,
   Palette, PanelLeft, PanelRight, RotateCcw, Wrench,
@@ -61,7 +62,7 @@ export function buildToolbarContextMenuItems(
   return [
     {
       id: 'toolbar-buttons',
-      label: 'Buttons',
+      label: translateNow('commonUi.c_tb_buttons'),
       icon: createElement(Eye, { size: ICON_SIZE }),
       submenu: entries.map((entry) => ({
         id: `toggle-${entry.id}`,
@@ -75,19 +76,19 @@ export function buildToolbarContextMenuItems(
     },
     {
       id: 'toolbar-position',
-      label: 'Position',
+      label: translateNow('commonUi.c_tb_position'),
       icon: createElement(position === 'left' ? PanelLeft : PanelRight, { size: ICON_SIZE }),
       submenu: [
         {
           id: 'position-left',
-          label: 'Links vom Editor',
+          label: translateNow('commonUi.c_tb_leftOfEditor'),
           checked: position === 'left',
           icon: createElement(PanelLeft, { size: ICON_SIZE }),
           run: () => setToolbarPosition('left'),
         },
         {
           id: 'position-right',
-          label: 'Rechts vom Editor',
+          label: translateNow('commonUi.c_tb_rightOfEditor'),
           checked: position === 'right',
           icon: createElement(PanelRight, { size: ICON_SIZE }),
           run: () => setToolbarPosition('right'),
@@ -97,13 +98,13 @@ export function buildToolbarContextMenuItems(
     { id: 'sep-toolbar', label: '', separator: true },
     {
       id: 'toolbar-reset',
-      label: 'Layout zurücksetzen',
+      label: translateNow('commonUi.c_tb_resetLayout'),
       icon: createElement(RotateCcw, { size: ICON_SIZE }),
       run: () => resetToolbarLayout(),
     },
     {
       id: 'toolbar-hide',
-      label: 'Werkzeugleiste ausblenden',
+      label: translateNow('commonUi.c_tb_hideToolbar'),
       icon: createElement(EyeOff, { size: ICON_SIZE }),
       run: () => setToolbarVisible(false),
     },
@@ -134,35 +135,35 @@ export function buildToolbarButtonContextMenuItems(
   return [
     {
       id: 'hide',
-      label: 'Ausblenden',
+      label: translateNow('commonUi.c_tb_hide'),
       icon: createElement(EyeOff, { size: ICON_SIZE }),
       run: () => toggleEntryHidden(entryId),
     },
     { id: 'sep-move', label: '', separator: true },
     {
       id: 'move-up',
-      label: 'Nach vorn verschieben',
+      label: translateNow('commonUi.c_tb_forward'),
       icon: createElement(ArrowUp, { size: ICON_SIZE }),
       disabled: isFirst,
       run: () => moveEntry(entryId, 'up', visibleIds),
     },
     {
       id: 'move-down',
-      label: 'Nach hinten verschieben',
+      label: translateNow('commonUi.c_tb_backward'),
       icon: createElement(ArrowDown, { size: ICON_SIZE }),
       disabled: isLast,
       run: () => moveEntry(entryId, 'down', visibleIds),
     },
     {
       id: 'move-start',
-      label: 'An den Anfang verschieben',
+      label: translateNow('commonUi.c_tb_toStart'),
       icon: createElement(ArrowUpToLine, { size: ICON_SIZE }),
       disabled: isFirst,
       run: () => moveEntry(entryId, 'start', visibleIds),
     },
     {
       id: 'move-end',
-      label: 'An das Ende verschieben',
+      label: translateNow('commonUi.c_tb_toEnd'),
       icon: createElement(ArrowDownToLine, { size: ICON_SIZE }),
       disabled: isLast,
       run: () => moveEntry(entryId, 'end', visibleIds),
@@ -170,7 +171,7 @@ export function buildToolbarButtonContextMenuItems(
     { id: 'sep-color', label: '', separator: true },
     {
       id: 'color',
-      label: 'Farbe wählen',
+      label: translateNow('commonUi.c_tb_color'),
       icon: createElement(Palette, { size: ICON_SIZE }),
       submenu: TOOLBAR_COLORS.map((color) => ({
         id: `color-${color.id}`,
@@ -183,7 +184,7 @@ export function buildToolbarButtonContextMenuItems(
     { id: 'sep-toolbar-submenu', label: '', separator: true },
     {
       id: 'toolbar',
-      label: 'Werkzeugleiste',
+      label: translateNow('commonUi.c_tb_toolbar'),
       icon: createElement(Wrench, { size: ICON_SIZE }),
       submenu: buildToolbarContextMenuItems(allEntries, position),
     },

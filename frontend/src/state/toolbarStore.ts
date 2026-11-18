@@ -21,6 +21,7 @@
  * @module state/toolbarStore
  */
 
+import { translateNow } from '../i18n'
 import {
   useUiSettings, getUiSettings, updateUiSettings, DEFAULT_UI_SETTINGS,
 } from './userSettingsStore'
@@ -71,15 +72,15 @@ export const DEFAULT_TOOLBAR_PREFS: ToolbarPrefs = structuredClone(DEFAULT_UI_SE
  * `value: null` clears the override and restores the inherited toolbar colour.
  */
 export const TOOLBAR_COLORS: Array<{ id: string; label: string; value: string | null }> = [
-  { id: 'default', label: 'Standard', value: null },
-  { id: 'red', label: 'Rot', value: '#ef4444' },
-  { id: 'orange', label: 'Orange', value: '#f97316' },
-  { id: 'yellow', label: 'Gelb', value: '#eab308' },
-  { id: 'green', label: 'Grün', value: '#22c55e' },
-  { id: 'cyan', label: 'Türkis', value: '#06b6d4' },
-  { id: 'blue', label: 'Blau', value: '#3b82f6' },
-  { id: 'purple', label: 'Violett', value: '#a855f7' },
-  { id: 'pink', label: 'Pink', value: '#ec4899' },
+  { id: 'default', get label() { return translateNow('commonUi.c_tc_default') }, value: null },
+  { id: 'red', get label() { return translateNow('commonUi.c_tc_red') }, value: '#ef4444' },
+  { id: 'orange', get label() { return translateNow('commonUi.c_tc_orange') }, value: '#f97316' },
+  { id: 'yellow', get label() { return translateNow('commonUi.c_tc_yellow') }, value: '#eab308' },
+  { id: 'green', get label() { return translateNow('commonUi.c_tc_green') }, value: '#22c55e' },
+  { id: 'cyan', get label() { return translateNow('commonUi.c_tc_cyan') }, value: '#06b6d4' },
+  { id: 'blue', get label() { return translateNow('commonUi.c_tc_blue') }, value: '#3b82f6' },
+  { id: 'purple', get label() { return translateNow('commonUi.c_tc_purple') }, value: '#a855f7' },
+  { id: 'pink', get label() { return translateNow('commonUi.c_tc_pink') }, value: '#ec4899' },
 ]
 
 // ─── Pure helpers (exported for tests and for callers that build orders) ─────

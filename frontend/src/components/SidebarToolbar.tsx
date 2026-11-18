@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from '../i18n'
 import {
   Upload, FolderOpen, Download, Settings,
   FileText, FilePlus, MessageCircle, ScrollText,
@@ -96,6 +97,7 @@ export function SidebarToolbar({
   onOpenQuickSwitcher, onOpenRandomNote, onInsertTemplate, onToggleDictation,
   isAdmin, isVaultOwner, globalUnreadCount,
 }: SidebarToolbarProps) {
+  const { t } = useTranslation()
   const longPress = useLongPress({ suppressNativeDrag: true })
   const { isEnabled } = useFeatureContext()
   const { ribbonIcons } = usePluginContext()
@@ -108,28 +110,28 @@ export function SidebarToolbar({
   const [menu, setMenu] = useState<{ x: number; y: number; entryId: string | null } | null>(null)
 
   const builtinItems: ToolbarItem[] = [
-    { id: 'create-vault', icon: <Plus size={ICON_SIZE} />, label: 'Neuer Vault', action: onCreateVault },
-    { id: 'create-file', icon: <FilePlus size={ICON_SIZE} />, label: 'Neue Datei', action: onCreateFile, requiresVault: true, requiresWrite: true },
-    { id: 'create-canvas', icon: <LayoutDashboard size={ICON_SIZE} />, label: 'Neues Canvas', action: onCreateCanvas, requiresVault: true, requiresWrite: true },
-    { id: 'daily-note', icon: <CalendarDays size={ICON_SIZE} />, label: 'Tagesnotiz (Ctrl+Alt+D)', action: () => onDailyNote?.(), requiresVault: true, requiresWrite: true },
-    { id: 'insert-template', icon: <FileInput size={ICON_SIZE} />, label: 'Vorlage einfügen', action: () => onInsertTemplate?.(), requiresVault: true, requiresWrite: true },
-    { id: 'dictation', icon: <Mic size={ICON_SIZE} />, label: 'Diktat starten/stoppen', action: () => onToggleDictation?.(), requiresVault: true, requiresWrite: true, feature: 'voice-transcription' },
-    { id: 'command-palette', icon: <Command size={ICON_SIZE} />, label: 'Befehlspalette öffnen (Ctrl+P)', action: () => onOpenCommandPalette?.() },
-    { id: 'quick-switcher', icon: <FileSearch size={ICON_SIZE} />, label: 'Schnellwechsler öffnen (Ctrl+O)', action: () => onOpenQuickSwitcher?.(), requiresVault: true },
-    { id: 'random-note', icon: <Shuffle size={ICON_SIZE} />, label: 'Zufällige Notiz öffnen', action: () => onOpenRandomNote?.(), requiresVault: true },
-    { id: 'import-file', icon: <Upload size={ICON_SIZE} />, label: 'Datei importieren', action: onImportFile, requiresVault: true, requiresWrite: true },
-    { id: 'import-folder', icon: <FolderOpen size={ICON_SIZE} />, label: 'Ordner importieren', action: onImportFolder, requiresVault: true, requiresWrite: true },
-    { id: 'export-vault', icon: <Download size={ICON_SIZE} />, label: 'Vault exportieren', action: onExportVault, requiresVault: true },
-    { id: 'trash', icon: <Trash2 size={ICON_SIZE} />, label: 'Papierkorb', action: () => onOpenTrash?.(), requiresVault: true },
-    { id: 'graph', icon: <Share2 size={ICON_SIZE} />, label: 'Graph', action: onOpenGraph, requiresVault: true },
-    { id: 'chat', icon: <MessageCircle size={ICON_SIZE} />, label: 'Chat', action: () => onNavigate('chat'), feature: 'chat' },
-    { id: 'admin-audit', icon: <FileText size={ICON_SIZE} />, label: 'Audit-Log', action: () => onNavigate('admin-audit'), adminOnly: true },
-    { id: 'admin-logs', icon: <ScrollText size={ICON_SIZE} />, label: 'Server-Logs', action: () => onNavigate('admin-logs'), adminOnly: true },
+    { id: 'create-vault', icon: <Plus size={ICON_SIZE} />, label: t('commonUi.c_newVault'), action: onCreateVault },
+    { id: 'create-file', icon: <FilePlus size={ICON_SIZE} />, label: t('commonUi.c_newFile'), action: onCreateFile, requiresVault: true, requiresWrite: true },
+    { id: 'create-canvas', icon: <LayoutDashboard size={ICON_SIZE} />, label: t('commonUi.c_newCanvas'), action: onCreateCanvas, requiresVault: true, requiresWrite: true },
+    { id: 'daily-note', icon: <CalendarDays size={ICON_SIZE} />, label: t('commonUi.c_dailyNote'), action: () => onDailyNote?.(), requiresVault: true, requiresWrite: true },
+    { id: 'insert-template', icon: <FileInput size={ICON_SIZE} />, label: t('commonUi.c_insertTemplate'), action: () => onInsertTemplate?.(), requiresVault: true, requiresWrite: true },
+    { id: 'dictation', icon: <Mic size={ICON_SIZE} />, label: t('commonUi.c_toggleDictation'), action: () => onToggleDictation?.(), requiresVault: true, requiresWrite: true, feature: 'voice-transcription' },
+    { id: 'command-palette', icon: <Command size={ICON_SIZE} />, label: t('commonUi.c_openPalette'), action: () => onOpenCommandPalette?.() },
+    { id: 'quick-switcher', icon: <FileSearch size={ICON_SIZE} />, label: t('commonUi.c_openSwitcher'), action: () => onOpenQuickSwitcher?.(), requiresVault: true },
+    { id: 'random-note', icon: <Shuffle size={ICON_SIZE} />, label: t('commonUi.c_randomNote'), action: () => onOpenRandomNote?.(), requiresVault: true },
+    { id: 'import-file', icon: <Upload size={ICON_SIZE} />, label: t('commonUi.c_importFile'), action: onImportFile, requiresVault: true, requiresWrite: true },
+    { id: 'import-folder', icon: <FolderOpen size={ICON_SIZE} />, label: t('commonUi.c_importFolder'), action: onImportFolder, requiresVault: true, requiresWrite: true },
+    { id: 'export-vault', icon: <Download size={ICON_SIZE} />, label: t('commonUi.c_exportVault'), action: onExportVault, requiresVault: true },
+    { id: 'trash', icon: <Trash2 size={ICON_SIZE} />, label: t('commonUi.c_trash'), action: () => onOpenTrash?.(), requiresVault: true },
+    { id: 'graph', icon: <Share2 size={ICON_SIZE} />, label: t('commonUi.c_graph'), action: onOpenGraph, requiresVault: true },
+    { id: 'chat', icon: <MessageCircle size={ICON_SIZE} />, label: t('commonUi.c_chat'), action: () => onNavigate('chat'), feature: 'chat' },
+    { id: 'admin-audit', icon: <FileText size={ICON_SIZE} />, label: t('commonUi.c_auditLog'), action: () => onNavigate('admin-audit'), adminOnly: true },
+    { id: 'admin-logs', icon: <ScrollText size={ICON_SIZE} />, label: t('commonUi.c_serverLogs'), action: () => onNavigate('admin-logs'), adminOnly: true },
     // Hidden by default (toolbarStore's DEFAULT_TOOLBAR_PREFS) — the toolbar
     // context menu and the "Werkzeugleiste ein-/ausblenden" command already do
     // this. Users who want it back tick it in the "Buttons" submenu.
-    { id: 'toggle-toolbar', icon: <PanelLeftClose size={ICON_SIZE} />, label: 'Werkzeugleiste ausblenden', action: () => setToolbarVisible(false) },
-    { id: 'settings', icon: <Settings size={ICON_SIZE} />, label: 'Einstellungen (Ctrl+,)', action: () => onOpenSettings?.() },
+    { id: 'toggle-toolbar', icon: <PanelLeftClose size={ICON_SIZE} />, label: t('commonUi.c_hideToolbar'), action: () => setToolbarVisible(false) },
+    { id: 'settings', icon: <Settings size={ICON_SIZE} />, label: t('commonUi.c_settingsShortcut'), action: () => onOpenSettings?.() },
   ]
 
   // Plugin ribbon icons become ordinary entries. Their id has to survive a
@@ -219,7 +221,7 @@ export function SidebarToolbar({
     <div
       className={`app-toolbar app-toolbar--${prefs.position}`}
       role="toolbar"
-      aria-label="Werkzeugleiste"
+      aria-label={t('commonUi.c_toolbar')}
       onContextMenu={openToolbarMenu}
     >
       {visibleIds.map((id) => {

@@ -7,6 +7,7 @@
  * Supports drag/move, resize, double-click to open, and edit mode for path editing.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useCallback, useState, useRef, useEffect, useMemo } from 'react'
 import { FileText, ImageIcon, AlertTriangle, Film, Music, FileCode } from 'lucide-react'
 import type { FileNode } from '../../canvas/types'
@@ -81,6 +82,7 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
   node, selected, onSelect, onFileOpen, onFilePathChange, directoryTree, readOnly,
   editing, editPath, onEditEnd, vaultId, onFileSave,
 }: FileNodeRendererProps) {
+  const { t } = useTranslation()
   const colorClass = getCanvasColorClass(node.color)
   const exists = fileExistsInTree(directoryTree, node.file)
   const fileName = node.file.split('/').pop() ?? node.file
@@ -286,13 +288,13 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
             onKeyDown={handleKeyDown}
             onPointerDown={handlePointerDown}
             spellCheck={false}
-            aria-label="Markdown-Inhalt bearbeiten"
+            aria-label={t('canvasUi.editMarkdown')}
           />
         )
       }
       return (
         <div className="canvas-node__file-edit canvas-node__file-path-edit">
-          <label className="canvas-node__edit-label">Datei suchen:</label>
+          <label className="canvas-node__edit-label">{t('canvasUi.searchFile')}</label>
           <div className="canvas-node__file-search">
             <input
               ref={inputRef}
@@ -303,8 +305,8 @@ export const FileNodeRenderer = memo(function FileNodeRenderer({
               onBlur={commitEdit}
               onKeyDown={handlePathKeyDown}
               onPointerDown={handlePointerDown}
-              placeholder="Dateiname oder Pfad…"
-              aria-label="Dateipfad bearbeiten"
+              placeholder={t('canvasUi.filePlaceholder')}
+              aria-label={t('canvasUi.editFilePathLabel')}
               autoComplete="off"
             />
             {suggestionsOpen && suggestions.length > 0 && (

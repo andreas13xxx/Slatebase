@@ -13,6 +13,7 @@
  * already-fetched, already-sorted `rows`.
  */
 
+import { useTranslation } from '../../i18n'
 import { Fragment, memo, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import type { BaseDocument, BaseRow, BaseView, ComputedSummaries, FormulaValue } from '@slatebase/shared-contracts'
@@ -46,6 +47,7 @@ function firstValue(row: BaseRow, key: string): string {
 export const BasesListView = memo(function BasesListView({
   doc, view, rows, vaultId, thisRow, onOpenNote,
 }: BasesListViewProps) {
+  const { t } = useTranslation()
   const formulaKeys = useMemo(() => new Set(Object.keys(doc.formulas ?? {})), [doc.formulas])
 
   // The columns shown under each entry: the view's configured columns minus the
@@ -148,7 +150,7 @@ export const BasesListView = memo(function BasesListView({
   )
 
   if (rows.length === 0) {
-    return <p className="bases-list__empty">Keine Einträge</p>
+    return <p className="bases-list__empty">{t('basesUi.noEntries')}</p>
   }
 
   return (
@@ -165,7 +167,7 @@ export const BasesListView = memo(function BasesListView({
         </div>
       )}
       {groups ? (
-        <div className="bases-list-groups" role="list" aria-label="Listen-Ansicht">
+        <div className="bases-list-groups" role="list" aria-label={t('basesUi.listView')}>
           {groups.map((g) => (
             <section key={g.key} className="bases-list__group" role="listitem">
               <button
@@ -183,7 +185,7 @@ export const BasesListView = memo(function BasesListView({
           ))}
         </div>
       ) : (
-        <ul className={listClass} role="list" aria-label="Listen-Ansicht">
+        <ul className={listClass} role="list" aria-label={t('basesUi.listView')}>
           {rows.map(renderItem)}
         </ul>
       )}

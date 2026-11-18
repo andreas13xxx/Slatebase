@@ -5,6 +5,7 @@
  *
  * @module components/settings/MailImportSection
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { RefreshCw, Pencil, Trash2, Plus, FolderTree, Folder } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -66,6 +67,7 @@ const EMPTY_FORM: ConfigFormState = {
 }
 
 export function MailImportSection() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
 
@@ -109,7 +111,7 @@ export function MailImportSection() {
     try {
       applyLoaded(await fetchData())
     } catch (err) {
-      setError(extractErrorMessage(err, 'Mail-Import-Konfiguration konnte nicht geladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.mailLoadFailed')))
     } finally {
       setLoading(false)
     }
@@ -120,7 +122,7 @@ export function MailImportSection() {
     let cancelled = false
     fetchData()
       .then((result) => { if (!cancelled) { applyLoaded(result); setError(null) } })
-      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, 'Mail-Import-Konfiguration konnte nicht geladen werden')) })
+      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, translateNow('settingsUi.mailLoadFailed'))) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [vaultId, apiClient, fetchData, applyLoaded])
@@ -133,7 +135,7 @@ export function MailImportSection() {
       await apiClient.updateMailImportConfig(vaultId, config.id, { enabled: nextEnabled })
     } catch (err) {
       setConfigs((prev) => prev.map((c) => (c.id === config.id ? { ...c, enabled: config.enabled } : c)))
-      setError(extractErrorMessage(err, 'Konto konnte nicht aktualisiert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.accountUpdateFailed')))
     }
   }, [vaultId, apiClient])
 
@@ -146,10 +148,10 @@ export function MailImportSection() {
       const status = await apiClient.getMailImportStatus(vaultId, config.id)
       setStatuses((prev) => ({ ...prev, [config.id]: status }))
       if (outcome.result === 'error') {
-        setError(outcome.error ?? 'Import fehlgeschlagen')
+        setError(outcome.error ?? translateNow('settingsUi.importFailedMail'))
       }
     } catch (err) {
-      setError(extractErrorMessage(err, 'Import fehlgeschlagen'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.importFailedMail')))
     } finally {
       setImportingId(null)
     }
@@ -163,7 +165,7 @@ export function MailImportSection() {
       await apiClient.deleteMailImportConfig(vaultId, target.id)
       await load()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Konto konnte nicht entfernt werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.accountRemoveFailed')))
     }
   }, [deleting, vaultId, apiClient, load])
 
@@ -215,7 +217,7 @@ export function MailImportSection() {
       const { tree } = await apiClient.getMailImportMailboxTree(vaultId, editingId)
       setMailboxTree(tree)
     } catch (err) {
-      setMailboxTreeError(extractErrorMessage(err, 'Ordner konnten nicht geladen werden'))
+      setMailboxTreeError(extractErrorMessage(err, translateNow('settingsUi.foldersLoadFailed')))
     } finally {
       setMailboxTreeLoading(false)
     }
@@ -233,19 +235,19 @@ export function MailImportSection() {
     const port = Number.parseInt(form.port, 10)
     const intervalMinutes = Number.parseInt(form.intervalMinutes, 10)
     if (!form.name.trim() || !form.host.trim() || !form.username.trim()) {
-      setFormError('Name, Host und Benutzername sind erforderlich')
+      setFormError(translateNow('settingsUi.nameHostUserRequired'))
       return
     }
     if (!Number.isFinite(port) || port < 1 || port > 65535) {
-      setFormError('Der Port muss zwischen 1 und 65535 liegen')
+      setFormError(translateNow('settingsUi.portRange'))
       return
     }
     if (!Number.isFinite(intervalMinutes) || intervalMinutes < 1) {
-      setFormError('Das Intervall muss mindestens 1 Minute betragen')
+      setFormError(translateNow('settingsUi.intervalMin1'))
       return
     }
     if (editingId === null && form.password.trim() === '') {
-      setFormError('Passwort ist erforderlich')
+      setFormError(translateNow('settingsUi.passwordRequired'))
       return
     }
 
@@ -283,7 +285,7 @@ export function MailImportSection() {
       setEditingId(null)
       await load()
     } catch (err) {
-      setFormError(extractErrorMessage(err, 'Konto konnte nicht gespeichert werden'))
+      setFormError(extractErrorMessage(err, translateNow('settingsUi.accountSaveFailed')))
     } finally {
       setFormSaving(false)
     }
@@ -295,11 +297,11 @@ export function MailImportSection() {
     <div className="mail-import-section">
       {error && <p className="settings-error" role="alert">{error}</p>}
 
-      <SettingSection title="Postfächer" description="IMAP-Postfächer, die periodisch nach neuen E-Mails abgefragt und als Markdown-Notizen mit Anhängen in diesen Vault importiert werden.">
-        {loading && <p className="settings-loading">Lädt…</p>}
+      <SettingSection title={t('settingsUi.mailboxes')} description={t('settingsUi.mailboxesDesc')}>
+        {loading && <p className="settings-loading">{t('settingsUi.loadingShort')}</p>}
 
         {!loading && configs.length === 0 && (
-          <p className="sync-section__empty">Noch keine Postfächer konfiguriert.</p>
+          <p className="sync-section__empty">{t('settingsUi.noMailboxes')}</p>
         )}
 
         {!loading && configs.length > 0 && (
@@ -314,7 +316,7 @@ export function MailImportSection() {
                         type="checkbox"
                         checked={config.enabled}
                         onChange={() => void handleToggleEnabled(config)}
-                        aria-label={`${config.name} aktivieren`}
+                        aria-label={t('settingsUi.enableNamed', { name: config.name })}
                       />
                     </label>
                     <span className="sync-section__item-name">{config.name}</span>
@@ -325,9 +327,9 @@ export function MailImportSection() {
                   </span>
 
                   <div className="sync-section__item-meta">
-                    <span>{config.secure ? 'TLS' : 'Ohne TLS'}</span>
-                    <span>Ziel: {config.targetFolder || '(Vault-Wurzel)'}</span>
-                    <span>alle {config.intervalMinutes} Min.</span>
+                    <span>{config.secure ? t('settingsUi.tls') : t('settingsUi.noTls')}</span>
+                    <span>{t('settingsUi.target', { folder: config.targetFolder || t('settingsUi.vaultRoot') })}</span>
+                    <span>{t('settingsUi.everyMin', { n: config.intervalMinutes })}</span>
                   </div>
 
                   <div className="sync-section__item-status">
@@ -337,8 +339,8 @@ export function MailImportSection() {
                     <span>{formatLastRun(status?.lastRunAt ?? null)}</span>
                     {status && status.lastRunAt && (
                       status.lastFoundCount === 0
-                        ? <span>Keine neuen Mails</span>
-                        : <span>{status.lastImportedCount} von {status.lastFoundCount} Mail(s) importiert</span>
+                        ? <span>{t('settingsUi.noNewMails')}</span>
+                        : <span>{t('settingsUi.mailsImported', { imported: status.lastImportedCount, found: status.lastFoundCount })}</span>
                     )}
                   </div>
 
@@ -348,13 +350,13 @@ export function MailImportSection() {
 
                   <div className="sync-section__item-actions">
                     <Button size="sm" onClick={() => void handleImportNow(config)} disabled={importingId === config.id}>
-                      <RefreshCw size={14} aria-hidden="true" /> {importingId === config.id ? 'Importiert…' : 'Jetzt importieren'}
+                      <RefreshCw size={14} aria-hidden="true" /> {importingId === config.id ? t('settingsUi.importing') : t('settingsUi.importNow')}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEditForm(config)}>
-                      <Pencil size={14} aria-hidden="true" /> Bearbeiten
+                      <Pencil size={14} aria-hidden="true" /> {t('settingsUi.edit')}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setDeleting(config)}>
-                      <Trash2 size={14} aria-hidden="true" /> Entfernen
+                      <Trash2 size={14} aria-hidden="true" /> {t('settingsUi.remove')}
                     </Button>
                   </div>
                 </li>
@@ -366,7 +368,7 @@ export function MailImportSection() {
         {!formOpen && (
           <div className="settings-actions">
             <Button variant="secondary" onClick={openCreateForm}>
-              <Plus size={14} aria-hidden="true" /> Postfach hinzufügen
+              <Plus size={14} aria-hidden="true" /> {t('settingsUi.addMailbox')}
             </Button>
           </div>
         )}
@@ -376,21 +378,21 @@ export function MailImportSection() {
             {formError && <p className="settings-error" role="alert">{formError}</p>}
 
             <div className="settings-field">
-              <label htmlFor="mail-import-form-name" className="settings-field-label">Name</label>
+              <label htmlFor="mail-import-form-name" className="settings-field-label">{t('settingsUi.name')}</label>
               <input
                 id="mail-import-form-name"
                 type="text"
                 className="settings-field-input"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="z.B. Privates Postfach"
+                placeholder={t('settingsUi.namePhMail')}
                 disabled={formSaving}
               />
             </div>
 
             <div className="sync-section__form-row">
               <div className="settings-field">
-                <label htmlFor="mail-import-form-host" className="settings-field-label">Host</label>
+                <label htmlFor="mail-import-form-host" className="settings-field-label">{t('settingsUi.host')}</label>
                 <input
                   id="mail-import-form-host"
                   type="text"
@@ -402,7 +404,7 @@ export function MailImportSection() {
                 />
               </div>
               <div className="settings-field">
-                <label htmlFor="mail-import-form-port" className="settings-field-label">Port</label>
+                <label htmlFor="mail-import-form-port" className="settings-field-label">{t('settingsUi.port')}</label>
                 <input
                   id="mail-import-form-port"
                   type="number"
@@ -423,12 +425,12 @@ export function MailImportSection() {
                 onChange={(e) => setForm((f) => ({ ...f, secure: e.target.checked }))}
                 disabled={formSaving}
               />
-              TLS verwenden
+              {t('settingsUi.useTls')}
             </label>
 
             <div className="sync-section__form-row">
               <div className="settings-field">
-                <label htmlFor="mail-import-form-username" className="settings-field-label">Benutzername</label>
+                <label htmlFor="mail-import-form-username" className="settings-field-label">{t('settingsUi.username')}</label>
                 <input
                   id="mail-import-form-username"
                   type="text"
@@ -440,7 +442,7 @@ export function MailImportSection() {
                 />
               </div>
               <div className="settings-field">
-                <label htmlFor="mail-import-form-password" className="settings-field-label">Passwort</label>
+                <label htmlFor="mail-import-form-password" className="settings-field-label">{t('settingsUi.password')}</label>
                 <PasswordInput
                   id="mail-import-form-password"
                   className="settings-field-input"
@@ -453,13 +455,13 @@ export function MailImportSection() {
             </div>
             <p className="settings-field-hint">
               {editingId !== null
-                ? 'Passwort leer lassen, um das gespeicherte Passwort unverändert zu lassen.'
-                : 'Wird verschlüsselt gespeichert und nie im Klartext zurückgegeben.'}
+                ? t('settingsUi.passwordKeep')
+                : t('settingsUi.credEncrypted')}
             </p>
 
             <div className="sync-section__form-row">
               <div className="settings-field">
-                <label htmlFor="mail-import-form-mailbox" className="settings-field-label">IMAP-Ordner</label>
+                <label htmlFor="mail-import-form-mailbox" className="settings-field-label">{t('settingsUi.imapFolder')}</label>
                 <div className="mailbox-field-row">
                   <input
                     id="mail-import-form-mailbox"
@@ -472,16 +474,16 @@ export function MailImportSection() {
                   />
                   {editingId !== null && (
                     <Button type="button" size="sm" variant="ghost" onClick={() => void handleBrowseMailboxes()} disabled={formSaving}>
-                      <FolderTree size={14} aria-hidden="true" /> Durchsuchen
+                      <FolderTree size={14} aria-hidden="true" /> {t('settingsUi.browse')}
                     </Button>
                   )}
                 </div>
                 {editingId === null && (
-                  <p className="settings-field-hint">Nach dem ersten Speichern kannst du die verfügbaren Ordner direkt durchsuchen.</p>
+                  <p className="settings-field-hint">{t('settingsUi.browseAfterSave')}</p>
                 )}
               </div>
               <div className="settings-field">
-                <label htmlFor="mail-import-form-interval" className="settings-field-label">Intervall (Minuten)</label>
+                <label htmlFor="mail-import-form-interval" className="settings-field-label">{t('settingsUi.intervalMinutes')}</label>
                 <input
                   id="mail-import-form-interval"
                   type="number"
@@ -497,19 +499,19 @@ export function MailImportSection() {
 
             {mailboxTreeOpen && (
               <div className="mailbox-tree">
-                {mailboxTreeLoading && <p className="settings-loading">Ordner werden geladen…</p>}
+                {mailboxTreeLoading && <p className="settings-loading">{t('settingsUi.foldersLoading')}</p>}
                 {mailboxTreeError && <p className="settings-error" role="alert">{mailboxTreeError}</p>}
                 {!mailboxTreeLoading && !mailboxTreeError && mailboxTree && (
                   mailboxTree.length === 0
-                    ? <p className="sync-section__empty">Keine Ordner gefunden.</p>
+                    ? <p className="sync-section__empty">{t('settingsUi.noFolders')}</p>
                     : <MailboxTreeList nodes={mailboxTree} onSelect={handleSelectMailbox} />
                 )}
               </div>
             )}
 
             <div className="settings-field">
-              <label htmlFor="mail-import-form-target" className="settings-field-label">Zielordner im Vault</label>
-              <p className="settings-field-hint">Relativer Pfad im Vault. Leer = Vault-Wurzel. Anhänge landen in einem <code>attachments</code>-Unterordner davon.</p>
+              <label htmlFor="mail-import-form-target" className="settings-field-label">{t('settingsUi.targetFolder')}</label>
+              <p className="settings-field-hint">{t('settingsUi.targetHint1')} <code>attachments</code>{' '}{t('settingsUi.targetHint2')}</p>
               <input
                 id="mail-import-form-target"
                 type="text"
@@ -528,15 +530,15 @@ export function MailImportSection() {
                 onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
                 disabled={formSaving}
               />
-              Aktiviert
+              {t('settingsUi.enabled')}
             </label>
 
             <div className="settings-actions">
               <Button type="submit" variant="primary" disabled={formSaving}>
-                {formSaving ? 'Speichern…' : 'Speichern'}
+                {formSaving ? t('settingsUi.saving') : t('settingsUi.save')}
               </Button>
               <Button type="button" variant="ghost" onClick={closeForm} disabled={formSaving}>
-                Abbrechen
+                {t('settingsUi.cancel')}
               </Button>
             </div>
           </form>
@@ -545,9 +547,9 @@ export function MailImportSection() {
 
       <ConfirmModal
         open={deleting !== null}
-        title="Postfach entfernen"
-        message={deleting ? `"${deleting.name}" wirklich entfernen? Das gespeicherte Passwort wird ebenfalls gelöscht.` : ''}
-        confirmLabel="Entfernen"
+        title={t('settingsUi.removeMailboxTitle')}
+        message={deleting ? t('settingsUi.removeMailboxMessage', { name: deleting.name }) : ''}
+        confirmLabel={t('settingsUi.remove')}
         variant="danger"
         onConfirm={() => void handleDeleteConfirm()}
         onCancel={() => setDeleting(null)}
