@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation, translateNow } from '../i18n'
 import { History, RotateCcw, Loader2 } from 'lucide-react'
 import type { IApiClient } from '../api'
 import { showToast } from './ToastNotification'
@@ -121,6 +122,7 @@ export function VersionBrowser({
   apiClient,
   onRestore,
 }: VersionBrowserProps) {
+  const { t } = useTranslation()
   const [versions, setVersions] = useState<VersionEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTimestamp, setSelectedTimestamp] = useState<string | null>(null)
@@ -137,7 +139,7 @@ export function VersionBrowser({
       const sorted = [...response.versions].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
       setVersions(sorted)
     } catch (err: unknown) {
-      showToast('error', extractErrorMessage(err, 'Versionen konnten nicht geladen werden'))
+      showToast('error', extractErrorMessage(err, translateNow('commonUi.c_versionsLoadFailed')))
       setVersions([])
     } finally {
       setLoading(false)
@@ -167,7 +169,7 @@ export function VersionBrowser({
       const diff = computeDiff(response.content, currentContent)
       setDiffLines(diff)
     } catch (err: unknown) {
-      showToast('error', extractErrorMessage(err, 'Versionsinhalt konnte nicht geladen werden'))
+      showToast('error', extractErrorMessage(err, translateNow('commonUi.c_versionContentFailed')))
       setSelectedTimestamp(null)
     } finally {
       setLoadingContent(false)
@@ -179,14 +181,14 @@ export function VersionBrowser({
     if (!selectedTimestamp) return
 
     const confirmed = window.confirm(
-      'Möchten Sie diese Version wirklich wiederherstellen? Die aktuelle Version wird als neue Version gesichert.'
+      translateNow('commonUi.c_restoreConfirm')
     )
     if (!confirmed) return
 
     setRestoring(true)
     try {
       await apiClient.restoreVersion(vaultId, filePath, selectedTimestamp)
-      showToast('success', 'Version erfolgreich wiederhergestellt')
+      showToast('success', translateNow('commonUi.c_restoredOk'))
       setSelectedTimestamp(null)
       setDiffLines([])
       await loadVersions()
@@ -194,7 +196,7 @@ export function VersionBrowser({
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
-        : 'Version konnte nicht wiederhergestellt werden'
+        : translateNow('commonUi.c_versionRestoreFailed')
       showToast('error', message)
     } finally {
       setRestoring(false)
@@ -205,7 +207,7 @@ export function VersionBrowser({
     return (
       <div className="version-browser version-browser--loading">
         <Loader2 size={20} className="version-browser__spinner" />
-        <span>Versionen werden geladen…</span>
+        <span>{t('commonUi.c_versionsLoading')}</span>
       </div>
     )
   }
@@ -215,7 +217,7 @@ export function VersionBrowser({
       <div className="version-browser version-browser--empty">
         <History size={24} className="version-browser__empty-icon" />
         <span className="version-browser__empty-text">
-          Keine früheren Versionen vorhanden
+          {t('commonUi.c_noVersions')}
         </span>
       </div>
     )
@@ -228,9 +230,9 @@ export function VersionBrowser({
         <div className="version-browser__list">
           <div className="version-browser__list-header">
             <History size={16} />
-            <span>Versionen ({versions.length})</span>
+            <span>{t('commonUi.c_versionsHeading', { n: versions.length })}</span>
           </div>
-          <ul className="version-browser__entries" role="listbox" aria-label="Dateiversionen">
+          <ul className="version-browser__entries" role="listbox" aria-label={t('commonUi.c_fileVersions')}>
             {versions.map((version) => (
               <li
                 key={version.timestamp}
@@ -261,14 +263,14 @@ export function VersionBrowser({
         <div className="version-browser__diff">
           {!selectedTimestamp && (
             <div className="version-browser__diff-placeholder">
-              <span>Version auswählen um Unterschiede anzuzeigen</span>
+              <span>{t('commonUi.c_selectVersion')}</span>
             </div>
           )}
 
           {selectedTimestamp && loadingContent && (
             <div className="version-browser__diff-loading">
               <Loader2 size={16} className="version-browser__spinner" />
-              <span>Inhalt wird geladen…</span>
+              <span>{t('commonUi.c_contentLoading')}</span>
             </div>
           )}
 
@@ -282,13 +284,13 @@ export function VersionBrowser({
                   className="version-browser__restore-btn"
                   onClick={() => void handleRestore()}
                   disabled={restoring}
-                  title="Version wiederherstellen"
+                  title={t('commonUi.c_restoreVersion')}
                 >
                   <RotateCcw size={14} />
-                  <span>{restoring ? 'Wird wiederhergestellt…' : 'Wiederherstellen'}</span>
+                  <span>{restoring ? t('commonUi.c_restoring') : t('commonUi.c_restore')}</span>
                 </button>
               </div>
-              <div className="version-browser__diff-content" role="region" aria-label="Diff-Ansicht">
+              <div className="version-browser__diff-content" role="region" aria-label={t('commonUi.c_diffView')}>
                 {diffLines.map((line, index) => (
                   <div
                     key={index}
@@ -308,7 +310,7 @@ export function VersionBrowser({
 
           {selectedTimestamp && !loadingContent && diffLines.length === 0 && (
             <div className="version-browser__diff-placeholder">
-              <span>Keine Unterschiede gefunden</span>
+              <span>{t('commonUi.c_noDiff')}</span>
             </div>
           )}
         </div>

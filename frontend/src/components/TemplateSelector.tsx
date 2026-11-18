@@ -4,7 +4,7 @@ import type { IApiClient } from '../api'
 import { showToast } from './ToastNotification'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { substituteTemplatePlaceholders } from '../utils/templatePlaceholders'
-import { useTranslation } from '../i18n'
+import { useTranslation, translateNow } from '../i18n'
 import './TemplateSelector.css'
 import { foldForSearch, foldQuery } from '../utils/searchFold'
 
@@ -67,7 +67,7 @@ export function TemplateSelector({
   onInsertContent,
   insertTitle = '',
 }: TemplateSelectorProps) {
-  const { locale } = useTranslation()
+  const { locale, t } = useTranslation()
   const [step, setStep] = useState<'loading' | 'select' | 'filename'>('loading')
   const [templates, setTemplates] = useState<TemplateEntry[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateEntry | null>(null)
@@ -104,7 +104,7 @@ export function TemplateSelector({
     apiClient.listTemplates(vaultId).then(
       (result) => {
         if (result.templates.length === 0) {
-          showToast('info', `Keine Vorlagen verfügbar. Erstellen Sie .md-Dateien im Verzeichnis "Templates/" Ihres Vaults.`)
+          showToast('info', translateNow('commonUi.c_ts_noTemplates'))
           onClose()
           return
         }
@@ -197,7 +197,7 @@ export function TemplateSelector({
       return
     }
     if (/[<>:"/\\|?*]/.test(trimmedName) || /[\x00-\x1f]/.test(trimmedName)) { // eslint-disable-line no-control-regex
-      setFileNameError('Dateiname enthält ungültige Zeichen')
+      setFileNameError(translateNow('commonUi.c_ts_badChars'))
       return
     }
 
@@ -278,7 +278,7 @@ export function TemplateSelector({
         className="template-selector"
         role="dialog"
         aria-modal="true"
-        aria-label={mode === 'insert' ? 'Vorlage einfügen' : 'Neue Notiz aus Vorlage'}
+        aria-label={mode === 'insert' ? t('commonUi.c_ts_insertTemplate') : t('commonUi.c_ts_newFromTemplate')}
       >
         {step === 'select' && (
           <>
@@ -288,7 +288,7 @@ export function TemplateSelector({
                 ref={inputRef}
                 type="text"
                 className="template-selector-input"
-                placeholder="Vorlage suchen…"
+                placeholder={t('commonUi.c_ts_searchTemplate')}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
@@ -312,7 +312,7 @@ export function TemplateSelector({
               id="template-selector-list"
               className="template-selector-list"
               role="listbox"
-              aria-label="Vorlagen"
+              aria-label={t('commonUi.c_ts_templates')}
             >
               {filteredTemplates.length === 0 ? (
                 <li className="template-selector-empty" role="option" aria-selected={false}>
@@ -340,20 +340,20 @@ export function TemplateSelector({
         {step === 'filename' && (
           <div className="template-selector-filename">
             <label className="template-selector-filename-label">
-              Dateiname für neue Notiz (Vorlage: {selectedTemplate?.name})
+              {t('commonUi.c_ts_fileNameFor', { name: selectedTemplate?.name ?? '' })}
             </label>
             <input
               ref={fileNameInputRef}
               type="text"
               className="template-selector-filename-input"
-              placeholder="Dateiname (ohne .md)"
+              placeholder={t('commonUi.c_ts_fileNamePh')}
               value={fileName}
               onChange={(e) => {
                 setFileName(e.target.value)
                 setFileNameError(null)
               }}
               onKeyDown={handleKeyDownFileName}
-              aria-label="Dateiname"
+              aria-label={t('commonUi.c_ts_fileName')}
               aria-invalid={fileNameError ? 'true' : undefined}
               disabled={isCreating}
             />

@@ -158,7 +158,7 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
         method: 'POST', headers, body: JSON.stringify({ newOwnerId }),
       })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ message: 'Fehler' }))
+        const body = await res.json().catch(() => ({ message: t('myVaultsPage.genericError') }))
         throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`)
       }
       void loadVaults(dispatch, apiClient)
@@ -177,19 +177,19 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
     <div className="my-vaults-page">
       <div className="my-vaults-header">
         <Database size={22} color="var(--accent-text)" />
-        <h1 className="my-vaults-title">Meine Vaults</h1>
+        <h1 className="my-vaults-title">{t('myVaultsPage.title')}</h1>
         <Button variant="secondary" size="sm" onClick={handleRefresh} style={{ marginLeft: 'auto' }}>
-          <RefreshCw size={13} /> Aktualisieren
+          <RefreshCw size={13} /> {t('myVaultsPage.refresh')}
         </Button>
       </div>
 
       {/* Owned vaults section */}
       <section className="my-vaults-section">
         <h2 className="my-vaults-section-title">
-          <Crown size={14} /> Eigene Vaults ({ownedVaults.length})
+          <Crown size={14} /> {t('myVaultsPage.owned', { count: ownedVaults.length })}
         </h2>
         {ownedVaults.length === 0 ? (
-          <p className="my-vaults-empty">Keine eigenen Vaults vorhanden.</p>
+          <p className="my-vaults-empty">{t('myVaultsPage.noOwned')}</p>
         ) : (
           <ul className="my-vaults-list">
             {ownedVaults.map((vault) => {
@@ -203,14 +203,14 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                     <span className="my-vaults-item-name">{vault.name}</span>
                     {stats && (
                       <span className="my-vaults-item-stats">
-                        {stats.fileCount} Dateien · {formatBytes(stats.sizeBytes)}
+                        {t('myVaultsPage.files', { count: stats.fileCount })} · {formatBytes(stats.sizeBytes)}
                       </span>
                     )}
                     <button
                       className="my-vaults-share-btn"
                       onClick={() => setExpandedVault(isExpanded ? null : vault.id)}
-                      title="Freigaben verwalten"
-                      aria-label={`Freigaben für "${vault.name}" verwalten`}
+                      title={t('myVaultsPage.manageShares')}
+                      aria-label={t('myVaultsPage.manageSharesFor', { name: vault.name })}
                     >
                       <Users size={12} />
                       {shares.length > 0 && <span className="my-vaults-share-count">{shares.length}</span>}
@@ -218,24 +218,24 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                     <button
                       className="my-vaults-action-btn"
                       onClick={() => void exportVault(dispatch, apiClient, vault.id, vault.name)}
-                      title="Vault exportieren"
-                      aria-label={`Vault "${vault.name}" exportieren`}
+                      title={t('myVaultsPage.export')}
+                      aria-label={t('myVaultsPage.exportFor', { name: vault.name })}
                     >
                       <Download size={12} />
                     </button>
                     <button
                       className={`my-vaults-action-btn${transferVault === vault.id ? ' my-vaults-action-btn--active' : ''}`}
                       onClick={() => setTransferVault(transferVault === vault.id ? null : vault.id)}
-                      title="Besitz übertragen"
-                      aria-label={`Vault "${vault.name}" übertragen`}
+                      title={t('myVaultsPage.transferOwnership')}
+                      aria-label={t('myVaultsPage.transferFor', { name: vault.name })}
                     >
                       <ArrowRightLeft size={12} />
                     </button>
                     <button
                       className="my-vaults-delete-btn"
                       onClick={() => void handleDelete(vault)}
-                      title={`"${vault.name}" löschen`}
-                      aria-label={`Vault "${vault.name}" löschen`}
+                      title={t('myVaultsPage.deleteNamed', { name: vault.name })}
+                      aria-label={t('myVaultsPage.deleteFor', { name: vault.name })}
                     >
                       <Trash2 size={12} />
                     </button>
@@ -253,16 +253,16 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                                 className="my-vaults-sharing-perm-select"
                                 value={s.permission}
                                 onChange={(e) => void handleChangePermission(vault.id, s.userId, e.target.value as 'read' | 'write')}
-                                aria-label={`Berechtigung für ${s.username ?? s.userId}`}
+                                aria-label={t('myVaultsPage.permissionFor', { user: s.username ?? s.userId })}
                               >
-                                <option value="read">Lesen</option>
-                                <option value="write">Schreiben</option>
+                                <option value="read">{t('myVaultsPage.read')}</option>
+                                <option value="write">{t('myVaultsPage.write')}</option>
                               </select>
                               <button
                                 className="my-vaults-sharing-revoke"
                                 onClick={() => void handleRevokeShare(vault.id, s.userId)}
-                                title="Freigabe widerrufen"
-                                aria-label={`Freigabe für ${s.username ?? s.userId} widerrufen`}
+                                title={t('myVaultsPage.revokeShare')}
+                                aria-label={t('myVaultsPage.revokeShareFor', { user: s.username ?? s.userId })}
                               >
                                 <X size={12} />
                               </button>
@@ -271,7 +271,7 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                         </div>
                       )}
                       {shares.length === 0 && (
-                        <p className="my-vaults-sharing-empty">Noch nicht geteilt.</p>
+                        <p className="my-vaults-sharing-empty">{t('myVaultsPage.notShared')}</p>
                       )}
                       <AddShareForm
                         apiClient={apiClient}
@@ -302,10 +302,10 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
       {/* Shared vaults section */}
       <section className="my-vaults-section">
         <h2 className="my-vaults-section-title">
-          Mit mir geteilt ({sharedVaults.length})
+          {t('myVaultsPage.sharedWithMe', { count: sharedVaults.length })}
         </h2>
         {sharedVaults.length === 0 ? (
-          <p className="my-vaults-empty">Keine geteilten Vaults vorhanden.</p>
+          <p className="my-vaults-empty">{t('myVaultsPage.noShared')}</p>
         ) : (
           <ul className="my-vaults-list">
             {sharedVaults.map((vault) => {
@@ -317,21 +317,21 @@ export function MyVaultsPage({ apiClient }: MyVaultsPageProps) {
                     <span className="my-vaults-item-name">{vault.name}</span>
                     {stats && (
                       <span className="my-vaults-item-stats">
-                        {stats.fileCount} Dateien · {formatBytes(stats.sizeBytes)}
+                        {t('myVaultsPage.files', { count: stats.fileCount })} · {formatBytes(stats.sizeBytes)}
                       </span>
                     )}
                     {vault.permission === 'read' ? (
                       <span className="my-vaults-badge my-vaults-badge--read">
-                        <Eye size={11} /> Nur Lesen
+                        <Eye size={11} /> {t('myVaultsPage.readOnly')}
                       </span>
                     ) : (
                       <span className="my-vaults-badge my-vaults-badge--write">
-                        <Pencil size={11} /> Bearbeiten
+                        <Pencil size={11} /> {t('myVaultsPage.editable')}
                       </span>
                     )}
                   </div>
                   <div className="my-vaults-item-owner">
-                    Besitzer: <strong>{vault.ownerName ?? vault.ownerId ?? '—'}</strong>
+                    {t('myVaultsPage.owner')} <strong>{vault.ownerName ?? vault.ownerId ?? '—'}</strong>
                   </div>
                 </li>
               )
@@ -378,6 +378,7 @@ interface AddShareFormProps {
 }
 
 function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [permission, setPermission] = useState<'read' | 'write'>('read')
@@ -419,7 +420,7 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
     setShowSuggestions(false)
 
     const trimmed = username.trim()
-    if (trimmed === '') { setError('Benutzername eingeben.'); return }
+    if (trimmed === '') { setError(t('myVaultsPage.enterUsername')); return }
 
     const targetId = selectedUserId ?? trimmed
     setLoading(true)
@@ -434,7 +435,7 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
       })
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ message: 'Fehler' }))
+        const body = await res.json().catch(() => ({ message: t('myVaultsPage.genericError') }))
         throw new Error(body.message ?? `HTTP ${res.status}`)
       }
 
@@ -443,7 +444,7 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
       setPermission('read')
       await onShareAdded()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Hinzufügen')
+      setError(err instanceof Error ? err.message : t('myVaultsPage.addFailed'))
     } finally {
       setLoading(false)
     }
@@ -460,9 +461,9 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
             onChange={(e) => handleUsernameChange(e.target.value)}
             onFocus={() => { if (suggestions.length > 0 && !selectedUserId) setShowSuggestions(true) }}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            placeholder="Benutzer hinzufügen…"
+            placeholder={t('myVaultsPage.addUser')}
             autoComplete="off"
-            aria-label="Benutzername für Freigabe"
+            aria-label={t('myVaultsPage.usernameForShare')}
           />
           {showSuggestions && suggestions.length > 0 && (
             <ul className="my-vaults-add-share-suggestions">
@@ -485,10 +486,10 @@ function AddShareForm({ apiClient, vaultId, onShareAdded }: AddShareFormProps) {
           className="my-vaults-add-share-perm"
           value={permission}
           onChange={(e) => setPermission(e.target.value as 'read' | 'write')}
-          aria-label="Berechtigung"
+          aria-label={t('myVaultsPage.permission')}
         >
-          <option value="read">Lesen</option>
-          <option value="write">Schreiben</option>
+          <option value="read">{t('myVaultsPage.read')}</option>
+          <option value="write">{t('myVaultsPage.write')}</option>
         </select>
         <button type="submit" className="my-vaults-add-share-btn" disabled={loading}>
           {loading ? '…' : '+'}
@@ -515,6 +516,7 @@ interface TransferFormProps {
  * Shows a warning before executing the transfer.
  */
 function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, onTransfer }: TransferFormProps) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -557,7 +559,7 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
     setShowSuggestions(false)
 
     const trimmed = username.trim()
-    if (trimmed === '') { setError('Benutzername eingeben.'); return }
+    if (trimmed === '') { setError(t('myVaultsPage.enterUsername')); return }
 
     setConfirmStep(true)
   }
@@ -571,7 +573,7 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
       await onTransfer(vaultId, targetId)
       onTransferred()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Übertragung fehlgeschlagen')
+      setError(err instanceof Error ? err.message : t('myVaultsPage.transferFailed'))
       setConfirmStep(false)
     } finally {
       setLoading(false)
@@ -582,7 +584,7 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
     <div className="my-vaults-transfer-panel">
       <div className="my-vaults-transfer-header">
         <ArrowRightLeft size={12} />
-        <span>Besitz übertragen</span>
+        <span>{t('myVaultsPage.transferOwnership')}</span>
       </div>
 
       {!confirmStep ? (
@@ -596,9 +598,9 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
                 onChange={(e) => handleUsernameChange(e.target.value)}
                 onFocus={() => { if (suggestions.length > 0 && !selectedUserId) setShowSuggestions(true) }}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="Neuer Besitzer…"
+                placeholder={t('myVaultsPage.newOwner')}
                 autoComplete="off"
-                aria-label="Benutzername für Übertragung"
+                aria-label={t('myVaultsPage.usernameForTransfer')}
               />
               {showSuggestions && suggestions.length > 0 && (
                 <ul className="my-vaults-add-share-suggestions">
@@ -629,7 +631,7 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
       ) : (
         <div className="my-vaults-transfer-confirm">
           <p className="my-vaults-transfer-warning">
-            ⚠️ Vault <strong>„{vaultName}"</strong> wird an <strong>{username}</strong> übertragen. Du verlierst den Zugriff.
+            {t('myVaultsPage.warnBefore')} <strong>„{vaultName}"</strong> {t('myVaultsPage.warnMiddle')} <strong>{username}</strong>{t('myVaultsPage.warnAfter')}
           </p>
           <div className="my-vaults-transfer-confirm-actions">
             <button
@@ -638,7 +640,7 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
               onClick={() => void handleConfirm()}
               disabled={loading}
             >
-              {loading ? 'Übertrage…' : 'Übertragen'}
+              {loading ? t('myVaultsPage.transferring') : t('myVaultsPage.transfer')}
             </button>
             <button
               type="button"
@@ -646,7 +648,7 @@ function TransferForm({ apiClient, vaultId, vaultName, onTransferred, onCancel, 
               onClick={() => setConfirmStep(false)}
               disabled={loading}
             >
-              Abbrechen
+              {t('common.cancel')}
             </button>
           </div>
           {error && <p className="my-vaults-add-share-error">{error}</p>}

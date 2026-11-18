@@ -3,6 +3,7 @@
  *
  * Presentational: all state (installing, errors, versions) comes from ThemeStoreBrowser.
  */
+import { useTranslation } from '../../i18n'
 import { useState } from 'react'
 import { Check, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { storeThemeScreenshotUrl } from '../../api'
@@ -25,23 +26,22 @@ export interface ThemeStoreCardProps {
 }
 
 /** Mode names are spelled out so the badge never relies on color alone. */
-const MODE_LABEL: Record<'dark' | 'light', string> = { dark: 'Dunkel', light: 'Hell' }
-
 export function ThemeStoreCard({ theme, installedVersion, update, busy, error, onInstall, onUpdate }: ThemeStoreCardProps) {
+  const { t } = useTranslation()
   // A failed image (missing file, unsupported type, offline) shows the placeholder; it never blocks anything.
   const [imageFailed, setImageFailed] = useState(false)
   const installed = installedVersion !== undefined
-  const modes = theme.modes.length > 0 ? theme.modes.map((m) => MODE_LABEL[m]).join(' · ') : 'Modus unbekannt'
+  const modes = theme.modes.length > 0 ? theme.modes.map((m) => (m === 'dark' ? t('settingsUi.modeDark') : t('settingsUi.modeLight'))).join(' · ') : t('settingsUi.modeUnknown')
 
   return (
     <li className="theme-store-card" data-repo={theme.repo}>
       <div className="theme-store-card__image">
         {imageFailed ? (
-          <span className="theme-store-card__placeholder"><ImageIcon size={20} aria-hidden="true" /> Keine Vorschau</span>
+          <span className="theme-store-card__placeholder"><ImageIcon size={20} aria-hidden="true" /> {t('settingsUi.noPreview')}</span>
         ) : (
           <img
             src={storeThemeScreenshotUrl(theme.repo)}
-            alt={`Vorschau von ${theme.name}`}
+            alt={t('settingsUi.previewOf', { name: theme.name })}
             loading="lazy"
             onError={() => setImageFailed(true)}
           />
@@ -59,19 +59,19 @@ export function ThemeStoreCard({ theme, installedVersion, update, busy, error, o
         <div className="theme-store-card__actions">
           {busy ? (
             <span className="theme-store-card__status" role="status">
-              <Loader2 size={14} className="theme-store-card__spinner" aria-hidden="true" /> Wird geladen…
+              <Loader2 size={14} className="theme-store-card__spinner" aria-hidden="true" /> {t('settingsUi.loading')}
             </span>
           ) : update !== undefined ? (
             <>
               <span className="theme-store-card__status">{update.installedVersion} → {update.latestVersion}</span>
-              <Button size="sm" variant="primary" onClick={onUpdate} aria-label={`${theme.name} aktualisieren`}>Aktualisieren</Button>
+              <Button size="sm" variant="primary" onClick={onUpdate} aria-label={t('settingsUi.updateNamed', { name: theme.name })}>{t('settingsUi.update')}</Button>
             </>
           ) : installed ? (
             <span className="theme-store-card__status">
-              <Check size={14} aria-hidden="true" /> Installiert{installedVersion !== '' ? ` (${installedVersion})` : ''}
+              <Check size={14} aria-hidden="true" /> {t('settingsUi.installedLabel')}{installedVersion !== '' ? ` (${installedVersion})` : ''}
             </span>
           ) : (
-            <Button size="sm" variant="secondary" onClick={onInstall} aria-label={`${theme.name} installieren`}>Installieren</Button>
+            <Button size="sm" variant="secondary" onClick={onInstall} aria-label={t('settingsUi.installNamed', { name: theme.name })}>{t('settingsUi.install')}</Button>
           )}
         </div>
 

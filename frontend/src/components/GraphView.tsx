@@ -678,13 +678,13 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
       const items: ContextMenuItem[] = [
         {
           id: 'open',
-          label: 'Öffnen',
+          label: t('commonUi.c_gv_open'),
           icon: <FileText size={14} />,
           run: () => { if (apiClient) void openTab(tabDispatch, appDispatch, apiClient, vaultId, filePath, fileName) },
         },
         { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(filePath) },
         { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} />, run: () => renameInExplorer(filePath) },
-        { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} />, run: () => deleteInExplorer(filePath) },
+        { id: 'delete', label: t('commonUi.c_gv_delete'), icon: <Trash2 size={14} />, run: () => deleteInExplorer(filePath) },
         ...buildPluginMenuItems('file-menu', [file, 'graph-context-menu'], 'graph-plugin-menu'),
       ]
       setContextMenu({ x: e.clientX, y: e.clientY, items })
@@ -1082,7 +1082,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
           <input
             type="text"
             className="graph-search-input"
-            placeholder="Suchen…"
+            placeholder={t('commonUi.c_gv_search')}
             value={searchQuery}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
@@ -1102,7 +1102,7 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
                 </button>
               ))
             ) : (
-              <div className="graph-search-no-results">Keine Ergebnisse</div>
+              <div className="graph-search-no-results">{t('commonUi.c_gv_noResults')}</div>
             )}
           </div>
         )}

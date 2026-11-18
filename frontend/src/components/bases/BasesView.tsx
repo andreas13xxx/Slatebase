@@ -11,6 +11,7 @@
  * stale row behind.
  */
 
+import { useTranslation, translateNow } from '../../i18n'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { IApiClient } from '../../api'
 import { parseBase } from '@slatebase/shared-contracts'
@@ -72,6 +73,7 @@ export interface BasesViewProps {
 export const BasesView = memo(function BasesView({
   apiClient, vaultId, source, hostPath, readOnly, onOpenNote, onSaveSource, onNoteMoved, mode = 'view', onShowView,
 }: BasesViewProps) {
+  const { t } = useTranslation()
   // Leaving source mode goes through a ref: the host passes a fresh callback every render, and the
   // `bases:*` controller effect below must not re-register on each of them.
   const showViewRef = useRef(onShowView)
@@ -247,7 +249,7 @@ export const BasesView = memo(function BasesView({
       if (values.length === 0) fm[property] = undefined
       else if (values.length === 1) fm[property] = values[0]
       else fm[property] = values
-    }, 'Zelle konnte nicht gespeichert werden')
+    }, translateNow('basesUi.cellSaveFailed'))
   }, [writeFrontmatter])
 
   const onNoteMovedRef = useRef(onNoteMoved)
@@ -268,14 +270,14 @@ export const BasesView = memo(function BasesView({
         void runQueryRef.current()
         requestVaultTreeRefresh(vaultId)
       }).catch((err: unknown) => {
-        setActionError(extractErrorMessage(err, 'Karte konnte nicht verschoben werden'))
+        setActionError(extractErrorMessage(err, translateNow('basesUi.cardMoveFailed')))
       })
       return
     }
     void writeFrontmatter(path, (fm) => {
       if (newValue === '') fm[property] = undefined
       else fm[property] = newValue
-    }, 'Karte konnte nicht verschoben werden')
+    }, translateNow('basesUi.cardMoveFailed'))
   }, [writeFrontmatter, apiClient, vaultId])
 
   // Write a sort change back into the selected view in the `.base` file.
@@ -315,7 +317,7 @@ export const BasesView = memo(function BasesView({
       (c) => !c.startsWith('file.') && !c.startsWith('formula.') && !(doc.formulas && c in doc.formulas),
     )
     const frontmatter = buildBlankFrontmatter(columns, doc, view, overrides)
-    const baseName = baseNameOverride?.replace(/[\\/]/g, '-').trim() || 'Unbenannt'
+    const baseName = baseNameOverride?.replace(/[\\/]/g, '-').trim() || translateNow('basesUi.untitled')
     try {
       // Resolve a non-colliding file name under the target folder.
       const path = await resolveNewNotePath(apiClient, vaultId, folder, baseName)
@@ -332,7 +334,7 @@ export const BasesView = memo(function BasesView({
       return path
     } catch (err) {
       // Surface the failure (permissions, quota, network) instead of doing nothing on click.
-      setActionError(extractErrorMessage(err, 'Eintrag konnte nicht angelegt werden'))
+      setActionError(extractErrorMessage(err, translateNow('basesUi.itemCreateFailed')))
       return null
     }
   }, [doc, safeIndex, apiClient, vaultId, onOpenNote])
@@ -391,7 +393,7 @@ export const BasesView = memo(function BasesView({
     window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
     // The file holds what the table shows. If the result was cut short, say so instead of
     // letting a success toast pass for a complete export.
-    if (truncated) showToast('warning', 'Die Tabelle war gekürzt — die CSV enthält nur die angezeigten Zeilen')
+    if (truncated) showToast('warning', translateNow('basesUi.tableTruncated'))
     return true
   }, [hostPath, truncated])
 
@@ -469,7 +471,7 @@ export const BasesView = memo(function BasesView({
       {actionError && (
         <div className="bases-view__error" role="alert">
           {actionError}
-          <button type="button" className="bases-view__error-dismiss" onClick={() => setActionError(null)}>Schließen</button>
+          <button type="button" className="bases-view__error-dismiss" onClick={() => setActionError(null)}>{t('basesUi.close')}</button>
         </div>
       )}
       {truncated && !queryError && (
@@ -489,18 +491,18 @@ export const BasesView = memo(function BasesView({
       )}
       {isUnknownViewType && !pluginViewError && activeView && (
         <div className="bases-view__warning" role="status" aria-live="polite">
-          {`Für den Ansichtstyp „${activeView.type}“ ist kein Plugin installiert — es wird die Tabelle angezeigt.`}
+          {t('basesUi.noPluginForType', { type: activeView.type })}
         </div>
       )}
       {mode === 'view' && isPluginPending && (
-        <div className="bases-view__loading" role="status" aria-live="polite">Ansicht wird geladen…</div>
+        <div className="bases-view__loading" role="status" aria-live="polite">{t('basesUi.viewLoading')}</div>
       )}
-      {loading && tableIsActive && !isPluginPending && <div className="bases-view__loading" role="status" aria-live="polite">Lädt…</div>}
+      {loading && tableIsActive && !isPluginPending && <div className="bases-view__loading" role="status" aria-live="polite">{t('basesUi.loadingShort')}</div>}
 
       {mode === 'view' && isPluginView && activeView && (
         <ErrorBoundary
           onError={(err) => setPluginViewError(err.message)}
-          fallback={<div className="bases-view__error" role="alert">Die Plugin-Ansicht ist abgestürzt — es wird die Tabelle angezeigt.</div>}
+          fallback={<div className="bases-view__error" role="alert">{t('basesUi.pluginViewCrashed')}</div>}
         >
           <BasesPluginViewHost
             apiClient={apiClient}

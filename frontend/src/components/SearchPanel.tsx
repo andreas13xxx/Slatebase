@@ -784,13 +784,13 @@ function SearchFileGroup({
   function buildFileGroupMenuItems(): ContextMenuItem[] {
     const firstLine = fileResult.hits[0]?.line ?? 1
     const items: ContextMenuItem[] = [
-      { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: () => onHitClick(vaultId, fileResult.filePath, firstLine) },
+      { id: 'open', label: t('commonUi.c_sp_open'), icon: <FileText size={14} />, run: () => onHitClick(vaultId, fileResult.filePath, firstLine) },
     ]
     if (isActiveVault) {
       items.push(
         { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(fileResult.filePath) },
         { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} />, run: () => renameInExplorer(fileResult.filePath) },
-        { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} />, run: () => deleteInExplorer(fileResult.filePath) },
+        { id: 'delete', label: t('commonUi.c_sp_delete'), icon: <Trash2 size={14} />, run: () => deleteInExplorer(fileResult.filePath) },
       )
     }
     const file = buildTFileFromPath(fileResult.filePath)

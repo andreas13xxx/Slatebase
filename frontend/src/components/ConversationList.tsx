@@ -169,7 +169,7 @@ export function ConversationList({ onlineUserIds }: ConversationListProps) {
                       {isOnline && (
                         <span
                           className="presence-dot"
-                          aria-label="Online"
+                          aria-label={t('commonUi.c_cl_online')}
                           style={{
                             width: '8px',
                             height: '8px',

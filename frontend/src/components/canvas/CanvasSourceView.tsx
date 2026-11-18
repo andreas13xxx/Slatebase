@@ -3,6 +3,7 @@
  * Allows direct editing in source mode (non-read-only).
  */
 
+import { useTranslation, translateNow } from '../../i18n'
 import { memo, useState, useCallback, useRef, useEffect } from 'react'
 import { serializeCanvas } from '../../canvas'
 import type { CanvasDocument } from '../../canvas/types'
@@ -19,6 +20,7 @@ export interface CanvasSourceViewProps {
 export const CanvasSourceView = memo(function CanvasSourceView({
   document, readOnly, onApplySource,
 }: CanvasSourceViewProps) {
+  const { t } = useTranslation()
   const serialized = serializeCanvas(document)
   const [editValue, setEditValue] = useState(serialized)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -44,7 +46,7 @@ export const CanvasSourceView = memo(function CanvasSourceView({
       JSON.parse(value)
       setParseError(null)
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Ungültiges JSON')
+      setParseError(err instanceof Error ? err.message : translateNow('canvasUi.invalidJson'))
     }
   }, [])
 
@@ -55,7 +57,7 @@ export const CanvasSourceView = memo(function CanvasSourceView({
       onApplySource(editValue)
       setParseError(null)
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Ungültiges JSON')
+      setParseError(err instanceof Error ? err.message : translateNow('canvasUi.invalidJson'))
     }
   }, [editValue, parseError, onApplySource])
 
@@ -84,16 +86,16 @@ export const CanvasSourceView = memo(function CanvasSourceView({
   return (
     <div className="canvas-source-view">
       <div className="canvas-source-view__header">
-        <span className="canvas-source-view__title">Quelltext (.canvas JSON)</span>
+        <span className="canvas-source-view__title">{t('canvasUi.sourceTitle')}</span>
         {!readOnly && (
           <button
             type="button"
             className="canvas-source-view__apply-btn"
             onClick={handleApply}
             disabled={!!parseError}
-            title="Änderungen übernehmen (Ctrl+S)"
+            title={t('canvasUi.applyChanges')}
           >
-            Übernehmen
+            {t('canvasUi.apply')}
           </button>
         )}
       </div>
@@ -110,7 +112,7 @@ export const CanvasSourceView = memo(function CanvasSourceView({
         onKeyDown={handleKeyDown}
         readOnly={readOnly}
         spellCheck={false}
-        aria-label="Canvas JSON Quelltext"
+        aria-label={t('canvasUi.sourceLabel')}
       />
     </div>
   )

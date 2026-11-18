@@ -1,4 +1,5 @@
 import { type ReactNode, type PointerEvent as ReactPointerEvent, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
+import { translateNow } from '../i18n'
 import { scrollToHeadingAnchor, scrollToBlockAnchor } from '../utils/scrollToAnchor'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -105,8 +106,8 @@ function ambiguityTitle(
   resolution: { resolved: { path: string }; alternativeCount: number } | null,
 ): string | undefined {
   if (!resolution || resolution.alternativeCount === 0) return undefined
-  const suffix = resolution.alternativeCount === 1 ? 'weitere gleichnamige Datei' : 'weitere gleichnamige Dateien'
-  return `Löst auf zu: ${resolution.resolved.path} (+${resolution.alternativeCount} ${suffix})`
+  const suffix = resolution.alternativeCount === 1 ? translateNow('commonUi.c_vm_oneMore') : translateNow('commonUi.c_vm_manyMore')
+  return translateNow('commonUi.c_vm_resolves', { path: resolution.resolved.path, n: resolution.alternativeCount, suffix: suffix })
 }
 
 
@@ -334,7 +335,7 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
         setContextMenu({
           x: e.clientX, y: e.clientY,
           items: [
-            { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: () => onInternalLinkClick?.(path) },
+            { id: 'open', label: translateNow('commonUi.c_vm_open'), icon: <FileText size={14} />, run: () => onInternalLinkClick?.(path) },
             { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(path) },
             { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(path).catch(() => {}) } },
             ...buildPluginMenuItems('file-menu', [file, 'link-context-menu'], 'view-mode-link-menu'),
@@ -350,7 +351,7 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
         setContextMenu({
           x: e.clientX, y: e.clientY,
           items: [
-            { id: 'open', label: 'Link öffnen', icon: <ExternalLink size={14} />, run: () => window.open(url, '_blank', 'noopener,noreferrer') },
+            { id: 'open', label: translateNow('commonUi.c_vm_openLink'), icon: <ExternalLink size={14} />, run: () => window.open(url, '_blank', 'noopener,noreferrer') },
             { id: 'copy', label: 'Link kopieren', icon: <Copy size={14} />, run: () => { void navigator.clipboard.writeText(url).catch(() => {}) } },
             ...buildPluginMenuItems('url-menu', [url], 'view-mode-url-menu'),
           ],
@@ -422,7 +423,7 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
     if (isPublic) return
     if (!apiClient) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setError('Kein API-Client verfügbar')
+      setError(translateNow('commonUi.c_vm_noApi'))
       return
     }
 
@@ -457,7 +458,7 @@ function NoteEmbed({ vaultId, filePath, target, heading, blockRef, directoryTree
     return () => { cancelled = true }
   }, [apiClient, isPublic, vaultId, filePath, heading, blockRef, target])
 
-  const shownError = isPublic ? (publicEmbed?.kind === 'note' ? null : PUBLIC_EMBED_UNAVAILABLE) : error
+  const shownError = isPublic ? (publicEmbed?.kind === 'note' ? null : publicEmbedUnavailable()) : error
   const shownContent = isPublic ? (publicEmbed?.kind === 'note' ? publicEmbed.markdown : null) : noteContent
 
   if (shownError) {
@@ -714,8 +715,8 @@ function renderFootnoteSection(
         key: 'backref',
         href: `#${footnoteRefAnchorId(entry.identifier)}`,
         className: 'view-mode-footnote-backref',
-        title: 'Zurück zum Verweis',
-        'aria-label': 'Zurück zum Verweis',
+        title: translateNow('commonUi.c_vm_backToRef'),
+        'aria-label': translateNow('commonUi.c_vm_backToRef'),
         onClick: (e: React.MouseEvent) => {
           e.preventDefault()
           scrollToAnchorId(footnoteRefAnchorId(entry.identifier))
@@ -727,7 +728,7 @@ function renderFootnoteSection(
   return createElement('section', {
     key,
     className: 'view-mode-footnotes',
-    'aria-label': 'Fußnoten',
+    'aria-label': translateNow('commonUi.c_vm_footnotes'),
   },
     createElement('hr', { className: 'view-mode-footnotes-divider' }),
     createElement('ol', { className: 'view-mode-footnotes-list' }, items),
@@ -1391,7 +1392,7 @@ function renderPhrasingNode(
       },
         createElement('a', {
           href: `#${footnoteAnchorId(ref.identifier)}`,
-          title: `Fußnote ${ref.fnNumber}`,
+          title: translateNow('commonUi.c_vm_footnoteN', { n: ref.fnNumber }),
           onClick: (e: React.MouseEvent) => {
             e.preventDefault()
             scrollToAnchorId(footnoteAnchorId(ref.identifier))
@@ -1518,14 +1519,14 @@ function buildImageSrc(vaultId: string, resolvedPath: string): string {
 }
 
 /** Generic notice for an embed a public share cannot show; reveals neither a path nor a reason. */
-const PUBLIC_EMBED_UNAVAILABLE = 'Eingebetteter Inhalt nicht verfügbar'
+const publicEmbedUnavailable = (): string => translateNow('commonUi.c_vm_embedUnavailable')
 
 /**
  * Text for an embed that could not be resolved. In the app it names the missing target; on a public
  * share it stays generic, so the page says nothing about what the vault does or does not contain.
  */
 function missingEmbedLabel(vaultId: string, label: string): string {
-  return parsePublicVaultId(vaultId) === null ? label : PUBLIC_EMBED_UNAVAILABLE
+  return parsePublicVaultId(vaultId) === null ? label : publicEmbedUnavailable()
 }
 
 /**

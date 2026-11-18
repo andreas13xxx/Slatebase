@@ -15,6 +15,7 @@
  * @module components/settings/AppearanceSection
  */
 
+import { useTranslation, translateNow, type TranslationKey } from '../../i18n'
 import { useCallback } from 'react'
 import { useStatusBar } from '../../hooks/useStatusBar'
 import { useStatusBarItemVisibility, type BuiltinStatusBarItemId } from '../../hooks/useStatusBarItemVisibility'
@@ -33,13 +34,13 @@ import { showToast } from '../ToastNotification'
 import { extractErrorMessage } from '../../utils/error'
 import { SettingSection, SettingRow, Button } from './ui'
 
-const BUILTIN_ITEMS: Array<{ id: BuiltinStatusBarItemId; label: string }> = [
-  { id: 'clock', label: 'Uhr' },
-  { id: 'vaultName', label: 'Vault-Name' },
-  { id: 'wordStats', label: 'Wort- und Zeichenanzahl' },
-  { id: 'cursorPosition', label: 'Cursor-Position' },
-  { id: 'linkCounts', label: 'Aus-/eingehende Links' },
-  { id: 'theme', label: 'Aktives Theme' },
+const BUILTIN_ITEMS: Array<{ id: BuiltinStatusBarItemId; labelKey: TranslationKey }> = [
+  { id: 'clock', labelKey: 'settingsUi.sbClock' },
+  { id: 'vaultName', labelKey: 'settingsUi.sbVaultName' },
+  { id: 'wordStats', labelKey: 'settingsUi.sbWordStats' },
+  { id: 'cursorPosition', labelKey: 'settingsUi.sbCursor' },
+  { id: 'linkCounts', labelKey: 'settingsUi.sbLinks' },
+  { id: 'theme', labelKey: 'settingsUi.sbTheme' },
 ]
 
 /** One visibility toggle row for a built-in status bar item. */
@@ -56,6 +57,7 @@ function StatusBarItemToggle({ id, label }: { id: BuiltinStatusBarItemId; label:
 
 /** Colour scheme and language — stored on the user record, not in preferences. */
 function ProfileDisplaySettings() {
+  const { t } = useTranslation()
   const { authState, authDispatch } = useAuthContext()
   const { apiClient } = useAppContext()
 
@@ -69,7 +71,7 @@ function ProfileDisplaySettings() {
         const updated = await apiClient.updateProfile(patch)
         authDispatch({ type: 'PROFILE_UPDATED', payload: { user: updated } })
       } catch (err: unknown) {
-        showToast('error', extractErrorMessage(err, 'Einstellung konnte nicht gespeichert werden'))
+        showToast('error', extractErrorMessage(err, translateNow('settingsUi.saveFailed')))
       }
     },
     [apiClient, authDispatch],
@@ -77,13 +79,13 @@ function ProfileDisplaySettings() {
 
   return (
     <SettingSection
-      title="Erscheinungsbild"
-      description="Gilt für dein Konto auf allen Geräten."
+      title={t('settingsUi.appearanceTitle')}
+      description={t('settingsUi.appearanceDesc')}
     >
       <SettingRow
-        label="Farbschema"
+        label={t('settingsUi.colorScheme')}
         htmlFor="appearance-color-scheme"
-        hint="„System“ folgt der Einstellung deines Betriebssystems."
+        hint={t('settingsUi.colorSchemeHint')}
       >
         <select
           id="appearance-color-scheme"
@@ -91,13 +93,13 @@ function ProfileDisplaySettings() {
           value={colorScheme}
           onChange={(e) => { void save({ colorScheme: e.target.value as 'light' | 'dark' | 'system' }) }}
         >
-          <option value="light">Hell</option>
-          <option value="dark">Dunkel</option>
-          <option value="system">System</option>
+          <option value="light">{t('settingsUi.light')}</option>
+          <option value="dark">{t('settingsUi.dark')}</option>
+          <option value="system">{t('settingsUi.system')}</option>
         </select>
       </SettingRow>
 
-      <SettingRow label="Sprache" htmlFor="appearance-language">
+      <SettingRow label={t('settingsUi.language')} htmlFor="appearance-language">
         <select
           id="appearance-language"
           className="settings-field-input"
@@ -116,6 +118,7 @@ function ProfileDisplaySettings() {
  * Appearance settings for the current account.
  */
 export function AppearanceSection() {
+  const { t } = useTranslation()
   const { visible, toggle } = useStatusBar()
   const uiSettings = useUiSettings()
   const toolbar = useToolbarPrefs()
@@ -133,23 +136,23 @@ export function AppearanceSection() {
       <ProfileDisplaySettings />
 
       <SettingSection
-        title="Statusleiste"
-        description="Zeigt eine Leiste am unteren Rand mit Uhrzeit und weiteren Informationen."
+        title={t('settingsUi.statusBar')}
+        description={t('settingsUi.statusBarDesc')}
       >
-        <SettingRow label="Statusleiste anzeigen" htmlFor="statusbar-toggle">
+        <SettingRow label={t('settingsUi.showStatusBar')} htmlFor="statusbar-toggle">
           <input id="statusbar-toggle" type="checkbox" checked={visible} onChange={toggle} />
         </SettingRow>
 
         {visible && BUILTIN_ITEMS.map((item) => (
-          <StatusBarItemToggle key={item.id} id={item.id} label={item.label} />
+          <StatusBarItemToggle key={item.id} id={item.id} label={t(item.labelKey)} />
         ))}
       </SettingSection>
 
       <SettingSection
-        title="Werkzeugleiste"
-        description="Reihenfolge, Farben und einzelne Schaltflächen änderst du direkt über das Kontextmenü der Leiste."
+        title={t('settingsUi.toolbar')}
+        description={t('settingsUi.toolbarDesc')}
       >
-        <SettingRow label="Werkzeugleiste anzeigen" htmlFor="toolbar-visible">
+        <SettingRow label={t('settingsUi.showToolbar')} htmlFor="toolbar-visible">
           <input
             id="toolbar-visible"
             type="checkbox"
@@ -158,24 +161,24 @@ export function AppearanceSection() {
           />
         </SettingRow>
 
-        <SettingRow label="Position" htmlFor="toolbar-position">
+        <SettingRow label={t('settingsUi.position')} htmlFor="toolbar-position">
           <select
             id="toolbar-position"
             className="settings-field-input"
             value={toolbar.position}
             onChange={(e) => { setToolbarPosition(e.target.value as ToolbarPosition) }}
           >
-            <option value="left">Links</option>
-            <option value="right">Rechts</option>
+            <option value="left">{t('settingsUi.left')}</option>
+            <option value="right">{t('settingsUi.right')}</option>
           </select>
         </SettingRow>
 
         <SettingRow
-          label="Anordnung zurücksetzen"
+          label={t('settingsUi.resetLayout')}
           hint={
             isCustomised
-              ? 'Stellt Reihenfolge, Farben und ausgeblendete Schaltflächen wieder her.'
-              : 'Die Leiste ist unverändert.'
+              ? t('settingsUi.resetLayoutHint')
+              : t('settingsUi.layoutUnchanged')
           }
         >
           <Button
@@ -183,16 +186,16 @@ export function AppearanceSection() {
             onClick={resetToolbarLayout}
             disabled={!isCustomised}
           >
-            Zurücksetzen
+            {t('settingsUi.reset')}
           </Button>
         </SettingRow>
       </SettingSection>
 
-      <SettingSection title="Datei-Explorer">
+      <SettingSection title={t('settingsUi.fileExplorer')}>
         <SettingRow
-          label="Aktive Datei im Explorer verfolgen"
+          label={t('settingsUi.followActive')}
           htmlFor="explorer-follow-active-file"
-          hint="Klappt beim Wechsel des aktiven Tabs automatisch die übergeordneten Ordner der Datei auf und markiert sie."
+          hint={t('settingsUi.followActiveHint')}
         >
           <input
             id="explorer-follow-active-file"

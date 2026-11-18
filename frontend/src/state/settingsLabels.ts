@@ -5,37 +5,38 @@
  */
 
 import type { SettingsCategory, SettingsSection } from './settingsState'
+import { translateNow } from '../i18n'
 
 /** German labels for each settings section, used for headings and nav search matching. */
 export const SECTION_LABELS: Record<SettingsSection, string> = {
-  'profile': 'Profil',
-  'password': 'Passwort ändern',
-  'security': 'Sicherheit',
-  'sessions': 'Sitzungen',
-  'mcp-tokens': 'MCP-Tokens',
-  'public-shares': 'Öffentliche Links',
-  'keybindings': 'Tastaturkürzel',
-  'appearance': 'Darstellung',
-  'my-vaults': 'Meine Vaults',
-  'delete-account': 'Konto löschen',
-  'plugins': 'Plugins',
-  'vault-config': 'Vault-Konfiguration',
-  'editor-files': 'Editor und Dateien',
-  'keychain': 'Schlüsselbund',
-  'themes': 'Themes',
-  'css-snippets': 'CSS-Snippets',
-  'git-sync': 'Git-Synchronisation',
-  'mail-import': 'Mail-Import',
-  'server-config': 'Serverkonfiguration',
-  'user-management': 'Benutzerverwaltung',
-  'vault-management': 'Vault-Verwaltung',
-  'feature-toggles': 'Feature-Toggles',
-  'server-restart': 'Server neu starten',
+  get 'profile'() { return translateNow('commonUi.c_sl_profile') },
+  get 'password'() { return translateNow('commonUi.c_sl_password') },
+  get 'security'() { return translateNow('commonUi.c_sl_security') },
+  get 'sessions'() { return translateNow('commonUi.c_sl_sessions') },
+  get 'mcp-tokens'() { return translateNow('commonUi.c_sl_mcp_tokens') },
+  get 'public-shares'() { return translateNow('commonUi.c_sl_public_shares') },
+  get 'keybindings'() { return translateNow('commonUi.c_sl_keybindings') },
+  get 'appearance'() { return translateNow('commonUi.c_sl_appearance') },
+  get 'my-vaults'() { return translateNow('commonUi.c_sl_my_vaults') },
+  get 'delete-account'() { return translateNow('commonUi.c_sl_delete_account') },
+  get 'plugins'() { return translateNow('commonUi.c_sl_plugins') },
+  get 'vault-config'() { return translateNow('commonUi.c_sl_vault_config') },
+  get 'editor-files'() { return translateNow('commonUi.c_sl_editor_files') },
+  get 'keychain'() { return translateNow('commonUi.c_sl_keychain') },
+  get 'themes'() { return translateNow('commonUi.c_sl_themes') },
+  get 'css-snippets'() { return translateNow('commonUi.c_sl_css_snippets') },
+  get 'git-sync'() { return translateNow('commonUi.c_sl_git_sync') },
+  get 'mail-import'() { return translateNow('commonUi.c_sl_mail_import') },
+  get 'server-config'() { return translateNow('commonUi.c_sl_server_config') },
+  get 'user-management'() { return translateNow('commonUi.c_sl_user_management') },
+  get 'vault-management'() { return translateNow('commonUi.c_sl_vault_management') },
+  get 'feature-toggles'() { return translateNow('commonUi.c_sl_feature_toggles') },
+  get 'server-restart'() { return translateNow('commonUi.c_sl_server_restart') },
 }
 
 /** German labels for category headings in the settings sidebar. */
 export const CATEGORY_LABELS: Record<SettingsCategory, string> = {
-  'account': 'Konto',
-  'vault': 'Vault',
-  'administration': 'Administration',
+  get 'account'() { return translateNow('commonUi.c_sl_account') },
+  get 'vault'() { return translateNow('commonUi.c_sl_vault') },
+  get 'administration'() { return translateNow('commonUi.c_sl_administration') },
 }

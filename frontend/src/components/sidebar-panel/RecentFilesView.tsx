@@ -5,6 +5,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react'
+import { useTranslation, translateNow } from '../../i18n'
 import { Clock } from 'lucide-react'
 import * as recentFilesStore from '../../state/recentFilesStore'
 import { getFileIcon, getFileIconClass, getDisplayName } from '../../utils/fileIcons'
@@ -35,15 +36,15 @@ function formatRelativeTime(isoTimestamp: string): string {
   const diffMs = now - then
 
   const minutes = Math.floor(diffMs / 60_000)
-  if (minutes < 1) return 'Gerade eben'
-  if (minutes < 60) return `Vor ${minutes} Min.`
+  if (minutes < 1) return translateNow('commonUi.c_justNow')
+  if (minutes < 60) return translateNow('commonUi.c_minAgo', { n: minutes })
 
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Vor ${hours} Std.`
+  if (hours < 24) return translateNow('commonUi.c_hourAgo', { n: hours })
 
   const days = Math.floor(hours / 24)
-  if (days === 1) return 'Gestern'
-  if (days < 7) return `Vor ${days} Tagen`
+  if (days === 1) return translateNow('commonUi.c_yesterday')
+  if (days < 7) return translateNow('commonUi.c_daysAgo', { n: days })
 
   return new Date(isoTimestamp).toLocaleDateString('de-DE', {
     day: '2-digit',
@@ -57,6 +58,7 @@ function formatRelativeTime(isoTimestamp: string): string {
  * Entries are clickable and open the file in a tab.
  */
 export function RecentFilesView({ onOpenFile, refreshKey: _refreshKey }: RecentFilesViewProps): React.ReactElement {
+  const { t } = useTranslation()
   const entries: RecentFileEntry[] = useMemo(
     () => recentFilesStore.getRecent(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,15 +71,15 @@ export function RecentFilesView({ onOpenFile, refreshKey: _refreshKey }: RecentF
 
   if (entries.length === 0) {
     return (
-      <div className="recent-files-view recent-files-view--empty" role="region" aria-label="Zuletzt geöffnet">
+      <div className="recent-files-view recent-files-view--empty" role="region" aria-label={t('commonUi.c_recentlyOpened')}>
         <Clock size={24} className="recent-files-view__empty-icon" />
-        <span className="recent-files-view__empty-text">Keine zuletzt geöffneten Dateien</span>
+        <span className="recent-files-view__empty-text">{t('commonUi.c_noRecent')}</span>
       </div>
     )
   }
 
   return (
-    <div className="recent-files-view" role="region" aria-label="Zuletzt geöffnet">
+    <div className="recent-files-view" role="region" aria-label={t('commonUi.c_recentlyOpened')}>
       <ul className="recent-files-view__list" role="list">
         {entries.map((entry) => {
           const fileName = getFileName(entry.path)

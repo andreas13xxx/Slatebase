@@ -3,6 +3,7 @@
  * Supports drag/move and resize.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useCallback } from 'react'
 import type { GroupNode } from '../../canvas/types'
 import { getCanvasColorClass } from './canvas-utils'
@@ -21,6 +22,7 @@ export interface GroupNodeRendererProps {
 export const GroupNodeRenderer = memo(function GroupNodeRenderer({
   node, selected, onSelect, readOnly,
 }: GroupNodeRendererProps) {
+  const { t } = useTranslation()
   const colorClass = getCanvasColorClass(node.color)
 
   const { onDragStart } = useNodeDrag(node.id, readOnly)
@@ -53,7 +55,7 @@ export const GroupNodeRenderer = memo(function GroupNodeRenderer({
       onKeyDown={handleNodeKeyDown}
       tabIndex={0}
       role="group"
-      aria-label={node.label ? `Gruppe: ${node.label}` : 'Gruppe'}
+      aria-label={node.label ? t('canvasUi.groupNamed', { label: node.label }) : t('canvasUi.group')}
     >
       {node.label && (
         <span className="canvas-node__group-label">{node.label}</span>

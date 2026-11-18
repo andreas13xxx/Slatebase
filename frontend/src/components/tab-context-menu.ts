@@ -8,6 +8,7 @@
  * @module tab-context-menu
  */
 import { createElement } from 'react'
+import { translateNow } from '../i18n'
 import { X, CopyX, PanelRightClose, FolderOpen, Link, Pencil, Trash2, Pin, PinOff, ArrowLeft, ArrowRight, PanelRight } from 'lucide-react'
 import type { ContextMenuItem } from './ContextMenu'
 import type { TabEntry } from '../state/tabState'
@@ -41,16 +42,16 @@ export function buildTabContextMenuItems(
   const items: ContextMenuItem[] = [
     {
       id: 'toggle-pin',
-      label: tab.pinned ? 'Lösen' : 'Anheften',
+      label: tab.pinned ? translateNow('commonUi.c_tm_unpin') : translateNow('commonUi.c_tm_pin'),
       icon: createElement(tab.pinned ? PinOff : Pin, { size: ICON_SIZE }),
       run: () => tabDispatch({ type: 'TOGGLE_PIN', payload: { tabId: tab.id } }),
     },
     { id: 'sep-pin', label: '', separator: true },
-    { id: 'close', label: 'Tab schließen', icon: createElement(X, { size: ICON_SIZE }), run: () => tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } }) },
-    { id: 'close-others', label: 'Andere schließen', icon: createElement(CopyX, { size: ICON_SIZE }), run: () => tabDispatch({ type: 'CLOSE_OTHER_TABS', payload: { tabId: tab.id } }) },
+    { id: 'close', label: translateNow('commonUi.c_tm_close'), icon: createElement(X, { size: ICON_SIZE }), run: () => tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: tab.id } }) },
+    { id: 'close-others', label: translateNow('commonUi.c_tm_closeOthers'), icon: createElement(CopyX, { size: ICON_SIZE }), run: () => tabDispatch({ type: 'CLOSE_OTHER_TABS', payload: { tabId: tab.id } }) },
     {
       id: 'close-to-right',
-      label: 'Alle rechts schließen',
+      label: translateNow('commonUi.c_tm_closeRight'),
       icon: createElement(PanelRightClose, { size: ICON_SIZE }),
       disabled: isLastTab,
       run: () => tabDispatch({ type: 'CLOSE_TABS_TO_RIGHT', payload: { tabId: tab.id } }),
@@ -89,10 +90,10 @@ export function buildTabContextMenuItems(
 
   items.push(
     { id: 'sep-file-ops', label: '', separator: true },
-    { id: 'reveal', label: 'Im Explorer zeigen', icon: createElement(FolderOpen, { size: ICON_SIZE }), run: () => revealInExplorer(tab.filePath) },
-    { id: 'copy-link', label: 'Link kopieren', icon: createElement(Link, { size: ICON_SIZE }), run: () => { void copyLinkWithFeedback(tab.vaultId, tab.filePath) } },
-    { id: 'rename', label: 'Umbenennen', icon: createElement(Pencil, { size: ICON_SIZE }), run: () => renameInExplorer(tab.filePath) },
-    { id: 'delete', label: 'Löschen', icon: createElement(Trash2, { size: ICON_SIZE }), run: () => deleteInExplorer(tab.filePath) },
+    { id: 'reveal', label: translateNow('commonUi.c_tm_reveal'), icon: createElement(FolderOpen, { size: ICON_SIZE }), run: () => revealInExplorer(tab.filePath) },
+    { id: 'copy-link', label: translateNow('commonUi.c_tm_copyLink'), icon: createElement(Link, { size: ICON_SIZE }), run: () => { void copyLinkWithFeedback(tab.vaultId, tab.filePath) } },
+    { id: 'rename', label: translateNow('commonUi.c_tm_rename'), icon: createElement(Pencil, { size: ICON_SIZE }), run: () => renameInExplorer(tab.filePath) },
+    { id: 'delete', label: translateNow('commonUi.c_tm_delete'), icon: createElement(Trash2, { size: ICON_SIZE }), run: () => deleteInExplorer(tab.filePath) },
   )
 
   const file = buildTFileFromPath(tab.filePath)

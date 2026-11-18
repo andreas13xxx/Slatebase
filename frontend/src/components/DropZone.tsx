@@ -1,4 +1,5 @@
 import { Upload } from 'lucide-react'
+import { useTranslation } from '../i18n'
 import { useDropZone } from '../hooks/useDropZone'
 import type { UseDropZoneOptions } from '../hooks/useDropZone'
 import './DropZone.css'
@@ -47,6 +48,7 @@ export function DropZone({
   className,
   hideOverlay,
 }: DropZoneProps) {
+  const { t } = useTranslation()
   const { isDragOver, dropRef, handlers } = useDropZone({
     onDrop,
     maxFiles,
@@ -69,7 +71,7 @@ export function DropZone({
           <div className="drop-zone__overlay-content">
             <Upload size={32} className="drop-zone__overlay-icon" />
             <span className="drop-zone__overlay-text">
-              {disabled ? 'Drop nicht möglich' : 'Dateien hier ablegen'}
+              {disabled ? t('commonUi.c_dropNotPossible') : t('commonUi.c_dropFilesHere')}
             </span>
           </div>
         </div>

@@ -3,6 +3,7 @@
  * Handles: bold, italic, code, headings, links, lists.
  * Intentionally lightweight — no full remark pipeline for performance in canvas nodes.
  */
+import { translateNow } from '../../i18n'
 
 /** URL schemes allowed in link hrefs rendered from untrusted note content. */
 const SAFE_URL_SCHEME = /^(?:https?|mailto):/i
@@ -107,8 +108,8 @@ export function renderSimpleMarkdown(text: string): React.ReactNode[] {
       rendered = (
         <div key={i} className="canvas-md-mermaid">
           <div className="canvas-md-mermaid-header">
-            <span className="canvas-md-mermaid-label">Mermaid-Diagramm</span>
-            <span className="canvas-md-mermaid-hint">Nicht in Canvas-Vorschau gerendert</span>
+            <span className="canvas-md-mermaid-label">{translateNow('canvasUi.mermaid')}</span>
+            <span className="canvas-md-mermaid-hint">{translateNow('canvasUi.mermaidHint')}</span>
           </div>
           <pre className="canvas-md-mermaid-code">{mermaidBlock}</pre>
         </div>

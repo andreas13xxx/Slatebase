@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { translateNow } from '../i18n'
 import { showToast } from '../components/ToastNotification'
 
 /**
@@ -67,7 +68,7 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
     accept,
     targetPath = '',
     disabled = false,
-    disabledMessage = 'Bitte zuerst eine Datei öffnen',
+    disabledMessage = translateNow('commonUi.c_dz_openFile'),
   } = options
 
   const [isDragOver, setIsDragOver] = useState(false)
@@ -141,7 +142,7 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
 
     // Validate: max file count
     if (droppedFiles.length > maxFiles) {
-      showToast('error', `Maximal ${maxFiles} Dateien pro Drop-Vorgang erlaubt (${droppedFiles.length} ausgewählt)`)
+      showToast('error', translateNow('commonUi.c_dz_tooMany', { max: maxFiles, n: droppedFiles.length }))
       return
     }
 
@@ -151,12 +152,12 @@ export function useDropZone(options: UseDropZoneOptions): UseDropZoneReturn {
 
     for (const file of droppedFiles) {
       if (file.size > maxFileSize) {
-        showToast('error', `"${file.name}" überschreitet die maximale Dateigröße von ${maxSizeMB} MB`)
+        showToast('error', translateNow('commonUi.c_dz_tooBig', { name: file.name, mb: maxSizeMB }))
         continue
       }
 
       if (accept && accept.length > 0 && !accept.includes(file.type)) {
-        showToast('warning', `"${file.name}" hat einen nicht unterstützten Dateityp`)
+        showToast('warning', translateNow('commonUi.c_dz_badType', { name: file.name }))
         continue
       }
 

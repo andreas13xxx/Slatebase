@@ -185,31 +185,31 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
 
     const vaultsPerUser = parseInt(maxVaultsPerUser, 10)
     if (isNaN(vaultsPerUser) || vaultsPerUser < 1 || vaultsPerUser > 1000) {
-      newErrors.maxVaultsPerUser = 'Muss zwischen 1 und 1000 liegen'
+      newErrors.maxVaultsPerUser = t('commonUi.c_ac_range1000')
     }
 
     // The remaining limits share one message: they are all "a positive whole
     // number", and a field-by-field message would repeat the same sentence
     // eleven times without telling the admin anything new.
     const positiveFields: Array<[string, number, number]> = [
-      ['Ordnertiefe', parseInt(maxDirectoryDepth, 10), 200],
-      ['Aufräum-Intervall', parseInt(cleanupIntervalHours, 10), 720],
-      ['Upload-Größe', parseInt(uploadMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
-      ['Dateien pro Upload', parseInt(uploadMaxFilesPerDrop, 10), 1000],
-      ['Bild-Einfügegröße', parseInt(uploadMaxImagePasteSize, 10), Number.MAX_SAFE_INTEGER],
-      ['Import-Dateigröße', parseInt(importMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
-      ['Import-Dateianzahl', parseInt(importMaxFiles, 10), Number.MAX_SAFE_INTEGER],
-      ['Import-Tiefe', parseInt(importMaxDepth, 10), 100],
-      ['MCP-Dateigröße', parseInt(mcpMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
+      [t('commonUi.c_ac_dirDepthShort'), parseInt(maxDirectoryDepth, 10), 200],
+      [t('commonUi.c_ac_cleanupShort'), parseInt(cleanupIntervalHours, 10), 720],
+      [t('commonUi.c_ac_uploadSizeShort'), parseInt(uploadMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
+      [t('commonUi.c_ac_filesPerUpload'), parseInt(uploadMaxFilesPerDrop, 10), 1000],
+      [t('commonUi.c_ac_pasteSizeShort'), parseInt(uploadMaxImagePasteSize, 10), Number.MAX_SAFE_INTEGER],
+      [t('commonUi.c_ac_importSizeShort'), parseInt(importMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
+      [t('commonUi.c_ac_importFiles'), parseInt(importMaxFiles, 10), Number.MAX_SAFE_INTEGER],
+      [t('commonUi.c_ac_importDepthShort'), parseInt(importMaxDepth, 10), 100],
+      [t('commonUi.c_ac_mcpSizeShort'), parseInt(mcpMaxFileSize, 10), Number.MAX_SAFE_INTEGER],
       ['MCP-Rate-Limit', parseInt(mcpRateLimit, 10), Number.MAX_SAFE_INTEGER],
-      ['Session-Dauer', parseInt(sessionDurationHours, 10), 8760],
-      ['Session-Lebensdauer', parseInt(sessionMaxLifetimeDays, 10), 365],
+      [t('commonUi.c_ac_sessionDurationShort'), parseInt(sessionDurationHours, 10), 8760],
+      [t('commonUi.c_ac_sessionLifetimeShort'), parseInt(sessionMaxLifetimeDays, 10), 365],
       ['SSE-Verbindungen', parseInt(sseMaxConnections, 10), 100000],
       ['SSE pro Nutzer', parseInt(sseMaxPerUser, 10), 1000],
     ]
     const invalid = positiveFields.filter(([, value, max]) => isNaN(value) || value < 1 || value > max)
     if (invalid.length > 0) {
-      newErrors.limits = `Ungültiger Wert: ${invalid.map(([label]) => label).join(', ')}`
+      newErrors.limits = t('commonUi.c_ac_invalidValue', { labels: invalid.map(([label]) => label).join(', ') })
     }
 
     setErrors(newErrors)
@@ -318,7 +318,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
       {/* Feature-Toggles section */}
       {!hideFeatureToggles && (
       <section className="admin-config-card">
-        <h2 className="admin-config-card-title">Feature-Toggles</h2>
+        <h2 className="admin-config-card-title">{t('commonUi.c_ac_featureToggles')}</h2>
         <FeatureTogglesSection apiClient={apiClient} />
       </section>
       )}
@@ -448,14 +448,13 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
 
         {/* Vaults & Uploads — limits that were previously config-file only */}
         <section className="admin-config-card">
-          <h2 className="admin-config-card-title">Vaults &amp; Uploads</h2>
+          <h2 className="admin-config-card-title">{t('commonUi.c_ac_vaultsUploads')}</h2>
           <p className="admin-config-hint">
-            Diese Grenzen galten bisher nur über <code>config/default.json</code>. Sie greifen sofort;
-            Port, Host und Log-Level brauchen weiterhin einen Neustart.
+            {t('commonUi.c_ac_intro1')} <code>config/default.json</code>{t('commonUi.c_ac_intro2')}
           </p>
           <div className="admin-config-grid">
             <div className="admin-config-field">
-              <label htmlFor="config-max-vaults-per-user">Vaults pro Benutzer</label>
+              <label htmlFor="config-max-vaults-per-user">{t('commonUi.c_ac_vaultsPerUser')}</label>
               <input
                 id="config-max-vaults-per-user"
                 type="number"
@@ -466,12 +465,12 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 aria-invalid={errors.maxVaultsPerUser !== undefined}
               />
               <p className="admin-config-hint">
-                Wie viele Vaults ein Konto besitzen darf. Freigegebene Vaults zählen nicht mit.
+                {t('commonUi.c_ac_vaultsPerUserHint')}
               </p>
               {errors.maxVaultsPerUser && <p className="admin-config-field-error">{errors.maxVaultsPerUser}</p>}
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-max-directory-depth">Maximale Ordnertiefe</label>
+              <label htmlFor="config-max-directory-depth">{t('commonUi.c_ac_maxDepth')}</label>
               <input
                 id="config-max-directory-depth"
                 type="number"
@@ -480,10 +479,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 value={maxDirectoryDepth}
                 onChange={(e) => setMaxDirectoryDepth(e.target.value)}
               />
-              <p className="admin-config-hint">Verschachtelungsebenen, die der Datei-Explorer einliest.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_maxDepthHint')}</p>
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-upload-max-size">Upload-Größe (Bytes)</label>
+              <label htmlFor="config-upload-max-size">{t('commonUi.c_ac_uploadSize')}</label>
               <input
                 id="config-upload-max-size"
                 type="number"
@@ -491,10 +490,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 value={uploadMaxFileSize}
                 onChange={(e) => setUploadMaxFileSize(e.target.value)}
               />
-              <p className="admin-config-hint">Pro hochgeladener Datei. Standard: 100 MB.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_uploadSizeHint')}</p>
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-upload-max-files">Dateien pro Upload</label>
+              <label htmlFor="config-upload-max-files">{t('commonUi.c_ac_filesPerUpload')}</label>
               <input
                 id="config-upload-max-files"
                 type="number"
@@ -503,10 +502,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 value={uploadMaxFilesPerDrop}
                 onChange={(e) => setUploadMaxFilesPerDrop(e.target.value)}
               />
-              <p className="admin-config-hint">Wie viele Dateien auf einmal abgelegt werden dürfen.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_filesPerUploadHint')}</p>
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-upload-paste-size">Bild-Einfügegröße (Bytes)</label>
+              <label htmlFor="config-upload-paste-size">{t('commonUi.c_ac_pasteSize')}</label>
               <input
                 id="config-upload-paste-size"
                 type="number"
@@ -514,10 +513,10 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 value={uploadMaxImagePasteSize}
                 onChange={(e) => setUploadMaxImagePasteSize(e.target.value)}
               />
-              <p className="admin-config-hint">Grenze für Bilder, die aus der Zwischenablage eingefügt werden.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_pasteSizeHint')}</p>
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-cleanup-interval">Aufräum-Intervall (Stunden)</label>
+              <label htmlFor="config-cleanup-interval">{t('commonUi.c_ac_cleanup')}</label>
               <input
                 id="config-cleanup-interval"
                 type="number"
@@ -526,17 +525,17 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 value={cleanupIntervalHours}
                 onChange={(e) => setCleanupIntervalHours(e.target.value)}
               />
-              <p className="admin-config-hint">Abstand zwischen Papierkorb- und Versions-Aufräumläufen.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_cleanupHint')}</p>
             </div>
           </div>
         </section>
 
         {/* Import & MCP */}
         <section className="admin-config-card">
-          <h2 className="admin-config-card-title">Import &amp; MCP</h2>
+          <h2 className="admin-config-card-title">{t('commonUi.c_ac_importMcp')}</h2>
           <div className="admin-config-grid">
             <div className="admin-config-field">
-              <label htmlFor="config-import-max-size">Import-Dateigröße (Bytes)</label>
+              <label htmlFor="config-import-max-size">{t('commonUi.c_ac_importSize')}</label>
               <input
                 id="config-import-max-size"
                 type="number"
@@ -545,11 +544,11 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 onChange={(e) => setImportMaxFileSize(e.target.value)}
                 disabled={isPinned('maxImportFileSize')}
               />
-              <p className="admin-config-hint">Gesamtgröße eines Vault-Imports. Standard: 500 MB.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_importSizeHint')}</p>
               {envHint('maxImportFileSize')}
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-import-max-files">Import-Dateianzahl</label>
+              <label htmlFor="config-import-max-files">{t('commonUi.c_ac_importFiles')}</label>
               <input
                 id="config-import-max-files"
                 type="number"
@@ -561,7 +560,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
               {envHint('maxImportFiles')}
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-import-max-depth">Import-Ordnertiefe</label>
+              <label htmlFor="config-import-max-depth">{t('commonUi.c_ac_importDepth')}</label>
               <input
                 id="config-import-max-depth"
                 type="number"
@@ -574,7 +573,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
               {envHint('maxImportDepth')}
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-mcp-max-size">MCP-Dateigröße (Bytes)</label>
+              <label htmlFor="config-mcp-max-size">{t('commonUi.c_ac_mcpSize')}</label>
               <input
                 id="config-mcp-max-size"
                 type="number"
@@ -583,11 +582,11 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 onChange={(e) => setMcpMaxFileSize(e.target.value)}
               />
               <p className="admin-config-hint">
-                Getrennt von der Editor-Grenze: MCP liefert auch Bilder und PDFs base64-kodiert aus.
+                {t('commonUi.c_ac_mcpSizeHint')}
               </p>
             </div>
             <div className="admin-config-field">
-              <label htmlFor="config-mcp-rate-limit">MCP-Anfragen pro Minute</label>
+              <label htmlFor="config-mcp-rate-limit">{t('commonUi.c_ac_mcpRate')}</label>
               <input
                 id="config-mcp-rate-limit"
                 type="number"
@@ -595,7 +594,7 @@ export function AdminConfigPage({ apiClient, hideFeatureToggles }: AdminConfigPa
                 value={mcpRateLimit}
                 onChange={(e) => setMcpRateLimit(e.target.value)}
               />
-              <p className="admin-config-hint">Pro Token.</p>
+              <p className="admin-config-hint">{t('commonUi.c_ac_perToken')}</p>
             </div>
           </div>
           {errors.limits && <p className="admin-config-field-error">{errors.limits}</p>}

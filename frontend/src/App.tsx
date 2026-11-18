@@ -35,7 +35,7 @@ import {
   setActivePersonalDictionaryVault,
 } from './editor/spellcheck/personal-dictionary'
 import { useZoom } from './state/zoomStore'
-import { I18nProvider, useTranslation } from './i18n'
+import { I18nProvider, useTranslation, translateNow } from './i18n'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
 import { GlobalTooltip } from './components/GlobalTooltip'
@@ -718,7 +718,7 @@ function AppContent() {
     } else {
       setActiveSettingsPage(null)
       const vault = state.vaults.find((v) => v.id === state.selectedVaultId)
-      const tabName = vault ? `Aktivität — ${vault.name}` : 'Aktivität'
+      const tabName = vault ? translateNow('commonUi.c_app_activityVault', { vault: vault.name }) : translateNow('commonUi.c_app_activity')
       tabDispatch({
         type: 'OPEN_TAB',
         payload: { vaultId: state.selectedVaultId, filePath: '__view::activity', fileName: tabName },
@@ -757,7 +757,7 @@ function AppContent() {
   /** Opens or creates today's daily note for the active vault. */
   const handleDailyNote = useCallback(async () => {
     if (!state.selectedVaultId) {
-      showToast('error', 'Bitte zuerst einen Vault auswählen')
+      showToast('error', translateNow('commonUi.c_app_selectVault'))
       return
     }
 
@@ -784,7 +784,7 @@ function AppContent() {
    */
   const handleDailyNoteOffset = useCallback(async (offsetDays: number) => {
     if (!state.selectedVaultId) {
-      showToast('error', 'Bitte zuerst einen Vault auswählen')
+      showToast('error', translateNow('commonUi.c_app_selectVault'))
       return
     }
 
@@ -890,7 +890,7 @@ function AppContent() {
         if (!isEnabled('mcp')) return <FeatureDisabledHint featureName="MCP" />
         return <McpTokensPage apiClient={apiClient} />
       case 'plugins':
-        if (!isEnabled('obsidian-plugin-compat')) return <FeatureDisabledHint featureName="Plugin-Kompatibilität" />
+        if (!isEnabled('obsidian-plugin-compat')) return <FeatureDisabledHint featureName={translateNow('commonUi.c_app_pluginCompat')} />
         return state.selectedVaultId
           ? <PluginManagementPage apiClient={apiClient} vaultId={state.selectedVaultId} />
           : <div style={{ padding: 24, color: 'var(--text-subtle)' }}>{t('common.noSelection')}</div>
@@ -1155,8 +1155,8 @@ function AppContent() {
       }}
       fallback={
         <div className="app-loading" role="alert" style={{ flexDirection: 'column', gap: 12 }}>
-          <span>Ein Plugin hat einen unerwarteten Fehler verursacht.</span>
-          <button type="button" onClick={() => window.location.reload()}>Seite neu laden</button>
+          <span>{translateNow('commonUi.c_app_pluginError')}</span>
+          <button type="button" onClick={() => window.location.reload()}>{translateNow('commonUi.c_app_reload')}</button>
         </div>
       }
     >
@@ -1230,7 +1230,7 @@ function AppContent() {
                 type="button"
                 className="version-browser-modal__close"
                 onClick={() => setVersionBrowserTarget(null)}
-                aria-label="Schließen"
+                aria-label={translateNow('commonUi.c_app_close')}
               >
                 <X size={16} />
               </button>
@@ -1307,7 +1307,7 @@ function AppContent() {
                   {versionInfo.mismatch && (
                     <span
                       className="app-version-mismatch"
-                      title="Frontend und Backend laufen auf unterschiedlichen Versionen — evtl. hilft ein harter Reload (Strg+Shift+R) oder ein erneutes Deployment."
+                      title={translateNow('commonUi.c_app_versionMismatch')}
                     >
                       Versions-Mismatch
                     </span>
@@ -1318,7 +1318,7 @@ function AppContent() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="app-version-update"
-                      title={`Update auf v${versionInfo.latest} verfügbar`}
+                      title={translateNow('commonUi.c_app_updateAvailable', { version: versionInfo.latest })}
                     >
                       (neu: v{versionInfo.latest})
                     </a>

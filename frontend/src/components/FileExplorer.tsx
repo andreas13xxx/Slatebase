@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { useAppContext, exportVault } from '../state'
 import { useTabContext } from '../state/tabContext'
-import { useTranslation } from '../i18n'
+import { useTranslation, translateNow } from '../i18n'
 import { openTab } from '../state/tabActions'
 import type { DirectoryTree, VaultInfo } from '../types'
 import { extractErrorMessage } from '../utils/error'
@@ -1283,7 +1283,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
       // Validate: max 50 files
       if (droppedFiles.length > 50) {
-        showToast('error', `Maximal 50 Dateien pro Drop-Vorgang erlaubt (${droppedFiles.length} ausgewählt)`)
+        showToast('error', translateNow('commonUi.c_fe_tooMany', { n: droppedFiles.length }))
         return
       }
 
@@ -1292,7 +1292,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
       const validFiles: File[] = []
       for (const file of droppedFiles) {
         if (file.size > maxFileSize) {
-          showToast('error', `"${file.name}" überschreitet die maximale Dateigröße von 100 MB`)
+          showToast('error', translateNow('commonUi.c_fe_tooBig', { name: file.name }))
           continue
         }
         validFiles.push(file)
@@ -1436,7 +1436,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         <p className="file-explorer-empty">{t('vault.noVaults')}</p>
       ) : (
         <>
-          <nav className="file-explorer" aria-label="File explorer">
+          <nav className="file-explorer" aria-label={t('commonUi.c_fe_explorer')}>
           {/* nav-files-container: real Obsidian has one vault, so this class
               wraps its whole tree, and its top-level folders/files sit
               directly inside one inner <div> (`.nav-files-container > div >
@@ -1630,7 +1630,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
             { id: 'versions', label: 'Versionen', icon: <History size={14} /> },
             // Public links are for notes only, and only while the admin has enabled the feature.
             ...(publicSharesEnabled && node.name.toLowerCase().endsWith('.md')
-              ? [{ id: 'publicShare', label: 'Öffentlichen Link verwalten', icon: <Link2 size={14} /> }]
+              ? [{ id: 'publicShare', label: t('commonUi.c_fe_publicLink'), icon: <Link2 size={14} /> }]
               : []),
           ]
           menuItems = [...menuItems, ...buildFileMenuItems(node)]

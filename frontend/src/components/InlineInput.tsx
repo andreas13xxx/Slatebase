@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from '../i18n'
 
 /**
  * Props for the InlineInput component.
@@ -24,6 +25,7 @@ export interface InlineInputProps {
  * Validates: Requirements 3.2, 3.5, 3.8, 4.2, 4.6
  */
 export function InlineInput({ initialValue, selectRange, onConfirm, onCancel, validate }: InlineInputProps) {
+  const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,7 +81,7 @@ export function InlineInput({ initialValue, selectRange, onConfirm, onCancel, va
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         maxLength={255}
-        aria-label="Dateiname eingeben"
+        aria-label={t('commonUi.c_enterFileName')}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'inline-input-error' : undefined}
       />

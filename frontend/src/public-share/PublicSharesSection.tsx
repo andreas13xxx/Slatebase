@@ -8,6 +8,7 @@ import { showToast } from '../components/ToastNotification'
 import { SettingSection, Button } from '../components/settings/ui'
 import { formatShareDate } from './publicShareFormat'
 import { notifyPublicSharesChanged } from './publicShareEvents'
+import { useTranslation } from '../i18n'
 import './PublicSharesSection.css'
 
 /**
@@ -16,6 +17,7 @@ import './PublicSharesSection.css'
  */
 export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
   const { state } = useAppContext()
+  const { t } = useTranslation()
   const [shares, setShares] = useState<PublicShareSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pendingRevoke, setPendingRevoke] = useState<PublicShareSummary | null>(null)
@@ -25,16 +27,16 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
     try {
       setShares(await apiClient.listMyPublicShares())
     } catch (err) {
-      setError(extractErrorMessage(err, 'Die Links konnten nicht geladen werden.'))
+      setError(extractErrorMessage(err, t('publicShare.section.loadFailed')))
     }
-  }, [apiClient])
+  }, [apiClient, t])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load on mount
     void load()
   }, [load])
 
-  const vaultName = (vaultId: string): string => state.vaults.find((v) => v.id === vaultId)?.name ?? 'Unbekannter Vault'
+  const vaultName = (vaultId: string): string => state.vaults.find((v) => v.id === vaultId)?.name ?? t('publicShare.section.unknownVault')
 
   const confirmRevoke = async (): Promise<void> => {
     const share = pendingRevoke
@@ -42,35 +44,35 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
     if (share === null) return
     try {
       await apiClient.revokeMyPublicShare(share.id)
-      showToast('success', 'Der Link wurde widerrufen.')
+      showToast('success', t('publicShare.section.revoked'))
       notifyPublicSharesChanged()
       await load()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Der Link konnte nicht widerrufen werden.'))
+      setError(extractErrorMessage(err, t('publicShare.section.revokeFailed')))
     }
   }
 
   return (
     <SettingSection
-      title="Öffentliche Links"
-      description="Links, über die Personen ohne Konto eine Notiz lesen können. Neue Links erzeugst du im Kontextmenü einer Notiz („Öffentlichen Link verwalten“)."
+      title={t('publicShare.section.title')}
+      description={t('publicShare.section.description')}
     >
       {error !== null && <p role="alert">{error}</p>}
-      {shares === null && error === null && <p role="status">Wird geladen…</p>}
-      {shares !== null && shares.length === 0 && <p>Du hast noch keine öffentlichen Links erzeugt.</p>}
+      {shares === null && error === null && <p role="status">{t('publicShare.loading')}</p>}
+      {shares !== null && shares.length === 0 && <p>{t('publicShare.section.empty')}</p>}
       {shares !== null && shares.length > 0 && (
         <div className="table-scroll">
         <table className="public-shares-table data-table">
-          <caption className="sr-only">Deine öffentlichen Links</caption>
+          <caption className="sr-only">{t('publicShare.section.caption')}</caption>
           <thead>
             <tr>
-              <th scope="col">Notiz</th>
-              <th scope="col">Vault</th>
-              <th scope="col">Erstellt</th>
-              <th scope="col">Gültig bis</th>
-              <th scope="col">Passwort</th>
-              <th scope="col">Zuletzt abgerufen</th>
-              <th scope="col"><span className="sr-only">Aktionen</span></th>
+              <th scope="col">{t('publicShare.section.note')}</th>
+              <th scope="col">{t('publicShare.section.vault')}</th>
+              <th scope="col">{t('publicShare.created')}</th>
+              <th scope="col">{t('publicShare.validUntil')}</th>
+              <th scope="col">{t('publicShare.password')}</th>
+              <th scope="col">{t('publicShare.lastAccess')}</th>
+              <th scope="col"><span className="sr-only">{t('publicShare.section.actions')}</span></th>
             </tr>
           </thead>
           <tbody>
@@ -79,12 +81,12 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
                 <th scope="row">{share.filePath}</th>
                 <td>{vaultName(share.vaultId)}</td>
                 <td>{formatShareDate(share.createdAt)}</td>
-                <td>{share.expiresAt !== undefined ? formatShareDate(share.expiresAt) : 'unbegrenzt'}</td>
-                <td>{share.passwordProtected ? 'ja' : 'nein'}</td>
-                <td>{share.lastAccessAt !== undefined ? formatShareDate(share.lastAccessAt) : 'noch nie'}</td>
+                <td>{share.expiresAt !== undefined ? formatShareDate(share.expiresAt) : t('publicShare.unlimited')}</td>
+                <td>{share.passwordProtected ? t('publicShare.yes') : t('publicShare.no')}</td>
+                <td>{share.lastAccessAt !== undefined ? formatShareDate(share.lastAccessAt) : t('publicShare.never')}</td>
                 <td>
-                  <Button variant="danger" onClick={() => setPendingRevoke(share)} aria-label={`Link zu ${share.filePath} widerrufen`}>
-                    Widerrufen
+                  <Button variant="danger" onClick={() => setPendingRevoke(share)} aria-label={t('publicShare.section.revokeFor', { path: share.filePath })}>
+                    {t('publicShare.revoke')}
                   </Button>
                 </td>
               </tr>
@@ -95,9 +97,9 @@ export function PublicSharesSection({ apiClient }: { apiClient: IApiClient }) {
       )}
       <ConfirmModal
         open={pendingRevoke !== null}
-        title="Link widerrufen?"
-        message={`Der Link zu „${pendingRevoke?.filePath ?? ''}“ funktioniert danach nicht mehr.`}
-        confirmLabel="Widerrufen"
+        title={t('publicShare.section.confirmTitle')}
+        message={t('publicShare.section.confirmMessage', { path: pendingRevoke?.filePath ?? '' })}
+        confirmLabel={t('publicShare.revoke')}
         onConfirm={() => { void confirmRevoke() }}
         onCancel={() => setPendingRevoke(null)}
       />

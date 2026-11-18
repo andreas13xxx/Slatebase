@@ -8,6 +8,7 @@
  */
 
 import moment from 'moment/min/moment-with-locales'
+import { translateNow } from '../i18n'
 
 /** Obsidian's default, used when the file has no `format`. */
 export const DEFAULT_DAILY_NOTE_FORMAT = 'YYYY-MM-DD'
@@ -50,23 +51,23 @@ export function usableDailyNoteFormat(format: string | null | undefined): string
  * that is not a safe relative path, or the same name for different days.
  */
 export function validateDailyNoteFormat(format: string): string | null {
-  if (format.trim() === '') return 'Das Format darf nicht leer sein.'
-  if (format.length > 128) return 'Das Format darf höchstens 128 Zeichen lang sein.'
+  if (format.trim() === '') return translateNow('commonUi.c_dn_empty')
+  if (format.length > 128) return translateNow('commonUi.c_dn_long')
 
   // Neighbours in every unit a pattern can leave out: next day, next month, next year, and a far day.
   const samples = ['2026-01-01', '2026-01-02', '2026-02-01', '2027-01-01', '2028-12-31', '2026-07-15']
   const names = samples.map((day) => moment(day, ISO).format(format))
   for (const name of names) {
-    if (name.startsWith('/') || name.endsWith('/')) return 'Der Name darf nicht mit / beginnen oder enden.'
+    if (name.startsWith('/') || name.endsWith('/')) return translateNow('commonUi.c_dn_slash')
     for (const segment of name.split('/')) {
-      if (segment === '' ) return 'Der Name enthält einen leeren Ordnernamen (//).'
-      if (segment === '.' || segment === '..') return 'Der Name darf keine Ordner wie . oder .. enthalten.'
-      if (FORBIDDEN_IN_NAME.test(segment)) return 'Der Name enthält ein Zeichen, das in Dateinamen nicht erlaubt ist (< > : " | ? * \\).'
-      if (segment.length > MAX_SEGMENT_LENGTH) return 'Ein Teil des Namens ist zu lang.'
-      if (segment !== segment.trim() || segment.endsWith('.')) return 'Ein Teil des Namens beginnt oder endet mit einem Leerzeichen oder Punkt.'
+      if (segment === '' ) return translateNow('commonUi.c_dn_emptyFolder')
+      if (segment === '.' || segment === '..') return translateNow('commonUi.c_dn_dots')
+      if (FORBIDDEN_IN_NAME.test(segment)) return translateNow('commonUi.c_dn_badChar')
+      if (segment.length > MAX_SEGMENT_LENGTH) return translateNow('commonUi.c_dn_segLong')
+      if (segment !== segment.trim() || segment.endsWith('.')) return translateNow('commonUi.c_dn_segSpace')
     }
   }
-  if (new Set(names).size !== names.length) return 'Das Format enthält nicht genug Datumsangaben: verschiedene Tage ergäben dieselbe Notiz.'
+  if (new Set(names).size !== names.length) return translateNow('commonUi.c_dn_notEnough')
   return null
 }
 

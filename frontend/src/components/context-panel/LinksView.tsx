@@ -14,7 +14,7 @@
 import { useState, useCallback, type ReactNode } from 'react'
 import { useLongPress } from '../../hooks/useLongPress'
 import { FileText, FolderOpen, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
-import { useTranslation } from '../../i18n'
+import { useTranslation, translateNow } from '../../i18n'
 import type { LinkEntry, UnlinkedMentionEntry } from '../../state/documentPanelData'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { buildTFileFromPath } from '../../plugins/compat/plugin-event-bridge'
@@ -26,10 +26,10 @@ import './LinksView.css'
 function buildFileMenuItems(path: string, onOpen: () => void): ContextMenuItem[] {
   const file = buildTFileFromPath(path)
   return [
-    { id: 'open', label: 'Öffnen', icon: <FileText size={14} />, run: onOpen },
-    { id: 'reveal', label: 'Im Explorer zeigen', icon: <FolderOpen size={14} />, run: () => revealInExplorer(path) },
-    { id: 'rename', label: 'Umbenennen', icon: <Pencil size={14} />, run: () => renameInExplorer(path) },
-    { id: 'delete', label: 'Löschen', icon: <Trash2 size={14} />, run: () => deleteInExplorer(path) },
+    { id: 'open', label: translateNow('commonUi.c_lv_open'), icon: <FileText size={14} />, run: onOpen },
+    { id: 'reveal', label: translateNow('basesUi.menuReveal'), icon: <FolderOpen size={14} />, run: () => revealInExplorer(path) },
+    { id: 'rename', label: translateNow('basesUi.menuRename'), icon: <Pencil size={14} />, run: () => renameInExplorer(path) },
+    { id: 'delete', label: translateNow('commonUi.c_lv_delete'), icon: <Trash2 size={14} />, run: () => deleteInExplorer(path) },
     ...buildPluginMenuItems('file-menu', [file, 'link-context-menu'], 'links-view-plugin-menu'),
   ]
 }

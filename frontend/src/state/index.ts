@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react'
+import { translateNow } from '../i18n'
 import React from 'react'
 import type { AppState, AppAction, AppError } from '../types'
 import type { IApiClient } from '../api'
@@ -519,10 +520,7 @@ async function exportVaultViaZip(
   vaultName?: string,
 ): Promise<void> {
   const proceed = window.confirm(
-    'Dein Browser unterstützt keinen direkten Ordner-Export.\n\n' +
-    'Der Vault wird stattdessen als ZIP-Datei heruntergeladen.\n' +
-    'Tipp: In Chrome/Edge kannst du direkt in einen Ordner exportieren.\n\n' +
-    'Fortfahren?',
+    translateNow('commonUi.c_exp_confirm'),
   )
   if (!proceed) return
 

@@ -1,4 +1,5 @@
 import type { PublicEmbedView } from './types'
+import { translateNow } from '../i18n'
 
 /** Absolute URL of a public page for the given path (`/s/<token>`). */
 export function linkUrl(path: string): string {
@@ -19,11 +20,11 @@ export function formatShareDate(iso: string): string {
     : date.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-/** German label for the kind of an embed in the sharing preview. */
+/** Localised label for the kind of an embed in the sharing preview. */
 export function kindLabel(kind: PublicEmbedView['kind']): string {
   switch (kind) {
-    case 'note': return 'Notiz'
-    case 'asset': return 'Datei'
-    case 'unavailable': return 'nicht verfügbar'
+    case 'note': return translateNow('publicShare.kind.note')
+    case 'asset': return translateNow('publicShare.kind.asset')
+    case 'unavailable': return translateNow('publicShare.kind.unavailable')
   }
 }

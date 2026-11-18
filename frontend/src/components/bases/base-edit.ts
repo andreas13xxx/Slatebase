@@ -10,6 +10,7 @@
  * expression fallback for anything that does not round-trip.
  */
 
+import { translateNow } from '../../i18n'
 import { rowValueKey } from '@slatebase/shared-contracts'
 import type {
   BaseDocument, BaseFilterNode, BaseGroupBy, BaseGroupValue, BaseRow, BaseSortClause, BaseView,
@@ -397,7 +398,7 @@ export function columnLabel(doc: BaseDocument, id: string): string {
   // `status` and `note.status` name the same column: a display name declared under either spelling counts.
   const declared = columnEntry(doc.properties, id)?.displayName
   if (declared) return declared
-  if (id in FILE_COLUMN_LABELS) return FILE_COLUMN_LABELS[id]!
+  if (id in FILE_COLUMN_LABELS) return translateNow(`basesUi.col_${id.slice('file.'.length)}` as 'basesUi.col_name')
   if (id.startsWith('formula.')) return id.slice('formula.'.length)
   return id
 }

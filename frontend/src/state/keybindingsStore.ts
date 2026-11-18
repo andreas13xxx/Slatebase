@@ -12,6 +12,7 @@
  */
 
 import type { IApiClient } from '../api'
+import { translateNow } from '../i18n'
 import {
   MAX_HOTKEYS_PER_COMMAND,
   isValidHotkeyCommandId,
@@ -68,37 +69,37 @@ const SYNC_STORE_KEY = 'keybindings'
  */
 export const DEFAULT_KEYBINDINGS: KeybindingDefinition[] = [
   // Navigation
-  { commandId: 'slatebase:open-command-palette', label: 'Befehlspalette öffnen', defaultShortcut: 'Mod+P', category: 'navigation' },
-  { commandId: 'slatebase:open-settings', label: 'Einstellungen öffnen', defaultShortcut: 'Ctrl+,', category: 'navigation' },
-  { commandId: 'slatebase:toggle-sidebar', label: 'Seitenleiste ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
-  { commandId: 'slatebase:toggle-right-panel', label: 'Kontextpanel ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
-  { commandId: 'slatebase:toggle-toolbar', label: 'Werkzeugleiste ein-/ausblenden', defaultShortcut: '', category: 'navigation' },
-  { commandId: 'slatebase:toggle-theme', label: 'Farbschema umschalten', defaultShortcut: '', category: 'navigation' },
-  { commandId: 'slatebase:navigate-back', label: 'Zurück navigieren', defaultShortcut: 'Alt+ArrowLeft', category: 'navigation' },
-  { commandId: 'slatebase:navigate-forward', label: 'Vor navigieren', defaultShortcut: 'Alt+ArrowRight', category: 'navigation' },
-  { commandId: 'slatebase:open-quick-switcher', label: 'Schnellwechsler öffnen', defaultShortcut: 'Mod+O', category: 'navigation' },
-  { commandId: 'slatebase:next-tab', label: 'Nächster Tab', defaultShortcut: 'Ctrl+Shift+]', category: 'navigation' },
-  { commandId: 'slatebase:previous-tab', label: 'Vorheriger Tab', defaultShortcut: 'Ctrl+Shift+[', category: 'navigation' },
+  { commandId: 'slatebase:open-command-palette', get label() { return translateNow('commonUi.c_kb_00') }, defaultShortcut: 'Mod+P', category: 'navigation' },
+  { commandId: 'slatebase:open-settings', get label() { return translateNow('commonUi.c_kb_01') }, defaultShortcut: 'Ctrl+,', category: 'navigation' },
+  { commandId: 'slatebase:toggle-sidebar', get label() { return translateNow('commonUi.c_kb_02') }, defaultShortcut: '', category: 'navigation' },
+  { commandId: 'slatebase:toggle-right-panel', get label() { return translateNow('commonUi.c_kb_03') }, defaultShortcut: '', category: 'navigation' },
+  { commandId: 'slatebase:toggle-toolbar', get label() { return translateNow('commonUi.c_kb_04') }, defaultShortcut: '', category: 'navigation' },
+  { commandId: 'slatebase:toggle-theme', get label() { return translateNow('commonUi.c_kb_05') }, defaultShortcut: '', category: 'navigation' },
+  { commandId: 'slatebase:navigate-back', get label() { return translateNow('commonUi.c_kb_06') }, defaultShortcut: 'Alt+ArrowLeft', category: 'navigation' },
+  { commandId: 'slatebase:navigate-forward', get label() { return translateNow('commonUi.c_kb_07') }, defaultShortcut: 'Alt+ArrowRight', category: 'navigation' },
+  { commandId: 'slatebase:open-quick-switcher', get label() { return translateNow('commonUi.c_kb_08') }, defaultShortcut: 'Mod+O', category: 'navigation' },
+  { commandId: 'slatebase:next-tab', get label() { return translateNow('commonUi.c_kb_09') }, defaultShortcut: 'Ctrl+Shift+]', category: 'navigation' },
+  { commandId: 'slatebase:previous-tab', get label() { return translateNow('commonUi.c_kb_10') }, defaultShortcut: 'Ctrl+Shift+[', category: 'navigation' },
 
   // Panel
-  { commandId: 'slatebase:open-search', label: 'Vault-Suche öffnen', defaultShortcut: 'Mod+Shift+F', category: 'panel' },
-  { commandId: 'slatebase:toggle-mode', label: 'Editor-Modus wechseln', defaultShortcut: 'Mod+E', category: 'panel' },
+  { commandId: 'slatebase:open-search', get label() { return translateNow('commonUi.c_kb_11') }, defaultShortcut: 'Mod+Shift+F', category: 'panel' },
+  { commandId: 'slatebase:toggle-mode', get label() { return translateNow('commonUi.c_kb_12') }, defaultShortcut: 'Mod+E', category: 'panel' },
 
   // Editor
-  { commandId: 'slatebase:editor-save', label: 'Datei speichern', defaultShortcut: 'Mod+S', category: 'editor' },
-  { commandId: 'slatebase:editor-undo', label: 'Rückgängig', defaultShortcut: 'Mod+Z', category: 'editor' },
-  { commandId: 'slatebase:editor-redo', label: 'Wiederholen', defaultShortcut: 'Mod+Shift+Z', category: 'editor' },
+  { commandId: 'slatebase:editor-save', get label() { return translateNow('commonUi.c_kb_13') }, defaultShortcut: 'Mod+S', category: 'editor' },
+  { commandId: 'slatebase:editor-undo', get label() { return translateNow('commonUi.c_kb_14') }, defaultShortcut: 'Mod+Z', category: 'editor' },
+  { commandId: 'slatebase:editor-redo', get label() { return translateNow('commonUi.c_kb_15') }, defaultShortcut: 'Mod+Shift+Z', category: 'editor' },
 
   // Vault
-  { commandId: 'slatebase:daily-note', label: 'Tagesnotiz öffnen/erstellen', defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:daily-note', get label() { return translateNow('commonUi.c_kb_16') }, defaultShortcut: '', category: 'vault' },
   // Obsidian's default (a browser keeps Ctrl+N for a new window; the installed app and a PWA do not)
-  { commandId: 'slatebase:create-file', label: 'Neue Datei', defaultShortcut: 'Mod+N', category: 'vault' },
-  { commandId: 'slatebase:new-from-template', label: 'Neue Notiz aus Vorlage', defaultShortcut: '', category: 'vault' },
-  { commandId: 'slatebase:insert-template', label: 'Vorlage einfügen', defaultShortcut: '', category: 'vault' },
-  { commandId: 'slatebase:open-random-note', label: 'Zufällige Notiz öffnen', defaultShortcut: '', category: 'vault' },
-  { commandId: 'slatebase:create-unique-note', label: 'Eindeutige Notiz anlegen', defaultShortcut: '', category: 'vault' },
-  { commandId: 'slatebase:open-graph', label: 'Knowledge Graph öffnen', defaultShortcut: 'Mod+G', category: 'vault' },
-  { commandId: 'slatebase:open-trash', label: 'Papierkorb öffnen', defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:create-file', get label() { return translateNow('commonUi.c_kb_17') }, defaultShortcut: 'Mod+N', category: 'vault' },
+  { commandId: 'slatebase:new-from-template', get label() { return translateNow('commonUi.c_kb_18') }, defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:insert-template', get label() { return translateNow('commonUi.c_kb_19') }, defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:open-random-note', get label() { return translateNow('commonUi.c_kb_20') }, defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:create-unique-note', get label() { return translateNow('commonUi.c_kb_21') }, defaultShortcut: '', category: 'vault' },
+  { commandId: 'slatebase:open-graph', get label() { return translateNow('commonUi.c_kb_22') }, defaultShortcut: 'Mod+G', category: 'vault' },
+  { commandId: 'slatebase:open-trash', get label() { return translateNow('commonUi.c_kb_23') }, defaultShortcut: '', category: 'vault' },
 ]
 
 // ─── Internal State ──────────────────────────────────────────────────────────
@@ -446,7 +447,7 @@ async function flush(): Promise<void> {
     // The file did not take it: keep it queued (what was changed since wins) and try again later.
     failed = true
     pending.set(vaultId, { ...sent, ...pending.get(vaultId) })
-    reportSyncFailure(SYNC_STORE_KEY, error, 'Tastaturkürzel')
+    reportSyncFailure(SYNC_STORE_KEY, error, translateNow('commonUi.c_kb_syncLabel'))
   } finally {
     writingVault = null
   }

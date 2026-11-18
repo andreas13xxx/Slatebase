@@ -4,6 +4,7 @@
  * Renders Markdown in preview mode, raw text in edit mode.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useState, useCallback, useRef, useEffect } from 'react'
 import type { TextNode } from '../../canvas/types'
 import type { DirectoryTree } from '../../types'
@@ -32,6 +33,7 @@ export interface TextNodeRendererProps {
 export const TextNodeRenderer = memo(function TextNodeRenderer({
   node, selected, onSelect, onTextChange, readOnly, editing: externalEditing, onEditEnd,
 }: TextNodeRendererProps) {
+  const { t } = useTranslation()
   const colorClass = getCanvasColorClass(node.color)
   const [internalEditing, setInternalEditing] = useState(false)
   const editing = externalEditing || internalEditing
@@ -135,7 +137,7 @@ export const TextNodeRenderer = memo(function TextNodeRenderer({
           onBlur={finishEditing}
           onKeyDown={handleKeyDown}
           onPointerDown={handlePointerDown}
-          aria-label="Text bearbeiten"
+          aria-label={t('canvasUi.editText')}
         />
       ) : (
         <div className="canvas-node__content canvas-node__text-content">
@@ -144,7 +146,7 @@ export const TextNodeRenderer = memo(function TextNodeRenderer({
               {renderSimpleMarkdown(node.text)}
             </div>
           ) : (
-            <span className="canvas-node__placeholder">Doppelklick zum Bearbeiten</span>
+            <span className="canvas-node__placeholder">{t('canvasUi.doubleClickToEdit')}</span>
           )}
         </div>
       )}

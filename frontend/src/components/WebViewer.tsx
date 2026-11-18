@@ -14,6 +14,7 @@
  */
 
 import { memo, useMemo } from 'react'
+import { useTranslation } from '../i18n'
 import { ExternalLink, Globe } from 'lucide-react'
 import { parseWebUrl } from './web-url'
 import './WebViewer.css'
@@ -24,12 +25,13 @@ export interface WebViewerProps {
 }
 
 export const WebViewer = memo(function WebViewer({ url }: WebViewerProps) {
+  const { t } = useTranslation()
   const { valid, displayUrl } = useMemo(() => parseWebUrl(url), [url])
 
   if (!valid) {
     return (
       <div className="web-viewer web-viewer--error" role="alert">
-        Diese Adresse kann nicht angezeigt werden — nur <code>http(s)</code>-URLs werden unterstützt.
+        {t('commonUi.c_webBadUrl1')} <code>http(s)</code>{t('commonUi.c_webBadUrl2')}
       </div>
     )
   }
@@ -44,8 +46,8 @@ export const WebViewer = memo(function WebViewer({ url }: WebViewerProps) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="In neuem Tab öffnen"
-          title="In neuem Tab öffnen"
+          aria-label={t('commonUi.c_openNewTab')}
+          title={t('commonUi.c_openNewTab')}
         >
           <ExternalLink size={14} aria-hidden="true" />
         </a>
@@ -54,7 +56,7 @@ export const WebViewer = memo(function WebViewer({ url }: WebViewerProps) {
         src={url}
         className="web-viewer__frame"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        title={`Webseite: ${displayUrl}`}
+        title={t('commonUi.c_webPageTitle', { url: displayUrl })}
         loading="lazy"
         referrerPolicy="no-referrer"
       />

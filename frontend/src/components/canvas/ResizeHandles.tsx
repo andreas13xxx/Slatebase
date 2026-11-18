@@ -2,6 +2,7 @@
  * ResizeHandles — Renders 8 resize handles around a selected node.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo } from 'react'
 import type { ResizeHandle } from './useNodeResize'
 
@@ -22,6 +23,7 @@ const HANDLES: Array<{ handle: ResizeHandle; style: React.CSSProperties; cursor:
 ]
 
 export const ResizeHandles = memo(function ResizeHandles({ visible, onResizeStart }: ResizeHandlesProps) {
+  const { t } = useTranslation()
   if (!visible) return null
 
   return (
@@ -33,7 +35,7 @@ export const ResizeHandles = memo(function ResizeHandles({ visible, onResizeStar
           style={{ ...style, cursor, position: 'absolute' }}
           onPointerDown={(e) => onResizeStart(e, handle)}
           role="separator"
-          aria-label={`Größe ändern ${handle}`}
+          aria-label={t('canvasUi.resize', { handle: handle })}
         />
       ))}
     </>
