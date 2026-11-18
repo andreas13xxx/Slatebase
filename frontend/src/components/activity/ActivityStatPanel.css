@@ -78,7 +78,7 @@
 
 .activity-stat-bar {
   display: grid;
-  grid-template-columns: minmax(5rem, auto) 1fr auto;
+  grid-template-columns: 7rem 1fr auto;
   align-items: center;
   gap: var(--space-2, 0.5rem);
   font-size: 0.78rem;
@@ -96,6 +96,7 @@
   background: var(--bg-secondary);
   border-radius: 999px;
   overflow: hidden;
+  justify-self: stretch;
 }
 
 .activity-stat-bar__fill {
@@ -112,29 +113,83 @@
   text-align: right;
 }
 
-/* ─── Heatmap ──────────────────────────────────────────────────────────── */
+/* ─── Year tracker ─────────────────────────────────────────────────────── */
+
+.activity-year {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  padding: var(--space-2, 0.5rem);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 6px);
+}
+
+.activity-year__months {
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.activity-year__months > span { white-space: nowrap; overflow: visible; }
 
 .activity-heatmap {
-  display: flex;
-  gap: 3px;
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  gap: 1px;
 }
 
 .activity-heatmap__week {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
+  min-width: 0;
 }
 
 .activity-heatmap__cell {
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
-  background: var(--bg-secondary);
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 1.5px;
+  background: var(--bg-elevated);
 }
 
-/* Intensity levels: tint the accent over the empty-cell background.
-   color-mix keeps a single hue and stays correct in dark mode. */
-.activity-heatmap__cell--l1 { background: color-mix(in srgb, var(--accent) 25%, var(--bg-secondary)); }
-.activity-heatmap__cell--l2 { background: color-mix(in srgb, var(--accent) 50%, var(--bg-secondary)); }
-.activity-heatmap__cell--l3 { background: color-mix(in srgb, var(--accent) 75%, var(--bg-secondary)); }
+/* Intensity levels: tint the accent over the empty-cell background. */
+.activity-heatmap__cell--l1 { background: color-mix(in srgb, var(--accent) 28%, var(--bg-surface)); }
+.activity-heatmap__cell--l2 { background: color-mix(in srgb, var(--accent) 52%, var(--bg-surface)); }
+.activity-heatmap__cell--l3 { background: color-mix(in srgb, var(--accent) 76%, var(--bg-surface)); }
 .activity-heatmap__cell--l4 { background: var(--accent); }
+
+.activity-year__legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: var(--space-1, 0.25rem);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.activity-year__legend .activity-heatmap__cell { width: 9px; flex: 0 0 9px; }
+
+/* ─── Sparkline ────────────────────────────────────────────────────────── */
+
+.activity-spark {
+  width: 100%;
+  height: 3rem;
+  padding: var(--space-1, 0.25rem);
+  box-sizing: border-box;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 6px);
+}
+
+.activity-spark polyline {
+  stroke: var(--accent);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}

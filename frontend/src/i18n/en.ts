@@ -869,6 +869,7 @@ export const en: TranslationShape = {
       snippets: 'Snippets',
       sync: 'Sync',
     },
+    bucketCount: '{count} events',
     bucket: {
       today: 'Today',
       yesterday: 'Yesterday',
@@ -905,7 +906,10 @@ export const en: TranslationShape = {
     },
     stats: {
       byType: 'By type',
-      last10Weeks: 'Last 10 weeks',
+      lastYear: '{count} activities in the last year',
+      less: 'Less',
+      more: 'More',
+      trend: 'Trend (90 days)',
     },
     folderFilter: {
       all: 'All folders',

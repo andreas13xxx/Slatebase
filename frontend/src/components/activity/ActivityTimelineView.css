@@ -259,7 +259,7 @@
 /* The stat panel is a fixed-width right column only in the full variant;
    the compact variant never renders it. */
 .activity-timeline--full .activity-stat-panel {
-  flex: 0 0 15rem;
+  flex: 0 0 26rem;
 }
 
 .activity-timeline--compact .activity-timeline__content {
@@ -281,4 +281,57 @@
   font-size: 0.8rem;
   cursor: pointer;
   max-width: 14rem;
+}
+
+/* ─── Collapsible bucket header ───────────────────────────────────────── */
+
+.activity-bucket__toggle {
+  appearance: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity-bucket__toggle svg { align-self: center; flex: none; }
+.activity-bucket__toggle:hover .activity-bucket__title { color: var(--text-normal); }
+
+.activity-bucket__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-faint, var(--text-subtle));
+}
+
+/* Narrow viewports: stack the stat panel under the list instead of squeezing it. */
+@media (max-width: 767px) {
+  .activity-timeline--full .activity-timeline__content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .activity-timeline--full .activity-timeline__main {
+    flex: 0 0 auto;
+    overflow-y: visible;
+  }
+
+  .activity-timeline--full .activity-stat-panel {
+    flex: 0 0 auto;
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+    overflow-y: visible;
+  }
 }
