@@ -10,10 +10,8 @@ import { translateNow } from '../i18n'
 import type { IApiClient } from '../api'
 import type { ActivityEvent, ActivityEventType } from '../types'
 import type { ActivityAction, ActivityRange } from './activityState'
-import { HEATMAP_WEEKS } from './activityState'
+import { HEATMAP_WEEKS, HEATMAP_MAX_PAGES } from './activityState'
 
-/** Page cap for the year window (200 events each). */
-const HEATMAP_MAX_PAGES = 25
 import { extractErrorMessage } from '../utils/error'
 
 const PAGE_LIMIT = 50

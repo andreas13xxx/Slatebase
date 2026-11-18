@@ -18,6 +18,11 @@ export const DEFAULT_ACTIVITY_RANGE: ActivityRange = 'week'
 /** Fixed heatmap window, independent of the range switcher (L4). */
 export const HEATMAP_WEEKS = 53
 
+/** Page cap (200 events each) for the year window; hitting it means the oldest days may be missing. */
+export const HEATMAP_MAX_PAGES = 25
+/** Event count at which the year window counts as truncated. */
+export const HEATMAP_MAX_EVENTS = HEATMAP_MAX_PAGES * 200
+
 export interface ActivityState {
   /** Loaded events, newest first (may span multiple fetched pages). */
   events: ActivityEvent[]

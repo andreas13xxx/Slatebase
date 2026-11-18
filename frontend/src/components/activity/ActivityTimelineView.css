@@ -315,3 +315,23 @@
   letter-spacing: 0;
   color: var(--text-faint, var(--text-subtle));
 }
+
+/* Narrow viewports: stack the stat panel under the list instead of squeezing it. */
+@media (max-width: 767px) {
+  .activity-timeline--full .activity-timeline__content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .activity-timeline--full .activity-timeline__main {
+    flex: 0 0 auto;
+    overflow-y: visible;
+  }
+
+  .activity-timeline--full .activity-stat-panel {
+    flex: 0 0 auto;
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+    overflow-y: visible;
+  }
+}

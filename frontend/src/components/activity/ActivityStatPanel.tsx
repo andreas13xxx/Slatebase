@@ -19,7 +19,7 @@ import type { TranslationKey } from '../../i18n'
 import type { IApiClient } from '../../api'
 import type { ActivityEvent } from '../../types'
 import type { ActivityAction, ActivityRange } from '../../state/activityState'
-import { HEATMAP_WEEKS } from '../../state/activityState'
+import { HEATMAP_WEEKS, HEATMAP_MAX_EVENTS } from '../../state/activityState'
 import { loadActivityHeatmap } from '../../state/activityActions'
 import { countByType, buildHeatmap, buildDailySeries } from './activity-stats'
 import { ACTIVITY_EVENT_META } from './activity-event-meta'
@@ -65,6 +65,7 @@ export function ActivityStatPanel({
   }, [events])
 
   const heatmap = useMemo(() => buildHeatmap(heatmapEvents, HEATMAP_WEEKS), [heatmapEvents])
+  const truncated = heatmapEvents.length >= HEATMAP_MAX_EVENTS
   const total = useMemo(() => heatmap.weeks.flat().reduce((n, c) => n + c.count, 0), [heatmap])
   const sparkPoints = useMemo(() => {
     const series = buildDailySeries(heatmapEvents, SPARK_DAYS)
@@ -77,10 +78,12 @@ export function ActivityStatPanel({
     const labels: { week: number; text: string }[] = []
     let last = -1
     heatmap.weeks.forEach((week, wi) => {
-      const m = new Date(week[0]!.date).getMonth()
+      const [y, mo, d] = week[0]!.date.split('-').map(Number)
+      const first = new Date(y!, mo! - 1, d!) // local date: 'YYYY-MM-DD' alone would parse as UTC
+      const m = first.getMonth()
       if (m !== last) {
         last = m
-        labels.push({ week: wi, text: new Date(week[0]!.date).toLocaleDateString(undefined, { month: 'short' }) })
+        labels.push({ week: wi, text: first.toLocaleDateString(undefined, { month: 'short' }) })
       }
     })
     // Drop a label that would collide with the next one.
@@ -131,14 +134,14 @@ export function ActivityStatPanel({
 
       {/* Year tracker */}
       <section className="activity-stat-panel__section">
-        <h4 className="activity-stat-panel__heading">{t('activity.stats.lastYear', { count: total })}</h4>
+        <h4 className="activity-stat-panel__heading">{t('activity.stats.lastYear', { count: truncated ? `${total}+` : total })}</h4>
         <div className="activity-year">
           <div className="activity-year__months" aria-hidden="true">
             {monthLabels.map(l => (
               <span key={l.week} style={{ gridColumnStart: l.week + 1 }}>{l.text}</span>
             ))}
           </div>
-          <div className="activity-heatmap" role="img" aria-label={t('activity.stats.lastYear', { count: total })}>
+          <div className="activity-heatmap" role="img" aria-label={t('activity.stats.lastYear', { count: truncated ? `${total}+` : total })}>
             {heatmap.weeks.map((week, wi) => (
               <div key={wi} className="activity-heatmap__week">
                 {week.map(cell => {

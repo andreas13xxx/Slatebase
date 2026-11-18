@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { countByType, buildHeatmap } from './activity-stats'
+import { countByType, buildHeatmap, buildDailySeries } from './activity-stats'
 import type { ActivityEvent } from '../../types'
 
 function evt(type: ActivityEvent['type'], timestamp: string): ActivityEvent {
@@ -56,5 +56,22 @@ describe('buildHeatmap', () => {
   it('clamps weeks to at least 1', () => {
     const hm = buildHeatmap([], 0, now)
     expect(hm.weeks).toHaveLength(1)
+  })
+})
+
+describe('buildDailySeries', () => {
+  const now = new Date('2026-03-18T12:00:00')
+
+  it('returns one count per day, oldest first, ending today', () => {
+    const series = buildDailySeries([
+      evt('note.edited', '2026-03-18T09:00:00'),
+      evt('note.edited', '2026-03-18T10:00:00'),
+      evt('note.created', '2026-03-16T09:00:00'),
+    ], 4, now)
+    expect(series).toEqual([0, 1, 0, 2])
+  })
+
+  it('ignores events outside the window', () => {
+    expect(buildDailySeries([evt('note.edited', '2026-01-01T09:00:00')], 3, now)).toEqual([0, 0, 0])
   })
 })
