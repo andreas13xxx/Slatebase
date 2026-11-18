@@ -6,7 +6,6 @@
  */
 
 import type { Dispatch } from 'react'
-import { translateNow } from '../i18n'
 import type { IApiClient } from '../api'
 import type { ActivityEvent, ActivityEventType } from '../types'
 import type { ActivityAction, ActivityRange } from './activityState'
@@ -53,7 +52,7 @@ export async function loadActivity(
     })
     dispatch({ type: 'LOAD_SUCCESS', events: page.items, nextCursor: page.nextCursor })
   } catch (err) {
-    dispatch({ type: 'LOAD_ERROR', error: extractErrorMessage(err, translateNow('commonUi.c_aa_loadFailed')) })
+    dispatch({ type: 'LOAD_ERROR', error: extractErrorMessage(err, 'Aktivität konnte nicht geladen werden') })
   }
 }
 
@@ -78,7 +77,7 @@ export async function loadMoreActivity(
     })
     dispatch({ type: 'LOAD_MORE_SUCCESS', events: page.items, nextCursor: page.nextCursor })
   } catch (err) {
-    dispatch({ type: 'LOAD_MORE_ERROR', error: extractErrorMessage(err, translateNow('commonUi.c_aa_moreFailed')) })
+    dispatch({ type: 'LOAD_MORE_ERROR', error: extractErrorMessage(err, 'Weitere Aktivität konnte nicht geladen werden') })
   }
 }
 
