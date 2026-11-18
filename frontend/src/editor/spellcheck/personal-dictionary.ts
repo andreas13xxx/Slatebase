@@ -24,9 +24,6 @@ type DictionaryApi = Pick<IApiClient, 'getSpellcheckWords' | 'addSpellcheckWords
 /** Cache key prefix; the vault id is appended. */
 const CACHE_PREFIX = 'slatebase:spellcheck-personal:'
 
-/** The pre-vault, device-wide list — read once for migration, then deleted. */
-const LEGACY_STORAGE_KEY = 'slatebase:spellcheck-personal'
-
 /**
  * Guards against a corrupted or oversized entry poisoning every lint pass —
  * the whole list is handed to the worker on load and kept in memory there.
@@ -49,9 +46,6 @@ const sessionIgnored = new Set<string>()
 let api: DictionaryApi | null = null
 let activeVaultId: string | null = null
 let words: string[] = []
-
-/** Whether the legacy list was already offered to a server this session (success or not). */
-let legacyMigrationAttempted = false
 
 /**
  * Changes made while the server copy of the active vault is still on its way.
@@ -137,9 +131,7 @@ export async function setActivePersonalDictionaryVault(vaultId: string | null): 
   }
 
   try {
-    let remote = (await api.getSpellcheckWords(vaultId)).words
-    if (activeVaultId !== vaultId) return
-    remote = await migrateLegacyWords(api, vaultId, remote)
+    const remote = (await api.getSpellcheckWords(vaultId)).words
     if (activeVaultId !== vaultId) return
     words = [...new Set([...remote, ...session.added])].filter((word) => !session.removed.has(word)).slice(0, MAX_WORDS)
     writeCache(vaultId, words)
@@ -148,46 +140,6 @@ export async function setActivePersonalDictionaryVault(vaultId: string | null): 
     // Keep the cached words; the next vault switch or reload asks again.
   } finally {
     if (loadWindow === session) loadWindow = null
-  }
-}
-
-/**
- * Uploads the old device-wide list into the vault that is opened first, then
- * deletes it. Entries the server would reject are filtered out first — one bad
- * word fails the whole request. A failed upload (read-only access, server down)
- * keeps the old key for the next session; it is tried once per session, not on
- * every vault switch.
- */
-async function migrateLegacyWords(client: DictionaryApi, vaultId: string, remote: string[]): Promise<string[]> {
-  if (legacyMigrationAttempted) return remote
-
-  let stored: string[]
-  try {
-    stored = parseWordList(localStorage.getItem(LEGACY_STORAGE_KEY))
-  } catch {
-    return remote
-  }
-  const legacy = [...new Set(stored.filter(isValidWord))]
-  if (legacy.length === 0) {
-    removeLegacyKey()
-    return remote
-  }
-
-  legacyMigrationAttempted = true
-  try {
-    const merged = (await client.addSpellcheckWords(vaultId, legacy)).words
-    removeLegacyKey()
-    return merged
-  } catch {
-    return remote
-  }
-}
-
-function removeLegacyKey(): void {
-  try {
-    localStorage.removeItem(LEGACY_STORAGE_KEY)
-  } catch {
-    // Nothing to clean up if storage is unavailable.
   }
 }
 
@@ -278,7 +230,6 @@ export function resetPersonalDictionary(): void {
   activeVaultId = null
   words = []
   loadWindow = null
-  legacyMigrationAttempted = false
   sessionIgnored.clear()
   changeListeners.clear()
 }

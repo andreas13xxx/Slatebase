@@ -316,9 +316,6 @@ export class VaultService implements IVaultService {
 
     const entries = await this.registry.load()
 
-    // Migration: assign ownerId to vaults that don't have one
-    await this.migrateOrphanedVaults(entries)
-
     if (entries.length === 0) {
       this.logger.info('Vault registry is empty, no vaults to load')
       return
@@ -395,50 +392,6 @@ export class VaultService implements IVaultService {
         await this.scanForSymlinks(vaultId, rootPath, absolutePath)
       }
     }
-  }
-
-  /**
-   * Migrates vaults that have no ownerId by assigning them to the first admin user.
-   * This handles vaults created before the ownership feature was implemented.
-   * Persists the updated entries to the registry file.
-   */
-  private async migrateOrphanedVaults(entries: import('../vault/registry.js').VaultRegistryEntry[]): Promise<void> {
-    const orphaned = entries.filter((e) => e.ownerId === undefined || e.ownerId === '')
-    if (orphaned.length === 0) {
-      return
-    }
-
-    if (!this.userRepository) {
-      this.logger.warn('Cannot migrate orphaned vaults: UserRepository not configured', {
-        orphanedCount: orphaned.length,
-      })
-      return
-    }
-
-    // Find the first admin user to assign as owner
-    const adminUser = await this.userRepository.findByUsername('admin')
-    if (adminUser === null) {
-      this.logger.warn('Cannot migrate orphaned vaults: no admin user found', {
-        orphanedCount: orphaned.length,
-      })
-      return
-    }
-
-    for (const entry of orphaned) {
-      entry.ownerId = adminUser.userId
-      this.logger.info('Migrated orphaned vault: assigned owner', {
-        vaultId: entry.id,
-        vaultName: entry.name,
-        ownerId: adminUser.userId,
-      })
-    }
-
-    // Persist the updated entries
-    await this.registry!.save(entries)
-    this.logger.info('Orphaned vault migration complete', {
-      migratedCount: orphaned.length,
-      assignedTo: adminUser.username,
-    })
   }
 
   /**

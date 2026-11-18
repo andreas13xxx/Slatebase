@@ -11,7 +11,6 @@ import type {
   UserPreferences,
   RecentFileEntry,
   FavoriteEntry,
-  KeybindingEntry,
   UserUiSettings,
   UserVaultSettings,
   UserUiSettingsPatch,
@@ -24,14 +23,12 @@ import { KeyedJsonFileStore } from '../shared/json-file-store.js'
 
 const MAX_RECENT_FILES = 20
 const MAX_FAVORITES_TOTAL = 500
-const MAX_KEYBINDINGS = 200
 
 const MAX_VAULT_SETTINGS = 200
 
 const EMPTY_PREFERENCES: UserPreferences = {
   recentFiles: [],
   favorites: [],
-  keybindings: [],
   uiSettings: DEFAULT_UI_SETTINGS,
   vaultSettings: {},
 }
@@ -122,9 +119,6 @@ function sanitizeVaultSettings(raw: unknown): UserVaultSettings {
       ? parsed['activityRange']
       : DEFAULT_VAULT_SETTINGS.activityRange,
     webEmbedEnabled: bool('webEmbedEnabled', DEFAULT_VAULT_SETTINGS.webEmbedEnabled),
-    workspaces: Array.isArray(parsed['workspaces'])
-      ? parsed['workspaces'].filter((w): w is Record<string, unknown> => isRecord(w))
-      : DEFAULT_VAULT_SETTINGS.workspaces,
   }
 }
 
@@ -135,7 +129,6 @@ function sanitizePreferences(raw: unknown): UserPreferences {
   return {
     recentFiles: Array.isArray(parsed.recentFiles) ? parsed.recentFiles : [],
     favorites: Array.isArray(parsed.favorites) ? parsed.favorites : [],
-    keybindings: Array.isArray(parsed.keybindings) ? parsed.keybindings : [],
     uiSettings: sanitizeUiSettings(parsed.uiSettings),
     vaultSettings: Object.fromEntries(
       Object.entries(vaultSettingsRaw)
@@ -179,15 +172,6 @@ export class PreferencesStore implements IPreferencesService {
   async saveFavorites(userId: string, entries: FavoriteEntry[]): Promise<void> {
     const capped = entries.slice(0, MAX_FAVORITES_TOTAL)
     await this.store.mutate(userId, (prefs) => ({ ...prefs, favorites: capped }))
-  }
-
-  async getKeybindings(userId: string): Promise<KeybindingEntry[]> {
-    return (await this.store.read(userId)).keybindings
-  }
-
-  async saveKeybindings(userId: string, entries: KeybindingEntry[]): Promise<void> {
-    const capped = entries.slice(0, MAX_KEYBINDINGS)
-    await this.store.mutate(userId, (prefs) => ({ ...prefs, keybindings: capped }))
   }
 
   async getUiSettings(userId: string): Promise<UserUiSettings> {

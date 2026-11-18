@@ -262,8 +262,8 @@ describe('LinkIndexService (extended v2)', () => {
     })
   })
 
-  describe('v1 → v2 migration', () => {
-    it('triggers rebuild when loading v1 schema', async () => {
+  describe('index file of an older version', () => {
+    it('rebuilds instead of loading a v1 file', async () => {
       // Write a v1 index file
       const v1Data = {
         version: 1,

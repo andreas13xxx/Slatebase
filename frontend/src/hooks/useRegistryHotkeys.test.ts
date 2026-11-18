@@ -15,7 +15,7 @@ function key(init: KeyboardEventInit, target?: EventTarget): KeyboardEvent {
 
 async function withFile(file: Record<string, unknown>): Promise<void> {
   _reset()
-  await initialize({ getHotkeysConfig: async () => file, getKeybindings: async () => ({ entries: [] }), patchHotkeysConfig: async () => file } as unknown as IApiClient)
+  await initialize({ getHotkeysConfig: async () => file, patchHotkeysConfig: async () => file } as unknown as IApiClient)
   await loadVaultHotkeys('v1')
 }
 

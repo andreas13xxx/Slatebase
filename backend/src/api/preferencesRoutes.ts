@@ -1,6 +1,6 @@
 /**
  * Preferences routes module — everything stored per user: recent files,
- * favorites, keybindings, account-wide UI settings, and per-vault settings.
+ * favorites, account-wide UI settings, and per-vault settings.
  * All routes require authentication.
  *
  * Routes:
@@ -8,8 +8,6 @@
  *   PUT   /users/me/recent-files              — Save recent files
  *   GET   /users/me/favorites                 — Get favorites
  *   PUT   /users/me/favorites                 — Save favorites
- *   GET   /users/me/keybindings               — Get keybindings
- *   PUT   /users/me/keybindings               — Save keybindings
  *   GET   /users/me/ui-settings               — Get account-wide UI settings
  *   PATCH /users/me/ui-settings               — Merge a partial UI settings update
  *   GET   /users/me/vault-settings/:vaultId   — Get this user's settings for a vault
@@ -31,7 +29,6 @@ import type { IEventBus } from '../realtime/index.js'
 import {
   saveRecentFilesSchema,
   saveFavoritesSchema,
-  saveKeybindingsSchema,
   saveUiSettingsSchema,
   saveVaultSettingsSchema,
 } from '../preferences/validation.js'
@@ -166,46 +163,6 @@ export function createPreferencesRoutes(deps: PreferencesRoutesDeps): Hono {
       return c.json({ entries: result.data.entries }, 200)
     } catch (error) {
       logger.error('Failed to save favorites', { userId: session.userId, error: String(error) })
-      return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
-    }
-  })
-
-  // ── Keybindings ───────────────────────────────────────────────────────────
-
-  app.get('/users/me/keybindings', async (c: Context) => {
-    const session = c.get('session') as SessionContext
-    try {
-      const entries = await preferencesService.getKeybindings(session.userId)
-      return c.json({ entries }, 200)
-    } catch (error) {
-      logger.error('Failed to get keybindings', { userId: session.userId, error: String(error) })
-      return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
-    }
-  })
-
-  app.put('/users/me/keybindings', async (c: Context) => {
-    const session = c.get('session') as SessionContext
-
-    let body: unknown
-    try {
-      body = await c.req.json()
-    } catch {
-      return c.json(createApiError('VALIDATION_ERROR', 'Invalid JSON body'), 400)
-    }
-
-    const result = saveKeybindingsSchema.safeParse(body)
-    if (!result.success) {
-      const firstIssue = result.error.issues[0]
-      const message = firstIssue !== undefined ? firstIssue.message : 'Invalid input'
-      return c.json(createApiError('VALIDATION_ERROR', message), 400)
-    }
-
-    try {
-      await preferencesService.saveKeybindings(session.userId, result.data.entries)
-      publishChange(session.userId, 'keybindings', originOf(c))
-      return c.json({ entries: result.data.entries }, 200)
-    } catch (error) {
-      logger.error('Failed to save keybindings', { userId: session.userId, error: String(error) })
       return c.json(createApiError('INTERNAL_ERROR', 'Internal server error'), 500)
     }
   })

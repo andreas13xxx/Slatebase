@@ -21,13 +21,6 @@ import { globMatch } from '../search/glob-match.js'
 /** Most properties one Bases row carries when a base asks for all of them (`file.properties`). */
 const MAX_PROPERTIES_PER_ROW = 200
 
-/** JSON schema v1 for backward compatibility. */
-interface LinkIndexJsonV1 {
-  version: 1
-  updatedAt: string
-  forwardLinks: Record<string, string[]>
-}
-
 /** JSON schema v2 — includes tags and properties. */
 interface LinkIndexJsonV2 {
   version: 2
@@ -39,8 +32,8 @@ interface LinkIndexJsonV2 {
   embeds?: Record<string, string[]>
 }
 
-/** Union type for all supported persisted schemas. */
-type LinkIndexJson = LinkIndexJsonV1 | LinkIndexJsonV2
+/** The persisted schema. Files with any other version are rebuilt. */
+type LinkIndexJson = LinkIndexJsonV2
 
 /**
  * Normalizes a file path for index storage.
@@ -1049,7 +1042,6 @@ export class LinkIndexService implements ILinkIndex {
    * Attempts to load the index from disk.
    * On success, rebuilds the reverse map from persisted forward links.
    * On failure (missing file, invalid JSON, schema mismatch), triggers a full rebuild.
-   * Handles v1 → v2 migration by loading links and triggering rebuild for tags/properties.
    */
   async loadFromDisk(): Promise<void> {
     this.invalidateObservedListKeys()
@@ -1076,17 +1068,6 @@ export class LinkIndexService implements ILinkIndex {
       this.fileTags.clear()
       this.fileProperties.clear()
       this.propertyValueIndex.clear()
-
-      if (data.version === 1) {
-        // v1 → v2 migration: load forward links, then trigger full rebuild
-        // for tags and properties
-        this.logger.info('Link index v1 detected, triggering rebuild for v2 migration', {
-          vaultId: this.vaultId,
-          vaultName: this.vaultName,
-        })
-        await this.rebuild()
-        return
-      }
 
       if (data.embeds === undefined) {
         // Written before `file.embeds` existed: one rebuild fills it.
@@ -1553,7 +1534,7 @@ export class LinkIndexService implements ILinkIndex {
 
     // Check version field
     if (typeof obj['version'] !== 'number') return false
-    if (obj['version'] !== 1 && obj['version'] !== 2) return false
+    if (obj['version'] !== 2) return false
 
     // Check updatedAt field
     if (typeof obj['updatedAt'] !== 'string') return false
@@ -1572,11 +1553,8 @@ export class LinkIndexService implements ILinkIndex {
       }
     }
 
-    // v2 specific validation
-    if (obj['version'] === 2) {
-      if (obj['tags'] === null || typeof obj['tags'] !== 'object') return false
-      if (obj['properties'] === null || typeof obj['properties'] !== 'object') return false
-    }
+    if (obj['tags'] === null || typeof obj['tags'] !== 'object') return false
+    if (obj['properties'] === null || typeof obj['properties'] !== 'object') return false
 
     return true
   }

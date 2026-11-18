@@ -39,8 +39,6 @@ const MANAGED_GITIGNORE_LINES = [
   '.obsidian/workspace.json',
   '.obsidian/workspace-mobile.json',
 ]
-/** Lines older versions wrote on their own — superseded by the managed block. */
-const LEGACY_GITIGNORE_LINES = ['.slatebase/', '.obsidian/']
 /** Synthetic actor identity used for realtime events published by the background sync job (no browser session is involved). */
 const GIT_SYNC_ACTOR = { userId: 'system:git-sync', username: 'Git-Sync' }
 
@@ -320,7 +318,7 @@ export class GitSyncEngine implements IGitSyncEngine {
 
 /**
  * Returns the `.gitignore` content with Slatebase's managed block inserted or refreshed.
- * User lines outside the block are kept; legacy lines from older versions are dropped.
+ * User lines outside the block are kept.
  * Output is deterministic so every instance converges on identical content.
  */
 function applyManagedGitignoreBlock(existingLines: string[]): string {
@@ -333,7 +331,6 @@ function applyManagedGitignoreBlock(existingLines: string[]): string {
       if (line === GITIGNORE_BLOCK_END) insideBlock = false
       continue
     }
-    if (LEGACY_GITIGNORE_LINES.includes(line.trim())) continue
     userLines.push(line)
   }
   while (userLines.length > 0 && userLines[userLines.length - 1] === '') userLines.pop()

@@ -14,7 +14,6 @@ import {
 vi.mock('../../components/ToastNotification', () => ({ showToast: vi.fn() }))
 import { showToast } from '../../components/ToastNotification'
 
-const LEGACY_KEY = 'slatebase:spellcheck-personal'
 const cacheKey = (vaultId: string): string => `slatebase:spellcheck-personal:${vaultId}`
 
 function createMockApi(initial: string[] = []) {
@@ -200,59 +199,6 @@ describe('personal dictionary', () => {
       initializePersonalDictionary(createMockApi())
       await setActivePersonalDictionaryVault('v1')
       expect(removePersonalWord('Unbekannt')).toBe(false)
-    })
-  })
-
-  describe('migration of the old device-wide list', () => {
-    it('uploads it into the first vault opened and deletes the old key', async () => {
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt', 'Wort']))
-      const api = createMockApi(['Schon'])
-      initializePersonalDictionary(api)
-      await setActivePersonalDictionaryVault('v1')
-      expect(api.addSpellcheckWords).toHaveBeenCalledWith('v1', ['Alt', 'Wort'])
-      expect(readPersonalWords()).toEqual(['Alt', 'Schon', 'Wort'])
-      expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
-    })
-
-    it('keeps the old key when the upload fails', async () => {
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt']))
-      const api = createMockApi(['Schon'])
-      api.addSpellcheckWords.mockRejectedValueOnce(new Error('403'))
-      initializePersonalDictionary(api)
-      await setActivePersonalDictionaryVault('v1')
-      expect(readPersonalWords()).toEqual(['Schon'])
-      expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull()
-    })
-
-    it('leaves out entries the server would reject, so the rest still arrives', async () => {
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Gut', 'zwei Wörter', 'Gut', 'x'.repeat(101)]))
-      const api = createMockApi()
-      initializePersonalDictionary(api)
-      await setActivePersonalDictionaryVault('v1')
-      expect(api.addSpellcheckWords).toHaveBeenCalledWith('v1', ['Gut'])
-      expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
-    })
-
-    it('tries the upload once per session, not on every vault switch', async () => {
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt']))
-      const api = createMockApi()
-      api.addSpellcheckWords.mockRejectedValue(new Error('403'))
-      initializePersonalDictionary(api)
-      await setActivePersonalDictionaryVault('v1')
-      await setActivePersonalDictionaryVault('v2')
-      await setActivePersonalDictionaryVault('v3')
-      expect(api.addSpellcheckWords).toHaveBeenCalledTimes(1)
-      expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull()
-    })
-
-    it('does not migrate when the server could not be reached', async () => {
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(['Alt']))
-      const api = createMockApi()
-      api.getSpellcheckWords.mockRejectedValueOnce(new Error('offline'))
-      initializePersonalDictionary(api)
-      await setActivePersonalDictionaryVault('v1')
-      expect(api.addSpellcheckWords).not.toHaveBeenCalled()
-      expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull()
     })
   })
 

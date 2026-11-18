@@ -569,7 +569,6 @@ Not under `/api/v1/vaults/:vaultId/*`, listed so the inventory is complete. None
 |---|---|---|---|
 | GET | `/healthz`, `/readyz` | `healthRoutes.ts` | none (mounted at the app root, outside `/api/v1/*`; liveness/readiness only) |
 | GET | `/api/v1/version` | `versionRoutes.ts` | none (explicitly skipped in `auth/middleware.ts`) |
-| GET | `/api/v1/map-config` | `mapConfigRoutes.ts` | session. The handler comment says "Public, no authentication", but the route is registered under `/api/v1/*` and only `/api/v1/version` and the public-share reader paths bypass the auth middleware — the comment is wrong (finding F7). Returns only the operator's tile URL and attribution |
 | GET | `/api/v1/releases` | `releaseRoutes.ts` | session (GitHub release list, cached by `release-info/`) |
 | GET | `/api/v1/theme-store/themes`, `/theme-store/screenshot` | `themeStoreRoutes.ts` | session, feature `obsidian-theme-store` |
 | GET | `/api/v1/public-shares`, DELETE `/api/v1/public-shares/:id` | `publicShareRoutes.ts` | session, own links only |
@@ -581,9 +580,6 @@ Not under `/api/v1/vaults/:vaultId/*`, listed so the inventory is complete. None
 in `VAULT_ROUTE_LEVEL_EXCEPTIONS`, so read-only collaborators got 403 on every Bases view. Fixed with one exception row
 (`POST /bases/query` → `read`), the same as `/properties/query`; test in `vault-authorization-middleware.test.ts`
 (reader 200, non-member 403).
-
-**F7 — `mapConfigRoutes.ts:35` documents the route as public, but it needs a session.** Code behavior is the safer
-one (see the table above); only the comment is misleading.
 
 **F8 — The table-driven test does not cover every vault route.** `vault-authorization-middleware.test.ts` wires
 `app` by hand; it does not mount the theme routes, theme-store vault routes, `hotkeys-config`, `workspaces-config`,
@@ -605,4 +601,4 @@ middleware), so the document cannot be checked against the code mechanically.
   (`GET /public-shares`, `GET /public-shares/preview`, `GET /keychain/:secretId`), 7× `owner` (`GET`/`POST /shares`,
   `PUT`/`DELETE /shares/:userId`, `POST /transfer`, `PUT /config`, `DELETE` of the vault itself).
 - Unchanged: routes outside the middleware pattern (§19 and the "Routes outside the vault middleware" table above).
-- Open findings: F1, F3, F4, F7, F8 (F2, F5 and F6 resolved).
+- Open findings: F1, F3, F4, F8 (F2, F5 and F6 resolved; F7 obsolete, route removed).

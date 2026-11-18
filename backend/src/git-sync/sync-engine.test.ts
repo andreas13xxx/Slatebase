@@ -178,17 +178,15 @@ describe('GitSyncEngine', () => {
     })
   })
 
-  describe('.gitignore migration', () => {
+  describe('.gitignore managed block', () => {
     const readGitignore = () => readFile(join(vaultPath, '.gitignore'), 'utf-8')
 
-    it('replaces legacy lines with the managed block and keeps user lines', async () => {
-      await writeFile(join(vaultPath, '.gitignore'), '*.tmp\n.slatebase/\n.obsidian/\nprivate/\n')
+    it('appends the managed block and keeps user lines', async () => {
+      await writeFile(join(vaultPath, '.gitignore'), '*.tmp\nprivate/\n')
 
       await engine.runOne('vault-1', 'remote-1')
 
       const content = await readGitignore()
-      expect(content).not.toMatch(/^\.slatebase\/$/m)
-      expect(content).not.toMatch(/^\.obsidian\/$/m)
       expect(content).toContain('*.tmp\nprivate/\n')
       expect(content).toContain('# >>> slatebase managed')
     })
@@ -215,11 +213,11 @@ describe('GitSyncEngine', () => {
     })
 
     it('handles CRLF files', async () => {
-      await writeFile(join(vaultPath, '.gitignore'), 'mine/\r\n.slatebase/\r\n')
+      await writeFile(join(vaultPath, '.gitignore'), 'mine/\r\nother/\r\n')
       await engine.runOne('vault-1', 'remote-1')
       const content = await readGitignore()
       expect(content).toContain('mine/\n')
-      expect(content).not.toMatch(/^\.slatebase\/$/m)
+      expect(content).toContain('other/\n')
     })
   })
 

@@ -28,7 +28,7 @@ export interface RealtimeEventHandlers {
   onPluginSettingsChange?: (vaultId: string, pluginId: string) => void
   /**
    * Called when this user changed a preference on another device.
-   * `scope` names the bucket ('uiSettings', 'vaultSettings', 'keybindings',
+   * `scope` names the bucket ('uiSettings', 'vaultSettings',
    * 'favorites', 'recentFiles'); `vaultId` is set for 'vaultSettings' only.
    * Events originating from this tab are filtered out before this fires.
    */

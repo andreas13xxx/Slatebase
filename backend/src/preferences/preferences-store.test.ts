@@ -79,24 +79,6 @@ describe('PreferencesStore', () => {
     })
   })
 
-  describe('keybindings', () => {
-    it('returns an empty array for a user with no saved keybindings yet', async () => {
-      expect(await store.getKeybindings('user-1')).toEqual([])
-    })
-
-    it('saves and reads back keybindings', async () => {
-      const entries = [{ commandId: 'save', shortcut: 'Ctrl+S' }]
-      await store.saveKeybindings('user-1', entries)
-      expect(await store.getKeybindings('user-1')).toEqual(entries)
-    })
-
-    it('caps keybindings at 200 entries', async () => {
-      const entries = Array.from({ length: 210 }, (_, i) => ({ commandId: `cmd-${i}`, shortcut: 'Ctrl+X' }))
-      await store.saveKeybindings('user-1', entries)
-      expect(await store.getKeybindings('user-1')).toHaveLength(200)
-    })
-  })
-
   describe('sanitization of malformed on-disk data', () => {
     it('falls back to empty arrays when the stored JSON is missing expected fields', async () => {
       const usersDir = path.join(dataDir, 'users')
@@ -105,7 +87,6 @@ describe('PreferencesStore', () => {
 
       expect(await store.getRecentFiles('user-1')).toEqual([])
       expect(await store.getFavorites('user-1')).toEqual([])
-      expect(await store.getKeybindings('user-1')).toEqual([])
     })
   })
 })
@@ -167,7 +148,7 @@ describe('PreferencesStore — UI and per-vault settings', () => {
       await mkdir(path.join(dataDir, 'users'), { recursive: true })
       await writeFile(
         path.join(dataDir, 'users', 'legacy-preferences.json'),
-        JSON.stringify({ recentFiles: [], favorites: [], keybindings: [] }),
+        JSON.stringify({ recentFiles: [], favorites: [] }),
         'utf-8',
       )
 
@@ -235,11 +216,11 @@ describe('PreferencesStore — UI and per-vault settings', () => {
     })
 
     it('does not disturb the other preference buckets', async () => {
-      await store.saveKeybindings('user-1', [{ commandId: 'a', shortcut: 'Ctrl+A' }])
+      await store.saveFavorites('user-1', [{ type: 'file', vaultId: 'v', path: 'a.md', addedAt: 'x' } as never])
       await store.saveVaultSettings('user-1', 'vault-1', { saveAudioAttachment: true })
       await store.saveUiSettings('user-1', { statusBarVisible: false })
 
-      expect(await store.getKeybindings('user-1')).toEqual([{ commandId: 'a', shortcut: 'Ctrl+A' }])
+      expect(await store.getFavorites('user-1')).toHaveLength(1)
     })
   })
 })

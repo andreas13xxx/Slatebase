@@ -57,9 +57,6 @@ export interface ParsedShortcut {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Where earlier versions cached the per-user overrides; read once to take them over. */
-const LEGACY_STORAGE_KEY = 'slatebase:keybindings'
-
 /** Identifies this store to the shared first-sync/failure bookkeeping. */
 const SYNC_STORE_KEY = 'keybindings'
 
@@ -126,7 +123,7 @@ const RETRY_AFTER_FAILURE_MS = 30_000
 
 /**
  * Give the store the API client. The bindings themselves come from the open vault's hotkeys.json
- * (see {@link loadVaultHotkeys}); the per-user list on the server is only read once, to take over.
+ * (see {@link loadVaultHotkeys}).
  */
 export async function initialize(client: IApiClient): Promise<void> {
   apiClient = client
@@ -149,7 +146,7 @@ export function disconnect(): void {
   // The caches and markers belong to the account that is leaving: the next one must start clean.
   try {
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith(CACHE_PREFIX) || key.startsWith(TAKEN_OVER_PREFIX) || key === LEGACY_STORAGE_KEY) localStorage.removeItem(key)
+      if (key.startsWith(CACHE_PREFIX)) localStorage.removeItem(key)
     }
   } catch {
     // Silently fail
@@ -199,7 +196,6 @@ export async function loadVaultHotkeys(vaultId: string): Promise<boolean> {
   }
 
   bindings = readHotkeys(config)
-  if (!isTakenOver(vaultId)) await takeOverUserBindings(client, vaultId)
   saveCache(vaultId)
   notify()
   return true
@@ -207,35 +203,6 @@ export async function loadVaultHotkeys(vaultId: string): Promise<boolean> {
 
 function hasPendingWork(vaultId: string): boolean {
   return writingVault === vaultId || pending.has(vaultId)
-}
-
-/** Writes the old per-user bindings into the file, for commands the file does not name. Once per vault and device. */
-async function takeOverUserBindings(client: IApiClient, vaultId: string): Promise<void> {
-  let legacy: Array<{ commandId: string; shortcut: string }>
-  try {
-    legacy = (await client.getKeybindings()).entries
-  } catch {
-    legacy = loadLegacyCache() // server unavailable: the cache of the old store is the same data
-  }
-  const patch: Record<string, Hotkey[]> = {}
-  for (const { commandId, shortcut } of legacy) {
-    if (bindings.has(commandId)) continue
-    const fileId = toFileCommandId(commandId)
-    if (!isValidHotkeyCommandId(fileId)) continue
-    const value = shortcutsToFileValue(shortcut ? [shortcut] : [])
-    if (shortcut && value.length === 0) continue
-    patch[fileId] = value
-  }
-  if (Object.keys(patch).length > 0) {
-    try {
-      const saved = readHotkeys(await client.patchHotkeysConfig(vaultId, patch))
-      // The user may have changed a shortcut meanwhile; then the change is written next and wins.
-      if (currentVaultId === vaultId && !hasPendingWork(vaultId)) bindings = saved
-    } catch {
-      return // no write access or server down: try again the next time this vault is opened
-    }
-  }
-  markTakenOver(vaultId)
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -495,7 +462,6 @@ async function flush(): Promise<void> {
 // ─── Local cache (so shortcuts work before the file is read) ─────────────────
 
 const CACHE_PREFIX = 'slatebase:hotkeys:'
-const TAKEN_OVER_PREFIX = 'slatebase:hotkeys-taken-over:'
 
 function loadCache(vaultId: string): Map<string, string[]> {
   try {
@@ -519,37 +485,6 @@ function saveCache(vaultId: string): void {
     localStorage.setItem(CACHE_PREFIX + vaultId, JSON.stringify([...bindings.entries()]))
   } catch {
     // Silently fail
-  }
-}
-
-function isTakenOver(vaultId: string): boolean {
-  try {
-    return localStorage.getItem(TAKEN_OVER_PREFIX + vaultId) !== null
-  } catch {
-    return false
-  }
-}
-
-function markTakenOver(vaultId: string): void {
-  try {
-    localStorage.setItem(TAKEN_OVER_PREFIX + vaultId, '1')
-  } catch {
-    // Silently fail
-  }
-}
-
-/** The per-user overrides of earlier versions, as they were cached in this browser. */
-function loadLegacyCache(): Array<{ commandId: string; shortcut: string }> {
-  try {
-    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
-    const parsed: unknown = raw ? JSON.parse(raw) : null
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (item): item is { commandId: string; shortcut: string } =>
-        typeof item === 'object' && item !== null && typeof item.commandId === 'string' && typeof item.shortcut === 'string',
-    )
-  } catch {
-    return []
   }
 }
 

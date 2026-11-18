@@ -1,6 +1,6 @@
 /**
  * Shared bookkeeping for the per-user preference stores that mirror
- * `data/users/<userId>-preferences.json` — keybindings, favorites and recent
+ * `data/users/<userId>-preferences.json` — favorites and recent
  * files. Each keeps a localStorage cache for synchronous reads and pushes the
  * full list to the backend on a debounce.
  *

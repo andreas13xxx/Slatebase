@@ -178,10 +178,6 @@ Dateisystemzugriff folgt. Wer liest oder schreibt, braucht zusätzlich
   network rules are the barrier against exfiltration. Listing entry names needs read access,
   reading a value and every change need write access (`VAULT-ROUTE-AUTHORIZATION.md`).
   Limits: 200 entries per vault, 10 KB per value, IDs `[a-z0-9]` with single hyphens.
-- **Legacy plugin secrets:** `data/plugins/<vaultId>/<pluginId>/secrets.json` is moved into the
-  keychain at startup (`keychain/legacy-migration.ts`), key from `SLATEBASE_PLUGIN_SECRET_KEY` or
-  `data/.plugin-secret-key`; the file is deleted only after every entry is stored. Entries that
-  cannot be decrypted are dropped with a warning.
 - **Git-Sync / Mail-Import credentials:** same store via `shared-secrets/`, same key.
 
 ---

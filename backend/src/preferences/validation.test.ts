@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { saveRecentFilesSchema, saveFavoritesSchema, saveKeybindingsSchema } from './validation.js'
+import { saveRecentFilesSchema, saveFavoritesSchema } from './validation.js'
 
 describe('saveRecentFilesSchema', () => {
   it('accepts a valid list of recent file entries', () => {
@@ -46,24 +46,6 @@ describe('saveFavoritesSchema', () => {
   it('rejects more than 500 entries', () => {
     const entries = Array.from({ length: 501 }, () => ({ vaultId: 'v1', path: 'a.md', addedAt: 't' }))
     const result = saveFavoritesSchema.safeParse({ entries })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('saveKeybindingsSchema', () => {
-  it('accepts a valid keybinding entry', () => {
-    const result = saveKeybindingsSchema.safeParse({ entries: [{ commandId: 'save', shortcut: 'Ctrl+S' }] })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects an entry with an empty commandId', () => {
-    const result = saveKeybindingsSchema.safeParse({ entries: [{ commandId: '', shortcut: 'Ctrl+S' }] })
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects more than 200 entries', () => {
-    const entries = Array.from({ length: 201 }, (_, i) => ({ commandId: `cmd-${i}`, shortcut: 'x' }))
-    const result = saveKeybindingsSchema.safeParse({ entries })
     expect(result.success).toBe(false)
   })
 })

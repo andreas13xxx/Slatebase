@@ -38,17 +38,6 @@ export const saveFavoritesSchema = z.object({
   entries: z.array(favoriteEntrySchema).max(500),
 })
 
-/** Schema for a single keybinding entry. */
-const keybindingEntrySchema = z.object({
-  commandId: z.string().min(1).max(128),
-  shortcut: z.string().max(64),
-})
-
-/** Schema for saving keybindings. */
-export const saveKeybindingsSchema = z.object({
-  entries: z.array(keybindingEntrySchema).max(200),
-})
-
 // ─── UI Settings ─────────────────────────────────────────────────────────────
 
 /** Bounded string→boolean map, used for status bar item visibility. */
@@ -97,7 +86,4 @@ export const saveVaultSettingsSchema = z.object({
   contextPanel: opaqueBlobSchema.optional(),
   activityRange: z.string().max(16).nullable().optional(),
   webEmbedEnabled: z.boolean().optional(),
-  // Named workspace snapshots: opaque client-owned objects, bounded in count.
-  // The pane-tree/tab shape is the client's, so no inner schema here.
-  workspaces: z.array(z.record(z.string().max(128), z.unknown())).max(50).optional(),
 })

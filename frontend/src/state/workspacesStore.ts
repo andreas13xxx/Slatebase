@@ -22,7 +22,6 @@ import type { IApiClient } from '../api'
 import type { PersistedPaneTree } from './paneTreeState'
 import { parsePersistedPaneTree } from './paneTreeState'
 import type { PersistedPanelLayout } from '../components/side-panel/utils/persistence'
-import { getVaultSettings, updateVaultSettings } from './vaultSettingsStore'
 import { obsidianToPaneTree, paneTreeToObsidian } from './obsidianLayout'
 import { reportSyncFailure, reportSyncSuccess } from './preferenceSync'
 
@@ -46,7 +45,6 @@ type Layout = Record<string, unknown>
 
 /** Identifies this store to the shared failure bookkeeping. */
 const SYNC_STORE_KEY = 'workspaces'
-const TAKEN_OVER_PREFIX = 'slatebase:workspaces-taken-over:'
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -82,11 +80,6 @@ export function disconnect(): void {
   generation++
   reloadRequested = false
   parsedCache = null
-  try {
-    for (const key of Object.keys(localStorage)) if (key.startsWith(TAKEN_OVER_PREFIX)) localStorage.removeItem(key)
-  } catch {
-    // Silently fail
-  }
 }
 
 /** Calls `cb` whenever the saved layouts may have changed. Returns the unsubscribe function. */
@@ -254,104 +247,14 @@ export async function loadVaultWorkspaces(vaultId: string): Promise<boolean> {
     return false
   }
   applyFile(config)
-  if (!isTakenOver(vaultId)) await takeOverUserWorkspaces(client, vaultId)
   notify()
   return true
-}
-
-/** Moves the per-user workspaces of older versions into the file. */
-async function takeOverUserWorkspaces(client: IApiClient, vaultId: string): Promise<void> {
-  // The server's own copy of this vault's settings, read here: the settings store may not have loaded
-  // yet, or may be showing another vault
-  let stored: unknown
-  try {
-    stored = (await client.getVaultSettings(vaultId)).settings.workspaces
-  } catch {
-    return // not known yet: try again the next time this vault is opened
-  }
-  const legacy = (Array.isArray(stored) ? stored : [])
-    .map(parseWorkspace)
-    .filter((w): w is NamedWorkspace => w !== null && isValidWorkspaceName(w.name))
-  if (legacy.length === 0) {
-    markTakenOver(vaultId)
-    return
-  }
-  // Names in use, lower-cased, with the file's own spelling; names the patch adds count too
-  const taken = new Map<string, string>([...layouts.keys()].map((n) => [n.toLowerCase(), n]))
-  const patch: Record<string, Layout> = {}
-  // Layouts that did not fit under the cap stay in the old list instead of being deleted with it
-  let left: NamedWorkspace[] = []
-  for (const [index, ws] of legacy.entries()) {
-    if (taken.size >= MAX_WORKSPACES) {
-      left = legacy.slice(index)
-      break
-    }
-    const clash = taken.get(ws.name.toLowerCase())
-    if (clash === undefined) {
-      patch[ws.name] = toLayout(ws, vaultId)
-      taken.set(ws.name.toLowerCase(), ws.name)
-      continue
-    }
-    // The later saved layout keeps the name, the other one is kept under a number. A file entry that
-    // cannot be read is not replaced.
-    const current = Object.hasOwn(patch, clash) ? patch[clash] : layouts.get(clash)
-    const inFile = fromLayout(clash, current, vaultId)
-    const free = freeName(ws.name, taken)
-    if (!inFile || inFile.savedAt >= ws.savedAt) {
-      patch[free] = toLayout({ ...ws, name: free }, vaultId)
-    } else {
-      patch[free] = current!
-      patch[clash] = toLayout({ ...ws, name: clash }, vaultId)
-      taken.set(free.toLowerCase(), free)
-      continue
-    }
-    taken.set(free.toLowerCase(), free)
-  }
-  // The old list is opaque to the settings API (it stores the client's blob as it is)
-  const leftRaw = left as unknown as Record<string, unknown>[]
-  pendingWrites++ // a read of the file must not overwrite the cache with the state from before this write
-  const session = generation
-  try {
-    applyFile(await client.patchWorkspacesConfig(vaultId, { workspaces: patch }))
-    await client.saveVaultSettings(vaultId, { workspaces: leftRaw })
-  } catch {
-    // No write access or server down: try again the next time this vault is opened. If the file took the
-    // layouts and the old list is still there, that run finds the names taken and keeps what the file has.
-    return
-  } finally {
-    if (session === generation) pendingWrites--
-  }
-  if (getVaultSettings().workspaces.length > 0) updateVaultSettings({ workspaces: leftRaw })
-  if (left.length === 0) markTakenOver(vaultId)
 }
 
 function findByLowerName(name: string): string | null {
   const lower = name.toLowerCase()
   for (const existing of layouts.keys()) if (existing.toLowerCase() === lower) return existing
   return null
-}
-
-function freeName(base: string, taken: Map<string, string>): string {
-  for (let n = 2; ; n++) {
-    const candidate = `${base} (${n})`
-    if (!taken.has(candidate.toLowerCase())) return candidate
-  }
-}
-
-function isTakenOver(vaultId: string): boolean {
-  try {
-    return localStorage.getItem(TAKEN_OVER_PREFIX + vaultId) !== null
-  } catch {
-    return false
-  }
-}
-
-function markTakenOver(vaultId: string): void {
-  try {
-    localStorage.setItem(TAKEN_OVER_PREFIX + vaultId, '1')
-  } catch {
-    // Silently fail
-  }
 }
 
 // ─── Mutations (written to the file) ─────────────────────────────────────────
