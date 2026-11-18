@@ -863,6 +863,7 @@ export const de = {
       snippets: 'Snippets',
       sync: 'Sync',
     },
+    bucketCount: '{count} Ereignisse',
     bucket: {
       today: 'Heute',
       yesterday: 'Gestern',
@@ -899,7 +900,10 @@ export const de = {
     },
     stats: {
       byType: 'Nach Typ',
-      last10Weeks: 'Letzte 10 Wochen',
+      lastYear: '{count} Aktivitäten im letzten Jahr',
+      less: 'Weniger',
+      more: 'Mehr',
+      trend: 'Verlauf (90 Tage)',
     },
     folderFilter: {
       all: 'Alle Ordner',

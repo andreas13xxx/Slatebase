@@ -16,7 +16,7 @@ export type ActivityRange = 'day' | 'week' | 'month' | 'year'
 export const DEFAULT_ACTIVITY_RANGE: ActivityRange = 'week'
 
 /** Fixed heatmap window, independent of the range switcher (L4). */
-export const HEATMAP_WEEKS = 10
+export const HEATMAP_WEEKS = 53
 
 export interface ActivityState {
   /** Loaded events, newest first (may span multiple fetched pages). */

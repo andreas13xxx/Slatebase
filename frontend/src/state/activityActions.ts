@@ -6,10 +6,14 @@
  */
 
 import type { Dispatch } from 'react'
+import { translateNow } from '../i18n'
 import type { IApiClient } from '../api'
-import type { ActivityEventType } from '../types'
+import type { ActivityEvent, ActivityEventType } from '../types'
 import type { ActivityAction, ActivityRange } from './activityState'
 import { HEATMAP_WEEKS } from './activityState'
+
+/** Page cap for the year window (200 events each). */
+const HEATMAP_MAX_PAGES = 25
 import { extractErrorMessage } from '../utils/error'
 
 const PAGE_LIMIT = 50
@@ -51,7 +55,7 @@ export async function loadActivity(
     })
     dispatch({ type: 'LOAD_SUCCESS', events: page.items, nextCursor: page.nextCursor })
   } catch (err) {
-    dispatch({ type: 'LOAD_ERROR', error: extractErrorMessage(err, 'Aktivität konnte nicht geladen werden') })
+    dispatch({ type: 'LOAD_ERROR', error: extractErrorMessage(err, translateNow('commonUi.c_aa_loadFailed')) })
   }
 }
 
@@ -76,7 +80,7 @@ export async function loadMoreActivity(
     })
     dispatch({ type: 'LOAD_MORE_SUCCESS', events: page.items, nextCursor: page.nextCursor })
   } catch (err) {
-    dispatch({ type: 'LOAD_MORE_ERROR', error: extractErrorMessage(err, 'Weitere Aktivität konnte nicht geladen werden') })
+    dispatch({ type: 'LOAD_MORE_ERROR', error: extractErrorMessage(err, translateNow('commonUi.c_aa_moreFailed')) })
   }
 }
 
@@ -119,9 +123,17 @@ export async function loadActivityHeatmap(
 ): Promise<void> {
   const from = new Date(Date.now() - HEATMAP_WEEKS * 7 * 24 * 60 * 60 * 1000).toISOString()
   try {
-    const page = await apiClient.getActivity(vaultId, { limit: 200, from })
-    if (signal?.cancelled) return
-    dispatch({ type: 'HEATMAP_LOADED', events: page.items })
+    // The window spans a year: follow the cursor (route max 200/page), capped.
+    const items: ActivityEvent[] = []
+    let cursor: string | undefined
+    for (let i = 0; i < HEATMAP_MAX_PAGES; i++) {
+      const page = await apiClient.getActivity(vaultId, { limit: 200, from, ...(cursor ? { cursor } : {}) })
+      if (signal?.cancelled) return
+      items.push(...page.items)
+      if (!page.nextCursor) break
+      cursor = page.nextCursor
+    }
+    dispatch({ type: 'HEATMAP_LOADED', events: items })
   } catch {
     // Silent — the heatmap is a secondary panel; a failed load leaves it empty.
   }

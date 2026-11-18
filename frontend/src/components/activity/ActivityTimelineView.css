@@ -259,7 +259,7 @@
 /* The stat panel is a fixed-width right column only in the full variant;
    the compact variant never renders it. */
 .activity-timeline--full .activity-stat-panel {
-  flex: 0 0 15rem;
+  flex: 0 0 26rem;
 }
 
 .activity-timeline--compact .activity-timeline__content {
@@ -281,4 +281,37 @@
   font-size: 0.8rem;
   cursor: pointer;
   max-width: 14rem;
+}
+
+/* ─── Collapsible bucket header ───────────────────────────────────────── */
+
+.activity-bucket__toggle {
+  appearance: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity-bucket__toggle svg { align-self: center; flex: none; }
+.activity-bucket__toggle:hover .activity-bucket__title { color: var(--text-normal); }
+
+.activity-bucket__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-faint, var(--text-subtle));
 }
