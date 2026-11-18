@@ -874,6 +874,10 @@
 html {
   height: 100%;
   overflow: hidden;
+  /* `clip` forbids programmatic scrolling too: a focus()/scrollIntoView() on a
+     partly hidden element would otherwise shift the whole document (`hidden`
+     still scrolls) and leave a gap at the bottom until reload. */
+  overflow: clip;
 }
 
 body {
@@ -881,6 +885,7 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  overflow: clip;
   overscroll-behavior: none;
   background: var(--bg-base);
   color: var(--text-primary);
@@ -893,6 +898,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overflow: clip;
 }
 
 h1, h2, h3, h4, h5, h6 {
