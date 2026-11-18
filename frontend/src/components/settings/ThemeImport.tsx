@@ -5,6 +5,7 @@
  * Whether a theme with the same name exists is looked up right before saving, so this tab needs no theme list of
  * its own. A theme that is overwritten while active is re-applied locally; other clients follow via `vault:change`.
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react'
 import { Upload } from 'lucide-react'
@@ -24,6 +25,7 @@ interface PendingOverwrite {
 }
 
 export function ThemeImport() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
 
@@ -42,15 +44,15 @@ export function ThemeImport() {
     try {
       await apiClient.saveTheme(vaultId, themeId, css, manifest)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Theme konnte nicht importiert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.importFailed')))
       return
     }
     if (vaultRef.current !== vaultId) return
     if (!replacing) {
-      setNotice(`„${label}“ wurde importiert. Aktivieren kannst du es unter „Installiert“.`)
+      setNotice(translateNow('settingsUi.imported', { label: label }))
       return
     }
-    setNotice(`„${label}“ wurde überschrieben.`)
+    setNotice(translateNow('settingsUi.overwritten', { label: label }))
     // Re-applying keeps the screen in step when the overwritten theme is the active one. Whether it is active is
     // asked now, not when the file was picked: the choice may have changed while the dialog was open.
     try {
@@ -76,12 +78,12 @@ export function ThemeImport() {
       manifest = await readManifestFields(picked.files.manifest)
       css = await picked.files.css.text()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Die Dateien konnten nicht gelesen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.filesUnreadable')))
       return
     }
     const themeId = deriveThemeId(manifest.name ?? null, picked.files.css.name)
     if (themeId === null) {
-      setError('Der Theme-Name fehlt: Bitte manifest.json mit "name" mitliefern oder die CSS-Datei umbenennen.')
+      setError(translateNow('settingsUi.themeNameMissing'))
       return
     }
 
@@ -90,7 +92,7 @@ export function ThemeImport() {
     try {
       listed = await apiClient.listThemes(vaultId)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Themes konnten nicht geladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.themesLoadFailed')))
       return
     }
     // Case-insensitive: on Windows and macOS `Minimal` and `minimal` are the same folder.
@@ -128,8 +130,8 @@ export function ThemeImport() {
   return (
     <div className="theme-manager">
       <p className="theme-manager__note">
-        Importiere eine <code>theme.css</code> aus Obsidian, optional mit der zugehörigen <code>manifest.json</code>.
-        Das Theme landet im Ordner <code>.obsidian/themes/</code> dieses Vaults.
+        {t('settingsUi.importIntro1')} <code>theme.css</code> {t('settingsUi.importIntro2')} <code>manifest.json</code>.
+        {t('settingsUi.importIntro3')} <code>.obsidian/themes/</code> {t('settingsUi.importIntro4')}
       </p>
 
       {error && <p className="theme-manager__error" role="alert">{error}</p>}
@@ -138,7 +140,7 @@ export function ThemeImport() {
         className={`theme-manager__dropzone${dragging ? ' theme-manager__dropzone--active' : ''}`}
         role="button"
         tabIndex={0}
-        aria-label="Theme importieren: theme.css und optional manifest.json auswählen oder hierher ziehen"
+        aria-label={t('settingsUi.importDropLabel')}
         onClick={() => fileInputRef.current?.click()}
         onKeyDown={handleDropZoneKey}
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
@@ -146,7 +148,7 @@ export function ThemeImport() {
         onDrop={(e) => void handleDrop(e)}
       >
         <Upload size={16} aria-hidden="true" />
-        <span>theme.css (und optional manifest.json) auswählen oder hierher ziehen</span>
+        <span>{t('settingsUi.importDropText')}</span>
       </div>
       {/* Outside the role="button" zone: an input nested in an interactive control fails axe's nested-interactive rule. */}
       <input
@@ -165,9 +167,9 @@ export function ThemeImport() {
 
       <ConfirmModal
         open={overwrite !== null}
-        title="Theme überschreiben"
-        message={overwrite ? `Ein Theme "${overwrite.themeId}" existiert bereits. Überschreiben?` : ''}
-        confirmLabel="Überschreiben"
+        title={t('settingsUi.overwriteTitle')}
+        message={overwrite ? t('settingsUi.overwriteMessage', { id: overwrite.themeId }) : ''}
+        confirmLabel={t('settingsUi.overwrite')}
         variant="danger"
         onConfirm={() => {
           const pending = overwrite

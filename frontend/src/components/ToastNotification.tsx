@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from '../i18n'
 import { X, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import './ToastNotification.css'
 
@@ -112,6 +113,7 @@ function MountedNode({ node, className }: { node: HTMLElement; className: string
  * Manages its own internal toast queue.
  */
 export function ToastNotification() {
+  const { t } = useTranslation()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [fadingOut, setFadingOut] = useState<Set<string>>(new Set())
   const dismissTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -252,7 +254,7 @@ export function ToastNotification() {
               type="button"
               className="toast-notification-item__close"
               onClick={() => handleClose(toast.id)}
-              aria-label="Schließen"
+              aria-label={t('commonUi.c_close')}
             >
               <X size={14} />
             </button>

@@ -4,6 +4,7 @@
  * when its expression can be split that way, otherwise the raw expression.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { BaseDocument, BaseFilterNode, BaseRow } from '@slatebase/shared-contracts'
 import {
@@ -13,12 +14,6 @@ import {
 } from './base-edit'
 import { moveFilterNode, nudgeFilterNode } from './base-filter-tree'
 import { ColumnDropdown } from './base-column-dropdown'
-
-const GROUP_LABELS: Record<FilterGroupKey, string> = {
-  and: 'Alle Bedingungen treffen zu',
-  or: 'Mindestens eine Bedingung trifft zu',
-  not: 'Keine Bedingung trifft zu',
-}
 
 const DEFAULT_CONDITION: Condition = { property: 'file.name', operator: 'contains', value: '' }
 
@@ -70,6 +65,7 @@ interface ConditionRowProps {
 }
 
 const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns, disabled, onChange, onRemove, rawMode, onRawModeChange }: ConditionRowProps) {
+  const { t } = useTranslation()
   const parsed = parseCondition(expression)
   const condition = parsed ?? DEFAULT_CONDITION
   const emit = (next: Condition) => onChange(conditionToExpression(next))
@@ -80,7 +76,7 @@ const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns
       {rawMode || (parsed === null && expression !== '') ? (
         <CommitInput
           className="bases-tb__input bases-tb__input--grow"
-          label="Filterausdruck"
+          label={t('basesUi.filterExpression')}
           placeholder='z. B. status == "offen"'
           value={expression}
           disabled={disabled}
@@ -89,21 +85,21 @@ const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns
       ) : (
         <>
           {fixedProperty ? (
-            <span className="bases-tb__select bases-tb__select--fixed" aria-label="Eigenschaft">Datei</span>
+            <span className="bases-tb__select bases-tb__select--fixed" aria-label={t('basesUi.property')}>{t('basesUi.file')}</span>
           ) : (
                       <ColumnDropdown
               doc={doc}
               rows={rows}
               columns={columns}
               value={condition.property}
-              label="Eigenschaft"
+              label={t('basesUi.property')}
               disabled={disabled}
               onChange={(property) => emit({ ...condition, property })}
             />
           )}
           <select
             className="bases-tb__select"
-            aria-label="Operator"
+            aria-label={t('basesUi.operator')}
             value={condition.operator}
             disabled={disabled}
             onChange={(e) => {
@@ -112,12 +108,12 @@ const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns
               emit({ ...condition, operator, property })
             }}
           >
-            {(Object.keys(OPERATOR_LABELS) as Operator[]).map((op) => <option key={op} value={op}>{OPERATOR_LABELS[op]}</option>)}
+            {(Object.keys(OPERATOR_LABELS) as Operator[]).map((op) => <option key={op} value={op}>{t(`basesUi.op_${op}`)}</option>)}
           </select>
           {!VALUELESS_OPERATORS.has(condition.operator) && (
             <CommitInput
               className="bases-tb__input bases-tb__input--grow"
-              label="Wert"
+              label={t('basesUi.value')}
               value={condition.value}
               disabled={disabled}
               onCommit={(value) => emit({ ...condition, value })}
@@ -128,15 +124,15 @@ const ConditionRow = memo(function ConditionRow({ expression, doc, rows, columns
       <button
         type="button"
         className="bases-tb__icon-btn"
-        title={rawMode ? 'Zurück zum Baukasten' : 'Als Ausdruck bearbeiten'}
-        aria-label={rawMode ? 'Zurück zum Baukasten' : 'Als Ausdruck bearbeiten'}
+        title={rawMode ? t('basesUi.backToBuilder') : t('basesUi.editAsExpression')}
+        aria-label={rawMode ? t('basesUi.backToBuilder') : t('basesUi.editAsExpression')}
         aria-pressed={rawMode}
         disabled={disabled || (rawMode && parsed === null && expression !== '')}
         onClick={() => onRawModeChange(!rawMode)}
       >
         {'</>'}
       </button>
-      <button type="button" className="bases-tb__icon-btn" aria-label="Bedingung entfernen" title="Bedingung entfernen" disabled={disabled} onClick={onRemove}>×</button>
+      <button type="button" className="bases-tb__icon-btn" aria-label={t('basesUi.removeCondition')} title={t('basesUi.removeCondition')} disabled={disabled} onClick={onRemove}>×</button>
     </div>
   )
 })
@@ -171,26 +167,28 @@ interface GripHandlers {
 function RowTools({ index, count, kind, scopeMove, path, onChange, grip }: {
   index: number
   count: number
-  kind: 'Bedingung' | 'Gruppe'
+  kind: 'condition' | 'group'
   scopeMove?: ScopeMove
   path: FilterPath
   onChange: (update: RootUpdate) => void
   grip: GripHandlers
 }) {
+  const { t } = useTranslation()
+  const kindLabel = kind === 'condition' ? t('basesUi.kindCondition') : t('basesUi.kindGroup')
   return (
     <div className="bases-tb__row-tools">
       {count > 1 && (
         <>
           <span
             className="bases-tb__grip"
-            title="Ziehen zum Umsortieren"
+            title={t('basesUi.dragToReorder')}
             aria-hidden="true"
             {...grip}
           >
             ⠿
           </span>
-          <button type="button" className="bases-tb__icon-btn" aria-label={`${kind} nach oben`} title={`${kind} nach oben`} disabled={index === 0} onClick={() => onChange((r) => nudgeFilterNode(r, path, -1))}>↑</button>
-          <button type="button" className="bases-tb__icon-btn" aria-label={`${kind} nach unten`} title={`${kind} nach unten`} disabled={index === count - 1} onClick={() => onChange((r) => nudgeFilterNode(r, path, 1))}>↓</button>
+          <button type="button" className="bases-tb__icon-btn" aria-label={t('basesUi.kindUp', { kind: kindLabel })} title={t('basesUi.kindUp', { kind: kindLabel })} disabled={index === 0} onClick={() => onChange((r) => nudgeFilterNode(r, path, -1))}>↑</button>
+          <button type="button" className="bases-tb__icon-btn" aria-label={t('basesUi.kindDown', { kind: kindLabel })} title={t('basesUi.kindDown', { kind: kindLabel })} disabled={index === count - 1} onClick={() => onChange((r) => nudgeFilterNode(r, path, 1))}>↓</button>
         </>
       )}
       {scopeMove && (
@@ -201,6 +199,7 @@ function RowTools({ index, count, kind, scopeMove, path, onChange, grip }: {
 }
 
 const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, disabled, onChange, scopeMove }: GroupEditorProps) {
+  const { t } = useTranslation()
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
   const rowEls = useRef<Array<HTMLDivElement | null>>([])
@@ -251,15 +250,15 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
       <div className="bases-tb__group-head">
         <select
           className="bases-tb__select"
-          aria-label="Verknüpfung"
+          aria-label={t('basesUi.connector')}
           value={key}
           disabled={disabled}
           onChange={(e) => { const key = e.target.value as FilterGroupKey; onChange((r) => setGroupKey(r, path, key)) }}
         >
-          {(Object.keys(GROUP_LABELS) as FilterGroupKey[]).map((k) => <option key={k} value={k}>{GROUP_LABELS[k]}</option>)}
+          {(['and', 'or', 'not'] as FilterGroupKey[]).map((k) => <option key={k} value={k}>{t(`basesUi.group_${k}`)}</option>)}
         </select>
         {path.length > 0 && (
-          <button type="button" className="bases-tb__icon-btn" aria-label="Gruppe entfernen" title="Gruppe entfernen" disabled={disabled} onClick={() => onChange((r) => removeFilterNode(r, path))}>×</button>
+          <button type="button" className="bases-tb__icon-btn" aria-label={t('basesUi.removeGroup')} title={t('basesUi.removeGroup')} disabled={disabled} onClick={() => onChange((r) => removeFilterNode(r, path))}>×</button>
         )}
       </div>
       {children.map((child, i) => {
@@ -302,7 +301,7 @@ const GroupEditor = memo(function GroupEditor({ node, path, doc, rows, columns, 
             <RowTools
               index={i}
               count={children.length}
-              kind={typeof child === 'string' ? 'Bedingung' : 'Gruppe'}
+              kind={typeof child === 'string' ? 'condition' : 'group'}
               scopeMove={scopeMove}
               path={childPath}
               onChange={onChange}

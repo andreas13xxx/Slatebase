@@ -5,6 +5,7 @@
  *
  * @module components/settings/GitSyncSection
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { RefreshCw, Pencil, Trash2, Plus, KeyRound, Copy } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -42,6 +43,7 @@ function looksLikeFramedPrivateKey(value: string): boolean {
 }
 
 export function GitSyncSection() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
 
@@ -93,7 +95,7 @@ export function GitSyncSection() {
     try {
       applyLoaded(await fetchData())
     } catch (err) {
-      setError(extractErrorMessage(err, 'Git-Sync-Konfiguration konnte nicht geladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.gitLoadFailed')))
     } finally {
       setLoading(false)
     }
@@ -104,7 +106,7 @@ export function GitSyncSection() {
     let cancelled = false
     fetchData()
       .then((result) => { if (!cancelled) { applyLoaded(result); setError(null) } })
-      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, 'Git-Sync-Konfiguration konnte nicht geladen werden')) })
+      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, translateNow('settingsUi.gitLoadFailed'))) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [vaultId, apiClient, fetchData, applyLoaded])
@@ -118,7 +120,7 @@ export function GitSyncSection() {
       setBranch(result.branch)
       setBranchInput(result.branch)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Branch konnte nicht gespeichert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.branchSaveFailed')))
     } finally {
       setSavingBranch(false)
     }
@@ -132,7 +134,7 @@ export function GitSyncSection() {
       await apiClient.updateGitSyncRemote(vaultId, remote.id, { enabled: nextEnabled })
     } catch (err) {
       setRemotes((prev) => prev.map((r) => (r.id === remote.id ? { ...r, enabled: remote.enabled } : r)))
-      setError(extractErrorMessage(err, 'Remote konnte nicht aktualisiert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.remoteUpdateFailed')))
     }
   }, [vaultId, apiClient])
 
@@ -145,10 +147,10 @@ export function GitSyncSection() {
       const status = await apiClient.getGitSyncStatus(vaultId, remote.id)
       setStatuses((prev) => ({ ...prev, [remote.id]: status }))
       if (outcome.result === 'error') {
-        setError(outcome.error ?? 'Synchronisation fehlgeschlagen')
+        setError(outcome.error ?? translateNow('settingsUi.syncFailed'))
       }
     } catch (err) {
-      setError(extractErrorMessage(err, 'Synchronisation fehlgeschlagen'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.syncFailed')))
     } finally {
       setSyncingId(null)
     }
@@ -162,7 +164,7 @@ export function GitSyncSection() {
       await apiClient.deleteGitSyncRemote(vaultId, target.id)
       await load()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Remote konnte nicht entfernt werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.remoteRemoveFailed')))
     }
   }, [deleting, vaultId, apiClient, load])
 
@@ -208,7 +210,7 @@ export function GitSyncSection() {
       setForm((f) => ({ ...f, credential: privateKey }))
       setDisplayedPublicKey(publicKey)
     } catch (err) {
-      setFormError(extractErrorMessage(err, 'Schlüsselpaar konnte nicht generiert werden'))
+      setFormError(extractErrorMessage(err, translateNow('settingsUi.keygenFailed')))
     } finally {
       setGeneratingKey(false)
     }
@@ -230,11 +232,11 @@ export function GitSyncSection() {
 
     const intervalMinutes = Number.parseInt(form.intervalMinutes, 10)
     if (!form.name.trim() || !form.remoteUrl.trim()) {
-      setFormError('Name und Remote-URL sind erforderlich')
+      setFormError(translateNow('settingsUi.nameUrlRequired'))
       return
     }
     if (!Number.isFinite(intervalMinutes) || intervalMinutes < 1) {
-      setFormError('Das Intervall muss mindestens 1 Minute betragen')
+      setFormError(translateNow('settingsUi.intervalMin1'))
       return
     }
     if (editingId === null && form.credential.trim() === '') {
@@ -242,7 +244,7 @@ export function GitSyncSection() {
       return
     }
     if (form.authMethod === 'ssh-key' && form.credential.trim() !== '' && !looksLikeFramedPrivateKey(form.credential)) {
-      setFormError('Der private SSH-Schlüssel muss die vollständigen Zeilen "-----BEGIN ... PRIVATE KEY-----" und "-----END ... PRIVATE KEY-----" enthalten')
+      setFormError(translateNow('settingsUi.sshKeyFormat'))
       return
     }
 
@@ -272,7 +274,7 @@ export function GitSyncSection() {
       setEditingId(null)
       await load()
     } catch (err) {
-      setFormError(extractErrorMessage(err, 'Remote konnte nicht gespeichert werden'))
+      setFormError(extractErrorMessage(err, translateNow('settingsUi.remoteSaveFailed')))
     } finally {
       setFormSaving(false)
     }
@@ -285,11 +287,11 @@ export function GitSyncSection() {
       {error && <p className="settings-error" role="alert">{error}</p>}
 
       <SettingSection
-        title="Branch"
-        description="Alle Remotes dieses Vaults teilen sich denselben lokalen Branch, da ein Arbeitsverzeichnis nur auf einem Branch stehen kann."
+        title={t('settingsUi.branch')}
+        description={t('settingsUi.branchDesc')}
       >
         <div className="settings-field">
-          <label htmlFor="git-sync-branch" className="settings-field-label">Branch</label>
+          <label htmlFor="git-sync-branch" className="settings-field-label">{t('settingsUi.branch')}</label>
           <input
             id="git-sync-branch"
             type="text"
@@ -301,16 +303,16 @@ export function GitSyncSection() {
         </div>
         <div className="settings-actions">
           <Button variant="primary" onClick={() => void handleSaveBranch()} disabled={savingBranch || branchInput.trim() === branch || branchInput.trim() === ''}>
-            {savingBranch ? 'Speichern…' : 'Speichern'}
+            {savingBranch ? t('settingsUi.saving') : t('settingsUi.save')}
           </Button>
         </div>
       </SettingSection>
 
-      <SettingSection title="Remotes" description="Git-Remotes, mit denen dieser Vault synchronisiert wird.">
-        {loading && <p className="settings-loading">Lädt…</p>}
+      <SettingSection title={t('settingsUi.remotes')} description={t('settingsUi.remotesDesc')}>
+        {loading && <p className="settings-loading">{t('settingsUi.loadingShort')}</p>}
 
         {!loading && remotes.length === 0 && (
-          <p className="sync-section__empty">Noch keine Remotes konfiguriert.</p>
+          <p className="sync-section__empty">{t('settingsUi.noRemotes')}</p>
         )}
 
         {!loading && remotes.length > 0 && (
@@ -325,7 +327,7 @@ export function GitSyncSection() {
                         type="checkbox"
                         checked={remote.enabled}
                         onChange={() => void handleToggleEnabled(remote)}
-                        aria-label={`${remote.name} aktivieren`}
+                        aria-label={t('settingsUi.enableNamed', { name: remote.name })}
                       />
                     </label>
                     <span className="sync-section__item-name">{remote.name}</span>
@@ -334,8 +336,8 @@ export function GitSyncSection() {
                   <span className="sync-section__item-detail">{remote.remoteUrl}</span>
 
                   <div className="sync-section__item-meta">
-                    <span>{remote.authMethod === 'https-token' ? 'HTTPS-Token' : 'SSH-Schlüssel'}</span>
-                    <span>alle {remote.intervalMinutes} Min.</span>
+                    <span>{remote.authMethod === 'https-token' ? t('settingsUi.httpsToken') : t('settingsUi.sshKey')}</span>
+                    <span>{t('settingsUi.everyMin', { n: remote.intervalMinutes })}</span>
                   </div>
 
                   {remote.authMethod === 'ssh-key' && remote.publicKey && (() => {
@@ -344,7 +346,7 @@ export function GitSyncSection() {
                       <div className="sync-section__item-publickey">
                         <code>{publicKey}</code>
                         <Button type="button" variant="ghost" size="sm" onClick={() => void handleCopyPublicKey(publicKey)}>
-                          <Copy size={12} aria-hidden="true" /> Kopieren
+                          <Copy size={12} aria-hidden="true" /> {t('settingsUi.copy')}
                         </Button>
                       </div>
                     )
@@ -356,13 +358,13 @@ export function GitSyncSection() {
                     </span>
                     <span>{formatLastRun(status?.lastRunAt ?? null)}</span>
                     {status?.lastResult === 'success' && (status.lastPulledFiles !== null || status.lastPushedFiles !== null) && (
-                      <span>{status.lastPulledFiles ?? 0} Datei(en) geholt, {status.lastPushedFiles ?? 0} Datei(en) gepusht</span>
+                      <span>{t('settingsUi.filesPulledPushed', { pulled: status.lastPulledFiles ?? 0, pushed: status.lastPushedFiles ?? 0 })}</span>
                     )}
                   </div>
 
                   {status?.lastResult === 'conflict' && status.conflictFiles.length > 0 && (
                     <p className="sync-section__item-error">
-                      Konflikt in: {status.conflictFiles.join(', ')} — bitte im Editor direkt lösen. Die automatische Synchronisation ist für diesen Remote pausiert, bis ihr danach erneut auf "Jetzt synchronisieren" klickt.
+                      {t('settingsUi.conflictIn', { files: status.conflictFiles.join(', ') })}
                     </p>
                   )}
                   {status?.lastResult === 'error' && status.lastError && (
@@ -371,13 +373,13 @@ export function GitSyncSection() {
 
                   <div className="sync-section__item-actions">
                     <Button size="sm" onClick={() => void handleSyncNow(remote)} disabled={syncingId === remote.id}>
-                      <RefreshCw size={14} aria-hidden="true" /> {syncingId === remote.id ? 'Synchronisiert…' : 'Jetzt synchronisieren'}
+                      <RefreshCw size={14} aria-hidden="true" /> {syncingId === remote.id ? t('settingsUi.syncing') : t('settingsUi.syncNow')}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEditForm(remote)}>
-                      <Pencil size={14} aria-hidden="true" /> Bearbeiten
+                      <Pencil size={14} aria-hidden="true" /> {t('settingsUi.edit')}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setDeleting(remote)}>
-                      <Trash2 size={14} aria-hidden="true" /> Entfernen
+                      <Trash2 size={14} aria-hidden="true" /> {t('settingsUi.remove')}
                     </Button>
                   </div>
                 </li>
@@ -389,7 +391,7 @@ export function GitSyncSection() {
         {!formOpen && (
           <div className="settings-actions">
             <Button variant="secondary" onClick={openCreateForm}>
-              <Plus size={14} aria-hidden="true" /> Remote hinzufügen
+              <Plus size={14} aria-hidden="true" /> {t('settingsUi.addRemote')}
             </Button>
           </div>
         )}
@@ -399,20 +401,20 @@ export function GitSyncSection() {
             {formError && <p className="settings-error" role="alert">{formError}</p>}
 
             <div className="settings-field">
-              <label htmlFor="git-sync-form-name" className="settings-field-label">Name</label>
+              <label htmlFor="git-sync-form-name" className="settings-field-label">{t('settingsUi.name')}</label>
               <input
                 id="git-sync-form-name"
                 type="text"
                 className="settings-field-input"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="z.B. GitHub"
+                placeholder={t('settingsUi.namePhGit')}
                 disabled={formSaving}
               />
             </div>
 
             <div className="settings-field">
-              <label htmlFor="git-sync-form-url" className="settings-field-label">Remote-URL</label>
+              <label htmlFor="git-sync-form-url" className="settings-field-label">{t('settingsUi.remoteUrl')}</label>
               <input
                 id="git-sync-form-url"
                 type="text"
@@ -426,7 +428,7 @@ export function GitSyncSection() {
 
             <div className="sync-section__form-row">
               <div className="settings-field">
-                <label htmlFor="git-sync-form-auth" className="settings-field-label">Auth-Methode</label>
+                <label htmlFor="git-sync-form-auth" className="settings-field-label">{t('settingsUi.authMethod')}</label>
                 <select
                   id="git-sync-form-auth"
                   className="settings-field-input"
@@ -437,12 +439,12 @@ export function GitSyncSection() {
                   }}
                   disabled={formSaving}
                 >
-                  <option value="https-token">HTTPS-Token</option>
-                  <option value="ssh-key">SSH-Schlüssel</option>
+                  <option value="https-token">{t('settingsUi.httpsToken')}</option>
+                  <option value="ssh-key">{t('settingsUi.sshKey')}</option>
                 </select>
               </div>
               <div className="settings-field">
-                <label htmlFor="git-sync-form-interval" className="settings-field-label">Intervall (Minuten)</label>
+                <label htmlFor="git-sync-form-interval" className="settings-field-label">{t('settingsUi.intervalMinutes')}</label>
                 <input
                   id="git-sync-form-interval"
                   type="number"
@@ -458,14 +460,14 @@ export function GitSyncSection() {
 
             <div className="settings-field">
               <label htmlFor="git-sync-form-credential" className="settings-field-label">
-                {form.authMethod === 'https-token' ? 'Personal Access Token' : 'Privater SSH-Schlüssel'}
+                {form.authMethod === 'https-token' ? t('settingsUi.personalToken') : t('settingsUi.privateSshKey')}
               </label>
               <p className="settings-field-hint">
                 {editingId !== null
-                  ? 'Leer lassen, um das gespeicherte Credential unverändert zu lassen.'
+                  ? t('settingsUi.credKeep')
                   : form.authMethod === 'https-token'
-                    ? 'Wird verschlüsselt gespeichert und nie im Klartext zurückgegeben.'
-                    : 'Vollständiger Inhalt der privaten Schlüsseldatei, inklusive der Zeilen "-----BEGIN ... PRIVATE KEY-----" und "-----END ... PRIVATE KEY-----". Wird verschlüsselt gespeichert und nie im Klartext zurückgegeben.'}
+                    ? t('settingsUi.credEncrypted')
+                    : t('settingsUi.credSshHint')}
               </p>
               {form.authMethod === 'https-token' ? (
                 <PasswordInput
@@ -495,19 +497,19 @@ export function GitSyncSection() {
                       onClick={() => void handleGenerateKey()}
                       disabled={formSaving || generatingKey}
                     >
-                      <KeyRound size={14} aria-hidden="true" /> {generatingKey ? 'Generiert…' : 'Schlüsselpaar generieren'}
+                      <KeyRound size={14} aria-hidden="true" /> {generatingKey ? t('settingsUi.generating') : t('settingsUi.generateKey')}
                     </Button>
                   </div>
                   {displayedPublicKey && (
                     <div className="ssh-public-key-box">
                       <code className="ssh-public-key-box__value">{displayedPublicKey}</code>
                       <Button type="button" variant="ghost" size="sm" onClick={() => void handleCopyPublicKey(displayedPublicKey)}>
-                        <Copy size={14} aria-hidden="true" /> {publicKeyCopied ? 'Kopiert' : 'Kopieren'}
+                        <Copy size={14} aria-hidden="true" /> {publicKeyCopied ? t('settingsUi.copied') : t('settingsUi.copy')}
                       </Button>
                     </div>
                   )}
                   <p className="settings-field-hint">
-                    Öffentlichen Schlüssel als Deploy Key (mit Schreibzugriff) im GitHub-Repository unter Settings → Deploy keys eintragen.
+                    {t('settingsUi.deployKeyHint')}
                   </p>
                 </>
               )}
@@ -520,15 +522,15 @@ export function GitSyncSection() {
                 onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
                 disabled={formSaving}
               />
-              Aktiviert
+              {t('settingsUi.enabled')}
             </label>
 
             <div className="settings-actions">
               <Button type="submit" variant="primary" disabled={formSaving}>
-                {formSaving ? 'Speichern…' : 'Speichern'}
+                {formSaving ? t('settingsUi.saving') : t('settingsUi.save')}
               </Button>
               <Button type="button" variant="ghost" onClick={closeForm} disabled={formSaving}>
-                Abbrechen
+                {t('settingsUi.cancel')}
               </Button>
             </div>
           </form>
@@ -537,9 +539,9 @@ export function GitSyncSection() {
 
       <ConfirmModal
         open={deleting !== null}
-        title="Remote entfernen"
-        message={deleting ? `"${deleting.name}" wirklich entfernen? Das gespeicherte Credential wird ebenfalls gelöscht.` : ''}
-        confirmLabel="Entfernen"
+        title={t('settingsUi.removeRemoteTitle')}
+        message={deleting ? t('settingsUi.removeRemoteMessage', { name: deleting.name }) : ''}
+        confirmLabel={t('settingsUi.remove')}
         variant="danger"
         onConfirm={() => void handleDeleteConfirm()}
         onCancel={() => setDeleting(null)}

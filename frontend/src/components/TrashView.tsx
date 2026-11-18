@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation, translateNow } from '../i18n'
 import { Trash2, RotateCcw, FileText, Folder, Loader2 } from 'lucide-react'
 import type { IApiClient, TrashEntryInfo } from '../api'
 import { ConfirmModal } from './ConfirmModal'
@@ -29,6 +30,7 @@ function formatDeletionDate(isoDate: string): string {
  * Papierkorb-Ansicht — displays deleted files with restore and permanent delete actions.
  */
 export function TrashView({ vaultId, apiClient }: TrashViewProps) {
+  const { t } = useTranslation()
   const [entries, setEntries] = useState<TrashEntryInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
       const result = await apiClient.listTrash(vaultId)
       setEntries(result.entries)
     } catch {
-      showToast('error', 'Papierkorb konnte nicht geladen werden.')
+      showToast('error', translateNow('commonUi.c_trashLoadFailed'))
     } finally {
       setLoading(false)
     }
@@ -56,13 +58,13 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
     setActionInProgress(entry.id)
     try {
       await apiClient.restoreTrash(vaultId, entry.id)
-      showToast('success', `"${entry.originalPath}" wiederhergestellt.`)
+      showToast('success', translateNow('commonUi.c_restoredNamed', { path: entry.originalPath }))
       await fetchTrash()
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
-        : 'Unbekannter Fehler'
-      showToast('error', `Wiederherstellung fehlgeschlagen: ${message}`)
+        : translateNow('commonUi.c_unknownError')
+      showToast('error', translateNow('commonUi.c_restoreFailed', { message: message }))
     } finally {
       setActionInProgress(null)
     }
@@ -73,13 +75,13 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
     setActionInProgress(entry.id)
     try {
       await apiClient.deleteTrash(vaultId, entry.id)
-      showToast('success', `"${entry.originalPath}" endgültig gelöscht.`)
+      showToast('success', translateNow('commonUi.c_deletedPermanently', { path: entry.originalPath }))
       await fetchTrash()
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
-        : 'Unbekannter Fehler'
-      showToast('error', `Löschen fehlgeschlagen: ${message}`)
+        : translateNow('commonUi.c_unknownError')
+      showToast('error', translateNow('commonUi.c_deleteFailed', { message: message }))
     } finally {
       setActionInProgress(null)
     }
@@ -87,34 +89,34 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
 
   if (loading) {
     return (
-      <div className="trash-view" aria-label="Papierkorb">
+      <div className="trash-view" aria-label={t('commonUi.c_trash')}>
         <div className="trash-view__header">
           <Trash2 size={18} className="trash-view__header-icon" aria-hidden="true" />
-          <h2 className="trash-view__title">Papierkorb</h2>
+          <h2 className="trash-view__title">{t('commonUi.c_trash')}</h2>
         </div>
         <div className="trash-view__loading" role="status" aria-live="polite">
           <Loader2 size={18} className="trash-view__spinner" aria-hidden="true" />
-          <span>Lade Papierkorb…</span>
+          <span>{t('commonUi.c_trashLoading')}</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="trash-view" aria-label="Papierkorb">
+    <div className="trash-view" aria-label={t('commonUi.c_trash')}>
       <div className="trash-view__header">
         <Trash2 size={18} className="trash-view__header-icon" aria-hidden="true" />
-        <h2 className="trash-view__title">Papierkorb</h2>
-        <span className="trash-view__count" aria-label={`${entries.length} Einträge`}>{entries.length}</span>
+        <h2 className="trash-view__title">{t('commonUi.c_trash')}</h2>
+        <span className="trash-view__count" aria-label={t('commonUi.c_entriesCount', { n: entries.length })}>{entries.length}</span>
       </div>
 
       {entries.length === 0 ? (
         <div className="trash-view__empty" role="status" aria-live="polite">
           <Trash2 size={32} className="trash-view__empty-icon" aria-hidden="true" />
-          <p className="trash-view__empty-text">Der Papierkorb ist leer.</p>
+          <p className="trash-view__empty-text">{t('commonUi.c_trashEmpty')}</p>
         </div>
       ) : (
-        <ul className="trash-view__list" role="list" aria-label="Gelöschte Dateien">
+        <ul className="trash-view__list" role="list" aria-label={t('commonUi.c_deletedFiles')}>
           {entries.map((entry) => (
             <li key={entry.id} className="trash-view__entry">
               <div className="trash-view__entry-icon" aria-hidden="true">
@@ -128,31 +130,31 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
                   {entry.originalPath}
                 </span>
                 <span className="trash-view__entry-date">
-                  Gelöscht: {formatDeletionDate(entry.deletedAt)}
+                  {t('commonUi.c_deletedOn', { date: formatDeletionDate(entry.deletedAt) })}
                 </span>
               </div>
-              <div className="trash-view__entry-actions" role="group" aria-label={`Aktionen für ${entry.originalPath}`}>
+              <div className="trash-view__entry-actions" role="group" aria-label={t('commonUi.c_actionsFor', { path: entry.originalPath })}>
                 <button
                   type="button"
                   className="trash-view__btn trash-view__btn--restore"
                   onClick={() => void handleRestore(entry)}
                   disabled={actionInProgress === entry.id}
-                  title="Wiederherstellen"
-                  aria-label={`${entry.originalPath} wiederherstellen`}
+                  title={t('commonUi.c_restore')}
+                  aria-label={t('commonUi.c_restoreNamed', { path: entry.originalPath })}
                 >
                   <RotateCcw size={14} aria-hidden="true" />
-                  <span>Wiederherstellen</span>
+                  <span>{t('commonUi.c_restore')}</span>
                 </button>
                 <button
                   type="button"
                   className="trash-view__btn trash-view__btn--delete"
                   onClick={() => setConfirmDelete(entry)}
                   disabled={actionInProgress === entry.id}
-                  title="Endgültig löschen"
-                  aria-label={`${entry.originalPath} endgültig löschen`}
+                  title={t('commonUi.c_deletePermanently')}
+                  aria-label={t('commonUi.c_deleteNamed', { path: entry.originalPath })}
                 >
                   <Trash2 size={14} aria-hidden="true" />
-                  <span>Endgültig löschen</span>
+                  <span>{t('commonUi.c_deletePermanently')}</span>
                 </button>
               </div>
             </li>
@@ -162,13 +164,13 @@ export function TrashView({ vaultId, apiClient }: TrashViewProps) {
 
       <ConfirmModal
         open={confirmDelete !== null}
-        title="Endgültig löschen"
+        title={t('commonUi.c_deletePermanently')}
         message={confirmDelete
-          ? `"${confirmDelete.originalPath}" wird unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`
+          ? t('commonUi.c_permanentDeleteMessage', { path: confirmDelete.originalPath })
           : ''
         }
-        confirmLabel="Endgültig löschen"
-        cancelLabel="Abbrechen"
+        confirmLabel={t('commonUi.c_deletePermanently')}
+        cancelLabel={t('commonUi.c_cancel')}
         variant="danger"
         onConfirm={() => {
           if (confirmDelete) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from '../i18n'
 import { CheckCircle, ArrowUpCircle, Info, AlertTriangle, Loader } from 'lucide-react'
 import { compareSemver } from '../utils/semver'
 import { fetchReleaseList } from '../hooks/releaseApi'
@@ -20,6 +21,7 @@ interface VersionCheckState {
  * Designed for the Admin configuration page.
  */
 export function VersionCheckCard() {
+  const { t } = useTranslation()
   const [state, setState] = useState<VersionCheckState>({
     installedVersion: null,
     latestVersion: null,
@@ -101,7 +103,7 @@ export function VersionCheckCard() {
     return (
       <div className="version-check-card version-check-card--loading">
         <Loader size={16} className="version-check-card__spinner" />
-        <span className="version-check-card__text">Version wird geprüft...</span>
+        <span className="version-check-card__text">{t('commonUi.c_checkingVersion')}</span>
       </div>
     )
   }
@@ -110,7 +112,7 @@ export function VersionCheckCard() {
     return (
       <div className="version-check-card version-check-card--error">
         <AlertTriangle size={16} className="version-check-card__icon" />
-        <span className="version-check-card__text">Verbindung zum Backend nicht möglich</span>
+        <span className="version-check-card__text">{t('commonUi.c_backendUnreachable')}</span>
       </div>
     )
   }
@@ -120,7 +122,7 @@ export function VersionCheckCard() {
     return (
       <div className="version-check-card version-check-card--development">
         <Info size={16} className="version-check-card__icon" />
-        <span className="version-check-card__text">Entwicklungsversion</span>
+        <span className="version-check-card__text">{t('commonUi.c_devVersion')}</span>
       </div>
     )
   }
@@ -147,7 +149,7 @@ export function VersionCheckCard() {
         <ArrowUpCircle size={16} className="version-check-card__icon" />
         <div className="version-check-card__content">
           <span className="version-check-card__text">
-            Neue Version v{state.latestVersion} verfügbar
+            {t('commonUi.c_newVersionAvailable', { version: state.latestVersion })}
           </span>
           <span className="version-check-card__installed">
             Installiert: v{state.installedVersion}
@@ -159,7 +161,7 @@ export function VersionCheckCard() {
               rel="noopener noreferrer"
               className="version-check-card__link"
             >
-              Zum Release →
+              {t('commonUi.c_toRelease')}
             </a>
           )}
         </div>

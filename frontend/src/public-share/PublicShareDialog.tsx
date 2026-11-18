@@ -9,6 +9,7 @@ import { showToast } from '../components/ToastNotification'
 import { formatShareDate, kindLabel, linkUrl, toExpiryIso } from './publicShareFormat'
 import type { CreatedPublicShare, EmbedPreviewEntry, PublicShareSummary } from './types'
 import { notifyPublicSharesChanged } from './publicShareEvents'
+import { useTranslation } from '../i18n'
 import './PublicShareDialog.css'
 
 interface PublicShareDialogProps {
@@ -26,6 +27,7 @@ interface PublicShareDialogProps {
  * replaces it.
  */
 export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: PublicShareDialogProps) {
+  const { t } = useTranslation()
   const [existing, setExisting] = useState<PublicShareSummary | null>(null)
   const [embeds, setEmbeds] = useState<EmbedPreviewEntry[]>([])
   const [created, setCreated] = useState<CreatedPublicShare | null>(null)
@@ -54,11 +56,11 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       setExisting(shares.find((s) => s.filePath === filePath) ?? null)
       setEmbeds(preview)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Der Stand der Freigabe konnte nicht geladen werden.'))
+      setError(extractErrorMessage(err, t('publicShare.dialog.loadFailed')))
     } finally {
       setLoading(false)
     }
-  }, [apiClient, vaultId, filePath])
+  }, [apiClient, vaultId, filePath, t])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load on open
@@ -90,7 +92,7 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       setPassword('')
       setExpiry('')
       notifyPublicSharesChanged()
-    }, 'Der Link konnte nicht erzeugt werden.')
+    }, t('publicShare.dialog.createFailed'))
   }
 
   const revoke = (): Promise<void> =>
@@ -100,8 +102,8 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       setExisting(null)
       setCreated(null)
       notifyPublicSharesChanged()
-      showToast('success', 'Der Link wurde widerrufen.')
-    }, 'Der Link konnte nicht widerrufen werden.')
+      showToast('success', t('publicShare.dialog.revoked'))
+    }, t('publicShare.dialog.revokeFailed'))
 
   const replace = (): Promise<void> =>
     run(async () => {
@@ -110,7 +112,7 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       const result = await apiClient.regeneratePublicShare(vaultId, existing.id)
       setCreated(result)
       setExisting(result.share)
-    }, 'Der Link konnte nicht erneuert werden.')
+    }, t('publicShare.dialog.replaceFailed'))
 
   const update = (input: { password?: string | null; expiresAt?: string | null }): Promise<void> =>
     run(async () => {
@@ -118,16 +120,16 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       setExisting(await apiClient.updatePublicShare(vaultId, existing.id, input))
       setPassword('')
       setExpiry('')
-    }, 'Die Änderung konnte nicht gespeichert werden.')
+    }, t('publicShare.dialog.updateFailed'))
 
   const copy = async (): Promise<void> => {
     if (created === null) return
     try {
       await navigator.clipboard.writeText(linkUrl(created.path))
       setCopied(true)
-      showToast('success', 'Link kopiert.')
+      showToast('success', t('publicShare.dialog.copied'))
     } catch {
-      showToast('error', 'Der Link konnte nicht kopiert werden. Markiere ihn und kopiere ihn von Hand.')
+      showToast('error', t('publicShare.dialog.copyFailed'))
     }
   }
 
@@ -144,28 +146,28 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
       >
         <div className="confirm-modal-header">
           <span className="confirm-modal-icon"><Link2 size={18} aria-hidden="true" /></span>
-          <h2 id={titleId} className="confirm-modal-title">Öffentlicher Link: {fileName}</h2>
+          <h2 id={titleId} className="confirm-modal-title">{t('publicShare.dialog.title', { name: fileName })}</h2>
         </div>
 
         <p className="public-share-dialog__hint">
-          Jede Person mit dem Link kann diese Notiz lesen, auch ohne Konto. Der Link zeigt immer den aktuellen Stand der Notiz.
+          {t('publicShare.dialog.hint')}
         </p>
 
         {error !== null && <p role="alert" className="public-share-dialog__error">{error}</p>}
 
         {loading ? (
-          <p role="status">Wird geladen…</p>
+          <p role="status">{t('publicShare.loading')}</p>
         ) : (
           <>
             <EmbedPreview embeds={embeds} />
 
             {created !== null && (
               <div className="public-share-dialog__created">
-                <label htmlFor={urlId}>Dein Link (wird nur jetzt angezeigt)</label>
+                <label htmlFor={urlId}>{t('publicShare.dialog.yourLink')}</label>
                 <div className="public-share-dialog__row">
                   <input id={urlId} readOnly value={linkUrl(created.path)} onFocus={(e) => e.currentTarget.select()} />
                   <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" onClick={() => { void copy() }}>
-                    {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />} Kopieren
+                    {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />} {t('publicShare.dialog.copy')}
                   </button>
                 </div>
               </div>
@@ -173,14 +175,14 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
 
             {existing === null ? (
               <form onSubmit={(e) => { void create(e) }} className="public-share-dialog__form">
-                <label htmlFor={passwordId}>Passwort (optional)</label>
+                <label htmlFor={passwordId}>{t('publicShare.dialog.passwordOptional')}</label>
                 <PasswordInput id={passwordId} value={password} autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
-                <label htmlFor={expiryId}>Gültig bis (optional)</label>
+                <label htmlFor={expiryId}>{t('publicShare.dialog.expiryOptional')}</label>
                 <input id={expiryId} type="date" value={expiry} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setExpiry(e.target.value)} />
-                <p className="public-share-dialog__hint">Ein Passwort braucht mindestens 8 Zeichen.</p>
+                <p className="public-share-dialog__hint">{t('publicShare.dialog.passwordMinLength')}</p>
                 <div className="confirm-modal-actions">
-                  <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" onClick={onClose}>Schließen</button>
-                  <button type="submit" className="confirm-modal-btn confirm-modal-btn--primary" disabled={busy}>Link erzeugen</button>
+                  <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" onClick={onClose}>{t('publicShare.close')}</button>
+                  <button type="submit" className="confirm-modal-btn confirm-modal-btn--primary" disabled={busy}>{t('publicShare.dialog.createLink')}</button>
                 </div>
               </form>
             ) : (
@@ -207,11 +209,12 @@ export function PublicShareDialog({ apiClient, vaultId, filePath, onClose }: Pub
 }
 
 function EmbedPreview({ embeds }: { embeds: EmbedPreviewEntry[] }) {
+  const { t } = useTranslation()
   if (embeds.length === 0) return null
   const unavailable = embeds.filter((e) => e.kind === 'unavailable')
   return (
-    <section className="public-share-dialog__embeds" aria-label="Eingebettete Inhalte">
-      <h3>Der Link enthält zusätzlich</h3>
+    <section className="public-share-dialog__embeds" aria-label={t('publicShare.dialog.embedsLabel')}>
+      <h3>{t('publicShare.dialog.embedsTitle')}</h3>
       <ul>
         {embeds.filter((e) => e.kind !== 'unavailable').map((e) => (
           <li key={e.ref}>{e.ref} <span className="public-share-dialog__kind">({kindLabel(e.kind)})</span></li>
@@ -220,7 +223,7 @@ function EmbedPreview({ embeds }: { embeds: EmbedPreviewEntry[] }) {
       {unavailable.length > 0 && (
         <>
           <p className="public-share-dialog__hint">
-            Diese Einbettungen sind nicht verfügbar (fehlen, sind nicht lesbar oder sind Bases/Canvas) und erscheinen als Hinweis:
+            {t('publicShare.dialog.embedsUnavailable')}
           </p>
           <ul>{unavailable.map((e) => <li key={e.ref}>{e.ref}</li>)}</ul>
         </>
@@ -245,49 +248,50 @@ interface ExistingLinkProps {
 }
 
 function ExistingLink({ share, busy, password, expiry, passwordId, expiryId, onPassword, onExpiry, onUpdate, onRevoke, onReplace, onClose }: ExistingLinkProps) {
+  const { t } = useTranslation()
   return (
     <div className="public-share-dialog__existing">
       <dl className="public-share-dialog__facts">
-        <dt>Erstellt</dt><dd>{formatShareDate(share.createdAt)}</dd>
-        <dt>Gültig bis</dt><dd>{share.expiresAt !== undefined ? formatShareDate(share.expiresAt) : 'unbegrenzt'}</dd>
-        <dt>Passwort</dt><dd>{share.passwordProtected ? 'ja' : 'nein'}</dd>
-        <dt>Zuletzt abgerufen</dt><dd>{share.lastAccessAt !== undefined ? formatShareDate(share.lastAccessAt) : 'noch nie'}</dd>
-        <dt>Endung</dt><dd>…{share.tokenHint}</dd>
+        <dt>{t('publicShare.created')}</dt><dd>{formatShareDate(share.createdAt)}</dd>
+        <dt>{t('publicShare.validUntil')}</dt><dd>{share.expiresAt !== undefined ? formatShareDate(share.expiresAt) : t('publicShare.unlimited')}</dd>
+        <dt>{t('publicShare.password')}</dt><dd>{share.passwordProtected ? t('publicShare.yes') : t('publicShare.no')}</dd>
+        <dt>{t('publicShare.lastAccess')}</dt><dd>{share.lastAccessAt !== undefined ? formatShareDate(share.lastAccessAt) : t('publicShare.never')}</dd>
+        <dt>{t('publicShare.dialog.tokenEnding')}</dt><dd>…{share.tokenHint}</dd>
       </dl>
 
-      <label htmlFor={passwordId}>Neues Passwort</label>
+      <label htmlFor={passwordId}>{t('publicShare.dialog.newPassword')}</label>
       <PasswordInput id={passwordId} value={password} autoComplete="new-password" onChange={(e) => onPassword(e.target.value)} />
       <div className="public-share-dialog__row">
         <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" disabled={busy || password === ''} onClick={() => { void onUpdate({ password }) }}>
-          Passwort setzen
+          {t('publicShare.dialog.setPassword')}
         </button>
         {share.passwordProtected && (
           <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" disabled={busy} onClick={() => { void onUpdate({ password: null }) }}>
-            Passwort entfernen
+            {t('publicShare.dialog.removePassword')}
           </button>
         )}
       </div>
 
-      <label htmlFor={expiryId}>Neues Ablaufdatum</label>
+      <label htmlFor={expiryId}>{t('publicShare.dialog.newExpiry')}</label>
       <input id={expiryId} type="date" value={expiry} min={new Date().toISOString().slice(0, 10)} onChange={(e) => onExpiry(e.target.value)} />
       <div className="public-share-dialog__row">
         <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" disabled={busy || expiry === ''} onClick={() => { void onUpdate({ expiresAt: toExpiryIso(expiry) }) }}>
-          Ablaufdatum setzen
+          {t('publicShare.dialog.setExpiry')}
         </button>
         {share.expiresAt !== undefined && (
           <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" disabled={busy} onClick={() => { void onUpdate({ expiresAt: null }) }}>
-            Ablauf entfernen
+            {t('publicShare.dialog.removeExpiry')}
           </button>
         )}
       </div>
 
       <div className="confirm-modal-actions">
-        <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" onClick={onClose}>Schließen</button>
+        <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" onClick={onClose}>{t('publicShare.close')}</button>
         <button type="button" className="confirm-modal-btn confirm-modal-btn--cancel" disabled={busy} onClick={() => { void onReplace() }}>
-          Neuen Link erzeugen
+          {t('publicShare.dialog.newLink')}
         </button>
         <button type="button" className="confirm-modal-btn confirm-modal-btn--danger" disabled={busy} onClick={() => { void onRevoke() }}>
-          Link widerrufen
+          {t('publicShare.dialog.revokeLink')}
         </button>
       </div>
     </div>

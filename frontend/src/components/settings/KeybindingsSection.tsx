@@ -6,6 +6,7 @@
  * @module components/settings/KeybindingsSection
  */
 
+import { useTranslation, translateNow, type TranslationKey } from '../../i18n'
 import { useState, useCallback, useContext, useEffect, useRef } from 'react'
 import React from 'react'
 import {
@@ -29,12 +30,12 @@ import { NATIVE_TWINS, registryShortcuts } from '../../hooks/useRegistryHotkeys'
 import { showToast } from '../ToastNotification'
 import { SettingSection, Button } from './ui'
 
-/** German labels for keybinding categories. */
-const CATEGORY_LABELS: Record<KeybindingCategory, string> = {
-  navigation: 'Navigation',
-  editor: 'Editor',
-  vault: 'Vault',
-  panel: 'Panel',
+/** Translation keys of the keybinding category labels. */
+const CATEGORY_LABELS: Record<KeybindingCategory, TranslationKey> = {
+  navigation: 'settingsUi.catNavigation',
+  editor: 'settingsUi.catEditor',
+  vault: 'settingsUi.catVault',
+  panel: 'settingsUi.catPanel',
 }
 
 /** Category display order. */
@@ -45,6 +46,7 @@ const CATEGORY_ORDER: KeybindingCategory[] = ['navigation', 'panel', 'editor', '
  * Shows all configurable shortcuts, allows editing and resetting.
  */
 export function KeybindingsSection() {
+  const { t } = useTranslation()
   const [bindings, setBindings] = useState(getAllBindings())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [recordedKeys, setRecordedKeys] = useState('')
@@ -142,7 +144,7 @@ export function KeybindingsSection() {
     // Check for conflicts
     const conflict = findConflict(recordedKeys, editingId)
     if (conflict) {
-      showToast('error', `Konflikt: "${recordedKeys}" wird bereits für "${labelOf(conflict)}" verwendet`)
+      showToast('error', translateNow('settingsUi.hotkeyConflict', { keys: recordedKeys, command: labelOf(conflict) }))
       return
     }
 
@@ -151,7 +153,7 @@ export function KeybindingsSection() {
     setEditingId(null)
     setRecordedKeys('')
     refreshBindings()
-    showToast('success', 'Tastaturkürzel gespeichert')
+    showToast('success', translateNow('settingsUi.hotkeySaved'))
   }, [editingId, recordedKeys, adding, refreshBindings, shortcutsOf, labelOf])
 
   /** Unbind a shortcut (set to empty). */
@@ -170,7 +172,7 @@ export function KeybindingsSection() {
   const handleResetAll = useCallback(() => {
     resetAll()
     refreshBindings()
-    showToast('success', 'Alle Tastaturkürzel zurückgesetzt')
+    showToast('success', translateNow('settingsUi.hotkeysReset'))
   }, [refreshBindings])
 
   // Group bindings by category; the search matches the label, the command ID and the shortcuts
@@ -200,27 +202,26 @@ export function KeybindingsSection() {
   const grouped = [
     ...CATEGORY_ORDER.map(cat => ({
       category: cat as string,
-      label: CATEGORY_LABELS[cat],
+      label: t(CATEGORY_LABELS[cat]),
       items: bindings.filter(b => b.category === cat && matches(b)),
     })),
-    { category: 'registry', label: `Weitere Befehle (Obsidian und Plugins) — ${registryItems.length}`, items: registryItems },
+    { category: 'registry', label: t('settingsUi.moreCommands', { count: registryItems.length }), items: registryItems },
   ].filter(g => g.items.length > 0)
 
   return (
     <div className="keybindings-section">
       <p className="settings-field-hint">
-        Die Kürzel gelten für den ganzen Vault (<code>.obsidian/hotkeys.json</code>) und sind mit Obsidian kompatibel.
-        Klicke auf ein Kürzel, um es zu ändern. Drücke die gewünschte Tastenkombination und bestätige mit dem Speichern-Button.
+        {t('settingsUi.hotkeysIntro1')}<code>.obsidian/hotkeys.json</code>{t('settingsUi.hotkeysIntro2')}
       </p>
       <input
         type="search"
         className="keybindings-search"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="Befehle oder Kürzel suchen…"
-        aria-label="Befehle oder Kürzel suchen"
+        placeholder={t('settingsUi.searchCommandsPh')}
+        aria-label={t('settingsUi.searchCommands')}
       />
-      {grouped.length === 0 && <p className="settings-field-hint">Kein Befehl gefunden.</p>}
+      {grouped.length === 0 && <p className="settings-field-hint">{t('settingsUi.noCommand')}</p>}
 
       {grouped.map(group => (
         <SettingSection key={group.category} title={group.label}>
@@ -228,9 +229,9 @@ export function KeybindingsSection() {
           <table className="keybindings-table data-table">
             <thead>
               <tr>
-                <th className="keybindings-col-command">Befehl</th>
-                <th className="keybindings-col-shortcut">Kürzel</th>
-                <th className="keybindings-col-actions">Aktionen</th>
+                <th className="keybindings-col-command">{t('settingsUi.colCommand')}</th>
+                <th className="keybindings-col-shortcut">{t('settingsUi.colShortcut')}</th>
+                <th className="keybindings-col-actions">{t('settingsUi.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -245,7 +246,7 @@ export function KeybindingsSection() {
                           type="text"
                           className="keybindings-input"
                           value={recordedKeys ? formatShortcut(recordedKeys) : ''}
-                          placeholder="Taste drücken…"
+                          placeholder={t('settingsUi.pressKey')}
                           onKeyDown={handleKeyDown}
                           readOnly
                         />
@@ -254,7 +255,7 @@ export function KeybindingsSection() {
                           className="keybindings-btn keybindings-btn--save"
                           onClick={handleSaveShortcut}
                           disabled={!recordedKeys}
-                          title="Speichern"
+                          title={t('settingsUi.save')}
                         >
                           ✓
                         </button>
@@ -262,7 +263,7 @@ export function KeybindingsSection() {
                           type="button"
                           className="keybindings-btn keybindings-btn--cancel"
                           onClick={handleCancelEdit}
-                          title="Abbrechen"
+                          title={t('settingsUi.cancel')}
                         >
                           ✕
                         </button>
@@ -272,7 +273,7 @@ export function KeybindingsSection() {
                         type="button"
                         className="keybindings-shortcut-btn"
                         onClick={() => handleEdit(item.commandId)}
-                        title="Klicken zum Ändern"
+                        title={t('settingsUi.clickToChange')}
                       >
                         {item.effectiveShortcuts.length > 0
                           ? item.effectiveShortcuts.map(formatShortcut).join(' · ')
@@ -287,8 +288,8 @@ export function KeybindingsSection() {
                             type="button"
                             className="keybindings-btn keybindings-btn--unbind"
                             onClick={() => { setShortcuts(item.commandId, shortcutsOf(item.commandId).filter(s => s !== shortcut)); refreshBindings() }}
-                            title={`Nur ${formatShortcut(shortcut)} entfernen`}
-                            aria-label={`Nur ${formatShortcut(shortcut)} entfernen`}
+                            title={t('settingsUi.removeOnly', { keys: formatShortcut(shortcut) })}
+                            aria-label={t('settingsUi.removeOnly', { keys: formatShortcut(shortcut) })}
                           >
                             {formatShortcut(shortcut)} ✕
                           </button>
@@ -302,7 +303,7 @@ export function KeybindingsSection() {
                         type="button"
                         className="keybindings-btn keybindings-btn--add"
                         onClick={() => handleEdit(item.commandId, true)}
-                        title="Weiteres Kürzel hinzufügen"
+                        title={t('settingsUi.addShortcut')}
                       >
                         +
                       </button>
@@ -312,9 +313,9 @@ export function KeybindingsSection() {
                         type="button"
                         className="keybindings-btn keybindings-btn--unbind"
                         onClick={() => handleUnbind(item.commandId)}
-                        title="Bindung entfernen"
+                        title={t('settingsUi.removeBinding')}
                       >
-                        Entfernen
+                        {t('settingsUi.remove')}
                       </button>
                     )}
                     {item.isOverridden && editingId !== item.commandId && (
@@ -322,9 +323,9 @@ export function KeybindingsSection() {
                         type="button"
                         className="keybindings-btn keybindings-btn--reset"
                         onClick={() => handleResetOne(item.commandId)}
-                        title="Standard wiederherstellen"
+                        title={t('settingsUi.restoreDefault')}
                       >
-                        Standard
+                        {t('settingsUi.default')}
                       </button>
                     )}
                   </td>
@@ -338,7 +339,7 @@ export function KeybindingsSection() {
 
       <div className="settings-actions">
         <Button variant="secondary" onClick={handleResetAll}>
-          Alle zurücksetzen
+          {t('settingsUi.resetAll')}
         </Button>
       </div>
     </div>

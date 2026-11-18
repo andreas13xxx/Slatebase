@@ -1,3 +1,5 @@
+import { translateNow } from '../../i18n'
+
 /**
  * Shared formatting helpers for the git-sync and mail-import settings
  * sections — both show a "last run" line with the same result vocabulary
@@ -8,16 +10,16 @@
 export type SyncRunResult = 'success' | 'error' | 'conflict' | null
 
 export function formatLastRun(lastRunAt: string | null): string {
-  if (!lastRunAt) return 'Noch nicht ausgeführt'
+  if (!lastRunAt) return translateNow('settingsUi.notRunYet')
   return new Date(lastRunAt).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function resultLabel(result: SyncRunResult): string {
   switch (result) {
-    case 'success': return 'Erfolgreich'
-    case 'error': return 'Fehler'
-    case 'conflict': return 'Konflikt'
-    default: return 'Ausstehend'
+    case 'success': return translateNow('settingsUi.resSuccess')
+    case 'error': return translateNow('settingsUi.resError')
+    case 'conflict': return translateNow('settingsUi.resConflict')
+    default: return translateNow('settingsUi.resPending')
   }
 }
 

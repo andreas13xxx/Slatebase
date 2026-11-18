@@ -2,6 +2,7 @@
  * SnippetManager — CSS snippet list, upload, create, edit, toggle, delete
  * (Requirement 8, 9). Embedded in CssSnippetsSection.
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, Pencil, Upload, Plus, FileCode } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -34,12 +35,13 @@ function validateSnippetName(rawName: string): string | null {
   const filename = toFilename(rawName)
   const body = filename.slice(0, -'.css'.length)
   if (!FILENAME_BODY_PATTERN.test(body)) {
-    return 'Name darf nicht mit "." beginnen und keines der Zeichen / \\ % : * ? " < > | enthalten'
+    return translateNow('settingsUi.snippetNameInvalid')
   }
   return null
 }
 
 export function SnippetManager() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
 
@@ -60,7 +62,7 @@ export function SnippetManager() {
     try {
       setSnippets(await snippetStore.listForVault(apiClient, vaultId))
     } catch (err) {
-      setError(extractErrorMessage(err, 'Snippets konnten nicht geladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.snippetsLoadFailed')))
     } finally {
       setLoading(false)
     }
@@ -75,7 +77,7 @@ export function SnippetManager() {
     let cancelled = false
     snippetStore.listForVault(apiClient, vaultId)
       .then((items) => { if (!cancelled) setSnippets(items) })
-      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, 'Snippets konnten nicht geladen werden')) })
+      .catch((err: unknown) => { if (!cancelled) setError(extractErrorMessage(err, translateNow('settingsUi.snippetsLoadFailed'))) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [vaultId, apiClient])
@@ -97,7 +99,7 @@ export function SnippetManager() {
       // Roll back on failure
       setSnippets((prev) => prev.map((s) => (s.id === snippet.id ? { ...s, enabled: snippet.enabled } : s)))
       if (!nextEnabled) snippetInjector.remove(snippet.id)
-      setError(extractErrorMessage(err, 'Snippet konnte nicht aktiviert werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.snippetToggleFailed')))
     }
   }, [vaultId, apiClient])
 
@@ -111,7 +113,7 @@ export function SnippetManager() {
     if (!file || !vaultId || !apiClient) return
 
     if (file.size > MAX_SNIPPET_SIZE) {
-      setError(`Datei überschreitet die maximale Größe von 512 KB (${formatSize(file.size)})`)
+      setError(translateNow('settingsUi.snippetTooLarge', { size: formatSize(file.size) }))
       return
     }
 
@@ -121,7 +123,7 @@ export function SnippetManager() {
       await snippetStore.create(apiClient, vaultId, filename, content)
       await load()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Snippet konnte nicht hochgeladen werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.snippetUploadFailed')))
     }
   }, [vaultId, apiClient, load])
 
@@ -134,7 +136,7 @@ export function SnippetManager() {
       await load()
       setEditing(created)
     } catch (err) {
-      setError(extractErrorMessage(err, 'Snippet konnte nicht erstellt werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.snippetCreateFailed')))
     }
   }, [vaultId, apiClient, load])
 
@@ -147,7 +149,7 @@ export function SnippetManager() {
       snippetInjector.remove(target.id)
       await load()
     } catch (err) {
-      setError(extractErrorMessage(err, 'Snippet konnte nicht gelöscht werden'))
+      setError(extractErrorMessage(err, translateNow('settingsUi.snippetDeleteFailed')))
     }
   }, [deleting, vaultId, apiClient, load])
 
@@ -165,14 +167,14 @@ export function SnippetManager() {
 
   return (
     <div className="snippet-manager">
-      <p className="appearance-section__description">CSS-Snippets für diesen Vault:</p>
+      <p className="appearance-section__description">{t('settingsUi.snippetsForVault')}</p>
 
       {error && <p className="snippet-manager__error" role="alert">{error}</p>}
 
-      {loading && <p className="snippet-manager__loading">Lädt…</p>}
+      {loading && <p className="snippet-manager__loading">{t('settingsUi.loadingShort')}</p>}
 
       {!loading && snippets.length === 0 && (
-        <p className="snippet-manager__empty">Keine CSS-Snippets in diesem Vault.</p>
+        <p className="snippet-manager__empty">{t('settingsUi.noSnippets')}</p>
       )}
 
       {!loading && snippets.length > 0 && (
@@ -194,7 +196,7 @@ export function SnippetManager() {
                 type="button"
                 className="snippet-manager__action-btn"
                 onClick={() => setEditing(snippet)}
-                aria-label={`${snippet.filename} bearbeiten`}
+                aria-label={t('settingsUi.editNamed', { name: snippet.filename })}
               >
                 <Pencil size={14} />
               </button>
@@ -202,7 +204,7 @@ export function SnippetManager() {
                 type="button"
                 className="snippet-manager__action-btn"
                 onClick={() => setDeleting(snippet)}
-                aria-label={`${snippet.filename} löschen`}
+                aria-label={t('settingsUi.deleteNamed', { name: snippet.filename })}
               >
                 <Trash2 size={14} />
               </button>
@@ -252,9 +254,9 @@ export function SnippetManager() {
 
       <ConfirmModal
         open={deleting !== null}
-        title="Snippet löschen"
-        message={deleting ? `"${deleting.filename}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.` : ''}
-        confirmLabel="Löschen"
+        title={t('settingsUi.snippetDeleteTitle')}
+        message={deleting ? t('settingsUi.snippetDeleteMessage', { name: deleting.filename }) : ''}
+        confirmLabel={t('settingsUi.delete')}
         variant="danger"
         onConfirm={() => void handleDeleteConfirm()}
         onCancel={() => setDeleting(null)}

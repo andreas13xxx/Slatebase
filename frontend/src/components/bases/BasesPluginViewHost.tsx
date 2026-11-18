@@ -13,6 +13,7 @@
  * `PluginViewPanel`): plugin views render their own DOM, not React children.
  */
 
+import { translateNow } from '../../i18n'
 import { useEffect, useRef } from 'react'
 import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseView } from '@slatebase/shared-contracts'
@@ -68,7 +69,7 @@ export function BasesPluginViewHost({
 
     const owned = getBasesViewRegistrationWithOwner(view.type)
     if (!owned) {
-      onError(`Keine Plugin-View für den Typ "${view.type}" registriert.`)
+      onError(translateNow('basesUi.noPluginView', { type: view.type }))
       return
     }
     const { registration, pluginId } = owned

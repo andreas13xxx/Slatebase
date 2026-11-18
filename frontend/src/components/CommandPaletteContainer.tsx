@@ -231,7 +231,7 @@ export function CommandPaletteContainer({
   const openTemplateInserter = useCallback(() => {
     if (!state.selectedVaultId) return
     if (!getActiveEditorView()) {
-      showToast('info', 'Keine Notiz im Bearbeiten-Modus geöffnet.')
+      showToast('info', t('commonUi.c_noNoteInEdit'))
       return
     }
     setTemplateSelectorMode('insert')
@@ -259,7 +259,7 @@ export function CommandPaletteContainer({
   const handleTemplateContentInsert = useCallback((content: string) => {
     const view = getActiveEditorView()
     if (!view) {
-      showToast('error', 'Keine Notiz im Bearbeiten-Modus geöffnet.')
+      showToast('error', t('commonUi.c_noNoteInEdit'))
       return
     }
     // A plain document change — the editor's updateListener picks it up and
@@ -697,42 +697,42 @@ export function CommandPaletteContainer({
 
     commands.push({
       id: 'slatebase:open-settings',
-      name: 'Einstellungen öffnen',
+      name: t('commonUi.c_cmd_00'),
       callback: onOpenSettings,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:toggle-theme',
-      name: 'Farbschema umschalten (Hell/Dunkel)',
+      name: t('commonUi.c_cmd_01'),
       callback: onToggleTheme,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:toggle-sidebar',
-      name: 'Seitenleiste ein-/ausblenden',
+      name: t('commonUi.c_cmd_02'),
       callback: onToggleSidebar,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:toggle-right-panel',
-      name: 'Kontextpanel ein-/ausblenden',
+      name: t('commonUi.c_cmd_03'),
       callback: onToggleRightPanel,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:toggle-toolbar',
-      name: 'Werkzeugleiste ein-/ausblenden',
+      name: t('commonUi.c_cmd_04'),
       callback: toggleToolbarVisible,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:open-command-palette',
-      name: 'Befehlspalette öffnen',
+      name: t('commonUi.c_cmd_05'),
       callback: () => setIsOpen(true),
       pluginId: 'slatebase',
     })
@@ -742,7 +742,7 @@ export function CommandPaletteContainer({
     if (isEnabled('chat')) {
       commands.push({
         id: 'slatebase:navigate-chat',
-        name: 'Chat öffnen',
+        name: t('commonUi.c_cmd_06'),
         callback: () => onNavigate('chat'),
         pluginId: 'slatebase',
       })
@@ -751,7 +751,7 @@ export function CommandPaletteContainer({
     if (isEnabled('mcp')) {
       commands.push({
         id: 'slatebase:navigate-mcp-tokens',
-        name: 'API-Tokens (MCP)',
+        name: t('commonUi.c_cmd_07'),
         callback: () => onNavigate('mcp-tokens'),
         pluginId: 'slatebase',
       })
@@ -759,7 +759,7 @@ export function CommandPaletteContainer({
 
     commands.push({
       id: 'slatebase:logout',
-      name: 'Abmelden',
+      name: t('commonUi.c_cmd_08'),
       callback: onLogout,
       pluginId: 'slatebase',
     })
@@ -769,35 +769,35 @@ export function CommandPaletteContainer({
     if (isAdmin) {
       commands.push({
         id: 'slatebase:admin-users',
-        name: 'Benutzerverwaltung',
+        name: t('commonUi.c_cmd_09'),
         callback: () => onNavigate('admin-users'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:admin-vaults',
-        name: 'Vault-Übersicht (Admin)',
+        name: t('commonUi.c_cmd_10'),
         callback: () => onNavigate('admin-vaults'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:admin-config',
-        name: 'Serverkonfiguration',
+        name: t('commonUi.c_cmd_11'),
         callback: () => onNavigate('admin-config'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:admin-audit',
-        name: 'Audit-Log',
+        name: t('commonUi.c_cmd_12'),
         callback: () => onNavigate('admin-audit'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:admin-logs',
-        name: 'Server-Logs',
+        name: t('commonUi.c_cmd_13'),
         callback: () => onNavigate('admin-logs'),
         pluginId: 'slatebase',
       })
@@ -809,7 +809,7 @@ export function CommandPaletteContainer({
     if (activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' && !activeTab.filePath.startsWith('__webview::') && !activeTab.fileName.endsWith('.canvas')) {
       commands.push({
         id: 'slatebase:toggle-mode',
-        name: 'Editor-Modus wechseln (Bearbeiten/Vorschau)',
+        name: t('commonUi.c_cmd_14'),
         callback: () => tabDispatch({ type: 'TOGGLE_MODE', payload: { tabId: activeTab.id } }),
         pluginId: 'slatebase',
       })
@@ -818,7 +818,7 @@ export function CommandPaletteContainer({
     // Open search (always available)
     commands.push({
       id: 'slatebase:open-search',
-      name: 'Vault-Suche öffnen',
+      name: t('commonUi.c_cmd_15'),
       callback: () => {
         window.dispatchEvent(new CustomEvent('slatebase:open-search'))
       },
@@ -828,14 +828,14 @@ export function CommandPaletteContainer({
     if (hasVault) {
       commands.push({
         id: 'slatebase:open-quick-switcher',
-        name: 'Schnellwechsler öffnen',
+        name: t('commonUi.c_cmd_16'),
         callback: () => setQuickSwitcherOpen(true),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:open-random-note',
-        name: 'Zufällige Notiz öffnen',
+        name: t('commonUi.c_cmd_17'),
         callback: openRandomNote,
         pluginId: 'slatebase',
       })
@@ -843,21 +843,21 @@ export function CommandPaletteContainer({
 
     commands.push({
       id: 'slatebase:navigate-back',
-      name: 'Zurück navigieren',
+      name: t('commonUi.c_cmd_18'),
       callback: goBack,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:navigate-forward',
-      name: 'Vor navigieren',
+      name: t('commonUi.c_cmd_19'),
       callback: goForward,
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:create-vault',
-      name: 'Neuer Vault',
+      name: t('commonUi.c_cmd_20'),
       callback: onCreateVault,
       pluginId: 'slatebase',
     })
@@ -872,28 +872,28 @@ export function CommandPaletteContainer({
     if (hasVault && hasWriteAccess) {
       commands.push({
         id: 'slatebase:create-file',
-        name: 'Neue Datei',
+        name: t('commonUi.c_cmd_21'),
         callback: onCreateFile,
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:daily-note',
-        name: 'Tagesnotiz öffnen/erstellen',
+        name: t('commonUi.c_cmd_22'),
         callback: onDailyNote,
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:new-from-template',
-        name: 'Neue Notiz aus Vorlage',
+        name: t('commonUi.c_cmd_23'),
         callback: openTemplateSelector,
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:insert-template',
-        name: 'Vorlage einfügen',
+        name: t('commonUi.c_cmd_24'),
         callback: openTemplateInserter,
         pluginId: 'slatebase',
       })
@@ -901,7 +901,7 @@ export function CommandPaletteContainer({
       if (isEnabled('voice-transcription')) {
         commands.push({
           id: 'voice:toggle-dictation',
-          name: 'Diktat starten/stoppen',
+          name: t('commonUi.c_cmd_25'),
           callback: toggleDictation,
           pluginId: 'slatebase',
         })
@@ -909,21 +909,21 @@ export function CommandPaletteContainer({
 
       commands.push({
         id: 'slatebase:import-file',
-        name: 'Datei importieren',
+        name: t('commonUi.c_cmd_26'),
         callback: onImportFile,
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:import-folder',
-        name: 'Ordner importieren',
+        name: t('commonUi.c_cmd_27'),
         callback: onImportFolder,
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:canvas-new',
-        name: 'Neues Canvas erstellen',
+        name: t('commonUi.c_cmd_28'),
         callback: onCreateCanvas,
         pluginId: 'slatebase',
       })
@@ -931,7 +931,7 @@ export function CommandPaletteContainer({
       if (isEnabled('bases')) {
         commands.push({
           id: 'slatebase:base-new',
-          name: 'Neue Base erstellen',
+          name: t('commonUi.c_cmd_29'),
           callback: onCreateBase,
           pluginId: 'slatebase',
         })
@@ -941,21 +941,21 @@ export function CommandPaletteContainer({
     if (hasVault) {
       commands.push({
         id: 'slatebase:export-vault',
-        name: 'Vault exportieren (ZIP)',
+        name: t('commonUi.c_cmd_30'),
         callback: onExportVault,
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:open-trash',
-        name: 'Papierkorb',
+        name: t('commonUi.c_cmd_31'),
         callback: () => onNavigate('trash'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:open-graph',
-        name: 'Knowledge Graph öffnen',
+        name: t('commonUi.c_cmd_32'),
         callback: onOpenGraph,
         pluginId: 'slatebase',
       })
@@ -971,7 +971,7 @@ export function CommandPaletteContainer({
         const filePath = activeNote.filePath
         commands.push({
           id: 'slatebase:public-share',
-          name: 'Öffentlichen Link der Notiz verwalten',
+          name: t('commonUi.c_cmd_33'),
           callback: () => openPublicShareDialog(vaultId, filePath),
           pluginId: 'slatebase',
         })
@@ -980,7 +980,7 @@ export function CommandPaletteContainer({
       if (isEnabled('activity-timeline')) {
         commands.push({
           id: 'slatebase:open-activity',
-          name: 'Aktivitätszeitleiste öffnen',
+          name: t('commonUi.c_cmd_34'),
           callback: onOpenActivity,
           pluginId: 'slatebase',
         })
@@ -989,7 +989,7 @@ export function CommandPaletteContainer({
       if (isEnabled('obsidian-plugin-compat')) {
         commands.push({
           id: 'slatebase:plugins',
-          name: 'Plugins verwalten',
+          name: t('commonUi.c_cmd_35'),
           callback: () => onNavigate('plugins'),
           pluginId: 'slatebase',
         })
@@ -1000,28 +1000,28 @@ export function CommandPaletteContainer({
 
     commands.push({
       id: 'slatebase:open-outline',
-      name: 'Gliederung anzeigen',
+      name: t('commonUi.c_cmd_36'),
       callback: () => commandRegistry.executeCommand('outline:open'),
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:open-backlinks',
-      name: 'Backlinks anzeigen',
+      name: t('commonUi.c_cmd_37'),
       callback: () => commandRegistry.executeCommand('backlink:open'),
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:open-tags',
-      name: 'Tags anzeigen',
+      name: t('commonUi.c_cmd_38'),
       callback: () => commandRegistry.executeCommand('tag-pane:open'),
       pluginId: 'slatebase',
     })
 
     commands.push({
       id: 'slatebase:open-bookmarks',
-      name: 'Lesezeichen anzeigen',
+      name: t('commonUi.c_cmd_39'),
       callback: () => commandRegistry.executeCommand('bookmarks:open'),
       pluginId: 'slatebase',
     })
@@ -1037,21 +1037,21 @@ export function CommandPaletteContainer({
     if (isCanvasActive) {
       commands.push({
         id: 'slatebase:canvas-jump-to-group',
-        name: 'Canvas: Zu Gruppe springen',
+        name: t('commonUi.c_cmd_40'),
         callback: () => commandRegistry.executeCommand('canvas:jump-to-group'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:canvas-export-image',
-        name: 'Canvas: Als Bild exportieren',
+        name: t('commonUi.c_cmd_41'),
         callback: () => commandRegistry.executeCommand('canvas:export-as-image'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:canvas-convert-to-file',
-        name: 'Canvas: In Datei umwandeln',
+        name: t('commonUi.c_cmd_42'),
         callback: () => commandRegistry.executeCommand('canvas:convert-to-file'),
         pluginId: 'slatebase',
       })
@@ -1066,126 +1066,126 @@ export function CommandPaletteContainer({
 
       commands.push({
         id: 'slatebase:editor-heading1',
-        name: 'Editor: Überschrift 1',
+        name: t('commonUi.c_cmd_43'),
         callback: dispatch('heading1'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-heading2',
-        name: 'Editor: Überschrift 2',
+        name: t('commonUi.c_cmd_44'),
         callback: dispatch('heading2'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-heading3',
-        name: 'Editor: Überschrift 3',
+        name: t('commonUi.c_cmd_45'),
         callback: dispatch('heading3'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-bold',
-        name: 'Editor: Fett',
+        name: t('commonUi.c_cmd_46'),
         callback: dispatch('bold'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-italic',
-        name: 'Editor: Kursiv',
+        name: t('commonUi.c_cmd_47'),
         callback: dispatch('italic'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-strikethrough',
-        name: 'Editor: Durchgestrichen',
+        name: t('commonUi.c_cmd_48'),
         callback: dispatch('strikethrough'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-code',
-        name: 'Editor: Code (inline)',
+        name: t('commonUi.c_cmd_49'),
         callback: dispatch('code'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-link',
-        name: 'Editor: Link einfügen',
+        name: t('commonUi.c_cmd_50'),
         callback: dispatch('link'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-bullet-list',
-        name: 'Editor: Aufzählung',
+        name: t('commonUi.c_cmd_51'),
         callback: dispatch('bulletList'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-numbered-list',
-        name: 'Editor: Nummerierte Liste',
+        name: t('commonUi.c_cmd_52'),
         callback: dispatch('numberedList'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-task',
-        name: 'Editor: Aufgabe (Checkbox)',
+        name: t('commonUi.c_cmd_53'),
         callback: dispatch('task'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-quote',
-        name: 'Editor: Zitat',
+        name: t('commonUi.c_cmd_54'),
         callback: dispatch('quote'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-horizontal-rule',
-        name: 'Editor: Horizontale Linie',
+        name: t('commonUi.c_cmd_55'),
         callback: dispatch('horizontalRule'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-table',
-        name: 'Editor: Tabelle einfügen',
+        name: t('commonUi.c_cmd_56'),
         callback: dispatch('table'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:attach-file',
-        name: 'Anhang einfügen',
+        name: t('commonUi.c_cmd_57'),
         callback: dispatch('attachFile'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-undo',
-        name: 'Editor: Rückgängig',
+        name: t('commonUi.c_cmd_58'),
         callback: dispatch('undo'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-redo',
-        name: 'Editor: Wiederherstellen',
+        name: t('commonUi.c_cmd_59'),
         callback: dispatch('redo'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-toggle-line-numbers',
-        name: 'Editor: Zeilennummern umschalten',
+        name: t('commonUi.c_cmd_60'),
         callback: dispatch('toggleLineNumbers'),
         pluginId: 'slatebase',
       })
@@ -1225,63 +1225,63 @@ export function CommandPaletteContainer({
 
       commands.push({
         id: 'slatebase:editor-fold-all',
-        name: 'Editor: Alle Überschriften und Listen einklappen',
+        name: t('commonUi.c_cmd_61'),
         callback: () => commandRegistry.executeCommand('editor:fold-all'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-fold-less',
-        name: 'Editor: Weniger einklappen',
+        name: t('commonUi.c_cmd_62'),
         callback: () => commandRegistry.executeCommand('editor:fold-less'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-fold-more',
-        name: 'Editor: Mehr einklappen',
+        name: t('commonUi.c_cmd_63'),
         callback: () => commandRegistry.executeCommand('editor:fold-more'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-toggle-fold',
-        name: 'Editor: Einklappen der aktuellen Zeile umschalten',
+        name: t('commonUi.c_cmd_64'),
         callback: () => commandRegistry.executeCommand('editor:toggle-fold'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-toggle-fold-properties',
-        name: 'Editor: Einklappen der Eigenschaften umschalten',
+        name: t('commonUi.c_cmd_65'),
         callback: () => commandRegistry.executeCommand('editor:toggle-fold-properties'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:editor-unfold-all',
-        name: 'Editor: Alle Überschriften und Listen ausklappen',
+        name: t('commonUi.c_cmd_66'),
         callback: () => commandRegistry.executeCommand('editor:unfold-all'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:note-composer-extract-heading',
-        name: 'Editor: Überschrift extrahieren…',
+        name: t('commonUi.c_cmd_67'),
         callback: () => commandRegistry.executeCommand('note-composer:extract-heading'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:note-composer-merge-file',
-        name: 'Editor: Mit anderer Datei zusammenführen…',
+        name: t('commonUi.c_cmd_68'),
         callback: () => commandRegistry.executeCommand('note-composer:merge-file'),
         pluginId: 'slatebase',
       })
 
       commands.push({
         id: 'slatebase:note-composer-split-file',
-        name: 'Editor: Aktuelle Auswahl extrahieren…',
+        name: t('commonUi.c_cmd_69'),
         callback: () => commandRegistry.executeCommand('note-composer:split-file'),
         pluginId: 'slatebase',
       })

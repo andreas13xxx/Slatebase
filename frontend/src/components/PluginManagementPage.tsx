@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { ConfirmModal } from './ConfirmModal'
 import { extractErrorMessage } from '../utils/error'
-import { useTranslation } from '../i18n'
+import { useTranslation, translateNow } from '../i18n'
 import { PluginStoreBrowser } from './plugin-store'
 import { mountSettingTab, waitForElement } from '../plugins/compat/setting-tab-mount'
 import { useVaultPluginChanges } from '../hooks/useVaultPluginChanges'
@@ -194,7 +194,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           pluginId: manifest.id,
           name: manifest.name,
           version: manifest.version,
-          author: manifest.author ?? 'Unbekannt',
+          author: manifest.author ?? translateNow('commonUi.c_pm_unknown'),
           description: manifest.description ?? '',
           status: regEntry?.status === 'loading'
             ? 'active'
@@ -216,7 +216,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Background: Analyze compatibility and detect settings for each plugin
       void analyzeAndDetectSettings(manifests, registry)
     } catch (err: unknown) {
-      if (!silent) setError(extractErrorMessage(err, 'Fehler beim Laden der Plugins'))
+      if (!silent) setError(extractErrorMessage(err, translateNow('commonUi.c_pm_loadFailed')))
     } finally {
       if (!silent) setLoading(false)
     }
@@ -328,7 +328,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       const host = await waitForElement(() => settingsContainerRef.current)
       if (!isCurrent()) return // another plugin's settings were opened (or the dialog closed) meanwhile
       if (!host) {
-        setSettingsError('Plugin-Einstellungen konnten nicht angezeigt werden.')
+        setSettingsError(translateNow('commonUi.c_pm_settingsNotShown2'))
         return
       }
       try {
@@ -347,7 +347,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
             }).catch((err: unknown) => {
               if (!isCurrent()) return
               console.error(`[PluginSettings] Error rendering declarative settings for "${pluginId}":`, err)
-              setSettingsError(`Plugin-Einstellungen konnten nicht gerendert werden: ${extractErrorMessage(err, 'Unbekannter Fehler')}`)
+              setSettingsError(translateNow('commonUi.c_pm_settingsRenderFailed', { detail: extractErrorMessage(err, translateNow('commonUi.c_pm_unknownError')) }))
             })
           } else {
             // Classic imperative display()
@@ -356,13 +356,13 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         })
       } catch (err) {
         console.error(`[PluginSettings] Error rendering settings for "${pluginId}":`, err)
-        const detail = extractErrorMessage(err, 'Unbekannter Fehler')
+        const detail = extractErrorMessage(err, translateNow('commonUi.c_pm_unknownError'))
         // If the error is about uninitialized state (common during async plugin startup),
         // show a retry-friendly message instead of a permanent error
         if (detail.includes('not ready') || detail.includes('not initialized') || detail.includes('not ready yet')) {
-          setSettingsError(`Plugin wird noch initialisiert. Bitte in wenigen Sekunden erneut versuchen.`)
+          setSettingsError(translateNow('commonUi.c_pm_pluginInitializing'))
         } else {
-          setSettingsError(`Plugin-Einstellungen konnten nicht gerendert werden: ${detail}`)
+          setSettingsError(translateNow('commonUi.c_pm_settingsRenderFailed', { detail: detail }))
         }
       }
       return
@@ -374,7 +374,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       setSettingsJson(data !== null && data !== undefined ? JSON.stringify(data, null, 2) : '{}')
     } catch {
       setSettingsJson('{}')
-      setSettingsError('Einstellungen konnten nicht geladen werden.')
+      setSettingsError(translateNow('commonUi.c_pm_settingsLoadFailed'))
     } finally {
       setSettingsLoading(false)
     }
@@ -390,9 +390,9 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       setSettingsModal(null)
     } catch (err: unknown) {
       if (err instanceof SyntaxError) {
-        setSettingsError('Ungültiges JSON-Format.')
+        setSettingsError(translateNow('commonUi.c_pm_invalidJson'))
       } else {
-        setSettingsError(extractErrorMessage(err, 'Speichern fehlgeschlagen.'))
+        setSettingsError(extractErrorMessage(err, translateNow('commonUi.c_pm_saveFailed')))
       }
     } finally {
       setSettingsSaving(false)
@@ -467,7 +467,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       }
     } catch (err: unknown) {
       console.error(`[PluginManagementPage] Failed to ${newStatus === 'active' ? 'activate' : 'deactivate'} plugin "${pluginId}":`, err)
-      const detail = extractErrorMessage(err, 'Aktivierung fehlgeschlagen')
+      const detail = extractErrorMessage(err, translateNow('commonUi.c_pm_activationFailed'))
       // Rollback on failure, but surface what actually went wrong instead of
       // silently reverting to the previous (usually empty) error state.
       setPlugins((prev) => prev.map((p) =>
@@ -539,9 +539,9 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         p.pluginId === pluginId ? { ...p, status: 'active', error: undefined } : p
       ))
     } catch (err: unknown) {
-      const detail = extractErrorMessage(err, 'Neu laden fehlgeschlagen')
+      const detail = extractErrorMessage(err, translateNow('commonUi.c_pm_reloadFailed'))
       setPlugins((prev) => prev.map((p) =>
-        p.pluginId === pluginId ? { ...p, status: 'error', error: `Neu laden fehlgeschlagen: ${detail}` } : p
+        p.pluginId === pluginId ? { ...p, status: 'error', error: translateNow('commonUi.c_pm_reloadFailedDetail', { detail: detail }) } : p
       ))
     } finally {
       setReloadingPlugins((prev) => {
@@ -581,7 +581,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       // Remove from display list
       setPlugins((prev) => prev.filter((p) => p.pluginId !== pluginId))
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Deinstallation fehlgeschlagen.'))
+      setError(extractErrorMessage(err, translateNow('commonUi.c_pm_uninstallFailed')))
     } finally {
       setDeletingPlugins((prev) => {
         const next = new Set(prev)
@@ -608,7 +608,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       case 'full': return 'Voll kompatibel'
       case 'partial': return 'Teilweise kompatibel'
       case 'unsupported': return 'Nicht unterstützt'
-      case 'unknown': return 'Unbekannt'
+      case 'unknown': return translateNow('commonUi.c_pm_unknown')
     }
   }
 
@@ -629,7 +629,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
    */
   async function activateInstalled(result: PluginInstallResult): Promise<void> {
     if (result.warnings?.some((w) => w.includes('eval(') || w.includes('new Function('))) {
-      throw new Error('Das Plugin nutzt eval und wurde nicht automatisch aktiviert. Aktiviere es unter „Installierte Plugins“ nach Bestätigung der Warnung.')
+      throw new Error(translateNow('commonUi.c_pm_evalNotActivated'))
     }
     if (!pluginContext) throw new Error('Plugin system is not ready')
     await pluginContext.setPluginEnabled(result.pluginId, true)
@@ -676,14 +676,14 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         <div className="plugin-management-header">
           <h1 className="plugin-management-title">
             <Plug size={20} />
-            Plugins
+            {t('commonUi.c_pm_plugins')}
           </h1>
         </div>
         {tabBar}
         {activeTab === 'installed' ? (
           <div className="plugin-management-loading" role="status" aria-live="polite">
             <span className="plugin-management-spinner" aria-hidden="true" />
-            <span>Plugins werden geladen…</span>
+            <span>{t('commonUi.c_pm_pluginsLoading')}</span>
           </div>
         ) : (
           importTab ?? <PluginStoreBrowser vaultId={vaultId} apiClient={apiClient} onPluginInstalled={() => void loadPlugins()} {...activationProps} />
@@ -699,7 +699,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         <div className="plugin-management-header">
           <h1 className="plugin-management-title">
             <Plug size={20} />
-            Plugins
+            {t('commonUi.c_pm_plugins')}
           </h1>
         </div>
         {tabBar}
@@ -712,7 +712,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               onClick={() => void loadPlugins()}
             >
               <RefreshCw size={12} />
-              Erneut versuchen
+              {t('commonUi.c_pm_retry')}
             </button>
           </div>
         ) : (
@@ -729,7 +729,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
         <div className="plugin-management-header">
           <h1 className="plugin-management-title">
             <Plug size={20} />
-            Plugins
+            {t('commonUi.c_pm_plugins')}
           </h1>
         </div>
         {tabBar}
@@ -737,9 +737,9 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
           <>
             <div className="plugin-management-empty">
               <Plug size={32} className="plugin-management-empty-icon" />
-              <p className="plugin-management-empty-title">Keine Plugins installiert</p>
+              <p className="plugin-management-empty-title">{t('commonUi.c_pm_noPlugins')}</p>
               <p className="plugin-management-empty-text">
-                Installiere Obsidian Community Plugins, um zusätzliche Funktionen hinzuzufügen.
+                {t('commonUi.c_pm_noPluginsHint')}
               </p>
             </div>
           </>
@@ -756,7 +756,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       <div className="plugin-management-header">
         <h1 className="plugin-management-title">
           <Plug size={20} />
-          Plugins
+          {t('commonUi.c_pm_plugins')}
         </h1>
         <span className="plugin-management-count">{plugins.length} installiert</span>
       </div>
@@ -766,7 +766,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       {activeTab === 'installed' ? (
         <>
           <p className="plugin-management-keychain-hint">
-            Aktive Plugins können alle Einträge im Schlüsselbund dieses Vaults lesen (Einstellungen → Vault → Schlüsselbund).
+            {t('commonUi.c_pm_keychainHint')}
           </p>
           <div className="plugin-management-update-actions">
             <button
@@ -846,8 +846,8 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 {plugin.hasSettings && plugin.status === 'active' && (
                   <button
                     className="plugin-card-btn plugin-card-btn--settings"
-                    title="Einstellungen"
-                    aria-label={`Einstellungen für ${plugin.name}`}
+                    title={t('commonUi.c_pm_settings')}
+                    aria-label={t('commonUi.c_pm_settingsFor', { name: plugin.name })}
                     onClick={() => void openSettings(plugin.pluginId, plugin.name)}
                   >
                     <Settings size={14} />
@@ -855,7 +855,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 )}
                 <button
                   className="plugin-card-btn plugin-card-btn--delete"
-                  title="Deinstallieren"
+                  title={t('commonUi.c_pm_uninstall')}
                   aria-label={`${plugin.name} deinstallieren`}
                   onClick={() => setDeleteConfirm({ pluginId: plugin.pluginId, pluginName: plugin.name })}
                   disabled={deletingPlugins.has(plugin.pluginId)}
@@ -893,10 +893,10 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                   className="plugin-card-btn plugin-card-btn--reload"
                   onClick={() => void handleReload(plugin.pluginId)}
                   disabled={reloadingPlugins.has(plugin.pluginId)}
-                  title="Neu laden"
+                  title={t('commonUi.c_pm_reload')}
                 >
                   <RefreshCw size={12} className={reloadingPlugins.has(plugin.pluginId) ? 'plugin-spinning' : ''} />
-                  Neu laden
+                  {t('commonUi.c_pm_reload')}
                 </button>
               </div>
             )}
@@ -919,13 +919,13 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 ? <ChevronDown size={12} />
                 : <ChevronRight size={12} />
               }
-              Kompatibilitätsdetails
+              {t('commonUi.c_pm_compatDetails')}
             </button>
 
             {expandedPlugin === plugin.pluginId && (
               <div className="plugin-card-details">
                 <div className="plugin-card-detail-row">
-                  <span className="plugin-card-detail-label">Kompatibilität:</span>
+                  <span className="plugin-card-detail-label">{t('commonUi.c_pm_compat')}</span>
                   <span className="plugin-card-detail-value">
                     {getCompatibilityIcon(plugin.compatibilityLevel)}
                     {getCompatibilityLabel(plugin.compatibilityLevel)}
@@ -935,7 +935,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 {/* Compatibility reasons */}
                 {plugin.compatibilityReasons.length > 0 && (
                   <div className="plugin-card-detail-reasons">
-                    <span className="plugin-card-detail-label">Begründung:</span>
+                    <span className="plugin-card-detail-label">{t('commonUi.c_pm_reason')}</span>
                     <ul className="plugin-card-reasons-list">
                       {plugin.compatibilityReasons.map((reason, idx) => (
                         <li key={idx} className="plugin-card-reasons-item">{reason}</li>
@@ -947,7 +947,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 {/* Detected API calls */}
                 {plugin.compatibilityApiCalls.length > 0 && (
                   <div className="plugin-card-detail-apicalls">
-                    <span className="plugin-card-detail-label">Erkannte API-Aufrufe:</span>
+                    <span className="plugin-card-detail-label">{t('commonUi.c_pm_apiCalls')}</span>
                     <div className="plugin-card-apicalls-grid">
                       {plugin.compatibilityApiCalls.map((call) => (
                         <div key={call.method} className={`plugin-card-apicall plugin-card-apicall--${call.classification}`}>
@@ -964,16 +964,16 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                 )}
 
                 <div className="plugin-card-detail-row">
-                  <span className="plugin-card-detail-label">Plugin-ID:</span>
+                  <span className="plugin-card-detail-label">{t('commonUi.c_pm_pluginId')}</span>
                   <span className="plugin-card-detail-value plugin-card-detail-value--mono">{plugin.pluginId}</span>
                 </div>
                 <div className="plugin-card-detail-row">
-                  <span className="plugin-card-detail-label">Version:</span>
+                  <span className="plugin-card-detail-label">{t('commonUi.c_pm_version')}</span>
                   <span className="plugin-card-detail-value">{plugin.version}</span>
                 </div>
                 {plugin.author && (
                   <div className="plugin-card-detail-row">
-                    <span className="plugin-card-detail-label">Autor:</span>
+                    <span className="plugin-card-detail-label">{t('commonUi.c_pm_author')}</span>
                     <span className="plugin-card-detail-value">{plugin.author}</span>
                   </div>
                 )}
@@ -995,7 +995,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               <button
                 className="plugin-settings-modal-close"
                 onClick={() => setSettingsModal(null)}
-                aria-label="Schließen"
+                aria-label={t('commonUi.c_pm_close')}
               >
                 <X size={16} />
               </button>
@@ -1004,7 +1004,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
               {settingsLoading ? (
                 <div className="plugin-settings-loading">
                   <span className="plugin-management-spinner" aria-hidden="true" />
-                  <span>Einstellungen werden geladen…</span>
+                  <span>{t('commonUi.c_pm_settingsLoading')}</span>
                 </div>
               ) : pluginContext?.settingTabRegistry.has(settingsModal.pluginId) ? (
                 /* Native plugin settings tab UI */
@@ -1042,7 +1042,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                   setSettingsModal(null)
                 }}
               >
-                {pluginContext?.settingTabRegistry.has(settingsModal.pluginId) ? 'Schließen' : 'Abbrechen'}
+                {pluginContext?.settingTabRegistry.has(settingsModal.pluginId) ? t('commonUi.c_pm_close') : t('commonUi.c_pm_cancel')}
               </button>
               {!pluginContext?.settingTabRegistry.has(settingsModal.pluginId) && (
                 <button
@@ -1051,7 +1051,7 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
                   disabled={settingsSaving || settingsLoading}
                 >
                   <Save size={13} />
-                  {settingsSaving ? 'Speichern…' : 'Speichern'}
+                  {settingsSaving ? t('commonUi.c_pm_saving') : t('commonUi.c_pm_save')}
                 </button>
               )}
             </div>
@@ -1062,9 +1062,9 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
       {/* Delete confirmation modal */}
       <ConfirmModal
         open={deleteConfirm !== null}
-        title="Plugin deinstallieren"
-        message={`Möchtest du das Plugin „${deleteConfirm?.pluginName ?? ''}" wirklich deinstallieren? Alle Plugin-Daten (Bundle, Styles, Einstellungen) werden unwiderruflich gelöscht.`}
-        confirmLabel="Deinstallieren"
+        title={t('commonUi.c_pm_uninstallTitle')}
+        message={t('commonUi.c_pm_uninstallMessage', { name: deleteConfirm?.pluginName ?? '' })}
+        confirmLabel={t('commonUi.c_pm_uninstall')}
         variant="danger"
         onConfirm={() => { if (deleteConfirm) void handleDelete(deleteConfirm.pluginId) }}
         onCancel={() => setDeleteConfirm(null)}

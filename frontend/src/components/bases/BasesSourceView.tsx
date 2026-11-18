@@ -3,6 +3,7 @@
  * A fallback for fields the table UI does not expose and for direct editing.
  */
 
+import { useTranslation, translateNow } from '../../i18n'
 import { memo, useState, useCallback, useRef, useEffect } from 'react'
 import { parseBase } from '@slatebase/shared-contracts'
 
@@ -16,6 +17,7 @@ export interface BasesSourceViewProps {
 }
 
 export const BasesSourceView = memo(function BasesSourceView({ source, readOnly, onApplySource }: BasesSourceViewProps) {
+  const { t } = useTranslation()
   const [editValue, setEditValue] = useState(source)
   const [parseError, setParseError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -33,13 +35,13 @@ export const BasesSourceView = memo(function BasesSourceView({ source, readOnly,
     const value = e.target.value
     setEditValue(value)
     const result = parseBase(value)
-    setParseError(result.success ? null : (result.errors[0]?.message ?? 'Ungültiges YAML'))
+    setParseError(result.success ? null : (result.errors[0]?.message ?? translateNow('basesUi.invalidYaml')))
   }, [])
 
   const handleApply = useCallback(() => {
     const result = parseBase(editValue)
     if (!result.success) {
-      setParseError(result.errors[0]?.message ?? 'Ungültiges YAML')
+      setParseError(result.errors[0]?.message ?? translateNow('basesUi.invalidYaml'))
       return
     }
     setParseError(null)
@@ -56,16 +58,16 @@ export const BasesSourceView = memo(function BasesSourceView({ source, readOnly,
   return (
     <div className="bases-source-view">
       <div className="bases-source-view__header">
-        <span className="bases-source-view__title">Quelltext (.base YAML)</span>
+        <span className="bases-source-view__title">{t('basesUi.sourceTitle')}</span>
         {!readOnly && (
           <button
             type="button"
             className="bases-source-view__apply-btn"
             onClick={handleApply}
             disabled={!!parseError}
-            title="Änderungen übernehmen (Ctrl+S)"
+            title={t('basesUi.applyChanges')}
           >
-            Übernehmen
+            {t('basesUi.apply')}
           </button>
         )}
       </div>
@@ -78,7 +80,7 @@ export const BasesSourceView = memo(function BasesSourceView({ source, readOnly,
         onKeyDown={handleKeyDown}
         readOnly={readOnly}
         spellCheck={false}
-        aria-label="Base YAML Quelltext"
+        aria-label={t('basesUi.sourceLabel')}
       />
     </div>
   )

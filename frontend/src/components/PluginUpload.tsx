@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, CheckCircle, AlertTriangle, Loader } from 'lucide-react'
 import type { IApiClient, PluginInstallResult } from '../api'
-import { useTranslation } from '../i18n'
+import { useTranslation, translateNow } from '../i18n'
 
 /** Maximum ZIP file size in bytes (10 MB). */
 const MAX_ZIP_SIZE = 10 * 1024 * 1024
@@ -53,7 +53,7 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled, activateAf
 
     // Client-side size check
     if (file.size > MAX_ZIP_SIZE) {
-      setUploadError(`Die Datei ist zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximale Größe: 10 MB.`)
+      setUploadError(t('commonUi.c_pu_tooLarge', { size: (file.size / 1024 / 1024).toFixed(1) }))
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
@@ -95,7 +95,7 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled, activateAf
       {/* Upload Section */}
       <div className="plugin-upload__section">
         <div className="plugin-upload__header">
-          <h3 className="plugin-upload__title">Plugin installieren</h3>
+          <h3 className="plugin-upload__title">{t('commonUi.c_pu_install')}</h3>
         </div>
 
         <div className="plugin-upload__area">
@@ -103,12 +103,12 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled, activateAf
             className="plugin-upload__button"
             onClick={handleUploadClick}
             disabled={uploading}
-            aria-label="Plugin-ZIP hochladen"
+            aria-label={t('commonUi.c_pu_uploadZip')}
           >
             {uploading ? (
               <>
                 <Loader size={16} className="plugin-upload__spinner" />
-                <span>Hochladen…</span>
+                <span>{t('commonUi.c_pu_uploading')}</span>
               </>
             ) : (
               <>
@@ -159,7 +159,7 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled, activateAf
         {uploadSuccess?.isUpgrade && (
           <div className="plugin-upload__message plugin-upload__message--warning">
             <AlertTriangle size={14} />
-            <span>Läuft das Plugin bereits, wird die neue Version erst nach einem Neuladen der Seite wirksam.</span>
+            <span>{t('commonUi.c_pu_reloadNote')}</span>
           </div>
         )}
 
@@ -189,22 +189,22 @@ export function PluginUpload({ apiClient, vaultId, onPluginInstalled, activateAf
 function mapUploadError(message: string): string {
   // Check for common backend error codes in the message
   if (message.includes('MISSING_FILES')) {
-    return 'Die ZIP-Datei enthält keine gültige Plugin-Struktur (manifest.json und main.js erforderlich).'
+    return translateNow('commonUi.c_pu_badStructure')
   }
   if (message.includes('MANIFEST_VALIDATION_FAILED')) {
-    return 'Das Plugin-Manifest ist ungültig. Bitte Pflichtfelder (id, name, version) prüfen.'
+    return translateNow('commonUi.c_pu_badManifest')
   }
   if (message.includes('BUNDLE_UNSAFE')) {
-    return 'Das Plugin-Bundle enthält unsichere Muster (eval, new Function oder document.write).'
+    return translateNow('commonUi.c_pu_unsafe')
   }
   if (message.includes('VERSION_NOT_HIGHER')) {
-    return 'Die hochgeladene Plugin-Version ist nicht höher als die installierte Version.'
+    return translateNow('commonUi.c_pu_notNewer')
   }
   if (message.includes('ZIP_TOO_LARGE')) {
-    return 'Die ZIP-Datei überschreitet die maximale Größe von 5 MB.'
+    return translateNow('commonUi.c_pu_zipTooBig')
   }
   if (message.includes('EXTRACTED_TOO_LARGE')) {
-    return 'Der extrahierte Inhalt überschreitet die maximale Größe von 10 MB.'
+    return translateNow('commonUi.c_pu_extractedTooBig')
   }
   return message
 }

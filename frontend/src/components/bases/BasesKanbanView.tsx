@@ -14,6 +14,7 @@
  * their note. Editing other properties stays in the table view and the note.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { CSSProperties, DragEvent } from 'react'
 import { ChevronDown, ChevronRight, Plus, GripVertical } from 'lucide-react'
@@ -81,6 +82,7 @@ interface KanbanColumn {
 export const BasesKanbanView = memo(function BasesKanbanView({
   doc, view, rows, layout = 'columns', vaultId, onOpenNote, onMoveCard, onAddCard, onReorderColumns,
 }: BasesKanbanViewProps) {
+  const { t } = useTranslation()
   const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, !onMoveCard)
   const { coverFor } = useCardCovers(doc, view, vaultId ?? '')
   // View `cardSize`: the column width of the board, or the card width of grouped cards laid out as
@@ -276,14 +278,14 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   if (!groupBy) {
     return (
       <div className="bases-kanban bases-kanban--error" role="alert">
-        Diese Karten-Ansicht hat kein <code>groupBy</code>-Feld. Füge im Quelltext
-        {' '}<code>groupBy: &lt;Eigenschaft&gt;</code> zur Ansicht hinzu.
+        {t('basesUi.kanbanNoGroupBy1')} <code>groupBy</code>{t('basesUi.kanbanNoGroupBy2')}
+        {' '}<code>groupBy: &lt;Eigenschaft&gt;</code> {t('basesUi.kanbanNoGroupBy3')}
       </div>
     )
   }
 
   if (rows.length === 0) {
-    return <p className="bases-kanban__empty">Keine Einträge</p>
+    return <p className="bases-kanban__empty">{t('basesUi.noEntries')}</p>
   }
 
   return (
@@ -299,7 +301,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
           ))}
         </div>
       )}
-      <div className={layout === 'rows' ? 'bases-kanban bases-kanban--rows' : 'bases-kanban'} role="list" aria-label="Karten-Ansicht" style={boardStyle}>
+      <div className={layout === 'rows' ? 'bases-kanban bases-kanban--rows' : 'bases-kanban'} role="list" aria-label={t('basesUi.cardsView')} style={boardStyle}>
         {columns.map((column) => {
         const isCollapsed = collapsed[column.key] ?? false
         const isCardDropTarget = draggable && dragOverKey === column.key && dragFromKey !== column.key

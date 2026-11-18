@@ -26,6 +26,7 @@
  */
 
 import { showToast } from '../components/ToastNotification'
+import { translateNow } from '../i18n'
 
 /** localStorage key prefix for the per-store first-sync markers. */
 const SYNCED_PREFIX = 'slatebase:synced:'
@@ -85,7 +86,7 @@ export function reportSyncFailure(storeKey: string, error: unknown, label?: stri
   failing.add(storeKey)
   showToast(
     'error',
-    `${label} konnten nicht gespeichert werden — Änderungen gelten vorerst nur auf diesem Gerät.`,
+    translateNow('commonUi.c_ps_failed', { label: label }),
   )
 }
 

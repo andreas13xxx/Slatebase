@@ -1,4 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
+import { translateNow } from '../i18n'
 import './ErrorBoundary.css'
 
 /**
@@ -56,16 +57,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="error-boundary-fallback" role="alert">
           <div className="error-boundary-content">
-            <h3 className="error-boundary-title">Etwas ist schiefgelaufen</h3>
+            <h3 className="error-boundary-title">{translateNow('commonUi.c_somethingWrong')}</h3>
             <p className="error-boundary-message">
-              {this.state.error?.message ?? 'Ein unerwarteter Fehler ist aufgetreten.'}
+              {this.state.error?.message ?? translateNow('commonUi.c_unexpectedError')}
             </p>
             <button
               className="error-boundary-reset"
               onClick={this.handleReset}
               type="button"
             >
-              Erneut versuchen
+              {translateNow('commonUi.c_retry')}
             </button>
           </div>
         </div>

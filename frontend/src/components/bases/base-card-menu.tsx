@@ -4,6 +4,7 @@
  * Rename, move and delete go through the File Explorer's own flows, so tree, tabs
  * and bookmarks are updated the same way as everywhere else.
  */
+import { translateNow } from '../../i18n'
 import { createElement, useCallback, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactElement } from 'react'
 import { ExternalLink, PanelRight, Pencil, FolderInput, Trash2, Bookmark, BookmarkMinus, FolderOpen, Link } from 'lucide-react'
@@ -34,26 +35,26 @@ export function buildCardMenuItems(
   const fileName = path.split('/').pop() ?? path
   const bookmarked = favoritesStore.isFavorite(vaultId, path)
   const items: ContextMenuItem[] = [
-    { id: 'open-tab', label: 'In Tab öffnen', icon: createElement(ExternalLink, { size: ICON_SIZE }), run: () => onOpenNote(path) },
+    { id: 'open-tab', label: translateNow('basesUi.menuOpenTab'), icon: createElement(ExternalLink, { size: ICON_SIZE }), run: () => onOpenNote(path) },
     {
       id: 'open-split',
-      label: 'In geteiltem Bereich öffnen',
+      label: translateNow('basesUi.menuOpenSplit'),
       icon: createElement(PanelRight, { size: ICON_SIZE }),
       run: () => requestOpenInSplit(vaultId, path, fileName),
     },
     { id: 'sep-edit', label: '', separator: true },
-    { id: 'rename', label: 'Umbenennen', icon: createElement(Pencil, { size: ICON_SIZE }), disabled: readOnly, run: () => renameInExplorer(path) },
-    { id: 'move', label: 'Verschieben nach …', icon: createElement(FolderInput, { size: ICON_SIZE }), disabled: readOnly, run: () => moveInExplorer(path) },
-    { id: 'delete', label: 'Löschen', icon: createElement(Trash2, { size: ICON_SIZE }), disabled: readOnly, run: () => deleteInExplorer(path) },
+    { id: 'rename', label: translateNow('basesUi.menuRename'), icon: createElement(Pencil, { size: ICON_SIZE }), disabled: readOnly, run: () => renameInExplorer(path) },
+    { id: 'move', label: translateNow('basesUi.menuMove'), icon: createElement(FolderInput, { size: ICON_SIZE }), disabled: readOnly, run: () => moveInExplorer(path) },
+    { id: 'delete', label: translateNow('basesUi.menuDelete'), icon: createElement(Trash2, { size: ICON_SIZE }), disabled: readOnly, run: () => deleteInExplorer(path) },
     { id: 'sep-more', label: '', separator: true },
     {
       id: 'bookmark',
-      label: bookmarked ? 'Lesezeichen entfernen' : 'Lesezeichen setzen',
+      label: bookmarked ? translateNow('basesUi.menuUnbookmark') : translateNow('basesUi.menuBookmark'),
       icon: createElement(bookmarked ? BookmarkMinus : Bookmark, { size: ICON_SIZE }),
       run: () => (bookmarked ? favoritesStore.remove(vaultId, path) : favoritesStore.add(vaultId, path)),
     },
-    { id: 'reveal', label: 'Im Explorer zeigen', icon: createElement(FolderOpen, { size: ICON_SIZE }), run: () => revealInExplorer(path) },
-    { id: 'copy-link', label: 'Link kopieren', icon: createElement(Link, { size: ICON_SIZE }), run: () => { void copyLinkWithFeedback(vaultId, path) } },
+    { id: 'reveal', label: translateNow('basesUi.menuReveal'), icon: createElement(FolderOpen, { size: ICON_SIZE }), run: () => revealInExplorer(path) },
+    { id: 'copy-link', label: translateNow('basesUi.menuCopyLink'), icon: createElement(Link, { size: ICON_SIZE }), run: () => { void copyLinkWithFeedback(vaultId, path) } },
   ]
   items.push(...buildPluginMenuItems('file-menu', [buildTFileFromPath(path), 'bases-card'], 'bases-card-plugin-menu'))
   return items

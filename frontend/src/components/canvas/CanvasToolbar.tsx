@@ -3,6 +3,7 @@
  * Provides: add objects, zoom controls, undo/redo, fit view, grid/minimap toggles, save.
  */
 
+import { useTranslation } from '../../i18n'
 import { memo } from 'react'
 import {
   Type, FileText, Link2, SquareDashed,
@@ -55,19 +56,20 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   onZoomIn, onZoomOut, onFitView, onToggleGrid, onToggleMinimap,
   onUndo, onRedo, onSave, onSetViewMode,
 }: CanvasToolbarProps) {
+  const { t } = useTranslation()
 
   return (
     <div className="canvas-toolbar">
       {/* Add Objects Group */}
       {!readOnly && viewMode === 'visual' && (
         <div className="canvas-toolbar__group">
-          <span className="canvas-toolbar__group-label">Hinzufügen</span>
+          <span className="canvas-toolbar__group-label">{t('canvasUi.add')}</span>
           <button
             type="button"
             className="canvas-toolbar__btn"
             onClick={onAddText}
-            title="Textknoten (T)"
-            aria-label="Textknoten hinzufügen"
+            title={t('canvasUi.textNodeTitle')}
+            aria-label={t('canvasUi.addTextNode')}
           >
             <Type size={14} />
           </button>
@@ -75,8 +77,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             type="button"
             className="canvas-toolbar__btn"
             onClick={onAddFile}
-            title="Dateiknoten (F)"
-            aria-label="Dateiknoten hinzufügen"
+            title={t('canvasUi.fileNodeTitle')}
+            aria-label={t('canvasUi.addFileNode')}
           >
             <FileText size={14} />
           </button>
@@ -84,8 +86,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             type="button"
             className="canvas-toolbar__btn"
             onClick={onAddLink}
-            title="Linkknoten (L)"
-            aria-label="Linkknoten hinzufügen"
+            title={t('canvasUi.linkNodeTitle')}
+            aria-label={t('canvasUi.addLinkNode')}
           >
             <Link2 size={14} />
           </button>
@@ -93,8 +95,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             type="button"
             className="canvas-toolbar__btn"
             onClick={onAddGroup}
-            title="Gruppe (G)"
-            aria-label="Gruppe hinzufügen"
+            title={t('canvasUi.groupTitle')}
+            aria-label={t('canvasUi.addGroup')}
           >
             <SquareDashed size={14} />
           </button>
@@ -112,8 +114,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             className="canvas-toolbar__btn"
             onClick={onUndo}
             disabled={!canUndo}
-            title="Rückgängig (Ctrl+Z)"
-            aria-label="Rückgängig"
+            title={t('canvasUi.undoTitle')}
+            aria-label={t('canvasUi.undo')}
           >
             <Undo2 size={14} />
           </button>
@@ -122,8 +124,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             className="canvas-toolbar__btn"
             onClick={onRedo}
             disabled={!canRedo}
-            title="Wiederherstellen (Ctrl+Shift+Z)"
-            aria-label="Wiederherstellen"
+            title={t('canvasUi.redoTitle')}
+            aria-label={t('canvasUi.redo')}
           >
             <Redo2 size={14} />
           </button>
@@ -139,8 +141,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className="canvas-toolbar__btn"
           onClick={onZoomOut}
-          title="Herauszoomen (–)"
-          aria-label="Herauszoomen"
+          title={t('canvasUi.zoomOutTitle')}
+          aria-label={t('canvasUi.zoomOut')}
         >
           <ZoomOut size={14} />
         </button>
@@ -149,8 +151,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className="canvas-toolbar__btn"
           onClick={onZoomIn}
-          title="Hineinzoomen (+)"
-          aria-label="Hineinzoomen"
+          title={t('canvasUi.zoomInTitle')}
+          aria-label={t('canvasUi.zoomIn')}
         >
           <ZoomIn size={14} />
         </button>
@@ -158,8 +160,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className="canvas-toolbar__btn"
           onClick={onFitView}
-          title="Alles einpassen"
-          aria-label="Alles einpassen"
+          title={t('canvasUi.fitView')}
+          aria-label={t('canvasUi.fitView')}
         >
           <Maximize size={14} />
         </button>
@@ -174,8 +176,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className={`canvas-toolbar__btn ${showGrid ? 'canvas-toolbar__btn--active' : ''}`}
           onClick={onToggleGrid}
-          title="Raster ein/aus"
-          aria-label="Raster ein/aus"
+          title={t('canvasUi.toggleGrid')}
+          aria-label={t('canvasUi.toggleGrid')}
           aria-pressed={showGrid}
         >
           <Grid3X3 size={14} />
@@ -184,8 +186,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className={`canvas-toolbar__btn ${showMinimap ? 'canvas-toolbar__btn--active' : ''}`}
           onClick={onToggleMinimap}
-          title="Minimap ein/aus"
-          aria-label="Minimap ein/aus"
+          title={t('canvasUi.toggleMinimap')}
+          aria-label={t('canvasUi.toggleMinimap')}
           aria-pressed={showMinimap}
         >
           <Map size={14} />
@@ -201,8 +203,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className={`canvas-toolbar__btn ${viewMode === 'visual' ? 'canvas-toolbar__btn--active' : ''}`}
           onClick={() => onSetViewMode('visual')}
-          title="Visueller Modus"
-          aria-label="Visueller Modus"
+          title={t('canvasUi.visualMode')}
+          aria-label={t('canvasUi.visualMode')}
           aria-pressed={viewMode === 'visual'}
         >
           <Eye size={14} />
@@ -211,8 +213,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           type="button"
           className={`canvas-toolbar__btn ${viewMode === 'source' ? 'canvas-toolbar__btn--active' : ''}`}
           onClick={() => onSetViewMode('source')}
-          title="Quelltext-Modus"
-          aria-label="Quelltext-Modus"
+          title={t('canvasUi.sourceMode')}
+          aria-label={t('canvasUi.sourceMode')}
           aria-pressed={viewMode === 'source'}
         >
           <Code size={14} />
@@ -229,8 +231,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             className="canvas-toolbar__btn"
             onClick={onSave}
             disabled={!dirty}
-            title="Speichern (Ctrl+S)"
-            aria-label="Speichern"
+            title={t('canvasUi.saveTitle')}
+            aria-label={t('canvasUi.save')}
           >
             <Save size={14} />
           </button>
@@ -238,8 +240,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
       )}
 
       {/* Status Indicators */}
-      {dirty && <span className="canvas-toolbar__dirty" title="Ungespeicherte Änderungen">●</span>}
-      {readOnly && <span className="canvas-toolbar__badge">Nur Lesen</span>}
+      {dirty && <span className="canvas-toolbar__dirty" title={t('canvasUi.unsaved')}>●</span>}
+      {readOnly && <span className="canvas-toolbar__badge">{t('canvasUi.readOnly')}</span>}
     </div>
   )
 })

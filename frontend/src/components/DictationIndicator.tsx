@@ -10,6 +10,7 @@
  * polite) and errors (`role="alert"`).
  */
 import { useSyncExternalStore, useCallback } from 'react'
+import { useTranslation, type TranslationKey } from '../i18n'
 import { Mic, Square, Loader2, AlertCircle, X } from 'lucide-react'
 import type { IApiClient } from '../api'
 import { getDictationController } from '../editor/dictation/dictation-controller'
@@ -17,10 +18,10 @@ import { useTranscriptionLanguage } from '../hooks/useTranscriptionLanguage'
 import './DictationIndicator.css'
 
 /** Language options offered in the indicator. Mirrors the backend default set. */
-const LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'auto', label: 'Automatisch erkennen' },
-  { value: 'de', label: 'Deutsch' },
-  { value: 'en', label: 'Englisch' },
+const LANGUAGE_OPTIONS: Array<{ value: string; labelKey: TranslationKey }> = [
+  { value: 'auto', labelKey: 'commonUi.c_dictAuto' },
+  { value: 'de', labelKey: 'commonUi.c_dictDe' },
+  { value: 'en', labelKey: 'commonUi.c_dictEn' },
 ]
 
 export interface DictationIndicatorProps {
@@ -31,6 +32,7 @@ export interface DictationIndicatorProps {
 }
 
 export function DictationIndicator({ vaultId, apiClient }: DictationIndicatorProps) {
+  const { t } = useTranslation()
   const controller = getDictationController()
   const state = useSyncExternalStore(
     (cb) => controller.subscribe(cb),
@@ -54,17 +56,17 @@ export function DictationIndicator({ vaultId, apiClient }: DictationIndicatorPro
           <span className="dictation-indicator__pulse" aria-hidden="true">
             <Mic size={16} />
           </span>
-          <span className="dictation-indicator__label">Aufnahme läuft…</span>
+          <span className="dictation-indicator__label">{t('commonUi.c_recording')}</span>
 
           <label className="dictation-indicator__lang">
-            <span className="dictation-indicator__visually-hidden">Sprache</span>
+            <span className="dictation-indicator__visually-hidden">{t('commonUi.c_language')}</span>
             <select
               value={language}
               onChange={(e) => { setLanguage(e.target.value) }}
-              aria-label="Diktatsprache"
+              aria-label={t('commonUi.c_dictLanguage')}
             >
               {LANGUAGE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
               ))}
             </select>
           </label>
@@ -75,12 +77,12 @@ export function DictationIndicator({ vaultId, apiClient }: DictationIndicatorPro
               checked={saveAudio}
               onChange={(e) => { setSaveAudio(e.target.checked) }}
             />
-            <span>Audio speichern</span>
+            <span>{t('commonUi.c_saveAudio')}</span>
           </label>
 
           <button type="button" className="dictation-indicator__stop" onClick={stop}>
             <Square size={14} aria-hidden="true" />
-            <span>Stopp &amp; Umwandeln</span>
+            <span>{t('commonUi.c_stopConvert')}</span>
           </button>
         </div>
       )}
@@ -89,7 +91,7 @@ export function DictationIndicator({ vaultId, apiClient }: DictationIndicatorPro
         <div className="dictation-indicator__panel" role="status" aria-live="polite">
           <Loader2 size={16} className="dictation-indicator__spinner" aria-hidden="true" />
           <span className="dictation-indicator__label">
-            Wird umgewandelt… Dies kann je nach Serverauslastung einen Moment dauern.
+            {t('commonUi.c_converting')}
           </span>
         </div>
       )}
@@ -97,12 +99,12 @@ export function DictationIndicator({ vaultId, apiClient }: DictationIndicatorPro
       {state.status === 'error' && (
         <div className="dictation-indicator__panel dictation-indicator__panel--error" role="alert">
           <AlertCircle size={16} aria-hidden="true" />
-          <span className="dictation-indicator__label">{state.error ?? 'Diktat fehlgeschlagen.'}</span>
+          <span className="dictation-indicator__label">{state.error ?? t('commonUi.c_dictFailed')}</span>
           <button
             type="button"
             className="dictation-indicator__dismiss"
             onClick={dismiss}
-            aria-label="Hinweis schließen"
+            aria-label={t('commonUi.c_closeHint')}
           >
             <X size={14} aria-hidden="true" />
           </button>

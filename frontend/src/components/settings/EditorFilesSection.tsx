@@ -8,7 +8,7 @@
  *
  * @module components/settings/EditorFilesSection
  */
-import { useTranslation } from '../../i18n'
+import { useTranslation, translateNow, type TranslationKey } from '../../i18n'
 import { useState } from 'react'
 import { useAppContext } from '../../state'
 import { extractErrorMessage } from '../../utils/error'
@@ -25,11 +25,11 @@ import { vaultSpellcheckLanguage, withVaultSpellcheckLanguage } from '../../hook
 import { isSpellcheckLanguage } from '../../editor/spellcheck/protocol'
 import { buildAttachmentPath, parseAttachmentPath, type AttachmentMode } from './attachmentPath'
 
-const MODE_LABELS: Record<AttachmentMode, string> = {
-  note: 'Im Ordner der Notiz',
-  root: 'Im Vault-Stamm',
-  subfolder: 'In einem Unterordner der Notiz',
-  folder: 'In einem festen Ordner',
+const MODE_LABELS: Record<AttachmentMode, TranslationKey> = {
+  note: 'settingsUi.misc_attNote',
+  root: 'settingsUi.misc_attRoot',
+  subfolder: 'settingsUi.misc_attSubfolder',
+  folder: 'settingsUi.misc_attFolder',
 }
 
 /**
@@ -42,6 +42,7 @@ function AttachmentSettings({ storedPath, disabled, saving, onSave }: {
   saving: boolean
   onSave: (path: string) => void
 }) {
+  const { t } = useTranslation()
   const stored = parseAttachmentPath(storedPath)
   const [mode, setMode] = useState<AttachmentMode>(stored.mode)
   const [name, setName] = useState(stored.name)
@@ -52,10 +53,10 @@ function AttachmentSettings({ storedPath, disabled, saving, onSave }: {
 
   return (
     <SettingSection
-      title="Anhänge"
-      description="Wohin neue Anhänge kommen (Drag &amp; Drop, Einfügen aus der Zwischenablage, „Anhang einfügen“, Diktat). Gespeichert in .obsidian/app.json, wie in Obsidian."
+      title={t('settingsUi.misc_attachments')}
+      description={t('settingsUi.misc_attachmentsDesc')}
     >
-      <SettingRow label="Speicherort" htmlFor="attachment-mode">
+      <SettingRow label={t('settingsUi.misc_location')} htmlFor="attachment-mode">
         <select
           id="attachment-mode"
           className="settings-field-input"
@@ -64,18 +65,18 @@ function AttachmentSettings({ storedPath, disabled, saving, onSave }: {
           disabled={disabled}
         >
           {(Object.keys(MODE_LABELS) as AttachmentMode[]).map((key) => (
-            <option key={key} value={key}>{MODE_LABELS[key]}</option>
+            <option key={key} value={key}>{t(MODE_LABELS[key])}</option>
           ))}
         </select>
       </SettingRow>
 
       {needsName && (
         <SettingRow
-          label={mode === 'subfolder' ? 'Name des Unterordners' : 'Ordner'}
+          label={mode === 'subfolder' ? t('settingsUi.misc_subfolderName') : t('settingsUi.misc_folder')}
           htmlFor="attachment-name"
           hint={mode === 'subfolder'
-            ? 'Wird im Ordner der jeweiligen Notiz angelegt, zum Beispiel attachments.'
-            : 'Pfad im Vault, zum Beispiel Anhänge/Bilder.'}
+            ? t('settingsUi.misc_subfolderHint')
+            : t('settingsUi.misc_folderHint')}
         >
           <input
             id="attachment-name"
@@ -92,7 +93,7 @@ function AttachmentSettings({ storedPath, disabled, saving, onSave }: {
 
       <div className="settings-actions">
         <Button variant="primary" disabled={disabled || !changed} onClick={() => onSave(pendingPath)}>
-          {saving ? 'Speichern…' : 'Speichern'}
+          {saving ? t('settingsUi.misc_saving') : t('settingsUi.misc_save')}
         </Button>
       </div>
     </SettingSection>
@@ -138,7 +139,7 @@ export function EditorFilesSection() {
   const promptDelete = useAppConfigValue('promptDelete')
 
   if (!vaultId) {
-    return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+    return <p className="settings-content-no-vault">{t('settingsUi.misc_noVault')}</p>
   }
 
   const save = async (patch: { [K in AppConfigKey]?: AppConfigValues[K] | null }): Promise<void> => {
@@ -146,7 +147,7 @@ export function EditorFilesSection() {
     try {
       await updateAppConfig(patch)
     } catch (error: unknown) {
-      showToast('error', `Einstellung konnte nicht gespeichert werden: ${extractErrorMessage(error)}`)
+      showToast('error', translateNow('settingsUi.misc_saveFailedWith', { detail: extractErrorMessage(error) }))
     } finally {
       setSaving(false)
     }
@@ -157,7 +158,7 @@ export function EditorFilesSection() {
   return (
     <div className="editor-files-section">
       {!canWrite && (
-        <p className="settings-field-hint">Diese Einstellungen gehören zum Vault. Ändern darf sie, wer den Vault bearbeiten darf.</p>
+        <p className="settings-field-hint">{t('settingsUi.misc_vaultSettingsHint')}</p>
       )}
 
       <AttachmentSettings
@@ -168,8 +169,8 @@ export function EditorFilesSection() {
         onSave={(path) => void save({ attachmentFolderPath: path })}
       />
 
-      <SettingSection title="Editor">
-        <SettingRow label="Lesbare Zeilenlänge" htmlFor="editor-readable" hint="Begrenzt die Textbreite auf ein gut lesbares Maß.">
+      <SettingSection title={t('settingsUi.misc_editor')}>
+        <SettingRow label={t('settingsUi.misc_readableLength')} htmlFor="editor-readable" hint={t('settingsUi.misc_readableLengthHint')}>
           <input
             id="editor-readable"
             type="checkbox"
@@ -178,7 +179,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ readableLineLength: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Zeilennummern" htmlFor="editor-line-numbers">
+        <SettingRow label={t('settingsUi.misc_lineNumbers')} htmlFor="editor-line-numbers">
           <input
             id="editor-line-numbers"
             type="checkbox"
@@ -187,7 +188,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ showLineNumber: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Rechtschreibprüfung" htmlFor="editor-spellcheck" hint="Die Sprache des Wörterbuchs wählst du weiterhin im Editor, sie gilt nur für dich.">
+        <SettingRow label={t('settingsUi.misc_spellcheck')} htmlFor="editor-spellcheck" hint={t('settingsUi.misc_spellcheckHint')}>
           <input
             id="editor-spellcheck"
             type="checkbox"
@@ -196,7 +197,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ spellcheck: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Notizen öffnen in" htmlFor="editor-view-mode" hint="Gilt beim Öffnen einer Markdown-Datei.">
+        <SettingRow label={t('settingsUi.misc_openNotesIn')} htmlFor="editor-view-mode" hint={t('settingsUi.misc_openNotesInHint')}>
           <select
             id="editor-view-mode"
             className="settings-field-input"
@@ -204,8 +205,8 @@ export function EditorFilesSection() {
             disabled={disabled}
             onChange={(e) => void save({ defaultViewMode: e.target.value as AppConfigValues['defaultViewMode'] })}
           >
-            <option value="preview">Leseansicht</option>
-            <option value="source">Bearbeiten</option>
+            <option value="preview">{t('settingsUi.misc_readingView')}</option>
+            <option value="source">{t('settingsUi.misc_edit')}</option>
           </select>
         </SettingRow>
         <SettingRow label={t('propertiesInDocument.label')} htmlFor="editor-properties-in-document" hint={t('propertiesInDocument.hint')}>
@@ -221,7 +222,7 @@ export function EditorFilesSection() {
             <option value="source">{t('propertiesInDocument.source')}</option>
           </select>
         </SettingRow>
-        <SettingRow label="Strikte Zeilenumbrüche" htmlFor="editor-strict-breaks" hint="Aus: ein einzelner Zeilenumbruch erscheint in der Leseansicht als Umbruch. An: er bleibt ein Leerzeichen, wie in CommonMark.">
+        <SettingRow label={t('settingsUi.misc_strictBreaks')} htmlFor="editor-strict-breaks" hint={t('settingsUi.misc_strictBreaksHint')}>
           <input
             id="editor-strict-breaks"
             type="checkbox"
@@ -239,11 +240,11 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ spellcheckLanguages: withVaultSpellcheckLanguage(spellcheckLanguages, isSpellcheckLanguage(e.target.value) ? e.target.value : null) })}
           >
             <option value="">{t('editorSettings.spellcheckPersonal')}</option>
-            <option value="de">Deutsch</option>
+            <option value="de">{t('settingsUi.misc_german')}</option>
             <option value="en">English</option>
           </select>
         </SettingRow>
-        <SettingRow label="Rechts-nach-links-Schrift" htmlFor="editor-rtl">
+        <SettingRow label={t('settingsUi.misc_rtl')} htmlFor="editor-rtl">
           <input
             id="editor-rtl"
             type="checkbox"
@@ -272,7 +273,7 @@ export function EditorFilesSection() {
         </SettingRow>
       </SettingSection>
 
-      <SettingSection title="Einrückung und Eingabe">
+      <SettingSection title={t('settingsUi.misc_indentInput')}>
         <SettingRow label={t('editorSettings.smartIndentList')} htmlFor="editor-smart-indent-list" hint={t('editorSettings.smartIndentListHint')}>
           <input
             id="editor-smart-indent-list"
@@ -291,7 +292,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ showIndentGuide: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Mit Tabulator einrücken" htmlFor="editor-use-tab" hint="Aus: Leerzeichen, so viele wie die Tabulatorbreite.">
+        <SettingRow label={t('settingsUi.misc_useTab')} htmlFor="editor-use-tab" hint={t('settingsUi.misc_useTabHint')}>
           <input
             id="editor-use-tab"
             type="checkbox"
@@ -300,7 +301,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ useTab: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Tabulatorbreite" htmlFor="editor-tab-size" hint="1 bis 16 Zeichen.">
+        <SettingRow label={t('settingsUi.misc_tabSize')} htmlFor="editor-tab-size" hint={t('settingsUi.misc_tabSizeHint')}>
           <input
             key={tabSize}
             id="editor-tab-size"
@@ -318,7 +319,7 @@ export function EditorFilesSection() {
             }}
           />
         </SettingRow>
-        <SettingRow label="Klammern automatisch schließen" htmlFor="editor-pair-brackets">
+        <SettingRow label={t('settingsUi.misc_pairBrackets')} htmlFor="editor-pair-brackets">
           <input
             id="editor-pair-brackets"
             type="checkbox"
@@ -327,7 +328,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ autoPairBrackets: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Markdown-Zeichen um Auswahl setzen" htmlFor="editor-pair-markdown" hint="Mit markiertem Text umschließen * _ ` die Auswahl.">
+        <SettingRow label={t('settingsUi.misc_pairMarkdown')} htmlFor="editor-pair-markdown" hint={t('settingsUi.misc_pairMarkdownHint')}>
           <input
             id="editor-pair-markdown"
             type="checkbox"
@@ -336,7 +337,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ autoPairMarkdown: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Überschriften falten" htmlFor="editor-fold-heading">
+        <SettingRow label={t('settingsUi.misc_foldHeading')} htmlFor="editor-fold-heading">
           <input
             id="editor-fold-heading"
             type="checkbox"
@@ -345,7 +346,7 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ foldHeading: e.target.checked })}
           />
         </SettingRow>
-        <SettingRow label="Listen falten" htmlFor="editor-fold-indent">
+        <SettingRow label={t('settingsUi.misc_foldIndent')} htmlFor="editor-fold-indent">
           <input
             id="editor-fold-indent"
             type="checkbox"
@@ -356,8 +357,8 @@ export function EditorFilesSection() {
         </SettingRow>
       </SettingSection>
 
-      <SettingSection title="Neue Notizen und Löschen">
-        <SettingRow label="Neue Notiz anlegen in" htmlFor="files-new-location">
+      <SettingSection title={t('settingsUi.misc_newNotesDelete')}>
+        <SettingRow label={t('settingsUi.misc_newNoteIn')} htmlFor="files-new-location">
           <select
             id="files-new-location"
             className="settings-field-input"
@@ -366,12 +367,12 @@ export function EditorFilesSection() {
             onChange={(e) => void save({ newFileLocation: e.target.value as AppConfigValues['newFileLocation'] })}
           >
             <option value="root">Vault-Stamm</option>
-            <option value="current">Ordner der geöffneten Notiz</option>
-            <option value="folder">Festem Ordner</option>
+            <option value="current">{t('settingsUi.misc_currentFolder')}</option>
+            <option value="folder">{t('settingsUi.misc_fixedFolder')}</option>
           </select>
         </SettingRow>
         {newFileLocation === 'folder' && (
-          <SettingRow label="Ordner für neue Notizen" htmlFor="files-new-folder" hint="Pfad im Vault, zum Beispiel Eingang. Gibt es den Ordner nicht, kommt die Notiz in den Vault-Stamm.">
+          <SettingRow label={t('settingsUi.misc_newNoteFolder')} htmlFor="files-new-folder" hint={t('settingsUi.misc_newNoteFolderHint')}>
             <input
               key={newFileFolderPath}
               id="files-new-folder"
@@ -388,7 +389,7 @@ export function EditorFilesSection() {
             />
           </SettingRow>
         )}
-        <SettingRow label="Vor dem Löschen nachfragen" htmlFor="files-prompt-delete" hint="Gelöschtes landet weiterhin im Papierkorb.">
+        <SettingRow label={t('settingsUi.misc_promptDelete')} htmlFor="files-prompt-delete" hint={t('settingsUi.misc_promptDeleteHint')}>
           <input
             id="files-prompt-delete"
             type="checkbox"

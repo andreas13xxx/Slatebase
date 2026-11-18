@@ -362,7 +362,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
         onDrop={handleExternalFileDrop}
         targetPath={uploadTargetDir}
         disabled={!filePath}
-        disabledMessage="Bitte zuerst eine Datei öffnen"
+        disabledMessage={t('commonUi.c_em_openFile')}
         className="edit-mode-drop-zone"
         hideOverlay
       >

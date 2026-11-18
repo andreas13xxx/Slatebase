@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from '../i18n'
 
 /**
  * Props for the MermaidRenderer component.
@@ -132,6 +133,7 @@ async function renderWithTimeout(
  * 5. Cleans up pending renders on unmount
  */
 export function MermaidRenderer({ code, diagramKey }: MermaidRendererProps) {
+  const { t } = useTranslation()
   const [state, setState] = useState<RenderState>({ status: 'loading' })
 
   // Ref to track current code prop for re-rendering without adding code to observer effect deps
@@ -242,7 +244,7 @@ export function MermaidRenderer({ code, diagramKey }: MermaidRendererProps) {
     case 'loading':
       return (
         <div className="view-mode-mermaid mermaid-loading">
-          <span>Diagramm wird geladen…</span>
+          <span>{t('commonUi.c_diagramLoading')}</span>
         </div>
       )
 
@@ -265,7 +267,7 @@ export function MermaidRenderer({ code, diagramKey }: MermaidRendererProps) {
     case 'timeout':
       return (
         <div className="view-mode-mermaid mermaid-error">
-          <p className="mermaid-error-message">Diagramm-Rendering abgebrochen (Timeout)</p>
+          <p className="mermaid-error-message">{t('commonUi.c_diagramTimeout')}</p>
           <pre className="view-mode-code"><code>{code}</code></pre>
         </div>
       )

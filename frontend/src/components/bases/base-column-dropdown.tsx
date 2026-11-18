@@ -9,6 +9,7 @@
  * single-export for react-refresh, and so both consumers import one copy.
  */
 
+import { useTranslation } from '../../i18n'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -44,6 +45,7 @@ export interface ColumnDropdownProps {
 export function ColumnDropdown({
   doc, rows, columns, value: rawValue, onChange, label, disabled, allowEmpty, emptyLabel,
 }: ColumnDropdownProps): ReactNode {
+  const { t } = useTranslation()
   // A stored `note.status` is the same column as the offered `status`.
   const value = rawValue === '' ? '' : rowValueKey(rawValue)
   const [open, setOpen] = useState(false)
@@ -120,7 +122,7 @@ export function ColumnDropdown({
             <li role="option" aria-selected={value === ''}>
               <button type="button" className="bases-tb__col-dd-opt" onClick={() => { onChange(''); setOpen(false) }}>
                 {value === '' ? <Check size={13} aria-hidden="true" className="bases-tb__col-dd-check" /> : <span className="bases-tb__col-dd-check" aria-hidden="true" />}
-                <span className="bases-tb__col-label">{emptyLabel ?? 'Keine'}</span>
+                <span className="bases-tb__col-label">{emptyLabel ?? t('basesUi.none')}</span>
               </button>
             </li>
           )}

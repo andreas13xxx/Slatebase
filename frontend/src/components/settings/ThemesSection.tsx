@@ -9,6 +9,7 @@
  *
  * @module components/settings/ThemesSection
  */
+import { useTranslation } from '../../i18n'
 import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useAppContext } from '../../state'
@@ -21,14 +22,15 @@ import { SettingSection } from './ui'
 
 type ThemesTab = 'installed' | 'discover' | 'import'
 
-const TABS: ReadonlyArray<{ id: ThemesTab; label: string }> = [
-  { id: 'installed', label: 'Installiert' },
-  { id: 'discover', label: 'Entdecken' },
-  { id: 'import', label: 'Importieren' },
+const TABS: ReadonlyArray<{ id: ThemesTab; labelKey: 'settingsUi.tabInstalled' | 'settingsUi.tabDiscover' | 'settingsUi.tabImport' }> = [
+  { id: 'installed', labelKey: 'settingsUi.tabInstalled' },
+  { id: 'discover', labelKey: 'settingsUi.tabDiscover' },
+  { id: 'import', labelKey: 'settingsUi.tabImport' },
 ]
 
 /** Wraps ThemeManager (and, with the store feature on, the catalog browser) with the section title/description. */
 export function ThemesSection() {
+  const { t } = useTranslation()
   const { isEnabled } = useFeatureContext()
   const { state } = useAppContext()
   const storeEnabled = isEnabled('obsidian-theme-store')
@@ -59,23 +61,23 @@ export function ThemesSection() {
   return (
     <>
     <VaultAppearanceSettings />
-    <SettingSection title="Themes" description="Obsidian-Themes für diesen Vault installieren und auswählen.">
-      <div className="themes-tabs" role="tablist" aria-label="Themes">
-        {tabs.map((t) => (
+    <SettingSection title={t('settingsUi.themes')} description={t('settingsUi.themesDesc')}>
+      <div className="themes-tabs" role="tablist" aria-label={t('settingsUi.themes')}>
+        {tabs.map((tb) => (
           <button
-            key={t.id}
-            ref={(node) => { tabRefs.current[t.id] = node }}
+            key={tb.id}
+            ref={(node) => { tabRefs.current[tb.id] = node }}
             type="button"
             role="tab"
-            id={`${baseId}-tab-${t.id}`}
-            aria-selected={shown === t.id}
-            aria-controls={`${baseId}-panel-${t.id}`}
-            tabIndex={shown === t.id ? 0 : -1}
+            id={`${baseId}-tab-${tb.id}`}
+            aria-selected={shown === tb.id}
+            aria-controls={`${baseId}-panel-${tb.id}`}
+            tabIndex={shown === tb.id ? 0 : -1}
             className="themes-tab"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(tb.id)}
             onKeyDown={handleKeyDown}
           >
-            {t.label}
+            {t(tb.labelKey)}
           </button>
         ))}
       </div>

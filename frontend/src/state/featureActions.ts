@@ -1,4 +1,5 @@
 import type { Dispatch } from 'react'
+import { translateNow } from '../i18n'
 import type { IApiClient } from '../api/index'
 import type { FeatureAction } from './featureState'
 
@@ -40,7 +41,7 @@ export async function toggleFeature(
     // Rollback on failure
     const message = error instanceof Error ? error.message :
       (typeof error === 'object' && error !== null && 'message' in error) ?
-        String((error as { message: unknown }).message) : 'Fehler beim Ändern des Features'
+        String((error as { message: unknown }).message) : translateNow('commonUi.c_fa_toggleFailed')
     dispatch({ type: 'FEATURE_UPDATE_FAILED', name, previousEnabled, error: message })
   }
 }

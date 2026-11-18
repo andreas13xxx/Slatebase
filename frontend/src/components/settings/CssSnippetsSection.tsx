@@ -5,6 +5,7 @@
  *
  * @module components/settings/CssSnippetsSection
  */
+import { useTranslation } from '../../i18n'
 import { SnippetManager } from './SnippetManager'
 import { SettingSection } from './ui'
 
@@ -13,8 +14,9 @@ import { SettingSection } from './ui'
  * other vault-scoped settings sections (VaultConfigSection, plugins).
  */
 export function CssSnippetsSection() {
+  const { t } = useTranslation()
   return (
-    <SettingSection title="CSS-Snippets" description="Eigene CSS-Snippets zur Anpassung des Erscheinungsbilds dieses Vaults hinzufügen und verwalten.">
+    <SettingSection title={t('settingsUi.cssSnippetsTitle')} description={t('settingsUi.cssSnippetsDesc')}>
       <SnippetManager />
     </SettingSection>
   )

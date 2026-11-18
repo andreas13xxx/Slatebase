@@ -3,6 +3,7 @@
  * and because non-component exports from a component module break fast refresh.
  */
 import type { CommunityTheme, ThemeUpdateCheck } from '../../api'
+import { translateNow } from '../../i18n'
 
 /** Which color modes a theme must support. */
 export type ModeFilter = 'all' | 'dark' | 'light'
@@ -94,17 +95,17 @@ export function storeErrorMessage(err: unknown, fallback: string): string {
   const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined
   switch (code) {
     case 'THEME_FILES_NOT_FOUND':
-      return 'Das Theme-Repository enthält keine installierbaren Dateien (erwartet: theme.css oder die ältere obsidian.css im Hauptverzeichnis, bei theme.css zusätzlich manifest.json).'
+      return translateNow('commonUi.c_ts_noFiles')
     case 'THEME_TOO_LARGE':
-      return 'Das Theme ist größer als 6 MB und kann nicht installiert werden.'
+      return translateNow('commonUi.c_ts_tooLarge')
     case 'THEME_INVALID':
-      return 'Das Manifest des Themes ist ungültig oder passt nicht zum Katalogeintrag.'
+      return translateNow('commonUi.c_ts_badManifest')
     case 'UPSTREAM_UNAVAILABLE':
-      return 'GitHub ist nicht erreichbar. Bitte später erneut versuchen.'
+      return translateNow('commonUi.c_ts_github')
     case 'THEME_NOT_IN_CATALOG':
-      return 'Das Theme steht nicht mehr im Katalog. Bitte die Liste neu laden.'
+      return translateNow('commonUi.c_ts_notInCatalog')
     case 'APPEARANCE_FILE_INVALID':
-      return 'Die Datei .obsidian/appearance.json ist ungültig. Das Theme wurde nicht aktiviert.'
+      return translateNow('commonUi.c_ts_badAppearance')
     default: {
       if (typeof err === 'object' && err !== null && typeof (err as { message?: unknown }).message === 'string') {
         return (err as { message: string }).message

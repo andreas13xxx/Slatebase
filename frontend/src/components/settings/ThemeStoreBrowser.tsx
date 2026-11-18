@@ -6,6 +6,7 @@
  * GitHub itself. The list grows as the user scrolls (24 cards at a time); the "Mehr laden" button is the equivalent
  * for keyboard and screen-reader users and for browsers without IntersectionObserver.
  */
+import { useTranslation, translateNow } from '../../i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useAppContext } from '../../state'
@@ -54,6 +55,7 @@ function canAutoLoad(): boolean {
 }
 
 export function ThemeStoreBrowser() {
+  const { t } = useTranslation()
   const { state, apiClient } = useAppContext()
   const vaultId = state.selectedVaultId
 
@@ -99,7 +101,7 @@ export function ThemeStoreBrowser() {
         setCatalogError(null)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setCatalogError(storeErrorMessage(err, 'Der Katalog konnte nicht geladen werden'))
+        if (!cancelled) setCatalogError(storeErrorMessage(err, translateNow('settingsUi.catalogLoadFailed')))
       })
       .finally(() => { if (!cancelled) setLoadingCatalog(false) })
     return () => { cancelled = true }
@@ -234,7 +236,7 @@ export function ThemeStoreBrowser() {
     try {
       setUpdates(await apiClient.checkStoreThemeUpdates(vaultId))
     } catch (err) {
-      setUpdateError(storeErrorMessage(err, 'Die Suche nach Updates ist fehlgeschlagen'))
+      setUpdateError(storeErrorMessage(err, translateNow('settingsUi.updateCheckFailed')))
     } finally {
       setCheckingUpdates(false)
     }
@@ -248,8 +250,7 @@ export function ThemeStoreBrowser() {
     <div className="theme-store">
       {showNotice && (
         <p className="theme-store__notice">
-          Themes sind fremdes CSS. Slatebase führt kein Skript daraus aus, manche laden aber Schriften oder Bilder von
-          anderen Servern; das zeigt dir der Abschnitt „Installiert" nach der Installation an.
+          {t('settingsUi.storeNotice')}
         </p>
       )}
 
@@ -257,96 +258,96 @@ export function ThemeStoreBrowser() {
         <div className="theme-store__error" role="alert">
           <span>{catalogError}</span>
           <Button size="sm" onClick={() => { setLoadingCatalog(true); setCatalogError(null); setReloadKey((k) => k + 1) }}>
-            Erneut versuchen
+            {t('settingsUi.retry')}
           </Button>
         </div>
       )}
       {catalog?.stale === true && (
-        <p className="theme-store__stale">GitHub ist gerade nicht erreichbar. Angezeigt wird die zuletzt bekannte Liste.</p>
+        <p className="theme-store__stale">{t('settingsUi.githubDown')}</p>
       )}
-      {loadingCatalog && <p className="theme-store__loading" role="status">Katalog wird geladen…</p>}
+      {loadingCatalog && <p className="theme-store__loading" role="status">{t('settingsUi.catalogLoading')}</p>}
 
       {catalog !== null && (
         <>
           <div className="theme-store__controls">
             <label className="theme-store__field">
-              <span>Suchen</span>
+              <span>{t('settingsUi.searchLabel')}</span>
               <input
                 type="search"
                 value={queryInput}
                 onChange={(e) => setQueryInput(e.target.value)}
-                placeholder="Name oder Autor"
+                placeholder={t('settingsUi.namePh')}
               />
             </label>
             <label className="theme-store__field">
-              <span>Modus</span>
+              <span>{t('settingsUi.mode')}</span>
               <select value={filters.mode} onChange={(e) => changeFilters({ mode: e.target.value as ModeFilter })}>
-                <option value="all">Alle</option>
-                <option value="light">Hell</option>
-                <option value="dark">Dunkel</option>
+                <option value="all">{t('settingsUi.all')}</option>
+                <option value="light">{t('settingsUi.light')}</option>
+                <option value="dark">{t('settingsUi.dark')}</option>
               </select>
             </label>
             {catalog.themes.some((t) => t.downloads !== undefined) && (
             <label className="theme-store__field">
-              <span>Sortieren nach</span>
+              <span>{t('settingsUi.sortBy')}</span>
               <select value={filters.sort} onChange={(e) => changeFilters({ sort: e.target.value as SortOrder })}>
-                <option value="downloads">Beliebtheit (Downloads)</option>
-                <option value="name">Name</option>
+                <option value="downloads">{t('settingsUi.byDownloads')}</option>
+                <option value="name">{t('settingsUi.byName')}</option>
               </select>
             </label>
             )}
             <label className="theme-store__check">
               <input type="checkbox" checked={filters.installedOnly} onChange={(e) => changeFilters({ installedOnly: e.target.checked })} />
-              Installiert
+              {t('settingsUi.filterInstalled')}
             </label>
             <label className="theme-store__check">
               <input type="checkbox" checked={filters.updatesOnly} onChange={(e) => changeFilters({ updatesOnly: e.target.checked })} />
-              Update verfügbar
+              {t('settingsUi.filterUpdates')}
             </label>
             <label className="theme-store__check">
               <input type="checkbox" checked={filters.showLegacy} onChange={(e) => changeFilters({ showLegacy: e.target.checked })} />
-              Veraltete anzeigen
+              {t('settingsUi.showLegacy')}
             </label>
             <label className="theme-store__check">
               <input type="checkbox" checked={activateAfter} onChange={(e) => setActivateAfter(e.target.checked)} />
-              Nach der Installation aktivieren
+              {t('settingsUi.activateAfter')}
             </label>
           </div>
 
           <div className="theme-store__updates">
             <Button size="sm" onClick={() => void checkUpdates()} disabled={checkingUpdates}>
-              <RefreshCw size={13} aria-hidden="true" /> {checkingUpdates ? 'Suche läuft…' : 'Nach Updates suchen'}
+              <RefreshCw size={13} aria-hidden="true" /> {checkingUpdates ? t('settingsUi.checking') : t('settingsUi.checkUpdates')}
             </Button>
             <span className="theme-store__update-result" role="status">
-              {updates !== null && updateCount > 0 && `${updateCount} ${updateCount === 1 ? 'Update' : 'Updates'} verfügbar`}
+              {updates !== null && updateCount > 0 && (updateCount === 1 ? t('settingsUi.updatesAvailableOne', { count: updateCount }) : t('settingsUi.updatesAvailableMany', { count: updateCount }))}
               {updates !== null && updateCount === 0 && updates.warnings.length === 0 && (
-                updates.checked === 0 ? 'Keines der installierten Themes steht im Katalog.' : 'Alle Themes sind aktuell.'
+                updates.checked === 0 ? t('settingsUi.noneInCatalog') : t('settingsUi.allUpToDate')
               )}
-              {updates !== null && updateCount === 0 && updates.warnings.length > 0 && 'Keine Updates gefunden, aber nicht alle Themes ließen sich prüfen.'}
+              {updates !== null && updateCount === 0 && updates.warnings.length > 0 && t('settingsUi.someUnchecked')}
             </span>
           </div>
           {updateError !== null && <p className="theme-store__error-text" role="alert">{updateError}</p>}
           {updates !== null && updates.warnings.length > 0 && (
             <ul className="theme-store__warnings">
-              {updates.warnings.map((w) => <li key={w}>Nicht geprüft: {w}</li>)}
+              {updates.warnings.map((w) => <li key={w}>{t('settingsUi.notChecked', { name: w })}</li>)}
             </ul>
           )}
           {updates !== null && updates.unknown.length > 0 && (
-            <p className="theme-store__hint">Version nicht vergleichbar: {updates.unknown.join(', ')}</p>
+            <p className="theme-store__hint">{t('settingsUi.versionIncomparable', { list: updates.unknown.join(', ') })}</p>
           )}
 
           <p className="theme-store__count" aria-live="polite">
             {filtered.length === 0
-              ? 'Keine Themes gefunden'
-              : `${visible.length} von ${filtered.length} angezeigt (Katalog: ${catalog.themes.length})`}
+              ? t('settingsUi.noThemesFound')
+              : t('settingsUi.shownOf', { visible: visible.length, total: filtered.length, catalog: catalog.themes.length })}
           </p>
           {filtered.length === 0 && (
             <Button size="sm" onClick={() => { setQueryInput(''); appliedQueryRef.current = ''; setFilters({ ...DEFAULT_FILTERS, mode: 'all', sort: filters.sort }); setVisibleCount(PAGE_SIZE) }}>
-              Filter zurücksetzen
+              {t('settingsUi.resetFilters')}
             </Button>
           )}
 
-          <ul className="theme-store__grid" aria-label="Community-Themes">
+          <ul className="theme-store__grid" aria-label={t('settingsUi.communityThemes')}>
             {visible.map((theme) => (
               <ThemeStoreCard
                 key={theme.repo}
@@ -363,7 +364,7 @@ export function ThemeStoreBrowser() {
 
           {hasMore && (
             <div className="theme-store__more" ref={sentinelRef}>
-              <Button onClick={loadMore}>Mehr laden</Button>
+              <Button onClick={loadMore}>{t('settingsUi.loadMore')}</Button>
             </div>
           )}
         </>
@@ -374,9 +375,9 @@ export function ThemeStoreBrowser() {
 
       <ConfirmModal
         open={replacing !== null}
-        title="Theme ersetzen"
-        message={replacing ? `Ein Theme "${replacing.name}" ist bereits installiert. Durch die Version aus dem Katalog ersetzen?` : ''}
-        confirmLabel="Ersetzen"
+        title={t('settingsUi.replaceTitle')}
+        message={replacing ? t('settingsUi.replaceMessage', { name: replacing.name }) : ''}
+        confirmLabel={t('settingsUi.replace')}
         variant="danger"
         onConfirm={() => {
           const pending = replacing

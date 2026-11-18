@@ -39,6 +39,7 @@ const MAX_VISIBLE_MIDDLE_SEGMENTS = 2
  * Validates: Requirements 7.1–7.7 of navigation-link-polish
  */
 export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeChange, modes }: BreadcrumbProps) {
+  const { t } = useTranslation()
   const showInlineTitle = useAppConfigValue('showInlineTitle')
   const [collapsedOpen, setCollapsedOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -80,7 +81,7 @@ export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeCh
   const hiddenMiddle = needsCollapse ? folderSegments.slice(0, folderSegments.length - MAX_VISIBLE_MIDDLE_SEGMENTS) : []
 
   return (
-    <div className="breadcrumb" ref={containerRef} aria-label="Dateipfad">
+    <div className="breadcrumb" ref={containerRef} aria-label={t('commonUi.c_bc_filePath')}>
       <button type="button" className="breadcrumb-segment" onClick={() => handleSegmentClick('')}>
         {vaultName}
       </button>
@@ -94,8 +95,8 @@ export function Breadcrumb({ vaultName, filePath, onSegmentClick, mode, onModeCh
               className="breadcrumb-segment breadcrumb-segment--collapsed"
               onClick={() => setCollapsedOpen((v) => !v)}
               aria-expanded={collapsedOpen}
-              aria-label="Weitere Ordner anzeigen"
-              title="Weitere Ordner anzeigen"
+              aria-label={t('commonUi.c_bc_moreFolders')}
+              title={t('commonUi.c_bc_moreFolders')}
             >
               <MoreHorizontal size={14} />
             </button>

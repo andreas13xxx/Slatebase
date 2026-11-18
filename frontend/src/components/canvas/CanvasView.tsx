@@ -3,6 +3,7 @@
  * Manages viewport (zoom/pan), wires CanvasProvider, and orchestrates rendering layers.
  */
 
+import { useTranslation } from '../../i18n'
 import { useCallback, useRef, useState, useEffect } from 'react'
 import { useLongPress } from '../../hooks/useLongPress'
 import { toBlob } from 'html-to-image'
@@ -78,6 +79,7 @@ const EXPORT_PIXEL_RATIO = 2
 // ─── Inner Component ──────────────────────────────────────────────────────────
 
 function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTree, token, onFileSave }: CanvasViewProps) {
+  const { t } = useTranslation()
   const { state, dispatch, save } = useCanvasContext()
   const containerRef = useRef<HTMLDivElement>(null)
   // Dispatch on the pressed element so handleContextMenu can find the node under the finger.
@@ -810,9 +812,9 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
     return (
       <div className="canvas-view canvas-view--error">
         <div className="canvas-view__error-content">
-          <h3>Canvas konnte nicht geladen werden</h3>
+          <h3>{t('canvasUi.loadFailed')}</h3>
           <p className="canvas-view__error-message">{parseError}</p>
-          <p className="canvas-view__error-hint">Die Datei enthält ungültiges JSON. Öffne sie im Texteditor um den Fehler zu beheben.</p>
+          <p className="canvas-view__error-hint">{t('canvasUi.loadFailedHint')}</p>
         </div>
       </div>
     )
@@ -822,7 +824,7 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
     return (
       <div className="canvas-view canvas-view--loading">
         <span className="app-loading-spinner" aria-hidden="true" />
-        <span>Canvas laden…</span>
+        <span>{t('canvasUi.loading')}</span>
       </div>
     )
   }
@@ -889,7 +891,7 @@ function CanvasViewInner({ vaultId, filePath, readOnly, onFileOpen, directoryTre
             onDrop={handleDrop}
             tabIndex={0}
             role="application"
-            aria-label="Canvas-Ansicht"
+            aria-label={t('canvasUi.canvasView')}
           >
             {/* Grid background */}
             {showGrid && (

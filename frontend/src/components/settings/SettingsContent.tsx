@@ -6,6 +6,7 @@
  * @module components/settings/SettingsContent
  */
 
+import { translateNow } from '../../i18n'
 import React, { useRef, useEffect, lazy, Suspense } from 'react'
 import { useSettingsContext } from '../../state/settingsContext'
 import { useAppContext } from '../../state'
@@ -93,7 +94,7 @@ function renderSection(
   isEnabled: (featureName: string) => boolean,
 ): React.JSX.Element | null {
   if (apiClient === null) {
-    return <p className="settings-content-error">API-Client nicht verfügbar.</p>
+    return <p className="settings-content-error">{translateNow('settingsUi.apiUnavailable')}</p>
   }
 
   const sectionDef = SETTINGS_SECTIONS.find((def) => def.id === section)
@@ -129,12 +130,12 @@ function renderSection(
       )
     case 'plugins':
       if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
       }
       return <PluginManagementPage apiClient={apiClient} vaultId={selectedVaultId} />
     case 'vault-config':
       if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
       }
       return <VaultConfigSection apiClient={apiClient} vaultId={selectedVaultId} />
     case 'editor-files':
@@ -143,22 +144,22 @@ function renderSection(
       return <KeychainSection />
     case 'themes':
       if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
       }
       return <ThemesSection />
     case 'css-snippets':
       if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
       }
       return <CssSnippetsSection />
     case 'git-sync':
       if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
       }
       return <GitSyncSection />
     case 'mail-import':
       if (selectedVaultId === null) {
-        return <p className="settings-content-no-vault">Kein Vault aktiv. Bitte wähle einen Vault im Datei-Explorer aus.</p>
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
       }
       return <MailImportSection />
     case 'server-config':
