@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.90.0](https://github.com/andreas13xxx/Slatebase/compare/v0.89.0...v0.90.0) (2026-11-18)
+
+
+### Features
+
+* **activity:** year tracker, sparkline, collapsible buckets ([#420](https://github.com/andreas13xxx/Slatebase/issues/420)) ([35ebac8](https://github.com/andreas13xxx/Slatebase/commit/35ebac8972fac38f3e9673f2268efd073891be64))
+
+
+### Bugfixes
+
+* stop hidden document scroll shifting the app layout ([#418](https://github.com/andreas13xxx/Slatebase/issues/418)) ([de730dd](https://github.com/andreas13xxx/Slatebase/commit/de730dd7d5690b852fbe451d9b8a1ee7d6c7c44c))
+
+
+### Sonstige Änderungen
+
+* **i18n:** move hardcoded German UI strings into translations ([#419](https://github.com/andreas13xxx/Slatebase/issues/419)) ([06a6d34](https://github.com/andreas13xxx/Slatebase/commit/06a6d343bd43665be3027e014b4b637ac518986a))
+* remove legacy migrations, map env vars and unused API routes ([#416](https://github.com/andreas13xxx/Slatebase/issues/416)) ([b2158a4](https://github.com/andreas13xxx/Slatebase/commit/b2158a4f7511dd7293adf7ca0797171e466bd117))
+
 ## [0.89.0](https://github.com/andreas13xxx/Slatebase/compare/v0.88.0...v0.89.0) (2026-11-17)
 
 
