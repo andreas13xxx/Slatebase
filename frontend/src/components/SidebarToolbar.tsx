@@ -5,6 +5,7 @@ import {
   FileText, FilePlus, MessageCircle, ScrollText,
   Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
   Command, FileSearch, Shuffle, FileInput, PanelLeftClose, Mic,
+  History,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
 import { usePluginContext } from '../plugins/compat/plugin-context'
@@ -123,6 +124,7 @@ export function SidebarToolbar({
     { id: 'import-folder', icon: <FolderOpen size={ICON_SIZE} />, label: t('commonUi.c_importFolder'), action: onImportFolder, requiresVault: true, requiresWrite: true },
     { id: 'export-vault', icon: <Download size={ICON_SIZE} />, label: t('commonUi.c_exportVault'), action: onExportVault, requiresVault: true },
     { id: 'trash', icon: <Trash2 size={ICON_SIZE} />, label: t('commonUi.c_trash'), action: () => onOpenTrash?.(), requiresVault: true },
+    { id: 'activity', icon: <History size={ICON_SIZE} />, label: t('commonUi.c_activitySidebar'), action: () => window.dispatchEvent(new CustomEvent('slatebase:open-activity-sidebar')), requiresVault: true, feature: 'activity-timeline' },
     { id: 'graph', icon: <Share2 size={ICON_SIZE} />, label: t('commonUi.c_graph'), action: onOpenGraph, requiresVault: true },
     { id: 'chat', icon: <MessageCircle size={ICON_SIZE} />, label: t('commonUi.c_chat'), action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-audit', icon: <FileText size={ICON_SIZE} />, label: t('commonUi.c_auditLog'), action: () => onNavigate('admin-audit'), adminOnly: true },

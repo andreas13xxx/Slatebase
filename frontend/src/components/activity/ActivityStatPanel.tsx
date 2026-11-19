@@ -23,6 +23,7 @@ import { HEATMAP_WEEKS, HEATMAP_MAX_EVENTS } from '../../state/activityState'
 import { loadActivityHeatmap } from '../../state/activityActions'
 import { countByType, buildHeatmap, buildDailySeries } from './activity-stats'
 import { ACTIVITY_EVENT_META } from './activity-event-meta'
+import './ActivityStatPanel.css'
 
 /** Days shown by the sparkline. */
 const SPARK_DAYS = 90

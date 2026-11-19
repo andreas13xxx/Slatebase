@@ -870,6 +870,7 @@ export const en: TranslationShape = {
       sync: 'Sync',
     },
     bucketCount: '{count} events',
+    bucketCountOne: '1 event',
     bucket: {
       today: 'Today',
       yesterday: 'Yesterday',
@@ -2217,6 +2218,8 @@ export const en: TranslationShape = {
     c_cmd_32: 'Open knowledge graph',
     c_cmd_33: 'Manage public link of the note',
     c_cmd_34: 'Open activity timeline',
+    c_cmd_activitySidebar: 'Show activity in the sidebar',
+    c_activitySidebar: 'Activity',
     c_cmd_35: 'Manage plugins',
     c_cmd_36: 'Show outline',
     c_cmd_37: 'Show backlinks',

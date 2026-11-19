@@ -182,7 +182,7 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
   const bucketSummary = (events: ActivityEvent[]): string => {
     const top = [...countByType(events).entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
     const parts = top.map(([type, n]) => `${n} ${t(ACTIVITY_EVENT_META[type].labelKey as TranslationKey)}`)
-    return `${t('activity.bucketCount', { count: events.length })} · ${parts.join(', ')}`
+    return `${t(events.length === 1 ? 'activity.bucketCountOne' : 'activity.bucketCount', { count: events.length })} · ${parts.join(', ')}`
   }
   const bucketLabel = (key: string): string => t(`activity.bucket.${key}` as TranslationKey)
 
