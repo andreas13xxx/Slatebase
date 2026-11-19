@@ -864,6 +864,7 @@ export const de = {
       sync: 'Sync',
     },
     bucketCount: '{count} Ereignisse',
+    bucketCountOne: '1 Ereignis',
     bucket: {
       today: 'Heute',
       yesterday: 'Gestern',
@@ -2211,6 +2212,8 @@ export const de = {
     c_cmd_32: 'Knowledge Graph öffnen',
     c_cmd_33: 'Öffentlichen Link der Notiz verwalten',
     c_cmd_34: 'Aktivitätszeitleiste öffnen',
+    c_cmd_activitySidebar: 'Aktivität in der Seitenleiste anzeigen',
+    c_activitySidebar: 'Aktivität',
     c_cmd_35: 'Plugins verwalten',
     c_cmd_36: 'Gliederung anzeigen',
     c_cmd_37: 'Backlinks anzeigen',
