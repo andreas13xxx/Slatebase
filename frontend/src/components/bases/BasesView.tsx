@@ -20,7 +20,7 @@ import { runBaseQuery } from '../../bases/query-engine'
 import type { BaseDocument, BaseGroupValue, BaseRow, BaseSortClause, BaseView, FileContent } from '@slatebase/shared-contracts'
 import { applyFrontmatterChange } from '../../utils/frontmatterWriter'
 import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
-import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
+import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { requestVaultTreeRefresh } from '../../state/vaultTreeRefreshBridge'
 import { requestReveal } from '../../state/revealFileBridge'
 import { setActiveBasesController, clearActiveBasesController, tableToTsv, tableToCsv, csvFileName } from '../../state/activeBasesBridge'
@@ -216,8 +216,9 @@ export const BasesView = memo(function BasesView({
   // re-read the current content, re-apply the mutation on top of it and retry
   // once, so a concurrent edit elsewhere is merged rather than overwritten.
   // Backs both the cell edit and the Kanban card move — one code path so the
-  // two cannot drift. The save triggers vault:change → runQuery refreshes the
-  // rows, so there is no optimistic row state to roll back here.
+  // two cannot drift. The backend's vault:change excludes the writing user, so
+  // we announce our own save locally; that re-runs this view's query (and every
+  // embed / plugin view / open tab on the note). No optimistic row state.
   const writeFrontmatter = useCallback(async (
     path: string,
     mutate: (fm: Record<string, unknown>) => void,
@@ -229,6 +230,7 @@ export const BasesView = memo(function BasesView({
       mutate(fm)
       const next = applyFrontmatterChange(file.content, fm, Object.keys(fm))
       await apiClient.saveFile(vaultId, path, next, file.etag)
+      dispatchRealtimeVaultChange({ vaultId, action: 'saved', path, userId: '', username: '' })
     }
     try {
       await applyAndSave(await apiClient.fetchFileContent(vaultId, path))

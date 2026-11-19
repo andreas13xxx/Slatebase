@@ -430,6 +430,16 @@ export class VaultShim implements IVaultShim {
       markPluginWrite(file.path);
       this.events.trigger('modify', file);
       this.onFileWrite?.(file, content);
+
+      // The backend's vault:change excludes the writer, so announce the save locally —
+      // otherwise plugin Bases views, embeds and open tabs keep showing the old content.
+      dispatchRealtimeVaultChange({
+        vaultId: this.vaultId,
+        action: 'saved',
+        path: file.path,
+        userId: '',
+        username: '',
+      });
     } catch (err: unknown) {
       const appErr = err as { code?: string; message?: string };
       throw new Error(
