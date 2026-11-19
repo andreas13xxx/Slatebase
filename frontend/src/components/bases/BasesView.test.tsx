@@ -213,6 +213,23 @@ describe('BasesView Kanban card move — ETag concurrency', () => {
     expect(saveFile.mock.calls[0]?.[1]).toBe('a.md')
   })
 
+  it('re-queries after the moved card is saved (own vault:change is never echoed back)', async () => {
+    const fetchFileContent = vi.fn().mockResolvedValue({ content: '---\nstatus: todo\n---\n', etag: 'etag-1' })
+    const saveFile = vi.fn().mockResolvedValue({ path: 'a.md', name: 'a.md', size: 1, etag: 'etag-2' })
+    const queryBase = vi.fn().mockResolvedValue(kanbanResult)
+    const apiClient = {
+      queryBase,
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }),
+      fetchFileContent, saveFile,
+    } as unknown as IApiClient
+
+    await dragTaskAToDone(apiClient)
+    await waitFor(() => expect(queryBase).toHaveBeenCalledTimes(1))
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(queryBase).toHaveBeenCalledTimes(2))
+  })
+
   it('re-reads and retries once when the first save conflicts', async () => {
     const fetchFileContent = vi.fn()
       .mockResolvedValueOnce({ content: '---\nstatus: todo\n---\n', etag: 'stale' })
