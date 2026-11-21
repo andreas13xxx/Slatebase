@@ -14,6 +14,7 @@
  * first snippet tag if snippets are already present; snippets applied later append after it.
  */
 
+import { stripLocalFileUrls } from './strip-local-urls'
 import { notifyCssChange } from './css-change'
 
 /** Maximum allowed theme CSS size in bytes (6 MB) — mirrors the backend limit. */
@@ -56,7 +57,7 @@ export class ThemeInjector implements IThemeInjector {
     const changed = created || style.getAttribute('data-slatebase-theme') !== themeId || this.appliedCss !== css
     if (changed) {
       style.setAttribute('data-slatebase-theme', themeId)
-      style.textContent = css
+      style.textContent = stripLocalFileUrls(css)
       this.appliedCss = css
     }
     document.documentElement.setAttribute(THEME_MARKER_ATTRIBUTE, themeId)
