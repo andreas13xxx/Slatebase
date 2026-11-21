@@ -308,11 +308,11 @@ const welcomeVaultService = new WelcomeVaultService(
   serverConfig.templatesDir,
 )
 welcomeVaultCreator = async (userId: string, language: 'de' | 'en'): Promise<void> => {
-  // Deduplicate vault name (VaultService enforces global name uniqueness)
+  // Deduplicate vault name (VaultService enforces name uniqueness per owner)
   const welcomeVaultConfig = config.getWelcomeVaultConfig()
   const baseName = welcomeVaultConfig.name[language]
-  const allVaults = await vaultService.getVaultList()
-  const existingNames = allVaults.map((v) => v.name)
+  const allVaults = await vaultService.getVaultList(userId)
+  const existingNames = allVaults.filter((v) => v.ownerId === userId).map((v) => v.name)
   const deduplicatedName = deduplicateVaultName(baseName, existingNames)
 
   const result = await welcomeVaultService.createWelcomeVault(userId, language, deduplicatedName)
