@@ -21,16 +21,35 @@
  *          Returns empty object if no frontmatter is present or if parsing fails.
  */
 export function extractProperties(content: string): Record<string, string[]> {
+  return extractPropertiesDetailed(content).properties
+}
+
+/** Result of {@link extractPropertiesDetailed}. */
+export interface ExtractedProperties {
+  /** Property key -> string values (same shape as {@link extractProperties}). */
+  properties: Record<string, string[]>
+  /**
+   * Keys the author WROTE as a YAML list (inline `[a]` or dash items), even with a single
+   * element. The `string[]` form alone cannot tell `tags: [a]` from `tags: a`.
+   */
+  listKeys: string[]
+}
+
+/**
+ * Like {@link extractProperties}, but also reports which keys were written in list syntax.
+ * Never throws; missing or invalid frontmatter yields empty results.
+ */
+export function extractPropertiesDetailed(content: string): ExtractedProperties {
   const frontmatter = extractFrontmatterBlock(content)
   if (frontmatter === null) {
-    return {}
+    return { properties: {}, listKeys: [] }
   }
 
   try {
     return parseFrontmatterProperties(frontmatter)
   } catch {
-    // Invalid YAML — return empty object (no throw)
-    return {}
+    // Invalid YAML — return empty result (no throw)
+    return { properties: {}, listKeys: [] }
   }
 }
 
@@ -66,8 +85,9 @@ function extractFrontmatterBlock(content: string): string | null {
  * Parses frontmatter YAML into a record of string arrays.
  * Only handles top-level scalar values and simple arrays.
  */
-function parseFrontmatterProperties(frontmatter: string): Record<string, string[]> {
+function parseFrontmatterProperties(frontmatter: string): ExtractedProperties {
   const result: Record<string, string[]> = {}
+  const listKeys: string[] = []
   const lines = frontmatter.split('\n')
 
   let i = 0
@@ -96,6 +116,7 @@ function parseFrontmatterProperties(frontmatter: string): Record<string, string[
       const values = parseInlineArray(inner)
       if (values.length > 0) {
         result[key] = values
+        listKeys.push(key)
       }
       i++
       continue
@@ -122,6 +143,7 @@ function parseFrontmatterProperties(frontmatter: string): Record<string, string[
 
       if (arrayValues.length > 0) {
         result[key] = arrayValues
+        listKeys.push(key)
         i = j
         continue
       }
@@ -146,7 +168,7 @@ function parseFrontmatterProperties(frontmatter: string): Record<string, string[
     i++
   }
 
-  return result
+  return { properties: result, listKeys }
 }
 
 /**

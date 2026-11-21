@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractProperties } from './property-extractor.js'
+import { extractProperties, extractPropertiesDetailed } from './property-extractor.js'
 
 describe('extractProperties', () => {
   it('extracts a simple string property', () => {
@@ -169,5 +169,18 @@ my_key: value2
     const content = '---\r\ntags: [a, b, c]\r\nstatus: draft\r\n---\r\n'
     const result = extractProperties(content)
     expect(result).toEqual({ tags: ['a', 'b', 'c'], status: ['draft'] })
+  })
+})
+
+describe('extractPropertiesDetailed', () => {
+  it('reports keys written as a list, even with one element', () => {
+    const content = '---\na: [x]\nb:\n  - y\nc: z\nd: [p, q]\n---\n'
+    const { properties, listKeys } = extractPropertiesDetailed(content)
+    expect(properties).toEqual({ a: ['x'], b: ['y'], c: ['z'], d: ['p', 'q'] })
+    expect([...listKeys].sort()).toEqual(['a', 'b', 'd'])
+  })
+
+  it('returns empty results without frontmatter', () => {
+    expect(extractPropertiesDetailed('# no frontmatter')).toEqual({ properties: {}, listKeys: [] })
   })
 })
