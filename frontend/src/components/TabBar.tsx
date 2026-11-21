@@ -8,6 +8,7 @@ import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTabContextMenuItems } from './tab-context-menu'
 import { useLongPress } from '../hooks/useLongPress'
+import { useTouchTabDrag, type TouchTabDropTarget } from '../hooks/useTouchTabDrag'
 import { PaneTreeContext } from '../state/paneTreeContext'
 import { listPanes } from '../state/paneTreeState'
 
@@ -73,6 +74,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
   // One instance serves all tabs: only a single finger can long-press at a time.
   const longPress = useLongPress({ suppressNativeDrag: true })
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const touchDrag = useTouchTabDrag({ onDrop: handleTouchDrop })
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   // A pane-local bar always renders (even empty) so an empty pane stays a valid
@@ -162,6 +164,18 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
     dragIndexRef.current = null
   }
 
+  /** Finger lifted after a touch drag: reorder in this bar or move to another pane's bar. */
+  function handleTouchDrop(fromIndex: number, target: TouchTabDropTarget) {
+    const tab = tabs[fromIndex]
+    if (!tab || target.barId === null) return
+    if (target.barId === (paneId ?? '')) {
+      const toIndex = target.index ?? tabs.length - 1
+      if (toIndex !== fromIndex) tabDispatch({ type: 'REORDER_TABS', payload: { fromIndex, toIndex } })
+    } else if (target.barId !== '' && paneId && onMoveTabToPane) {
+      onMoveTabToPane(paneId, target.barId, tab.id, target.index ?? undefined)
+    }
+  }
+
   function handleDragEnd() {
     dragIndexRef.current = null
     setDragOverIndex(null)
@@ -224,6 +238,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
     <>
     <div
       className="tab-bar"
+      data-tab-bar={paneId ?? ''}
       role="tablist"
       aria-label={t('tabs.ariaLabel')}
       onDragOver={handleRowDragOver}
@@ -275,10 +290,16 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
             role="tab"
             aria-selected={isActive}
             aria-label={tab.filePath}
-            className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index ? ' tab-bar-tab--drag-over' : ''}`}
+            className={`tab-bar-tab${isActive ? ' tab-bar-tab--active' : ''}${dragOverIndex === index || touchDrag.overIndex === index ? ' tab-bar-tab--drag-over' : ''}${touchDrag.draggingIndex === index ? ' tab-bar-tab--dragging' : ''}`}
+            data-tab-index={index}
             onClick={() => handleActivate(tab.id)}
             onContextMenu={(e) => handleTabContextMenu(e, index)}
             {...longPress}
+            onPointerDown={(e) => { longPress.onPointerDown(e); touchDrag.onPointerDown(e, index) }}
+            onPointerMove={(e) => { longPress.onPointerMove(e); touchDrag.onPointerMove(e) }}
+            onPointerUp={(e) => { longPress.onPointerUp(); touchDrag.onPointerUp(e) }}
+            onPointerCancel={() => { longPress.onPointerCancel(); touchDrag.onPointerCancel() }}
+            onClickCapture={(e) => { longPress.onClickCapture(e); touchDrag.onClickCapture(e) }}
             title={isGraphTab ? 'Graph' : tab.filePath}
             tabIndex={isActive ? 0 : -1}
             draggable

@@ -848,6 +848,11 @@
   border-left: 2px solid var(--accent);
 }
 
+/* Touch drag in progress (useTouchTabDrag). */
+.tab-bar-tab--dragging {
+  opacity: 0.6;
+}
+
 .tab-bar-tab[draggable="true"] {
   cursor: grab;
 }
