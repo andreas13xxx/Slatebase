@@ -250,7 +250,10 @@ function insertTabIntoState(state: TabState, tab: TabEntry, index?: number): Tab
     return { ...state, activeTabId: tab.id }
   }
   const tabs = [...state.tabs]
-  const at = index === undefined ? tabs.length : Math.min(Math.max(index, 0), tabs.length)
+  const pinnedCount = tabs.filter((t) => t.pinned).length
+  const wanted = index === undefined ? tabs.length : Math.min(Math.max(index, 0), tabs.length)
+  // Pinned tabs stay in front: a pinned tab lands within the pinned group, an unpinned one behind it.
+  const at = tab.pinned ? Math.min(wanted, pinnedCount) : Math.max(wanted, pinnedCount)
   tabs.splice(at, 0, tab)
   return { ...state, tabs, activeTabId: tab.id }
 }
