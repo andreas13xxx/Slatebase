@@ -861,35 +861,48 @@ export async function loadMermaid(): Promise<unknown> {
  * Prism, PDF.js and PIXI are fetched only when a plugin calls the loader.
  */
 function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
+  // Lazy loaders. A failed chunk load (offline, blocked) is logged once and answers
+  // `null`, the same contract the earlier stubs had, so plugins that test for an
+  // unavailable library keep working instead of crashing on a rejection.
+  const lazy = (api: string, load: () => Promise<unknown>) => async (): Promise<unknown> => {
+    try {
+      return await load();
+    } catch (err) {
+      errorOnce(`obsidian:${api}`, `${api}() failed to load its library`, err);
+      return null;
+    }
+  };
+
   if (!obs['loadPrism']) {
-    // Lazy: Prism is only fetched when a plugin asks for it. Obsidian returns the
-    // global `Prism` object, so it is also published on `window`.
-    obs['loadPrism'] = async (): Promise<unknown> => {
+    // Obsidian returns the global `Prism`; an instance a plugin already put there wins.
+    obs['loadPrism'] = lazy('loadPrism', async () => {
+      const w = window as unknown as { Prism?: unknown };
+      if (w.Prism) return w.Prism;
+      // `manual` stops Prism from re-highlighting every code block of the host page on load.
+      w.Prism = { manual: true };
       const mod = await import('prismjs');
-      const prism = mod.default ?? mod;
-      if (typeof window !== 'undefined') (window as unknown as { Prism?: unknown }).Prism = prism;
-      return prism;
-    };
+      w.Prism = mod.default ?? mod;
+      return w.Prism;
+    });
   }
   if (!obs['loadPdfJs']) {
-    // Lazy: pdfjs-dist is only fetched when a plugin actually asks for it.
-    obs['loadPdfJs'] = async (): Promise<unknown> => {
+    obs['loadPdfJs'] = lazy('loadPdfJs', async () => {
       const [pdfjs, worker] = await Promise.all([
         import('pdfjs-dist'),
         import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
       ]);
-      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
       return pdfjs;
-    };
+    });
   }
   // Obsidian 1.15 loads PIXI lazily. Slatebase's own graph does not use it, but plugins
   // that draw with PIXI get the real library, fetched only on request.
   if (!obs['loadPixi']) {
-    obs['loadPixi'] = async (): Promise<unknown> => {
+    obs['loadPixi'] = lazy('loadPixi', async () => {
       const pixi = await import('pixi.js');
-      if (typeof window !== 'undefined') (window as unknown as { PIXI?: unknown }).PIXI = pixi;
+      (window as unknown as { PIXI?: unknown }).PIXI = pixi;
       return pixi;
-    };
+    });
   }
 
   // KaTeX-backed math rendering
