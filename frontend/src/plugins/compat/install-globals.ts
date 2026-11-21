@@ -2408,27 +2408,7 @@ export function installObsidianGlobals(): void {
           enumerable: true,
         })
       }
-      // previewMode will be patched in Schritt 4 after MarkdownPreviewView is defined.
-      // For now, provide a minimal stub that won't crash on common access patterns.
-      // (undefined, not null — `previewMode` is now a `declare`-only field with no
-      // runtime initializer, so the prototype simply has nothing set yet here.)
-      if (MV.prototype.previewMode === undefined) {
-        // Reading-view controller. Slatebase renders reading mode through its
-        // own React pipeline, not an Obsidian MarkdownPreviewView, so there is
-        // nothing behind these to drive — they log instead of pretending.
-        const previewNoOp = (method: string) => (): void => {
-          warnNoOp('MarkdownView.previewMode', method, 'Slatebase renders reading mode outside the Obsidian preview pipeline.')
-        }
-        MV.prototype.previewMode = {
-          get: () => '',
-          set: previewNoOp('set'),
-          clear: previewNoOp('clear'),
-          rerender: previewNoOp('rerender'),
-          getScroll: () => 0,
-          applyScroll: previewNoOp('applyScroll'),
-          containerEl: document.createElement('div'),
-        }
-      }
+      // previewMode is defined further down, once MarkdownPreviewView exists.
     }
   }
 
@@ -3605,17 +3585,56 @@ export function installObsidianGlobals(): void {
     const MRClass = window.obsidian.MarkdownRenderer as { new (el: HTMLElement): unknown; prototype: object }
     window.obsidian.MarkdownPreviewView = class MarkdownPreviewView extends (MRClass as unknown as { new (el: HTMLElement): { containerEl: HTMLElement; app: unknown; hoverPopover: unknown } }) {
       private _data = ''
+      /** The MarkdownView that owns this sub-view; supplies the source path for link resolution. */
+      owner: { file?: { path?: string } | null } | null = null
 
-      get file(): unknown { return null }
+      get file(): unknown { return this.owner?.file ?? null }
 
       /** MarkdownSubView: get current content. */
       get(): string { return this._data }
-      /** MarkdownSubView: set content. */
-      set(data: string, _clear: boolean): void { this._data = data }
-      /** Clear content. */
-      clear(): void { this._data = '' }
-      /** Re-render the preview. No-op — Slatebase has no separate reading-mode renderer. */
-      rerender(_full?: boolean): void { /* no-op */ }
+      /** Bumped by every render/clear so a slower, superseded render can be dropped. */
+      private _generation = 0
+
+      /** MarkdownSubView: set content and render it into `containerEl`, replacing what was there. */
+      set(data: string, _clear: boolean): void {
+        this._data = data
+        void this.renderData()
+      }
+      /** Empty the rendered output and the stored content. */
+      clear(): void {
+        this._data = ''
+        this._generation++
+        this.containerEl?.replaceChildren()
+      }
+      /** Render the stored content again, from scratch. */
+      rerender(_full?: boolean): void {
+        void this.renderData()
+      }
+
+      /**
+       * Renders into a scratch element and swaps the result in only if no newer
+       * render or clear started meanwhile, so overlapping calls neither duplicate
+       * nor resurrect stale output.
+       */
+      private async renderData(): Promise<void> {
+        const el = this.containerEl
+        const generation = ++this._generation
+        if (!el) return
+        if (!this._data) {
+          el.replaceChildren()
+          return
+        }
+        const scratch = document.createElement('div')
+        try {
+          await (window.obsidian!.MarkdownPreviewView as { render: (...args: unknown[]) => Promise<void> })
+            .render(this.app, this._data, scratch, this.owner?.file?.path ?? '', this)
+        } catch (err) {
+          console.error('[PluginCompat] MarkdownView.previewMode failed to render:', err)
+          return
+        }
+        if (generation !== this._generation) return
+        el.replaceChildren(...Array.from(scratch.childNodes))
+      }
 
       /** MarkdownSubView: get scroll position. */
       getScroll(): number {
@@ -3663,8 +3682,12 @@ export function installObsidianGlobals(): void {
         get(this: unknown) {
           const self = this as { _previewMode?: unknown; contentEl?: HTMLElement }
           if (!self._previewMode) {
-            const el = self.contentEl ?? document.createElement('div')
-            self._previewMode = new (MPV as unknown as { new (el: HTMLElement): unknown })(el)
+            // Own element, never the view's contentEl: that holds editor/plugin DOM,
+            // which clear()/rerender() must not be able to wipe.
+            const el = document.createElement('div')
+            const preview = new (MPV as unknown as { new (el: HTMLElement): { owner: unknown } })(el)
+            preview.owner = self
+            self._previewMode = preview
           }
           return self._previewMode
         },
