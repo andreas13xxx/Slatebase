@@ -19,6 +19,7 @@ Vor jedem `git push` MÜSSEN folgende Checks bestehen:
 3. **Backend Tests**: `npm run test:coverage` — alle grün, Coverage-Schwellen gehalten
 4. **Frontend Tests**: `npm run test:coverage` — alle grün, Coverage-Schwellen gehalten
 5. **Frontend Lint**: `npx eslint . --quiet` — **0 Errors** (Warnings sind OK)
+6. **Code Review**: Den Diff gegen `master` wirklich lesen (`git diff origin/master...HEAD`) und reviewen (`/code-review` oder manuell). Lint/Build/Tests ersetzen kein Review. Funde beheben oder mit dem Nutzer klären, erst dann pushen. Im Bericht klar sagen, ob ein Review stattfand.
 
 Wenn ein Check fehlschlägt: **erst fixen, dann pushen**. Kein `--no-verify` ohne vorherige Behebung aller Errors.
 
