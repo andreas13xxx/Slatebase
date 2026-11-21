@@ -117,7 +117,7 @@ import { EditorHeaderRow } from './components/EditorHeaderRow'
 import { Breadcrumb } from './components/Breadcrumb'
 import { BASE_BREADCRUMB_MODES } from './components/breadcrumbModes'
 import { PaneHeader } from './components/panes/PaneHeader'
-import { isBreadcrumbPath } from './components/panes/breadcrumbPath'
+import { isBreadcrumbPath, isVirtualTabPath } from './components/panes/breadcrumbPath'
 import { useResize } from './hooks/useResize'
 import { useBreakpoint } from './hooks/useMediaQuery'
 import { useKeyboardViewport } from './hooks/useKeyboardViewport'
@@ -913,8 +913,8 @@ function AppContent() {
 
   // ─── Document-derived panel data (Outline/Links/Tags/Properties) ──────────
   // Shared across whichever side panel currently hosts these views — see SidePanel.tsx.
-  const documentContent = activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? (activeTab.editBuffer ?? activeTab.content) : null
-  const documentPath = activeTab && !activeTab.isBinary && activeTab.filePath !== '__graph__' ? activeTab.filePath : null
+  const documentContent = activeTab && !activeTab.isBinary && !isVirtualTabPath(activeTab.filePath) ? (activeTab.editBuffer ?? activeTab.content) : null
+  const documentPath = activeTab && !activeTab.isBinary && !isVirtualTabPath(activeTab.filePath) ? activeTab.filePath : null
 
   const documentPanelData = useDocumentPanelData({
     documentContent,
@@ -1036,7 +1036,7 @@ function AppContent() {
     if (!explorerFollowActiveFile || !activeTab) return
     // A drawer must not pop open by itself on every tab change.
     if (isMobileLayout) return
-    if (activeTab.filePath === '__graph__' || activeTab.filePath.startsWith('__view::')) return
+    if (isVirtualTabPath(activeTab.filePath)) return
     const rightSection = rightPanelState.sections.find((s) => s.viewIds.includes('explorer'))
     if (rightSection) {
       // Must ensure the panel hosting 'explorer' is visible before dispatching the reveal event below.

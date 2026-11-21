@@ -271,7 +271,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
       {tabs.map((tab, index) => {
         const isActive = !isShowingSettings && tab.id === activeTabId
         const hasUnsaved = tab.editBuffer !== null && tab.editBuffer !== tab.content
-        const isGraphTab = tab.filePath === '__graph__'
+        const isGraphTab = tab.filePath === '__graph__' || tab.filePath.startsWith('__local-graph::')
         // Plugin-view tabs (opened via workspace.getLeaf().setViewState()) carry the
         // view's own Obsidian icon name instead of a real filename — resolving it
         // through getFileIcon() would just guess from "__view::..." and show a generic
@@ -300,7 +300,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
             onPointerUp={(e) => { longPress.onPointerUp(); touchDrag.onPointerUp(e) }}
             onPointerCancel={() => { longPress.onPointerCancel(); touchDrag.onPointerCancel() }}
             onClickCapture={(e) => { longPress.onClickCapture(e); touchDrag.onClickCapture(e) }}
-            title={isGraphTab ? 'Graph' : tab.filePath}
+            title={isGraphTab ? tab.fileName : tab.filePath}
             tabIndex={isActive ? 0 : -1}
             draggable
             onDragStart={(e) => handleDragStart(e, index)}
