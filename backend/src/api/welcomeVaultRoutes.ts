@@ -177,12 +177,12 @@ export function createWelcomeVaultRoutes(deps: WelcomeVaultRouteDependencies): H
       const language: WelcomeVaultLanguage = userInfo.preferredLanguage ?? 'de'
 
       // 3. Determine vault name from config and deduplicate
-      // Check against all system vault names since VaultService.createVault
-      // validates uniqueness globally (not just per-user).
+      // VaultService.createVault validates uniqueness per owner, so only the
+      // user's own vaults can cause a collision.
       const welcomeVaultConfig = configService.getWelcomeVaultConfig()
       const baseName = welcomeVaultConfig.name[language]
-      const allVaults = await vaultService.getVaultList()
-      const existingNames = allVaults.map((v) => v.name)
+      const allVaults = await vaultService.getVaultList(session.userId)
+      const existingNames = allVaults.filter((v) => v.ownerId === session.userId).map((v) => v.name)
       const deduplicatedName = deduplicateVaultName(baseName, existingNames)
 
       // 4. Create welcome vault via service
