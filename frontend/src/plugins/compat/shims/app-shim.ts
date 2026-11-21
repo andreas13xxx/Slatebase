@@ -673,14 +673,15 @@ export class AppShim implements IAppShim {
 
   /**
    * Undocumented internal API that opens Obsidian's "what's new" release-notes
-   * screen. Slatebase has no such screen, so this is a deliberate no-op rather
-   * than a tracked gap — declaring it explicitly (and listing it in
-   * `emulatedProperties`) keeps `if (app.showReleaseNotes)` feature-detection
-   * from tripping the generic "non-emulated" warning, since the real method is
-   * genuinely present, it just does nothing.
+   * screen. Opens Slatebase's own release notes (the `app:show-release-notes`
+   * core command). Listed in `emulatedProperties` so `if (app.showReleaseNotes)`
+   * feature-detection does not trip the generic "non-emulated" warning.
    */
   showReleaseNotes(): void {
-    warnNoOp('App', 'showReleaseNotes', 'No release notes screen is shown.')
+    // Same screen as the `app:show-release-notes` core command.
+    if (!this.commands.executeCommandById('app:show-release-notes')) {
+      warnNoOp('App', 'showReleaseNotes', 'The release notes command is not registered yet.')
+    }
   }
 
   /**

@@ -264,7 +264,7 @@ const SUPPORTED_METHODS: ReadonlySet<string> = new Set([
   'fileManager.trashFile',
   'fileManager.promptForDeletion',
   'fileManager.getAvailablePathForAttachment',
-  // No rename dialog — the call logs a console message and leaves the file untouched.
+  // Hands over to the File Explorer's inline rename.
   'fileManager.promptForFileRename',
   // Real implementation (VaultShim.copy(), vault-shim.ts) — was missing from
   // this positive list, causing plugins that use it to be misclassified.

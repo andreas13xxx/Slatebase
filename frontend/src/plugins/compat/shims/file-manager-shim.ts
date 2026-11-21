@@ -13,7 +13,7 @@
 
 import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml'
 import type { DataWriteOptions, IVaultShim, TFile, TFolder } from '../types'
-import { warnNoOp } from '../log'
+import { renameInExplorer } from '../../../state/fileNavigation'
 import { computeLinkpath, toNewLinkFormat } from '../link-text'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry'
 
@@ -328,11 +328,13 @@ export class FileManagerShim implements IFileManagerShim {
   }
 
   /**
-   * Prompt the user to rename a file. In Slatebase, just a no-op stub.
+   * Ask the user to rename a file via the File Explorer's inline rename.
    * Plugins like Excalidraw call this for rename dialogs.
    */
-  async promptForFileRename(_file: TFile): Promise<void> {
-    warnNoOp('FileManager', 'promptForFileRename', 'No rename dialog is shown; the file is left unchanged.')
+  async promptForFileRename(file: TFile): Promise<void> {
+    // Hand over to the File Explorer's own inline rename, so tree refresh, open
+    // tabs, favorites and link migration all run through the one existing flow.
+    renameInExplorer(file.path, 'file')
   }
 
   /**
