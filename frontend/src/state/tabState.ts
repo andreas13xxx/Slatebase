@@ -471,9 +471,18 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
       if (fromIndex < 0 || fromIndex >= state.tabs.length) return state
       if (toIndex < 0 || toIndex >= state.tabs.length) return state
 
+      // Pinned tabs stay in front: a tab never crosses the pinned/unpinned boundary,
+      // whatever triggered the move (mouse drag, touch drag, menu).
+      const pinnedCount = state.tabs.filter((t) => t.pinned).length
+      const moving = state.tabs[fromIndex]
+      const target = moving?.pinned
+        ? Math.min(toIndex, pinnedCount - 1)
+        : Math.max(toIndex, pinnedCount)
+      if (target === fromIndex) return state
+
       const newTabs = [...state.tabs]
       const [movedTab] = newTabs.splice(fromIndex, 1)
-      newTabs.splice(toIndex, 0, movedTab)
+      newTabs.splice(target, 0, movedTab)
 
       return {
         ...state,
