@@ -94,16 +94,12 @@ describe('SidebarToolbar — built-in buttons', () => {
     expect(screen.getByLabelText('Vorlage einfügen')).toBeTruthy()
   })
 
-  it('leaves the "Werkzeugleiste ausblenden" button off the default layout', () => {
+  it('has no "Werkzeugleiste ausblenden" button in the bar or the Buttons submenu', () => {
     renderToolbar()
     expect(screen.queryByLabelText('Werkzeugleiste ausblenden')).toBeNull()
-    // Still offered, just unchecked, in the toolbar's own "Buttons" submenu.
     fireEvent.contextMenu(screen.getByRole('toolbar'))
     openSubmenu('Buttons')
-    expect(
-      screen.getByRole('menuitemcheckbox', { name: 'Werkzeugleiste ausblenden' })
-        .getAttribute('aria-checked'),
-    ).toBe('false')
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Werkzeugleiste ausblenden' })).toBeNull()
   })
 
   it('invokes the handler behind each new button', () => {
@@ -122,13 +118,6 @@ describe('SidebarToolbar — built-in buttons', () => {
     expect(onOpenQuickSwitcher).toHaveBeenCalledOnce()
     expect(onOpenRandomNote).toHaveBeenCalledOnce()
     expect(onInsertTemplate).toHaveBeenCalledOnce()
-  })
-
-  it('hides the whole toolbar from its own button once that button is shown', () => {
-    setEntryHidden('toggle-toolbar', false)
-    renderToolbar()
-    fireEvent.click(screen.getByLabelText('Werkzeugleiste ausblenden'))
-    expect(getToolbarPrefs().visible).toBe(false)
   })
 
   it('marks vault-scoped buttons unavailable without a vault, without firing them', () => {

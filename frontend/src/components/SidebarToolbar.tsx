@@ -4,7 +4,7 @@ import {
   Upload, FolderOpen, Download, Settings,
   FileText, FilePlus, MessageCircle, ScrollText,
   Plus, Share2, CalendarDays, Trash2, LayoutDashboard,
-  Command, FileSearch, Shuffle, FileInput, PanelLeftClose, Mic,
+  Command, FileSearch, Shuffle, FileInput, Mic,
   History,
 } from 'lucide-react'
 import { useFeatureContext } from '../state/featureContext'
@@ -12,7 +12,7 @@ import { usePluginContext } from '../plugins/compat/plugin-context'
 import { PluginRibbonGlyph } from './PluginRibbonIcon'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import {
-  useToolbarPrefs, resolveOrder, reorderEntry, setToolbarVisible,
+  useToolbarPrefs, resolveOrder, reorderEntry,
   PLUGIN_ENTRY_PREFIX,
 } from '../state/toolbarStore'
 import {
@@ -129,10 +129,6 @@ export function SidebarToolbar({
     { id: 'chat', icon: <MessageCircle size={ICON_SIZE} />, label: t('commonUi.c_chat'), action: () => onNavigate('chat'), feature: 'chat' },
     { id: 'admin-audit', icon: <FileText size={ICON_SIZE} />, label: t('commonUi.c_auditLog'), action: () => onNavigate('admin-audit'), adminOnly: true },
     { id: 'admin-logs', icon: <ScrollText size={ICON_SIZE} />, label: t('commonUi.c_serverLogs'), action: () => onNavigate('admin-logs'), adminOnly: true },
-    // Hidden by default (toolbarStore's DEFAULT_TOOLBAR_PREFS) — the toolbar
-    // context menu and the "Werkzeugleiste ein-/ausblenden" command already do
-    // this. Users who want it back tick it in the "Buttons" submenu.
-    { id: 'toggle-toolbar', icon: <PanelLeftClose size={ICON_SIZE} />, label: t('commonUi.c_hideToolbar'), action: () => setToolbarVisible(false) },
     { id: 'settings', icon: <Settings size={ICON_SIZE} />, label: t('commonUi.c_settingsShortcut'), action: () => onOpenSettings?.() },
   ]
 
