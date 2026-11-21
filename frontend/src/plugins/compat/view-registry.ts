@@ -15,6 +15,7 @@ import { setMarkdownOverride, clearMarkdownOverride } from './file-view-registry
 import { Scope } from './obsidian-api-extensions'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 import { EventSystem } from './event-system'
+import { findTabHeaderEl, findTabTitleEl, findTabIconEl } from './tab-header-dom'
 import type { EventRef } from './types'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from './api-gap-registry'
 
@@ -609,6 +610,50 @@ export class WorkspaceLeaf extends WorkspaceItem {
     this.leafEvents.trigger('group-change', next)
   }
 
+  /** Placeholders for tabs that are not on screen (sidebar leaves, closed tabs). */
+  private detachedTabEls: { header: HTMLElement; title: HTMLElement; icon: HTMLElement } | null = null
+
+  /** Path the leaf's tab carries in the tab strip, or null without a view. */
+  private tabPath(): string | null {
+    const view = this.view as unknown as { getViewType?: () => string; file?: { path?: string } | null } | null
+    const type = view?.getViewType?.()
+    if (!type) return null
+    if (type === 'markdown') return view?.file?.path ?? null
+    return `__view::${type}`
+  }
+
+  private detachedTab(): { header: HTMLElement; title: HTMLElement; icon: HTMLElement } {
+    if (!this.detachedTabEls) {
+      const header = document.createElement('div')
+      const title = document.createElement('div')
+      const icon = document.createElement('div')
+      header.append(icon, title)
+      this.detachedTabEls = { header, title, icon }
+    }
+    return this.detachedTabEls
+  }
+
+  /**
+   * The leaf's tab in the real tab strip (Obsidian: `tabHeaderEl`). A getter,
+   * not a snapshot — the strip is re-rendered by React. Falls back to a
+   * detached element when the tab is not mounted (sidebar leaf, closed tab).
+   */
+  get tabHeaderEl(): HTMLElement {
+    return findTabHeaderEl(this.tabPath()) ?? this.detachedTab().header
+  }
+
+  /** The tab's title element (Obsidian: `tabHeaderInnerTitleEl`). */
+  get tabHeaderInnerTitleEl(): HTMLElement {
+    const tab = findTabHeaderEl(this.tabPath())
+    return (tab && findTabTitleEl(tab)) ?? this.detachedTab().title
+  }
+
+  /** The tab's icon element (Obsidian: `tabHeaderInnerIconEl`). */
+  get tabHeaderInnerIconEl(): HTMLElement {
+    const tab = findTabHeaderEl(this.tabPath())
+    return (tab && findTabIconEl(tab)) ?? this.detachedTab().icon
+  }
+
   /** Called by Obsidian when the leaf is resized. No layout to react to here. */
   onResize(): void {}
 
@@ -941,6 +986,9 @@ export class WorkspaceLeaf extends WorkspaceItem {
       'app',
       'location',
       'containerEl',
+      'tabHeaderEl',
+      'tabHeaderInnerTitleEl',
+      'tabHeaderInnerIconEl',
       'hoverPopover',
       'parent',
       'group',
