@@ -28,18 +28,33 @@ describe('loadMermaid (Obsidian 1.15 surface)', () => {
   }, 60000);
 });
 
-describe('loadPixi (Obsidian 1.15)', () => {
-  it('is registered and resolves to null while PIXI is not bundled', async () => {
+describe('lazy loaders (Obsidian 1.15)', () => {
+  it('registers loadPixi, loadPrism and loadPdfJs as functions', () => {
     const w = window as unknown as { obsidian?: Record<string, unknown> };
     const previous = w.obsidian;
     w.obsidian = {};
     try {
       registerObsidianApiExtensions();
-      const loadPixi = w.obsidian['loadPixi'] as () => Promise<unknown>;
-      expect(typeof loadPixi).toBe('function');
-      await expect(loadPixi()).resolves.toBeNull();
+      for (const name of ['loadPixi', 'loadPrism', 'loadPdfJs']) {
+        expect(typeof w.obsidian[name]).toBe('function');
+      }
     } finally {
       w.obsidian = previous;
     }
   });
+
+  it('loadPrism resolves to the real Prism and sets window.Prism', async () => {
+    const w = window as unknown as { obsidian?: Record<string, unknown>; Prism?: unknown };
+    const previous = w.obsidian;
+    w.obsidian = {};
+    try {
+      registerObsidianApiExtensions();
+      const prism = (await (w.obsidian['loadPrism'] as () => Promise<Record<string, unknown>>)());
+      expect(typeof prism['highlight']).toBe('function');
+      expect(w.Prism).toBe(prism);
+    } finally {
+      w.obsidian = previous;
+      delete w.Prism;
+    }
+  }, 60000);
 });

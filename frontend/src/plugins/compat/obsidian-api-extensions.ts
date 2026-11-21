@@ -29,7 +29,7 @@
 
 import DOMPurify from 'dompurify';
 import { parse as parseYamlDoc, stringify as stringifyYamlDoc } from 'yaml';
-import { errorOnce, warnNoOp } from './log';
+import { errorOnce } from './log';
 import { foldForSearch, foldQuery, mapFoldedMatches } from '../../utils/searchFold';
 import type { BlockCache, CachedMetadata, HeadingCache, Pos } from './types';
 import { renderLucideIconInto } from './lucide-icons';
@@ -849,8 +849,8 @@ export async function loadMermaid(): Promise<unknown> {
 }
 
 /**
- * Register the loaders for libraries Slatebase does not ship (Prism, PDF.js)
- * and the KaTeX-backed math rendering functions.
+ * Register the lazy loaders for libraries plugins ask for by name (Prism, PDF.js,
+ * PIXI) and the KaTeX-backed math rendering functions.
  *
  * Math rendering (renderMath/finishRenderMath/loadMathJax) is now backed by
  * real KaTeX — see components/katex-loader.ts. The element returned by
@@ -858,18 +858,39 @@ export async function loadMermaid(): Promise<unknown> {
  * asynchronously once KaTeX loads, matching plugins that immediately append
  * the element to the DOM.
  *
- * Prism and PDF.js remain unavailable stubs.
+ * Prism, PDF.js and PIXI are fetched only when a plugin calls the loader.
  */
 function registerUnsupportedLoaders(obs: Record<string, unknown>): void {
-  const unavailable = (api: string, feature: string) => (): Promise<null> => {
-    warnNoOp('obsidian', api, `Slatebase does not bundle ${feature}; the plugin's ${feature} features will not render.`);
-    return Promise.resolve(null);
-  };
-
-  if (!obs['loadPrism']) obs['loadPrism'] = unavailable('loadPrism', 'Prism');
-  if (!obs['loadPdfJs']) obs['loadPdfJs'] = unavailable('loadPdfJs', 'PDF.js');
-  // Obsidian 1.15 loads PIXI lazily on first graph open; Slatebase's graph does not use it.
-  if (!obs['loadPixi']) obs['loadPixi'] = unavailable('loadPixi', 'PIXI');
+  if (!obs['loadPrism']) {
+    // Lazy: Prism is only fetched when a plugin asks for it. Obsidian returns the
+    // global `Prism` object, so it is also published on `window`.
+    obs['loadPrism'] = async (): Promise<unknown> => {
+      const mod = await import('prismjs');
+      const prism = mod.default ?? mod;
+      if (typeof window !== 'undefined') (window as unknown as { Prism?: unknown }).Prism = prism;
+      return prism;
+    };
+  }
+  if (!obs['loadPdfJs']) {
+    // Lazy: pdfjs-dist is only fetched when a plugin actually asks for it.
+    obs['loadPdfJs'] = async (): Promise<unknown> => {
+      const [pdfjs, worker] = await Promise.all([
+        import('pdfjs-dist'),
+        import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+      ]);
+      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      return pdfjs;
+    };
+  }
+  // Obsidian 1.15 loads PIXI lazily. Slatebase's own graph does not use it, but plugins
+  // that draw with PIXI get the real library, fetched only on request.
+  if (!obs['loadPixi']) {
+    obs['loadPixi'] = async (): Promise<unknown> => {
+      const pixi = await import('pixi.js');
+      if (typeof window !== 'undefined') (window as unknown as { PIXI?: unknown }).PIXI = pixi;
+      return pixi;
+    };
+  }
 
   // KaTeX-backed math rendering
   if (!obs['loadMathJax']) {
