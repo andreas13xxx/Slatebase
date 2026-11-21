@@ -12,6 +12,7 @@
  * splitHostPrefix().
  */
 
+import { stripLocalFileUrls } from '../appearance/strip-local-urls';
 import { OBSIDIAN_HOST_BODY_CLASSES } from './body-classes';
 
 /** Maximum allowed CSS size in bytes (2 MB — large plugins such as TaskNotes ship ~650 KB). */
@@ -499,7 +500,7 @@ export class CssInjector implements ICssInjector {
     // Create and inject <style> element
     const style = document.createElement('style');
     style.setAttribute('data-plugin-id', pluginId);
-    style.textContent = scopedCss;
+    style.textContent = stripLocalFileUrls(scopedCss);
     document.head.appendChild(style);
   }
 

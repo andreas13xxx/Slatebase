@@ -9,6 +9,7 @@
  * shared imports, so the two modules can evolve without coupling.
  */
 
+import { stripLocalFileUrls } from './strip-local-urls'
 import { notifyCssChange } from './css-change';
 
 /** Maximum allowed CSS size in bytes (512 KB) — mirrors the backend limit. */
@@ -65,7 +66,7 @@ export class SnippetInjector implements ISnippetInjector {
 
     const style = document.createElement('style');
     style.setAttribute('data-snippet-id', snippetId);
-    style.textContent = css;
+    style.textContent = stripLocalFileUrls(css);
     document.head.appendChild(style);
     appliedIds.add(snippetId);
     notifyCssChange();
