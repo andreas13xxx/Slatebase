@@ -8,7 +8,14 @@
  * @module components/settings/SettingsNavList
  */
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import {
+  ChevronDown, ChevronRight, UserCircle, Archive, ShieldCheck, User, KeyRound, Shield,
+  MonitorSmartphone, Bot, Share2, Keyboard, Palette, UserX, Puzzle, FolderCog,
+  FileText, Lock, Paintbrush, Code, GitBranch, Mail, Server, Users, Database,
+  ToggleRight, Power,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { SettingsAction, SettingsCategory, SettingsSection } from '../../state/settingsState'
 import type { SettingsNavState } from '../../state/settingsState'
 import type { ISettingsRegistry, ISettingsSectionDef } from '../../state/settingsRegistry'
@@ -33,6 +40,40 @@ export interface SettingsNavListProps {
   isFeatureEnabled?: (featureName: string) => boolean
 }
 
+/** Icon per settings section. */
+const SECTION_ICONS: Record<SettingsSection, LucideIcon> = {
+  'profile': User,
+  'password': KeyRound,
+  'security': Shield,
+  'sessions': MonitorSmartphone,
+  'mcp-tokens': Bot,
+  'public-shares': Share2,
+  'keybindings': Keyboard,
+  'appearance': Palette,
+  'my-vaults': Archive,
+  'delete-account': UserX,
+  'plugins': Puzzle,
+  'vault-config': FolderCog,
+  'editor-files': FileText,
+  'keychain': Lock,
+  'themes': Paintbrush,
+  'css-snippets': Code,
+  'git-sync': GitBranch,
+  'mail-import': Mail,
+  'server-config': Server,
+  'user-management': Users,
+  'vault-management': Database,
+  'feature-toggles': ToggleRight,
+  'server-restart': Power,
+}
+
+/** Icon per settings category. */
+const CATEGORY_ICONS: Record<SettingsCategory, LucideIcon> = {
+  account: UserCircle,
+  vault: Archive,
+  administration: ShieldCheck,
+}
+
 /** A filtered section with its resolved label. */
 interface ResolvedSection {
   def: ISettingsSectionDef
@@ -53,6 +94,16 @@ interface ResolvedSection {
  */
 export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelect, activeVaultId, isFeatureEnabled }: SettingsNavListProps) {
   const listRef = useRef<HTMLUListElement>(null)
+  const [collapsed, setCollapsed] = useState<ReadonlySet<SettingsCategory>>(new Set())
+
+  const toggleCategory = useCallback((category: SettingsCategory) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(category)) next.delete(category)
+      else next.add(category)
+      return next
+    })
+  }, [])
 
   const handleSectionClick = useCallback((category: SettingsCategory, section: SettingsSection) => {
     dispatch({ type: 'NAVIGATE', payload: { category, section } })
@@ -124,37 +175,59 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
       role="list"
       onKeyDown={handleKeyDown}
     >
-      {groupedSections.map(({ category, sections }) => (
-        <li key={category} role="presentation">
-          <p className="settings-nav-list__category-heading">
-            {CATEGORY_LABELS[category]}
-          </p>
-          <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {sections.map(({ def, label }) => {
-              const isActive = state.category === def.category && state.section === def.id
-              const vaultId = activeVaultId !== undefined ? activeVaultId : state.selectedVaultId
-              const noVaultSelected = def.requiresVault && vaultId === null
-              const featureDisabled = def.feature !== undefined && isFeatureEnabled !== undefined && !isFeatureEnabled(def.feature)
-              const isDisabled = noVaultSelected || featureDisabled
+      {groupedSections.map(({ category, sections }) => {
+        // While searching, show every match regardless of collapse state.
+        const isOpen = query !== '' || !collapsed.has(category)
+        const CategoryIcon = CATEGORY_ICONS[category]
+        const Chevron = isOpen ? ChevronDown : ChevronRight
+        const listId = `settings-nav-category-${category}`
+        return (
+          <li key={category} role="presentation">
+            <button
+              type="button"
+              className="settings-nav-list__category-heading"
+              aria-expanded={isOpen}
+              aria-controls={listId}
+              onClick={() => { toggleCategory(category) }}
+            >
+              <Chevron size={14} aria-hidden="true" />
+              <CategoryIcon size={14} aria-hidden="true" />
+              <span>{CATEGORY_LABELS[category]}</span>
+            </button>
+            <ul
+              id={listId}
+              role="list"
+              hidden={!isOpen}
+              style={{ listStyle: 'none', margin: 0, padding: 0 }}
+            >
+              {sections.map(({ def, label }) => {
+                const isActive = state.category === def.category && state.section === def.id
+                const vaultId = activeVaultId !== undefined ? activeVaultId : state.selectedVaultId
+                const noVaultSelected = def.requiresVault && vaultId === null
+                const featureDisabled = def.feature !== undefined && isFeatureEnabled !== undefined && !isFeatureEnabled(def.feature)
+                const isDisabled = noVaultSelected || featureDisabled
+                const SectionIcon = SECTION_ICONS[def.id]
 
-              return (
-                <li key={def.id} role="presentation">
-                  <button
-                    type="button"
-                    className="settings-nav-list__section-btn"
-                    aria-current={isActive ? 'page' : undefined}
-                    disabled={isDisabled}
-                    title={featureDisabled ? 'Dieses Feature ist deaktiviert. Bitte an einen Administrator wenden.' : undefined}
-                    onClick={() => { handleSectionClick(def.category, def.id) }}
-                  >
-                    {label}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </li>
-      ))}
+                return (
+                  <li key={def.id} role="presentation">
+                    <button
+                      type="button"
+                      className="settings-nav-list__section-btn"
+                      aria-current={isActive ? 'page' : undefined}
+                      disabled={isDisabled}
+                      title={featureDisabled ? 'Dieses Feature ist deaktiviert. Bitte an einen Administrator wenden.' : undefined}
+                      onClick={() => { handleSectionClick(def.category, def.id) }}
+                    >
+                      <SectionIcon size={15} aria-hidden="true" />
+                      {label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </li>
+        )
+      })}
     </ul>
   )
 }
