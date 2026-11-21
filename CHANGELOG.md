@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.93.0](https://github.com/andreas13xxx/Slatebase/compare/v0.92.0...v0.93.0) (2026-11-21)
+
+
+### Features
+
+* **plugin-compat:** lazy-load PDF.js, Prism and PIXI for plugins ([#434](https://github.com/andreas13xxx/Slatebase/issues/434)) ([1e97cfb](https://github.com/andreas13xxx/Slatebase/commit/1e97cfbc1b9b7c59e917abfb0e96eafece61bc6c))
+
+
+### Bugfixes
+
+* **plugin-compat:** back leaf.tabHeaderEl with the real tab strip ([#438](https://github.com/andreas13xxx/Slatebase/issues/438)) ([6dbb8c0](https://github.com/andreas13xxx/Slatebase/commit/6dbb8c01152ea9b267fd06e5bd43907d975b4dbe))
+* **plugin-compat:** harden lazy PDF.js/Prism/PIXI loaders ([#436](https://github.com/andreas13xxx/Slatebase/issues/436)) ([1dc4eea](https://github.com/andreas13xxx/Slatebase/commit/1dc4eeabdb3b32b0510616bae23d76e6334b67c0))
+* **plugin-compat:** strip file: URLs from injected CSS ([#437](https://github.com/andreas13xxx/Slatebase/issues/437)) ([11bd343](https://github.com/andreas13xxx/Slatebase/commit/11bd3433832fdbd683f7562ee272f296d4f4da7d))
+
 ## [0.92.0](https://github.com/andreas13xxx/Slatebase/compare/v0.91.0...v0.92.0) (2026-11-21)
 
 
