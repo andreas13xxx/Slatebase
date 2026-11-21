@@ -1,7 +1,7 @@
 ---
-version: "0.91.0" # x-release-please-version
+version: "0.92.0" # x-release-please-version
 updated: "2026-11-15T13:40"
-min_slatebase_version: "0.91.0" # x-release-please-version
+min_slatebase_version: "0.92.0" # x-release-please-version
 ---
 
 # Slatebase Tutorial Vault
@@ -10,8 +10,8 @@ This vault contains a complete guide for all Slatebase features.
 
 [//]: # (x-release-please-start-version)
 
-- **Version:** 0.91.0
+- **Version:** 0.92.0
 - **Last updated:** 15 November 2026, 13:40
-- **Minimum Slatebase version:** 0.91.0
+- **Minimum Slatebase version:** 0.92.0
 
 [//]: # (x-release-please-end)

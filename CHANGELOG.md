@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.92.0](https://github.com/andreas13xxx/Slatebase/compare/v0.91.0...v0.92.0) (2026-11-21)
+
+
+### Features
+
+* **settings:** collapsible nav categories and section icons ([#433](https://github.com/andreas13xxx/Slatebase/issues/433)) ([d5362aa](https://github.com/andreas13xxx/Slatebase/commit/d5362aae72b6d90bc12a83e1e90e74bd551e1d30))
+
+
+### Bugfixes
+
+* **tabs:** touch drag for tabs via pointer events ([#426](https://github.com/andreas13xxx/Slatebase/issues/426)) ([a22e8a1](https://github.com/andreas13xxx/Slatebase/commit/a22e8a1894d0ba6ef8e69f7f23489b078ed136a4))
+* **tabs:** treat local graph and web viewer as non-file tabs ([#430](https://github.com/andreas13xxx/Slatebase/issues/430)) ([3cf4866](https://github.com/andreas13xxx/Slatebase/commit/3cf4866aed5847bdd2bcb39eee4818342c4125a5))
+* **toolbar:** remove the hide-toolbar button ([#432](https://github.com/andreas13xxx/Slatebase/issues/432)) ([a530873](https://github.com/andreas13xxx/Slatebase/commit/a5308737250bf1f18a34e4f224f6728da34b54c2))
+* **welcome-vault:** dedupe name per owner only ([#429](https://github.com/andreas13xxx/Slatebase/issues/429)) ([eca0057](https://github.com/andreas13xxx/Slatebase/commit/eca00572ce74b9e0cc99609dd255573b25d11b8c))
+
+
+### Sonstige Änderungen
+
+* **i18n:** move hardcoded German UI strings into translations ([#427](https://github.com/andreas13xxx/Slatebase/issues/427)) ([e6e74bc](https://github.com/andreas13xxx/Slatebase/commit/e6e74bc79756f113cc6f22323adea7d83f16ffb2))
+* **steering:** require a real diff review before every push ([#431](https://github.com/andreas13xxx/Slatebase/issues/431)) ([242882a](https://github.com/andreas13xxx/Slatebase/commit/242882a42c38c0c129ddde4bc339efde6b5bd69f))
+
 ## [0.91.0](https://github.com/andreas13xxx/Slatebase/compare/v0.90.0...v0.91.0) (2026-11-19)
 
 
