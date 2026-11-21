@@ -89,9 +89,8 @@ export const DEFAULT_UI_SETTINGS: UserUiSettings = {
     visible: true,
     position: 'left',
     order: [],
-    // The toolbar's own "ausblenden" button is off by default; the client
-    // mirrors this list in `toolbarStore.DEFAULT_TOOLBAR_PREFS`.
-    hidden: ['toggle-toolbar'],
+    // The client mirrors this list in `toolbarStore.DEFAULT_TOOLBAR_PREFS`.
+    hidden: [],
     colors: {},
   },
 }
