@@ -19,10 +19,14 @@ import type { TranslationKey } from '../../i18n'
 import type { IApiClient } from '../../api'
 import type { ActivityEvent } from '../../types'
 import type { ActivityAction, ActivityRange } from '../../state/activityState'
-import { HEATMAP_WEEKS } from '../../state/activityState'
+import { HEATMAP_WEEKS, HEATMAP_MAX_EVENTS } from '../../state/activityState'
 import { loadActivityHeatmap } from '../../state/activityActions'
-import { countByType, buildHeatmap } from './activity-stats'
+import { countByType, buildHeatmap, buildDailySeries } from './activity-stats'
 import { ACTIVITY_EVENT_META } from './activity-event-meta'
+import './ActivityStatPanel.css'
+
+/** Days shown by the sparkline. */
+const SPARK_DAYS = 90
 
 const RANGES: ActivityRange[] = ['day', 'week', 'month', 'year']
 
@@ -62,6 +66,30 @@ export function ActivityStatPanel({
   }, [events])
 
   const heatmap = useMemo(() => buildHeatmap(heatmapEvents, HEATMAP_WEEKS), [heatmapEvents])
+  const truncated = heatmapEvents.length >= HEATMAP_MAX_EVENTS
+  const total = useMemo(() => heatmap.weeks.flat().reduce((n, c) => n + c.count, 0), [heatmap])
+  const sparkPoints = useMemo(() => {
+    const series = buildDailySeries(heatmapEvents, SPARK_DAYS)
+    const max = Math.max(1, ...series)
+    return series
+      .map((v, i) => `${((i / (series.length - 1)) * 100).toFixed(2)},${(22 - (v / max) * 20).toFixed(2)}`)
+      .join(' ')
+  }, [heatmapEvents])
+  const monthLabels = useMemo(() => {
+    const labels: { week: number; text: string }[] = []
+    let last = -1
+    heatmap.weeks.forEach((week, wi) => {
+      const [y, mo, d] = week[0]!.date.split('-').map(Number)
+      const first = new Date(y!, mo! - 1, d!) // local date: 'YYYY-MM-DD' alone would parse as UTC
+      const m = first.getMonth()
+      if (m !== last) {
+        last = m
+        labels.push({ week: wi, text: first.toLocaleDateString(undefined, { month: 'short' }) })
+      }
+    })
+    // Drop a label that would collide with the next one.
+    return labels.filter((l, i) => i === labels.length - 1 ? l.week <= HEATMAP_WEEKS - 3 : labels[i + 1]!.week - l.week >= 3)
+  }, [heatmap])
   const maxByType = byType.length > 0 ? byType[0]![1] : 0
 
   return (
@@ -105,32 +133,49 @@ export function ActivityStatPanel({
         )}
       </section>
 
-      {/* Heatmap */}
+      {/* Year tracker */}
       <section className="activity-stat-panel__section">
-        <h4 className="activity-stat-panel__heading">{t('activity.stats.last10Weeks')}</h4>
-        <div
-          className="activity-heatmap"
-          role="img"
-          aria-label={t('activity.stats.last10Weeks')}
-        >
-          {heatmap.weeks.map((week, wi) => (
-            <div key={wi} className="activity-heatmap__week">
-              {week.map(cell => {
-                // 0..4 intensity bucket scaled against the window's own max.
-                const level = cell.count === 0 || heatmap.max === 0
-                  ? 0
-                  : Math.min(4, Math.ceil((cell.count / heatmap.max) * 4))
-                return (
-                  <span
-                    key={cell.date}
-                    className={`activity-heatmap__cell activity-heatmap__cell--l${level}`}
-                    title={`${cell.date}: ${cell.count}`}
-                  />
-                )
-              })}
-            </div>
-          ))}
+        <h4 className="activity-stat-panel__heading">{t('activity.stats.lastYear', { count: truncated ? `${total}+` : total })}</h4>
+        <div className="activity-year">
+          <div className="activity-year__months" aria-hidden="true">
+            {monthLabels.map(l => (
+              <span key={l.week} style={{ gridColumnStart: l.week + 1 }}>{l.text}</span>
+            ))}
+          </div>
+          <div className="activity-heatmap" role="img" aria-label={t('activity.stats.lastYear', { count: truncated ? `${total}+` : total })}>
+            {heatmap.weeks.map((week, wi) => (
+              <div key={wi} className="activity-heatmap__week">
+                {week.map(cell => {
+                  const level = cell.count === 0 || heatmap.max === 0
+                    ? 0
+                    : Math.min(4, Math.ceil(Math.sqrt(cell.count / heatmap.max) * 4))
+                  return (
+                    <span
+                      key={cell.date}
+                      className={`activity-heatmap__cell activity-heatmap__cell--l${level}`}
+                      title={`${cell.date}: ${cell.count}`}
+                    />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+          <div className="activity-year__legend" aria-hidden="true">
+            <span>{t('activity.stats.less')}</span>
+            {[0, 1, 2, 3, 4].map(l => (
+              <span key={l} className={`activity-heatmap__cell activity-heatmap__cell--l${l}`} />
+            ))}
+            <span>{t('activity.stats.more')}</span>
+          </div>
         </div>
+      </section>
+
+      {/* Sparkline */}
+      <section className="activity-stat-panel__section">
+        <h4 className="activity-stat-panel__heading">{t('activity.stats.trend')}</h4>
+        <svg className="activity-spark" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label={t('activity.stats.trend')}>
+          <polyline points={sparkPoints} fill="none" vectorEffect="non-scaling-stroke" />
+        </svg>
       </section>
     </aside>
   )

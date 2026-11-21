@@ -11,8 +11,8 @@
  * the appropriate ARIA roles.
  */
 
-import React, { useReducer, useEffect, useCallback, useMemo } from 'react'
-import { History } from 'lucide-react'
+import React, { useReducer, useEffect, useCallback, useMemo, useState } from 'react'
+import { History, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import type { TranslationKey } from '../../i18n'
 import { useAppContext } from '../../state'
@@ -27,6 +27,7 @@ import {
 import { loadActivity, loadMoreActivity, refreshRecentActivity } from '../../state/activityActions'
 import { useVaultSetting, updateVaultSettings } from '../../state/vaultSettingsStore'
 import { groupIntoTimeBuckets } from './time-buckets'
+import { countByType } from './activity-stats'
 import {
   ACTIVITY_EVENT_META,
   typesForLane,
@@ -168,6 +169,21 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
     dispatch({ type: 'SET_PATH_PREFIX', pathPrefix })
   }, [])
 
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleBucket = useCallback((key: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+  /** "12 Ereignisse · 8 Notiz bearbeitet, 3 …" — shown in the header, esp. when collapsed. */
+  const bucketSummary = (events: ActivityEvent[]): string => {
+    const top = [...countByType(events).entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
+    const parts = top.map(([type, n]) => `${n} ${t(ACTIVITY_EVENT_META[type].labelKey as TranslationKey)}`)
+    return `${t(events.length === 1 ? 'activity.bucketCountOne' : 'activity.bucketCount', { count: events.length })} · ${parts.join(', ')}`
+  }
   const bucketLabel = (key: string): string => t(`activity.bucket.${key}` as TranslationKey)
 
   return (
@@ -237,7 +253,21 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
             <div className="activity-timeline__buckets">
               {buckets.map(bucket => (
                 <section className="activity-bucket" key={bucket.key} aria-label={bucketLabel(bucket.key)}>
-                  <h3 className="activity-bucket__header">{bucketLabel(bucket.key)}</h3>
+                  <h3 className="activity-bucket__header">
+                    <button
+                      type="button"
+                      className="activity-bucket__toggle"
+                      aria-expanded={!collapsed.has(bucket.key)}
+                      onClick={() => toggleBucket(bucket.key)}
+                    >
+                      {collapsed.has(bucket.key)
+                        ? <ChevronRight size={14} aria-hidden="true" />
+                        : <ChevronDown size={14} aria-hidden="true" />}
+                      <span className="activity-bucket__title">{bucketLabel(bucket.key)}</span>
+                      <span className="activity-bucket__summary">{bucketSummary(bucket.events)}</span>
+                    </button>
+                  </h3>
+                  {!collapsed.has(bucket.key) && (
                   <ul className="activity-bucket__list">
                     {bucket.events.map(evt => {
                       const meta = ACTIVITY_EVENT_META[evt.type]
@@ -279,6 +309,7 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
                       )
                     })}
                   </ul>
+                  )}
                 </section>
               ))}
 

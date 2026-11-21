@@ -88,3 +88,23 @@ export function buildHeatmap(events: ActivityEvent[], weeks: number, now: Date =
 
   return { weeks: grid, max }
 }
+
+/**
+ * Daily event counts for the last `days` days ending at `now` (oldest first),
+ * the data behind the sparkline. Pure given `now`.
+ */
+export function buildDailySeries(events: ActivityEvent[], days: number, now: Date = new Date()): number[] {
+  const perDay = new Map<string, number>()
+  for (const evt of events) {
+    const key = dayKey(new Date(evt.timestamp))
+    perDay.set(key, (perDay.get(key) ?? 0) + 1)
+  }
+  const series: number[] = []
+  const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  cursor.setDate(cursor.getDate() - (Math.max(1, Math.floor(days)) - 1))
+  for (let i = 0; i < days; i++) {
+    series.push(perDay.get(dayKey(cursor)) ?? 0)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return series
+}

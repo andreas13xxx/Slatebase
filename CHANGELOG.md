@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.91.0](https://github.com/andreas13xxx/Slatebase/compare/v0.90.0...v0.91.0) (2026-11-19)
+
+
+### Features
+
+* **activity:** sidebar button + command, load stat panel CSS ([#425](https://github.com/andreas13xxx/Slatebase/issues/425)) ([15b87c5](https://github.com/andreas13xxx/Slatebase/commit/15b87c57b5b57fc63c5bd32b7c2db2f20d739c37))
+
+
+### Bugfixes
+
+* refresh Bases views after own frontmatter writes ([#423](https://github.com/andreas13xxx/Slatebase/issues/423)) ([998d2e5](https://github.com/andreas13xxx/Slatebase/commit/998d2e54c6157732a9c7f4ba7c6ec15c9d199154))
+
+
+### Sonstige Änderungen
+
+* bump the minor-patch group in /backend with 7 updates ([#421](https://github.com/andreas13xxx/Slatebase/issues/421)) ([6b4ab9a](https://github.com/andreas13xxx/Slatebase/commit/6b4ab9a431e301f47cc7b1c6dc8afde739033fd4))
+* bump the minor-patch group in /frontend with 10 updates ([#422](https://github.com/andreas13xxx/Slatebase/issues/422)) ([d511ac7](https://github.com/andreas13xxx/Slatebase/commit/d511ac72db0117e609465d56d3f03829b8c7ebe9))
+
+## [0.90.0](https://github.com/andreas13xxx/Slatebase/compare/v0.89.0...v0.90.0) (2026-11-18)
+
+
+### Features
+
+* **activity:** year tracker, sparkline, collapsible buckets ([#420](https://github.com/andreas13xxx/Slatebase/issues/420)) ([35ebac8](https://github.com/andreas13xxx/Slatebase/commit/35ebac8972fac38f3e9673f2268efd073891be64))
+
+
+### Bugfixes
+
+* stop hidden document scroll shifting the app layout ([#418](https://github.com/andreas13xxx/Slatebase/issues/418)) ([de730dd](https://github.com/andreas13xxx/Slatebase/commit/de730dd7d5690b852fbe451d9b8a1ee7d6c7c44c))
+
+
+### Sonstige Änderungen
+
+* **i18n:** move hardcoded German UI strings into translations ([#419](https://github.com/andreas13xxx/Slatebase/issues/419)) ([06a6d34](https://github.com/andreas13xxx/Slatebase/commit/06a6d343bd43665be3027e014b4b637ac518986a))
+* remove legacy migrations, map env vars and unused API routes ([#416](https://github.com/andreas13xxx/Slatebase/issues/416)) ([b2158a4](https://github.com/andreas13xxx/Slatebase/commit/b2158a4f7511dd7293adf7ca0797171e466bd117))
+
 ## [0.89.0](https://github.com/andreas13xxx/Slatebase/compare/v0.88.0...v0.89.0) (2026-11-17)
 
 

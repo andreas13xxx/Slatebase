@@ -377,6 +377,25 @@ export function CommandPaletteContainer({
     deleteWorkspace(name)
   }, [])
 
+  /**
+   * Shows the compact activity view in a side panel. It is not part of any
+   * default panel layout, so it is added to the right panel on first use.
+   */
+  const openActivitySidebar = useCallback(() => {
+    const has = (sections: typeof rightPanelState.sections) => sections.some((sec) => sec.viewIds.includes('activity'))
+    const leftHas = has(leftPanelState.sections)
+    if (leftHas) {
+      const section = leftPanelState.sections.find((sec) => sec.viewIds.includes('activity'))
+      if (section) leftPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: section.id, viewId: 'activity' })
+      if (!showSidebar) onToggleSidebar()
+      return
+    }
+    if (!has(rightPanelState.sections)) rightPanelDispatch({ type: 'ADD_VIEW', viewId: 'activity' })
+    const target = rightPanelState.sections.find((sec) => sec.viewIds.includes('activity')) ?? rightPanelState.sections[0]
+    if (target) rightPanelDispatch({ type: 'SET_ACTIVE_VIEW', sectionId: target.id, viewId: 'activity' })
+    if (!showRightPanel) onToggleRightPanel()
+  }, [leftPanelState.sections, rightPanelState.sections, leftPanelDispatch, rightPanelDispatch, showSidebar, onToggleSidebar, showRightPanel, onToggleRightPanel])
+
   // ─── Custom events for the toolbar buttons ─────────────────────────────────
   // The toolbar buttons and the palette commands must do the same thing, so the
   // buttons dispatch these instead of carrying their own copies of the logic.
@@ -385,18 +404,21 @@ export function CommandPaletteContainer({
     function handleInsertTemplate() { openTemplateInserter() }
     function handleToggleDictation() { toggleDictation() }
     function handleCreateUniqueNote() { createUniqueNoteCmd() }
+    function handleOpenActivitySidebar() { openActivitySidebar() }
 
     window.addEventListener('slatebase:open-random-note', handleRandomNote)
     window.addEventListener('slatebase:insert-template', handleInsertTemplate)
     window.addEventListener('slatebase:toggle-dictation', handleToggleDictation)
     window.addEventListener('slatebase:create-unique-note', handleCreateUniqueNote)
+    window.addEventListener('slatebase:open-activity-sidebar', handleOpenActivitySidebar)
     return () => {
       window.removeEventListener('slatebase:open-random-note', handleRandomNote)
       window.removeEventListener('slatebase:insert-template', handleInsertTemplate)
       window.removeEventListener('slatebase:toggle-dictation', handleToggleDictation)
       window.removeEventListener('slatebase:create-unique-note', handleCreateUniqueNote)
+      window.removeEventListener('slatebase:open-activity-sidebar', handleOpenActivitySidebar)
     }
-  }, [openRandomNote, openTemplateInserter, toggleDictation, createUniqueNoteCmd])
+  }, [openRandomNote, openTemplateInserter, toggleDictation, createUniqueNoteCmd, openActivitySidebar])
 
   // ─── Keyboard shortcuts for the toolbar-related commands ───────────────────
   // These ship without a default binding, so nothing fires until the user
@@ -982,6 +1004,12 @@ export function CommandPaletteContainer({
           id: 'slatebase:open-activity',
           name: t('commonUi.c_cmd_34'),
           callback: onOpenActivity,
+          pluginId: 'slatebase',
+        })
+        commands.push({
+          id: 'slatebase:open-activity-sidebar',
+          name: t('commonUi.c_cmd_activitySidebar'),
+          callback: openActivitySidebar,
           pluginId: 'slatebase',
         })
       }

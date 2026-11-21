@@ -3,6 +3,7 @@ import type { IApiClient } from '../../../api/index';
 import type { DirectoryTree } from '../../../types';
 import type { TFile, TAbstractFile } from '../types';
 import { _reset as resetAppConfig, initialize as initializeAppConfig, setActiveVault } from '../../../state/vaultAppConfigStore';
+import { onRealtimeVaultChange } from '../../../state/realtimeVaultBridge';
 import { VaultShim, validatePath, treeNodeToTFile, treeNodeToTFolder } from './vault-shim';
 
 /**
@@ -525,6 +526,21 @@ describe('VaultShim', () => {
       await vault.modify(file, 'new content');
       expect(mockSave).toHaveBeenCalledWith('vault-123', 'notes/hello.md', 'new content');
       expect(eventCallback).toHaveBeenCalledWith(file);
+    });
+
+    it('announces the save locally so views refresh (own vault:change is never echoed back)', async () => {
+      apiClient = createMockApiClient({ saveFile: vi.fn().mockResolvedValue({ path: 'notes/hello.md', name: 'hello.md', size: 1 }) });
+      vault = new VaultShim('vault-123', 'Test Vault', apiClient, tree);
+      const seen: Array<{ vaultId: string; action: string; path: string }> = [];
+      const off = onRealtimeVaultChange((e) => { seen.push(e); });
+      const file: TFile = {
+        path: 'notes/hello.md', name: 'hello.md', basename: 'hello', extension: 'md',
+        stat: { mtime: 0, ctime: 0, size: 42 }, parent: null,
+      };
+
+      await vault.modify(file, 'x');
+      off();
+      expect(seen).toEqual([expect.objectContaining({ vaultId: 'vault-123', action: 'saved', path: 'notes/hello.md' })]);
     });
 
     it('rejects modify on non-existent file', async () => {
