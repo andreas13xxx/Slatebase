@@ -195,3 +195,13 @@ describe('buildPrefilterNode — property existence', () => {
     expect(buildPrefilterNode('!file.hasProperty("status")')).toBeNull()
   })
 })
+
+describe('buildPrefilterNode — variadic hasTag', () => {
+  it('pushes several literal tags as an OR', () => {
+    expect(buildPrefilterNode('file.hasTag("a", "#b")')).toEqual({ or: [{ tag: 'a' }, { tag: 'b' }] })
+  })
+
+  it('pushes nothing when one tag argument is not a literal', () => {
+    expect(buildPrefilterNode('file.hasTag("a", this.tag)')).toBeNull()
+  })
+})

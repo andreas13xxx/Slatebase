@@ -138,7 +138,11 @@ function evalNode(node: ExprNode, ctx: FormulaContext): FormulaValue {
         const arg = node.args.length > 0 ? stringify(evalNode(node.args[0]!, ctx)) : ''
         const api = ctx.fileApi
         if (!api) return false
-        if (node.method === 'hasTag') return api.hasTag(arg)
+        // `hasTag(...values)` is variadic in Obsidian: true when the file has ANY of the tags.
+        if (node.method === 'hasTag') {
+          if (node.args.length <= 1) return api.hasTag(arg)
+          return node.args.some((a) => api.hasTag(stringify(evalNode(a, ctx))))
+        }
         if (node.method === 'inFolder') return api.inFolder(arg)
         if (node.method === 'hasLink') return api.hasLink(arg)
         if (node.method === 'hasProperty' && api.hasProperty) return api.hasProperty(arg)

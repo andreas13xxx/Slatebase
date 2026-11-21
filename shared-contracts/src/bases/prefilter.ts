@@ -135,6 +135,16 @@ function extractFromNode(node: ExprNode): PrefilterNode | null {
     }
     case 'method': {
       // `file.hasTag("x")` / `file.inFolder("x")` on the bare `file` receiver.
+      if (node.object.kind === 'property' && node.object.name === 'file' && node.method === 'hasTag' && node.args.length > 1) {
+        // Variadic hasTag: any of the tags matches -> OR, but only if every argument is a literal.
+        const tags: PrefilterNode[] = []
+        for (const a of node.args) {
+          const lit = literalValue(a)
+          if (typeof lit !== 'string') return null
+          tags.push({ tag: lit.replace(/^#/, '') })
+        }
+        return { or: tags }
+      }
       if (node.object.kind === 'property' && node.object.name === 'file' && node.args.length === 1) {
         const arg = literalValue(node.args[0]!)
         if (typeof arg !== 'string') return null
