@@ -195,7 +195,7 @@ describe('Welcome Vault Routes', () => {
       })
       const vaultService = createMockVaultService({
         getVaultList: async (): Promise<VaultInfo[]> => [
-          { id: 'v1', name: 'Willkommen', path: '/vaults/v1', status: 'loaded' },
+          { id: 'v1', name: 'Willkommen', path: '/vaults/v1', status: 'loaded', ownerId: 'user-dedup' },
         ],
       })
       const app = createTestApp({ welcomeVaultService, vaultService, session })
@@ -206,6 +206,27 @@ describe('Welcome Vault Routes', () => {
       const body = await res.json() as { vaultId: string; vaultName: string }
       expect(body.vaultName).toBe('Willkommen (2)')
       expect(capturedName).toBe('Willkommen (2)')
+    })
+
+    it('ignores same-named vaults owned by other users', async () => {
+      const session: SessionContext = { userId: 'user-me', username: 'me', role: 'user', sessionId: 'sess-me' }
+      let capturedName: string | undefined
+      const welcomeVaultService = createMockWelcomeVaultService({
+        createWelcomeVault: async (_userId, _lang, overrideName): Promise<WelcomeVaultResult | undefined> => {
+          capturedName = overrideName
+          return { vaultId: 'vault-789', storagePath: '/data/vaults/vault-789', vaultName: overrideName ?? 'Willkommen' }
+        },
+      })
+      const vaultService = createMockVaultService({
+        getVaultList: async (): Promise<VaultInfo[]> => [
+          { id: 'v1', name: 'Willkommen', path: '/vaults/v1', status: 'loaded', ownerId: 'someone-else' },
+        ],
+      })
+      const app = createTestApp({ welcomeVaultService, vaultService, session })
+
+      const res = await app.request('/api/v1/welcome-vault', { method: 'POST' })
+      expect(res.status).toBe(201)
+      expect(capturedName).toBe('Willkommen')
     })
 
     it('returns 401 when not authenticated', async () => {
