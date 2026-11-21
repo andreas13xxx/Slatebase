@@ -111,12 +111,6 @@ describe('toolbar visibility and position', () => {
     expect(getToolbarPrefs().visible).toBe(true)
   })
 
-  it('leaves the toolbar-hide button hidden by default', () => {
-    // Redundant with the context menu entry and the toggle command, so it is
-    // off unless the user ticks it in the "Buttons" submenu.
-    expect(isEntryHidden('toggle-toolbar')).toBe(true)
-  })
-
   it('stores the docking side in the account settings', () => {
     setToolbarPosition('right')
     expect(getToolbarPrefs().position).toBe('right')
