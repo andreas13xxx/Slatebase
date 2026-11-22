@@ -249,20 +249,14 @@ const NAMES: Record<string, { de: string; en: string }> = {
  */
 export type UnsupportedReason =
   | 'stacked-tabs'
-  | 'blank-tab'
   | 'native-windows'
   | 'attachments'
-  | 'desktop-shell'
   | 'new-tab-defaults'
 
 const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }> = {
   'stacked-tabs': {
     de: 'Slatebase zeigt Tabs nebeneinander in einer Leiste, nicht gestapelt',
     en: 'Slatebase shows tabs side by side in one bar, not stacked',
-  },
-  'blank-tab': {
-    de: 'ein leerer Tab ohne Datei ist nicht vorgesehen — Tabs entstehen beim Öffnen einer Datei',
-    en: 'there is no empty tab without a file — a tab appears when you open one',
   },
   'native-windows': {
     de: 'Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster',
@@ -271,10 +265,6 @@ const UNSUPPORTED_REASONS: Record<UnsupportedReason, { de: string; en: string }>
   attachments: {
     de: 'externe Bild-Links lassen sich nicht automatisch in den Vault herunterladen — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen“ hinein',
     en: 'there is no automatic download of external image links into the vault — attachments come in via drag-and-drop, clipboard paste, or "Insert attachment"',
-  },
-  'desktop-shell': {
-    de: 'die Datei liegt auf dem Server, nicht auf diesem Rechner',
-    en: 'the file lives on the server, not on this machine',
   },
   'new-tab-defaults': {
     de: 'neue Tabs öffnen immer im zuletzt genutzten Modus',

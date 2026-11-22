@@ -55,6 +55,7 @@ import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
 import { useLongPress } from '../hooks/useLongPress'
 import { codeFolding, foldGutter } from '@codemirror/language'
 import { markdownFoldService } from './folding'
+import { foldPersistence, loadFileFolds, restoreFolds, setFoldVault } from './foldPersistence'
 import { isEmbeddableFile } from '../utils/internalLink'
 import { openExternalUrl } from '../utils/externalUrl'
 import { showToast } from '../components/ToastNotification'
@@ -148,6 +149,8 @@ export function CodeMirrorEditor({
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const prevTabIdRef = useRef<string>(tabId)
+  /** Vault and file the mounted view shows; `foldPersistence` reads it to know where to save folds. */
+  const foldTargetRef = useRef<{ vaultId: string; path: string } | null>(null)
   const onContentChangeRef = useRef(onContentChange)
   // The context menu's label for the properties entry, in the current language
   const { t } = useTranslation()
@@ -392,6 +395,7 @@ export function CodeMirrorEditor({
           return marker
         },
       }),
+      foldPersistence(() => foldTargetRef.current),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return
         const isRemote = update.transactions.some((tr) => tr.annotation(remoteSync))
@@ -594,6 +598,18 @@ export function CodeMirrorEditor({
     })
 
     viewRef.current = view
+
+    // Folds are not part of what a remount carries over, so bring them back
+    // from the per-file store (and point saving at this file).
+    const foldVaultId = livePreviewOptions?.vaultId
+    if (foldVaultId && filePath) {
+      foldTargetRef.current = { vaultId: foldVaultId, path: filePath }
+      setFoldVault(foldVaultId)
+      const savedFolds = loadFileFolds(foldVaultId, filePath)
+      if (savedFolds) restoreFolds(view, savedFolds)
+    } else {
+      foldTargetRef.current = null
+    }
 
     // Join the cross-pane mirror group so edits in another pane showing this
     // same file replay onto this view (and vice versa). See doc-sync-registry.

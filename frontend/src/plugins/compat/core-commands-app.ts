@@ -40,7 +40,7 @@ import { favoritesStore } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { showToast } from '../../components/ToastNotification'
-import { copyLinkWithFeedback } from '../../deep-link/copyDeepLink'
+import { buildActiveTabLink, copyLinkWithFeedback, isVaultFileTabPath } from '../../deep-link/copyDeepLink'
 import type { Locale } from '../../i18n'
 import { translateCoreCommandName, unsupportedCommandMessage, type UnsupportedReason } from './core-command-i18n'
 import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
@@ -230,6 +230,38 @@ function setPanelView(h: CoreAppCommandHandlers, viewId: PanelViewId): void {
 /** `workspace:copy-url`: copies a deep link to the active file (or the vault when the tab is no file). */
 function copyActiveLink(h: CoreAppCommandHandlers): Promise<void> {
   return copyLinkWithFeedback(h.vaultId, getActiveTab(h)?.filePath ?? null)
+}
+
+/** Opens a deep link in a new browser tab: the nearest thing a web app has to Obsidian's second window. */
+function openLinkInNewBrowserTab(link: string | null): void {
+  if (!link) {
+    showToast('error', 'Kein Vault geöffnet')
+    return
+  }
+  window.open(link, '_blank', 'noopener,noreferrer')
+}
+
+/** `workspace:open-in-new-window`: the active file (or the vault, for a non-file tab) in a new browser tab. */
+function openActiveTabInNewWindow(h: CoreAppCommandHandlers): void {
+  openLinkInNewBrowserTab(buildActiveTabLink(window.location.origin, h.vaultId, getActiveTab(h)?.filePath ?? null))
+}
+
+/** `workspace:new-window`: the open vault, without a file, in a new browser tab. */
+function openNewWindow(h: CoreAppCommandHandlers): void {
+  openLinkInNewBrowserTab(buildActiveTabLink(window.location.origin, h.vaultId, null))
+}
+
+/**
+ * `open-with-default-app:open`: hands the raw file to the browser, which opens what it can show
+ * and downloads the rest. The file lives on the server, so this is the closest thing to a default app.
+ */
+function openActiveFileRaw(h: CoreAppCommandHandlers): void {
+  const tab = getActiveTab(h)
+  if (!tab || !h.vaultId || !isVaultFileTabPath(tab.filePath)) {
+    showToast('info', 'Kein Datei-Tab geöffnet')
+    return
+  }
+  window.open(`/api/v1/vaults/${encodeURIComponent(h.vaultId)}/files?path=${encodeURIComponent(tab.filePath)}&raw=true`, '_blank', 'noopener,noreferrer')
 }
 
 function revealActiveFile(h: CoreAppCommandHandlers): void {
@@ -739,7 +771,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'workspace:show-trash', name: 'Show trash', run: (h) => h.onNavigate('trash') },
     // The `unsupported` specs below each name the concept Slatebase lacks; pinning
     // and closed-tab history sit among them because they *do* have an equivalent.
-    { id: 'workspace:new-tab', name: 'New tab', unsupported: 'blank-tab' },
+    // No empty tab exists; the quick switcher is the closest thing to Obsidian's blank tab ("open a file").
+    { id: 'workspace:new-tab', name: 'New tab', run: (h) => h.onOpenQuickSwitcher() },
     { id: 'workspace:toggle-pin', name: 'Toggle pin', run: toggleActiveTabPin },
     { id: 'workspace:split-vertical', name: 'Split right', run: (h) => h.onSplitPane('horizontal') },
     { id: 'workspace:split-horizontal', name: 'Split down', run: (h) => h.onSplitPane('vertical') },
@@ -753,9 +786,9 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'editor:focus-bottom', name: 'Focus on tab group below', run: (h) => h.onFocusPaneDirection('down') },
     { id: 'workspace:undo-close-pane', name: 'Undo close tab', run: (h) => { void undoCloseTab(h.tabDispatch, h.appDispatch, h.apiClient, h.tabState.closedTabsHistory) } },
     { id: 'workspace:move-to-new-window', name: 'Move current tab to new window', unsupported: 'native-windows' },
-    { id: 'workspace:new-window', name: 'New window', unsupported: 'native-windows' },
+    { id: 'workspace:new-window', name: 'New window', run: openNewWindow },
     { id: 'workspace:close-window', name: 'Close window', unsupported: 'native-windows' },
-    { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', unsupported: 'native-windows' },
+    { id: 'workspace:open-in-new-window', name: 'Open current tab in new window', run: openActiveTabInNewWindow },
     { id: 'workspace:toggle-stacked-tabs', name: 'Toggle stacked tabs', unsupported: 'stacked-tabs' },
     { id: 'workspace:copy-url', name: 'Copy Obsidian URL for current file', run: copyActiveLink },
     { id: 'workspace:export-pdf', name: 'Export to PDF...', run: exportActiveFileToPdf },
@@ -909,8 +942,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
         else showToast('error', 'Keine Tabellenansicht einer Base geöffnet')
       },
     },
-    { id: 'open-with-default-app:open', name: 'Open in default app', unsupported: 'desktop-shell' },
-    { id: 'open-with-default-app:show', name: 'Show in system explorer', unsupported: 'desktop-shell' },
+    { id: 'open-with-default-app:open', name: 'Open in default app', run: openActiveFileRaw },
+    { id: 'open-with-default-app:show', name: 'Show in system explorer', run: revealActiveFile },
     { id: 'switcher:open', name: 'Quick switcher: Open quick switcher', run: (h) => h.onOpenQuickSwitcher() },
     { id: 'bookmarks:bookmark-all-tabs', name: 'Bookmarks: Bookmark all tabs...', run: bookmarkAllTabs },
     { id: 'bookmarks:bookmark-current-heading', name: 'Bookmarks: Bookmark heading under cursor...', run: bookmarkCurrentHeading },

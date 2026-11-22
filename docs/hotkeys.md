@@ -59,12 +59,10 @@ explains why it does nothing:
 
 | Command | Why |
 |---|---|
-| `workspace:new-tab` | Slatebase has no empty tab; tabs open with a file |
-| `workspace:new-window`, `workspace:close-window`, `workspace:move-to-new-window`, `workspace:open-in-new-window`, `window:toggle-always-on-top` | runs in a browser tab, no windows of its own |
+| `workspace:close-window`, `workspace:move-to-new-window`, `window:toggle-always-on-top` | runs in a browser tab, no windows of its own |
 | `workspace:toggle-stacked-tabs` | tabs are side by side, not stacked |
 | `workspace:copy-url` | no `obsidian://` URL scheme |
 | `app:toggle-default-new-pane-mode` | no new-tab defaults |
-| `open-with-default-app:open`, `open-with-default-app:show` | no desktop shell |
 | `download-attachments` | remote attachments are not downloaded into the vault |
 
 ## Not checked

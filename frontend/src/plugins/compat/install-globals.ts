@@ -37,6 +37,8 @@ import * as CmLanguage from '@codemirror/language'
 import * as CmCommands from '@codemirror/commands'
 import * as CmAutocomplete from '@codemirror/autocomplete'
 import * as CmSearch from '@codemirror/search'
+import { getActiveEditorView } from '../../editor/plugin-extensions'
+import { getFoldVault, loadFileFolds, saveFileFolds, type FoldedLine } from '../../editor/foldPersistence'
 import * as CmLint from '@codemirror/lint'
 import * as LezerHighlight from '@lezer/highlight'
 import * as LezerCommon from '@lezer/common'
@@ -1287,12 +1289,25 @@ export function installObsidianGlobals(): void {
       vault: {},
       workspace: {},
       metadataCache: {},
-      // Obsidian persists per-file fold state here. Slatebase does not store
-      // folds across sessions, so saving is dropped and loading finds nothing.
+      // Obsidian persists per-file fold state here. Slatebase's editor keeps the
+      // same list per vault and file (`editor/foldPersistence.ts`), so a plugin
+      // reads and writes what the editor itself restores on the next open.
       foldManager: {
-        save: (): void => { debugOnce('foldManager::save', '[PluginCompat] foldManager.save() is a no-op — Slatebase does not persist fold state.') },
-        load: (): void => { debugOnce('foldManager::load', '[PluginCompat] foldManager.load() is a no-op — Slatebase does not persist fold state.') },
-        getFolds: (): unknown[] => [],
+        load: (file: { path?: string } | null): { folds: FoldedLine[]; lines: number } | null => {
+          const vaultId = getFoldVault()
+          if (!vaultId || !file?.path) return null
+          return loadFileFolds(vaultId, file.path)
+        },
+        save: (file: { path?: string } | null, foldInfo: { folds?: FoldedLine[]; lines?: number } | null): void => {
+          const vaultId = getFoldVault()
+          if (!vaultId || !file?.path) return
+          const folds = Array.isArray(foldInfo?.folds) ? foldInfo.folds.map(({ from, to }) => ({ from, to })) : []
+          saveFileFolds(vaultId, file.path, { folds, lines: foldInfo?.lines ?? 0 })
+        },
+        getFolds: (file: { path?: string } | null): FoldedLine[] => {
+          const vaultId = getFoldVault()
+          return vaultId && file?.path ? loadFileFolds(vaultId, file.path)?.folds ?? [] : []
+        },
       },
       // See AppShim.getAccentColor() for why this exists — kept in sync here
       // so views opened via createFileView's `sharedApp` (which reads through
@@ -2318,8 +2333,11 @@ export function installObsidianGlobals(): void {
       }
       /** Clear the view state. No-op — Slatebase re-renders from the editor directly. */
       clear(): void { /* no-op */ }
-      /** Show the search bar. No-op — Slatebase has its own search panel. */
-      showSearch(_replace?: boolean): void { /* no-op */ }
+      /** Show the in-file search bar (CM6's search panel; find and replace share it). */
+      showSearch(_replace?: boolean): void {
+        const view = getActiveEditorView()
+        if (view) CmSearch.openSearchPanel(view)
+      }
     } as unknown as Record<string, unknown>
   }
 
