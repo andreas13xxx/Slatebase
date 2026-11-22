@@ -45,8 +45,8 @@ describe('WorkspaceShim', () => {
   });
 
   describe('leftRibbon / rightRibbon', () => {
-    beforeEach(() => {
-      __resetToolbarStoreForTests();
+    beforeEach(async () => {
+      await __resetToolbarStoreForTests();
     });
 
     it('exposes hide/show/toggle without throwing on either side', () => {

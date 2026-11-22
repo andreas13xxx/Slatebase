@@ -2067,6 +2067,7 @@ export const en: TranslationShape = {
     c_exportVault: 'Export vault',
     c_insertTemplate: 'Insert template',
     c_toolbar: 'Toolbar',
+    c_toolbar_visible_failed: 'Could not change the toolbar (write access required)',
     c_newCanvas: 'New canvas',
     c_newVault: 'New vault',
     c_serverLogs: 'Server logs',

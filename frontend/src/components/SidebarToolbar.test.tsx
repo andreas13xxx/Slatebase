@@ -76,8 +76,8 @@ function openSubmenu(name: string | RegExp) {
   clickMenuItem(name)
 }
 
-beforeEach(() => {
-  __resetToolbarStoreForTests()
+beforeEach(async () => {
+  await __resetToolbarStoreForTests()
   ribbonIcons = []
   enabledFeatures = new Set(['obsidian-plugin-compat'])
   pluginRibbonCallback.mockClear()
