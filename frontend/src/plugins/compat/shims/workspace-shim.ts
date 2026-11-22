@@ -275,9 +275,21 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Plugins access this via `app.workspace.activeEditor?.editor`.
    */
   get activeEditor(): { editor: IEditor; file: TFile | null } | null {
+    if (this.activeEditorOverride) return this.activeEditorOverride;
     if (!this.activeFile) return null;
     return { editor: this.editorShim, file: this.activeFile };
   }
+
+  /**
+   * Obsidian lets an embedded editor claim the active-editor slot (`workspace.activeEditor = owner` on focus,
+   * `null` on blur) -- TaskNotes' modal editors do. Without a setter the assignment threw "setting getter-only
+   * property". The claim wins until it is cleared, then the derived editor of the active file applies again.
+   */
+  set activeEditor(owner: { editor: IEditor; file: TFile | null } | null) {
+    this.activeEditorOverride = owner;
+  }
+
+  private activeEditorOverride: { editor: IEditor; file: TFile | null } | null = null;
 
   /**
    * Whether the workspace layout is ready. In Slatebase, plugins load after
