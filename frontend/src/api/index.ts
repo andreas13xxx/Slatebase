@@ -1042,6 +1042,8 @@ export class ApiClient implements IApiClient {
   private onSessionExpired: (() => void) | null = null
   /** In-flight session probe shared by concurrent auth failures. See handleAuthFailure(). */
   private authFailureProbe: Promise<SessionProbe> | null = null
+  /** In-flight CSRF re-fetch shared by concurrent failures. See restoreCsrfToken(). */
+  private csrfRestore: Promise<void> | null = null
 
   /** Set the CSRF token for state-changing requests. */
   setCsrfToken(csrfToken: string | null): void {
@@ -2124,7 +2126,13 @@ export class ApiClient implements IApiClient {
       if (body?.code === 'CSRF_INVALID') {
         // A stale CSRF token and a dead session look identical from here — ask
         // the server which it is before touching local auth state.
-        await this.handleAuthFailure()
+        if (this.csrfToken === null) {
+          // No token here at all: the session is not necessarily gone (a dev hot reload re-creates this client
+          // while the page keeps its login). Fetch the token again instead of leaving every write failing.
+          await this.restoreCsrfToken()
+        } else {
+          await this.handleAuthFailure()
+        }
         // Re-throw the original error either way (caller gets CSRF_INVALID)
         await handleErrorResponse(response)
       }
@@ -2194,6 +2202,26 @@ export class ApiClient implements IApiClient {
       return resp.status === 401 ? 'dead' : 'unknown'
     } catch {
       return 'unknown'
+    }
+  }
+
+  /**
+   * Re-reads the CSRF token from `GET /auth/session` when this client has none. The token is derived from the
+   * session on the server, so a live session always yields one. Concurrent failures share one request. A dead or
+   * unreachable session changes nothing: only a 401 on a real request ends a session.
+   */
+  private async restoreCsrfToken(): Promise<void> {
+    this.csrfRestore ??= (async () => {
+      const result = await this.getSession()
+      if (result.status === 'alive' && this.csrfToken === null) {
+        this.csrfToken = result.csrfToken
+        window.__slatebaseCsrfToken = result.csrfToken
+      }
+    })()
+    try {
+      await this.csrfRestore
+    } finally {
+      this.csrfRestore = null
     }
   }
 
