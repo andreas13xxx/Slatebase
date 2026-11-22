@@ -52,6 +52,33 @@ describe('deliberate no-op stubs log rather than fail silently', () => {
     })
   })
 
+  describe('Plugin.registerObsidianProtocolHandler', () => {
+    it('logs at debug, not warn — plugins keep working without obsidian:// links', () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const Plugin = (window as unknown as { obsidian: { Plugin: new (app: unknown, manifest: unknown) => { registerObsidianProtocolHandler(a: string, h: () => void): void } } }).obsidian.Plugin
+      const plugin = new Plugin({}, { id: 'demo' })
+      plugin.registerObsidianProtocolHandler('demo-auth', () => {})
+      plugin.registerObsidianProtocolHandler('demo-auth', () => {})
+      expect(debug).toHaveBeenCalledTimes(1)
+      expect(debug.mock.calls[0]?.[0]).toContain('obsidian://demo-auth')
+      expect(warn).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Plugin.registerCliHandler and Component.registerEvent with a foreign ref', () => {
+    it('log at debug, not warn', () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const Plugin = (window as unknown as { obsidian: { Plugin: new (app: unknown, manifest: unknown) => { registerCliHandler(c: string, d: string, f: unknown, h: () => void): void; registerEvent(ref: unknown): void } } }).obsidian.Plugin
+      const plugin = new Plugin({}, { id: 'demo' })
+      plugin.registerCliHandler('demo:run', 'desc', null, () => {})
+      plugin.registerEvent({ foreign: true })
+      expect(debug).toHaveBeenCalledTimes(2)
+      expect(warn).not.toHaveBeenCalled()
+    })
+  })
+
   describe('HTMLElement.onWindowMigrated', () => {
     it('logs at debug — a single-window app has nothing to report', () => {
       const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
