@@ -40,6 +40,7 @@ export const APPEARANCE_CONFIG_KEYS = {
   monospaceFontFamily: font(),
   translucency: cfg.bool(false, false, 'passthrough'),
   showViewHeader: cfg.bool(false, false, 'passthrough'),
+  showRibbon: cfg.bool(true, false, 'passthrough'),
 } as const satisfies Record<string, ConfigKeyMeta>
 
 export type AppearanceConfigKey = keyof typeof APPEARANCE_CONFIG_KEYS

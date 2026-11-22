@@ -22,6 +22,12 @@
  */
 
 import { translateNow } from '../i18n'
+import { showToast } from '../components/ToastNotification'
+import {
+  getAppearanceValue, updateAppearance, useAppearanceValue,
+  initialize as initAppearance, setActiveVault as setAppearanceVault, _reset as resetAppearance,
+} from './vaultAppearanceStore'
+import type { IApiClient } from '../api'
 import {
   useUiSettings, getUiSettings, updateUiSettings, DEFAULT_UI_SETTINGS,
 } from './userSettingsStore'
@@ -168,17 +174,20 @@ function update(patch: Partial<ToolbarPrefs>): void {
 
 /** Current preferences snapshot (non-reactive — for command callbacks). */
 export function getToolbarPrefs(): ToolbarPrefs {
-  return getUiSettings().toolbar
+  return { ...getUiSettings().toolbar, visible: getAppearanceValue('showRibbon') }
 }
 
 /** Show or hide the whole toolbar. */
 export function setToolbarVisible(visible: boolean): void {
-  update({ visible })
+  // Visibility is `showRibbon` in the vault's appearance.json (same for everyone, needs write access).
+  updateAppearance({ showRibbon: visible }).catch(() => {
+    showToast('error', 'Werkzeugleiste konnte nicht geändert werden (Schreibzugriff nötig)')
+  })
 }
 
 /** Toggle the whole toolbar — backs the "Werkzeugleiste ein-/ausblenden" command. */
 export function toggleToolbarVisible(): void {
-  update({ visible: !getToolbarPrefs().visible })
+  setToolbarVisible(!getToolbarPrefs().visible)
 }
 
 /** Dock the toolbar to the left or right of the editor pane. */
@@ -278,10 +287,25 @@ function mergeOrder(persisted: string[], visibleOrder: string[]): string[] {
 
 /** Subscribe a component to the toolbar preferences. */
 export function useToolbarPrefs(): ToolbarPrefs {
-  return useUiSettings().toolbar
+  const toolbar = useUiSettings().toolbar
+  const visible = useAppearanceValue('showRibbon')
+  return { ...toolbar, visible }
 }
 
-/** Test-only: reset the toolbar back to its defaults. */
-export function __resetToolbarStoreForTests(): void {
+/**
+ * Test-only: reset the toolbar back to its defaults, with an in-memory vault whose
+ * `appearance.json` carries the visibility (`showRibbon`).
+ */
+export async function __resetToolbarStoreForTests(): Promise<void> {
   updateUiSettings({ toolbar: structuredClone(DEFAULT_TOOLBAR_PREFS) })
+  resetAppearance()
+  let file: Record<string, unknown> = {}
+  initAppearance({
+    getAppearanceConfig: async () => ({ ...file }),
+    patchAppearanceConfig: async (_vaultId: string, patch: Record<string, unknown>) => {
+      file = { ...file, ...patch }
+      return { ...file }
+    },
+  } as unknown as IApiClient)
+  await setAppearanceVault('toolbar-test')
 }

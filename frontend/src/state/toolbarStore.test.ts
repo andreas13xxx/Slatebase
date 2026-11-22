@@ -19,12 +19,13 @@ import {
   DEFAULT_TOOLBAR_PREFS,
 } from './toolbarStore'
 import { _reset as resetUiSettings, getUiSettings } from './userSettingsStore'
+import { getAppearanceValue } from './vaultAppearanceStore'
 
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
-beforeEach(() => {
+beforeEach(async () => {
   resetUiSettings()
-  __resetToolbarStoreForTests()
+  await __resetToolbarStoreForTests()
 })
 
 afterEach(() => {
@@ -102,10 +103,10 @@ describe('toolbar visibility and position', () => {
     expect(getToolbarPrefs()).toEqual(DEFAULT_TOOLBAR_PREFS)
   })
 
-  it('toggles visibility and stores it in the account settings', () => {
+  it('toggles visibility and stores it as showRibbon in the vault appearance', () => {
     toggleToolbarVisible()
     expect(getToolbarPrefs().visible).toBe(false)
-    expect(getUiSettings().toolbar.visible).toBe(false)
+    expect(getAppearanceValue('showRibbon')).toBe(false)
 
     setToolbarVisible(true)
     expect(getToolbarPrefs().visible).toBe(true)
