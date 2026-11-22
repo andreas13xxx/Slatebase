@@ -52,16 +52,6 @@ describe('deliberate no-op stubs log rather than fail silently', () => {
     })
   })
 
-  describe('foldManager', () => {
-    it('logs at debug that fold state is not persisted', () => {
-      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
-      const app = (window as unknown as { app: { foldManager: Record<string, () => void> } }).app
-      app.foldManager['save']!()
-      expect(debug).toHaveBeenCalledTimes(1)
-      expect(debug.mock.calls[0]?.[0]).toContain('foldManager.save()')
-    })
-  })
-
   describe('HTMLElement.onWindowMigrated', () => {
     it('logs at debug — a single-window app has nothing to report', () => {
       const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})

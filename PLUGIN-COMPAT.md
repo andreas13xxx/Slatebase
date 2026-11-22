@@ -121,9 +121,7 @@ Diese Command-IDs sind registriert (damit `executeCommandById()` sie findet), f�
 | Command-ID(s) | `unsupported` | Grund |
 |---|---|---|
 | `workspace:toggle-stacked-tabs` | `stacked-tabs` | Tabs stehen nebeneinander in einer Leiste; gestapelte Tabs gibt es nicht. (`workspace:split-vertical`/`-horizontal` und `editor:focus-top/-bottom/-left/-right` sind seit Split Panes echt.) |
-| `workspace:new-window`, `workspace:close-window`, `workspace:move-to-new-window`, `workspace:open-in-new-window`, `window:toggle-always-on-top` | `native-windows` | Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster. |
-| `workspace:new-tab` | `blank-tab` | Ein leerer Tab ohne Datei ist nicht vorgesehen: Tabs entstehen beim Öffnen einer Datei. |
-| `open-with-default-app:open`, `open-with-default-app:show` | `desktop-shell` | Desktop-only-Konzepte („in nativer App öffnen", „im System-Explorer anzeigen") — Dateien liegen serverseitig, es gibt kein lokales Dateisystem. |
+| `workspace:close-window`, `workspace:move-to-new-window`, `window:toggle-always-on-top` | `native-windows` | Slatebase läuft in einem Browser-Tab und verwaltet keine eigenen Fenster. |
 | `download-attachments` | `attachments` | Es gibt keinen automatischen Download externer Bild-Links in den Vault — Anhänge kommen per Drag & Drop, Einfügen aus der Zwischenablage oder „Anhang einfügen" hinein. |
 | `app:toggle-default-new-pane-mode` | `new-tab-defaults` | Neue Tabs öffnen immer im zuletzt genutzten Modus; es gibt keine Split-Pane-Voreinstellung zum Umschalten. |
 
@@ -210,7 +208,6 @@ Zwei grundsätzlich verschiedene Kategorien, die auch die Kompatibilitäts-Badge
 - **Weitere bewusste No-Ops, alle mit Log** — es gibt in der Compat-Schicht keinen stillen Stub mehr:
   - `window.CodeMirror.*` (CM5-Legacy: `defineMode`/`defineMIME`/`defineExtension`/`defineOption`/`registerHelper`/`registerGlobalHelper`) → `console.debug`. Slatebases Editor ist CM6; Plugins, die CM5 ansprechen, nutzen eine von Obsidian selbst als veraltet geführte API und liefern in aller Regel zusätzlich einen CM6-Pfad.
   - `MarkdownView.previewMode` rendert in ein eigenes Element (`containerEl`), nicht in Slatebases React-Leseansicht: `set`/`rerender` zeichnen den Inhalt mit dem Markdown-Renderer, `clear` leert ihn.
-  - `app.foldManager.save/load` → `console.debug`. Fold-Zustand wird nicht über Sessions hinweg gespeichert.
   - `HTMLElement.onNodeInserted` → `console.warn`. Feuert nie; Plugin-Code, der darauf wartet (verzögertes Messen/Layout), läuft dadurch nicht.
   - `HTMLElement.onWindowMigrated` → `console.debug`. Ein Single-Window-App hat nichts zu melden.
   - `hotkeyManager.setHotkeys`/`removeHotkeys` → `console.warn`. Slatebase hat keine Hotkey-Anpassung, in die geschrieben werden könnte.

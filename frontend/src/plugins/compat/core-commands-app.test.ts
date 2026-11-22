@@ -1390,12 +1390,27 @@ describe('registerCoreAppCommands — footnotes and commands without an equivale
     const registry = new CommandRegistry()
     registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab() }))
 
+    registry.executeCommand('workspace:close-window')
+    registry.executeCommand('workspace:toggle-stacked-tabs')
+
+    expect(toastSpy).toHaveBeenNthCalledWith(1, 'info', expect.stringContaining('windows'))
+    expect(toastSpy).toHaveBeenNthCalledWith(2, 'info', expect.stringContaining('stacked'))
+    toastSpy.mockRestore()
+  })
+
+  it('opens the active file in a new browser tab for open-in-new-window and open-with-default-app', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const registry = new CommandRegistry()
+    registerCoreAppCommands(registry, () => makeMinimalHandlers({ activeTab: makeTab({ filePath: 'a b.md' }) }))
+
+    registry.executeCommand('workspace:open-in-new-window')
     registry.executeCommand('workspace:new-window')
     registry.executeCommand('open-with-default-app:open')
 
-    expect(toastSpy).toHaveBeenNthCalledWith(1, 'info', expect.stringContaining('windows'))
-    expect(toastSpy).toHaveBeenNthCalledWith(2, 'info', expect.stringContaining('server'))
-    toastSpy.mockRestore()
+    expect(openSpy).toHaveBeenNthCalledWith(1, expect.stringContaining('file=a%20b.md'), '_blank', 'noopener,noreferrer')
+    expect(openSpy).toHaveBeenNthCalledWith(2, expect.not.stringContaining('file='), '_blank', 'noopener,noreferrer')
+    expect(openSpy).toHaveBeenNthCalledWith(3, '/api/v1/vaults/vault-1/files?path=a%20b.md&raw=true', '_blank', 'noopener,noreferrer')
+    openSpy.mockRestore()
   })
 
   it('registers every core command ID exactly once (a later duplicate silently wins)', () => {
