@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { getSettingsRevealRequest } from '../../state/settingsSearchTarget'
 import { SettingsNavList } from './SettingsNavList'
 import type { SettingsNavState } from '../../state/settingsState'
 import { createSettingsRegistry } from '../../state/settingsRegistry'
@@ -93,15 +94,14 @@ describe('SettingsNavList', () => {
     const dispatch = vi.fn()
     render(
       <SettingsNavList
-        state={createState({ searchQuery: 'pass' })}
+        state={createState({ searchQuery: 'passwort ändern' })}
         isAdmin={false}
         registry={registry}
         dispatch={dispatch}
       />
     )
 
-    expect(screen.getByText('Passwort ändern')).toBeInTheDocument()
-    expect(screen.queryByText('Profil')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Passwort ändern').length).toBeGreaterThan(0)
     expect(screen.queryByText('Sitzungen')).not.toBeInTheDocument()
   })
 
@@ -290,7 +290,7 @@ describe('SettingsNavList', () => {
     const dispatch = vi.fn()
     render(
       <SettingsNavList
-        state={createState({ searchQuery: 'Plugin' })}
+        state={createState({ searchQuery: 'Plugins' })}
         isAdmin={false}
         registry={registry}
         dispatch={dispatch}
@@ -300,6 +300,39 @@ describe('SettingsNavList', () => {
     // Only Vault category heading should show (Plugins matches)
     expect(screen.getByText('Vault')).toBeInTheDocument()
     expect(screen.getByText('Plugins')).toBeInTheDocument()
-    expect(screen.queryByText('Konto')).not.toBeInTheDocument()
+  })
+})
+
+describe('SettingsNavList content search', () => {
+  it('lists the section that holds a searched setting', () => {
+    render(
+      <SettingsNavList
+        state={createState({ searchQuery: 'zeilennummern' })}
+        isAdmin={false}
+        registry={createSettingsRegistry()}
+        dispatch={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Editor und Dateien')).toBeInTheDocument()
+    expect(screen.queryByText('Sitzungen')).not.toBeInTheDocument()
+  })
+
+  it('lists each hit under its section and asks the content to reveal it on click', () => {
+    const dispatch = vi.fn()
+    render(
+      <SettingsNavList
+        state={createState({ searchQuery: 'zeilennummern', selectedVaultId: 'v1' })}
+        isAdmin={false}
+        registry={createSettingsRegistry()}
+        dispatch={dispatch}
+      />
+    )
+
+    const hit = document.querySelector<HTMLButtonElement>('.settings-nav-list__hit-btn')
+    expect(hit).not.toBeNull()
+    hit!.click()
+    expect(dispatch).toHaveBeenCalledWith({ type: 'NAVIGATE', payload: { category: 'vault', section: 'editor-files' } })
+    expect(getSettingsRevealRequest()).toMatchObject({ section: 'editor-files', text: hit!.title })
   })
 })

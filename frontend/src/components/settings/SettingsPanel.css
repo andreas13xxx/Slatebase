@@ -531,3 +531,10 @@
     min-height: 44px;
   }
 }
+
+/* Flash on the setting a search hit led to. */
+.settings-search-highlight {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
