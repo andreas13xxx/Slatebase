@@ -750,17 +750,18 @@ export class LinkIndexService implements ILinkIndex {
     return [...this.observedListKeysCache]
   }
 
+  /** Records (or clears) which keys `normalizedPath` wrote in YAML list syntax. */
+  private setListKeys(normalizedPath: string, listKeys: readonly string[]): void {
+    if (listKeys.length > 0) this.fileListKeys.set(normalizedPath, new Set(listKeys))
+    else this.fileListKeys.delete(normalizedPath)
+  }
+
   /**
    * Drops the memoized observed-list-key set so the next `collectObservedListKeys()`
    * recomputes it. Called from every public entry point that mutates
    * `fileProperties` (rebuild / load / updateFile / removeFile / renameFile /
    * renameDirectory), so the cache can never serve a stale set.
    */
-  private setListKeys(normalizedPath: string, listKeys: readonly string[]): void {
-    if (listKeys.length > 0) this.fileListKeys.set(normalizedPath, new Set(listKeys))
-    else this.fileListKeys.delete(normalizedPath)
-  }
-
   private invalidateObservedListKeys(): void {
     this.observedListKeysCache = null
   }
