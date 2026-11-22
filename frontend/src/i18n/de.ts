@@ -2061,6 +2061,7 @@ export const de = {
     c_exportVault: 'Vault exportieren',
     c_insertTemplate: 'Vorlage einfügen',
     c_toolbar: 'Werkzeugleiste',
+    c_toolbar_visible_failed: 'Werkzeugleiste konnte nicht geändert werden (Schreibzugriff nötig)',
     c_newCanvas: 'Neues Canvas',
     c_newVault: 'Neuer Vault',
     c_serverLogs: 'Server-Logs',

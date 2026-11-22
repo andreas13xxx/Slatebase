@@ -39,7 +39,11 @@ export type ToolbarPosition = 'left' | 'right'
 
 /** The full persisted preference set. */
 export interface ToolbarPrefs {
-  /** Whether the toolbar is rendered at all. */
+  /**
+   * Whether the toolbar is rendered at all. Derived from `showRibbon` in the vault's
+   * `appearance.json`, never from the account settings: the persisted `uiSettings.toolbar.visible`
+   * is a legacy field that is still stored but no longer read.
+   */
   visible: boolean
   /** Side of the editor pane the toolbar docks to. */
   position: ToolbarPosition
@@ -181,7 +185,7 @@ export function getToolbarPrefs(): ToolbarPrefs {
 export function setToolbarVisible(visible: boolean): void {
   // Visibility is `showRibbon` in the vault's appearance.json (same for everyone, needs write access).
   updateAppearance({ showRibbon: visible }).catch(() => {
-    showToast('error', 'Werkzeugleiste konnte nicht geändert werden (Schreibzugriff nötig)')
+    showToast('error', translateNow('commonUi.c_toolbar_visible_failed'))
   })
 }
 

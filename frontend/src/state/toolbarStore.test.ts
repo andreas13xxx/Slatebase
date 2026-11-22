@@ -19,7 +19,14 @@ import {
   DEFAULT_TOOLBAR_PREFS,
 } from './toolbarStore'
 import { _reset as resetUiSettings, getUiSettings } from './userSettingsStore'
-import { getAppearanceValue } from './vaultAppearanceStore'
+import {
+  getAppearanceValue,
+  initialize as initAppearance,
+  setActiveVault as setAppearanceVault,
+  _reset as resetAppearance,
+} from './vaultAppearanceStore'
+import { showToast } from '../components/ToastNotification'
+import type { IApiClient } from '../api'
 
 vi.mock('../components/ToastNotification', () => ({ showToast: vi.fn() }))
 
@@ -109,6 +116,19 @@ describe('toolbar visibility and position', () => {
     expect(getAppearanceValue('showRibbon')).toBe(false)
 
     setToolbarVisible(true)
+    expect(getToolbarPrefs().visible).toBe(true)
+  })
+
+  it('keeps the toolbar and shows a toast when the vault refuses the change', async () => {
+    resetAppearance()
+    initAppearance({
+      getAppearanceConfig: async () => ({}),
+      patchAppearanceConfig: async () => { throw new Error('403') },
+    } as unknown as IApiClient)
+    await setAppearanceVault('read-only')
+
+    setToolbarVisible(false)
+    await vi.waitFor(() => expect(showToast).toHaveBeenCalledWith('error', expect.any(String)))
     expect(getToolbarPrefs().visible).toBe(true)
   })
 
