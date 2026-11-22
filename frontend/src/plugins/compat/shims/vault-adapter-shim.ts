@@ -75,6 +75,12 @@ export class VaultAdapterShim implements IVaultAdapter {
   private readonly vaultId: string
   private readonly apiClient: IApiClient
   private getTree: () => DirectoryTree
+  /**
+   * Own writes the directory-tree snapshot has not caught up with yet. `exists`/`stat` read a snapshot that only
+   * refreshes after the realtime round-trip, so a plugin that writes a file and checks it right away (TaskNotes'
+   * metadata staging) would see "missing". Entries expire, so a later external change is not masked for long.
+   */
+  private readonly overlay = new Map<string, { present: boolean; type: 'file' | 'folder'; at: number }>()
 
   constructor(vaultId: string, apiClient: IApiClient, getTree: () => DirectoryTree) {
     this.vaultId = vaultId
@@ -97,8 +103,57 @@ export class VaultAdapterShim implements IVaultAdapter {
    */
   async exists(path: string): Promise<boolean> {
     if (!path || path === '/' || path === '') return true
+    const own = this.overlayEntry(path)
+    if (own) return own.present
     const node = findNodeByPath(this.getTree(), path)
-    return node !== null
+    if (node) return true
+    if (isHiddenPath(path)) return (await this.statHiddenFile(path)) !== null
+    return false
+  }
+
+  private overlayEntry(path: string): { present: boolean; type: 'file' | 'folder' } | null {
+    const entry = this.overlay.get(path)
+    if (!entry) return null
+    if (Date.now() - entry.at > OVERLAY_TTL_MS) {
+      this.overlay.delete(path)
+      return null
+    }
+    return entry
+  }
+
+  /** Records a local change; a present path also makes its parent folders present. */
+  private markOverlay(path: string, present: boolean, type: 'file' | 'folder' = 'file'): void {
+    const at = Date.now()
+    this.overlay.set(path, { present, type, at })
+    if (!present) return
+    const parts = path.split('/')
+    for (let i = 1; i < parts.length; i++) {
+      const parent = parts.slice(0, i).join('/')
+      if (!this.overlay.get(parent)?.present) this.overlay.set(parent, { present: true, type: 'folder', at })
+    }
+  }
+
+  /**
+   * Obsidian's `adapter.getBasePath()` (desktop only). Slatebase has no local vault directory,
+   * so it reports the root like the other compat shims do.
+   */
+  getBasePath(): string {
+    return '/'
+  }
+
+  /**
+   * Dot-prefixed paths are hidden from the directory tree, so the tree cannot answer for them.
+   * The file endpoint can read them; a failed request counts as "not found" here, never as proof
+   * of absence for anything but this one lookup. Folders cannot be probed this way.
+   */
+  private async statHiddenFile(path: string): Promise<DataAdapterStat | null> {
+    try {
+      const result = await this.apiClient.fetchFileContent(this.vaultId, path)
+      const now = Date.now()
+      return { type: 'file', size: result.size ?? result.content.length, mtime: now, ctime: now }
+    } catch {
+      return null
+    }
   }
 
   /**
@@ -121,6 +176,7 @@ export class VaultAdapterShim implements IVaultAdapter {
   async write(path: string, data: string): Promise<void> {
     try {
       await this.apiClient.saveFile(this.vaultId, path, data)
+      this.markOverlay(path, true)
       markPluginWrite(path)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -165,8 +221,15 @@ export class VaultAdapterShim implements IVaultAdapter {
       return { type: 'folder', size: 0, mtime: Date.now(), ctime: Date.now() }
     }
 
+    const own = this.overlayEntry(path)
+    if (own) {
+      if (!own.present) return null
+      const now = Date.now()
+      return { type: own.type, size: 0, mtime: now, ctime: now }
+    }
+
     const node = findNodeByPath(this.getTree(), path)
-    if (!node) return null
+    if (!node) return isHiddenPath(path) ? this.statHiddenFile(path) : null
 
     return {
       type: node.type === 'file' ? 'file' : 'folder',
@@ -182,8 +245,9 @@ export class VaultAdapterShim implements IVaultAdapter {
    * when files are written via saveFile (fs.mkdir with recursive: true).
    * LiveSync calls mkdir as a preparation step before writing files into it.
    */
-  async mkdir(_path: string): Promise<void> {
-    // Intentional no-op — backend creates directories on file write
+  async mkdir(path: string): Promise<void> {
+    // The backend creates directories on file write; only remember the folder so `exists` agrees.
+    this.markOverlay(path, true, 'folder')
   }
 
   /**
@@ -192,6 +256,7 @@ export class VaultAdapterShim implements IVaultAdapter {
   async remove(path: string): Promise<void> {
     try {
       await this.apiClient.deleteContent(this.vaultId, path)
+      this.markOverlay(path, false)
       markPluginWrite(path)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -205,6 +270,8 @@ export class VaultAdapterShim implements IVaultAdapter {
   async rename(oldPath: string, newPath: string): Promise<void> {
     try {
       await this.apiClient.moveContent(this.vaultId, oldPath, newPath)
+      this.markOverlay(oldPath, false)
+      this.markOverlay(newPath, true)
       markPluginWrite(newPath)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -255,6 +322,7 @@ export class VaultAdapterShim implements IVaultAdapter {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
+      this.markOverlay(path, true)
       markPluginWrite(path)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -275,6 +343,7 @@ export class VaultAdapterShim implements IVaultAdapter {
     const emulatedProperties = new Set<string | symbol>([
       'insensitive',
       'getResourcePath',
+      'getBasePath',
       'exists',
       'read',
       'readBinary',
@@ -330,6 +399,14 @@ export class VaultAdapterShim implements IVaultAdapter {
 }
 
 // ─── Internal Helpers ──────────────────────────────────────────────────────────
+
+/** How long an own write overrides the directory-tree snapshot. */
+const OVERLAY_TTL_MS = 30_000
+
+/** True when any path segment starts with a dot (hidden from the directory tree). */
+function isHiddenPath(path: string): boolean {
+  return path.split('/').some((segment) => segment.startsWith('.') && segment !== '.' && segment !== '..')
+}
 
 /**
  * Find a node in the DirectoryTree by its path.
