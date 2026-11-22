@@ -20,6 +20,7 @@ import type { SettingsAction, SettingsCategory, SettingsSection } from '../../st
 import type { SettingsNavState } from '../../state/settingsState'
 import type { ISettingsRegistry, ISettingsSectionDef } from '../../state/settingsRegistry'
 import { SECTION_LABELS, CATEGORY_LABELS } from '../../state/settingsLabels'
+import { sectionContentMatches } from '../../state/settingsSearchIndex'
 import './SettingsNavList.css'
 
 /** Props for the SettingsNavList component. */
@@ -149,7 +150,7 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
 
     for (const def of sections) {
       const label = SECTION_LABELS[def.id]
-      if (query === '' || label.toLowerCase().includes(query)) {
+      if (query === '' || label.toLowerCase().includes(query) || sectionContentMatches(def.id, query)) {
         resolved.push({ def, label })
       }
     }

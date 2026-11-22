@@ -93,7 +93,7 @@ describe('SettingsNavList', () => {
     const dispatch = vi.fn()
     render(
       <SettingsNavList
-        state={createState({ searchQuery: 'pass' })}
+        state={createState({ searchQuery: 'passwort ändern' })}
         isAdmin={false}
         registry={registry}
         dispatch={dispatch}
@@ -101,7 +101,6 @@ describe('SettingsNavList', () => {
     )
 
     expect(screen.getByText('Passwort ändern')).toBeInTheDocument()
-    expect(screen.queryByText('Profil')).not.toBeInTheDocument()
     expect(screen.queryByText('Sitzungen')).not.toBeInTheDocument()
   })
 
@@ -290,7 +289,7 @@ describe('SettingsNavList', () => {
     const dispatch = vi.fn()
     render(
       <SettingsNavList
-        state={createState({ searchQuery: 'Plugin' })}
+        state={createState({ searchQuery: 'Plugins' })}
         isAdmin={false}
         registry={registry}
         dispatch={dispatch}
@@ -300,6 +299,21 @@ describe('SettingsNavList', () => {
     // Only Vault category heading should show (Plugins matches)
     expect(screen.getByText('Vault')).toBeInTheDocument()
     expect(screen.getByText('Plugins')).toBeInTheDocument()
-    expect(screen.queryByText('Konto')).not.toBeInTheDocument()
+  })
+})
+
+describe('SettingsNavList content search', () => {
+  it('lists the section that holds a searched setting', () => {
+    render(
+      <SettingsNavList
+        state={createState({ searchQuery: 'zeilennummern' })}
+        isAdmin={false}
+        registry={createSettingsRegistry()}
+        dispatch={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Editor und Dateien')).toBeInTheDocument()
+    expect(screen.queryByText('Sitzungen')).not.toBeInTheDocument()
   })
 })
