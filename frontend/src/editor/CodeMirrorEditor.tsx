@@ -34,6 +34,7 @@ import { createSlatebaseTheme, createSlatebaseHighlightStyle } from './theme'
 import { getEditorState, saveEditorState, editorHistoryExtension } from './state-store'
 import { registerSyncView, unregisterSyncView, broadcastChanges, remoteSync } from './doc-sync-registry'
 import { applyFormatting as applyFormattingAction } from './formatting'
+import { inlineTitleExtension, type InlineTitleOptions } from './inline-title'
 import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, createLinkContextMenuHandler, type LivePreviewOptions } from './live-preview'
 import { warnOnce } from '../plugins/compat/log'
 import { setActiveEditorView, clearActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
@@ -108,6 +109,8 @@ export interface CodeMirrorEditorProps {
   spellcheck?: boolean
   /** Dictionary the spellchecker checks against. */
   spellcheckLanguage?: SpellcheckLanguage
+  /** Inline title (file name) shown as an editable first line of the document; omit for none. */
+  inlineTitle?: InlineTitleOptions | null
   /** Whether Vim mode is enabled. */
   vimMode?: boolean
   /** Whether bracket auto-close is enabled. */
@@ -139,6 +142,7 @@ export function CodeMirrorEditor({
   readableLineLength = true,
   spellcheck = true,
   spellcheckLanguage = DEFAULT_SPELLCHECK_LANGUAGE,
+  inlineTitle = null,
   vimMode: _vimMode,
   bracketAutoClose: _bracketAutoClose,
   pluginExtensions: _pluginExtensions,
@@ -179,6 +183,7 @@ export function CodeMirrorEditor({
   // Same reasoning as showLineNumbersRef — the context menu's checkbox needs
   // the current value without re-running the mount-effect's listener.
   const readableLineLengthRef = useRef(readableLineLength)
+  const inlineTitleRef = useRef(inlineTitle)
   // Ditto for the spellcheck submenu's checkbox and language radio group.
   const spellcheckRef = useRef(spellcheck)
   const spellcheckLanguageRef = useRef(spellcheckLanguage)
@@ -200,6 +205,7 @@ export function CodeMirrorEditor({
   const livePreviewCompartment = useRef(new Compartment())
   const spellcheckCompartment = useRef(new Compartment())
   const editorPrefsCompartment = useRef(new Compartment())
+  const inlineTitleCompartment = useRef(new Compartment())
 
   // The vault's editor preferences (app.json); a stable object so a note is not rebuilt for nothing.
   const tabSize = useAppConfigValue('tabSize')
@@ -479,6 +485,7 @@ export function CodeMirrorEditor({
         spellcheck ? spellcheckExtension() : []
       ),
       editorPrefsCompartment.current.of(editorPrefsExtension(editorPrefs)),
+      inlineTitleCompartment.current.of(inlineTitleExtension(inlineTitleRef.current)),
       createLivePreviewCompartmentExtension(
         livePreviewCompartment.current,
         buildLivePreviewOptionsWithMenu(),
@@ -766,6 +773,12 @@ export function CodeMirrorEditor({
     if (!spellcheck) return
     setSpellcheckLanguage(spellcheckLanguage)
   }, [spellcheck, spellcheckLanguage])
+
+  // Inline title: the widget is rebuilt whenever title, read-only state or rename handler change.
+  useEffect(() => {
+    inlineTitleRef.current = inlineTitle
+    viewRef.current?.dispatch({ effects: inlineTitleCompartment.current.reconfigure(inlineTitleExtension(inlineTitle)) })
+  }, [inlineTitle, tabId])
 
   // Reconfigure livePreview compartment on prop change
   useEffect(() => {

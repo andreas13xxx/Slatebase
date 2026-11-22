@@ -27,6 +27,8 @@ import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFi
 import { resolveAttachmentTargetDir } from '../utils/internalLink'
 import { getAppConfigValue, useAppConfigValue } from '../state/vaultAppConfigStore'
 import { inlineTitleFromPath } from '../hooks/useShowInlineTitle'
+import { validateFileName } from '../utils/fileValidation'
+import { showToast } from './ToastNotification'
 import { EditorView } from '@codemirror/view'
 import { getActiveEditorView } from '../editor/plugin-extensions'
 import { useAnchorJump } from '../hooks/useAnchorJump'
@@ -328,6 +330,41 @@ export function TabContent() {
   const basesEnabled = isEnabled('bases')
   const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const showInlineTitle = useAppConfigValue('showInlineTitle')
+  // Editable inline title of the editor modes: renaming the title renames the file (keeps `.md`).
+  const inlineTitleVaultId = activeTab?.vaultId
+  const inlineTitlePath = activeTab?.filePath
+  const inlineTitleReadOnly = appState.vaults.find((v) => v.id === inlineTitleVaultId)?.permission === 'read'
+  const inlineTitleOptions = useMemo(() => {
+    if (!showInlineTitle || !apiClient || !inlineTitleVaultId || !inlineTitlePath || !/\.md$/i.test(inlineTitlePath)) return null
+    const vaultId = inlineTitleVaultId
+    const oldPath = inlineTitlePath
+    return {
+      title: inlineTitleFromPath(oldPath),
+      path: oldPath,
+      readOnly: inlineTitleReadOnly,
+      onRename: async (newTitle: string) => {
+        const newName = `${newTitle}.md`
+        const invalid = validateFileName(newName, 255)
+        if (invalid) {
+          showToast('error', invalid)
+          throw new Error(invalid)
+        }
+        try {
+          await apiClient.renameContent(vaultId, oldPath, newName)
+        } catch (err: unknown) {
+          showToast('error', extractErrorMessage(err, t('fileOps.renameError')))
+          throw err
+        }
+        const slash = oldPath.lastIndexOf('/')
+        const newPath = slash === -1 ? newName : `${oldPath.slice(0, slash)}/${newName}`
+        tabDispatch({ type: 'UPDATE_TAB_PATHS', payload: { oldPathPrefix: oldPath, newPathPrefix: newPath } })
+        favoritesStore.updatePath(vaultId, oldPath, newPath)
+        notifyPublicSharesChanged()
+        const tree = await apiClient.fetchVaultTree(vaultId)
+        appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId, tree } })
+      },
+    }
+  }, [showInlineTitle, apiClient, inlineTitleVaultId, inlineTitlePath, inlineTitleReadOnly, tabDispatch, appDispatch, t])
   const editModeLivePreviewOptions = useMemo(() => ({
     vaultId: activeTabVaultId ?? '',
     directoryTree: directoryTreeForActiveVault,
@@ -604,7 +641,6 @@ export function TabContent() {
     const isReadOnly = currentVault?.permission === 'read'
     return (
       <div className="tab-content tab-content--edit" role="tabpanel" aria-label={activeTab.fileName}>
-        {showInlineTitle && <InlineTitle filePath={activeTab.filePath} />}
         <EditMode
           content={editContent}
           onChange={handleEditChange}
@@ -616,6 +652,7 @@ export function TabContent() {
           filePath={activeTab.filePath}
           tabId={activeTab.id}
           livePreviewMode={false}
+          inlineTitle={inlineTitleOptions}
           livePreviewOptions={editModeLivePreviewOptions}
           onExternalFileDrop={handleExternalFileDrop}
           onImagePaste={handleImagePaste}
@@ -674,7 +711,6 @@ export function TabContent() {
           </button>
         </div>
       )}
-      {showInlineTitle && <InlineTitle filePath={activeTab.filePath} />}
       <EditMode
         content={editContentPreview}
         onChange={handleEditChange}
@@ -686,6 +722,7 @@ export function TabContent() {
         filePath={activeTab.filePath}
         tabId={activeTab.id}
         livePreviewMode={true}
+        inlineTitle={inlineTitleOptions}
         livePreviewOptions={previewModeLivePreviewOptions}
         onExternalFileDrop={handleExternalFileDrop}
         onImagePaste={handleImagePaste}
