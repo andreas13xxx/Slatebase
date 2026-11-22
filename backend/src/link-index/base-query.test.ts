@@ -223,6 +223,33 @@ describe('LinkIndexService.queryForBase', () => {
       expect(result.listKeys).not.toContain('status')
     })
 
+    it('reports a key written as a one-element list (inline and dash syntax)', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'one.md'),
+        '---\nauthors: [Ada]\nreviewers:\n  - Bob\nstatus: open\n---\n# One',
+      )
+      await service.rebuild()
+      const keys = (await service.queryForBase({ columns: [] })).listKeys
+      expect(keys).toContain('authors')
+      expect(keys).toContain('reviewers')
+      expect(keys).not.toContain('status')
+    })
+
+    it('drops a one-element list key once the note is rewritten as a scalar', async () => {
+      await fs.writeFile(path.join(tempDir, 'note.md'), '---\nauthors: [Ada]\n---\n# Note')
+      await service.rebuild()
+      expect((await service.queryForBase({ columns: [] })).listKeys).toContain('authors')
+      await service.updateFile('note.md', '---\nauthors: Ada\n---\n# Note')
+      expect((await service.queryForBase({ columns: [] })).listKeys).not.toContain('authors')
+    })
+
+    it('keeps the one-element list keys across a persist and reload', async () => {
+      await fs.writeFile(path.join(tempDir, 'one.md'), '---\nauthors: [Ada]\n---\n# One')
+      await service.rebuild()
+      await service.loadFromDisk()
+      expect((await service.queryForBase({ columns: [] })).listKeys).toContain('authors')
+    })
+
     it('omits listKeys entries when no property has multiple values', async () => {
       await fs.writeFile(path.join(tempDir, 'solo.md'), '---\nstatus: open\n---\n# Solo')
       await service.rebuild()

@@ -14,7 +14,7 @@ import type { ILogger } from '../logger/index.js'
 import type { ParsedWikilink, ILinkIndex, GraphData, GraphNode, GraphEdge, GraphQueryOptions, GraphMeta, BaseQuerySpec, BaseQueryNode, BaseQueryCondition, BaseQueryRow, BaseQueryResult, BaseQueryOperator } from './types.js'
 import { extractWikilinks } from './wikilink-parser.js'
 import { extractTags } from './tag-extractor.js'
-import { extractProperties } from './property-extractor.js'
+import { extractPropertiesDetailed } from './property-extractor.js'
 import { extractCanvasFileRefs } from './canvas-parser.js'
 import { globMatch } from '../search/glob-match.js'
 
@@ -30,6 +30,8 @@ interface LinkIndexJsonV2 {
   properties: Record<string, Record<string, string[]>>
   /** Embed targets per file (`file.embeds`). Absent in indexes written before it existed → rebuild on load. */
   embeds?: Record<string, string[]>
+  /** Keys written as a YAML list per file (even with one element). Absent in older indexes → rebuild on load. */
+  listProperties?: Record<string, string[]>
 }
 
 /** The persisted schema. Files with any other version are rebuilt. */
@@ -105,6 +107,12 @@ export class LinkIndexService implements ILinkIndex {
   private readonly backlinks: Map<string, Set<string>> = new Map()
   private readonly fileTags: Map<string, Set<string>> = new Map()
   private readonly fileProperties: Map<string, Map<string, string[]>> = new Map()
+  /**
+   * Property keys each file WROTE in YAML list syntax (even a single element). The `string[]`
+   * values of `fileProperties` cannot tell `tags: [a]` from `tags: a`. Entries for files that
+   * left `fileProperties` are ignored on read, so deletion sites need not clear this map.
+   */
+  private readonly fileListKeys: Map<string, Set<string>> = new Map()
   /** Inverse property index: key (lowercase) → value (lowercase) → Set<filePath> */
   private readonly propertyValueIndex: Map<string, Map<string, Set<string>>> = new Map()
   /**
@@ -140,6 +148,7 @@ export class LinkIndexService implements ILinkIndex {
     this.backlinks.clear()
     this.fileTags.clear()
     this.fileProperties.clear()
+    this.fileListKeys.clear()
     this.propertyValueIndex.clear()
 
     const mdFiles = await this.findMarkdownFiles(this.vaultPath)
@@ -232,7 +241,8 @@ export class LinkIndexService implements ILinkIndex {
 
       // Update properties
       this.removeFromPropertyValueIndex(normalizedPath)
-      const properties = extractProperties(content)
+      const { properties, listKeys } = extractPropertiesDetailed(content)
+      this.setListKeys(normalizedPath, listKeys)
       if (Object.keys(properties).length > 0) {
         this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
         this.addToPropertyValueIndex(normalizedPath, properties)
@@ -354,7 +364,8 @@ export class LinkIndexService implements ILinkIndex {
     }
 
     // Transfer properties (re-extract from content for correctness)
-    const properties = extractProperties(content)
+    const { properties, listKeys } = extractPropertiesDetailed(content)
+    this.setListKeys(normalizedNew, listKeys)
     if (Object.keys(properties).length > 0) {
       this.fileProperties.set(normalizedNew, new Map(Object.entries(properties)))
       this.addToPropertyValueIndex(normalizedNew, properties)
@@ -727,11 +738,22 @@ export class LinkIndexService implements ILinkIndex {
           if (values.length >= 2) keys.add(key)
         }
       }
+      // Keys written as a list anywhere count even with one element (`tags: [a]`).
+      for (const [filePath, listKeys] of this.fileListKeys) {
+        if (!this.fileProperties.has(filePath)) continue
+        for (const key of listKeys) keys.add(key)
+      }
       this.observedListKeysCache = [...keys]
     }
     // Return a fresh copy: the route layer unions declared registry keys into
     // this array, so handing out the cached reference would corrupt the cache.
     return [...this.observedListKeysCache]
+  }
+
+  /** Records (or clears) which keys `normalizedPath` wrote in YAML list syntax. */
+  private setListKeys(normalizedPath: string, listKeys: readonly string[]): void {
+    if (listKeys.length > 0) this.fileListKeys.set(normalizedPath, new Set(listKeys))
+    else this.fileListKeys.delete(normalizedPath)
   }
 
   /**
@@ -1067,6 +1089,7 @@ export class LinkIndexService implements ILinkIndex {
       this.backlinks.clear()
       this.fileTags.clear()
       this.fileProperties.clear()
+      this.fileListKeys.clear()
       this.propertyValueIndex.clear()
 
       if (data.embeds === undefined) {
@@ -1077,6 +1100,18 @@ export class LinkIndexService implements ILinkIndex {
         })
         await this.rebuild()
         return
+      }
+      if (data.listProperties === undefined) {
+        // Written before list syntax was tracked: one rebuild fills it.
+        this.logger.info('Link index without list properties detected, triggering rebuild', {
+          vaultId: this.vaultId,
+          vaultName: this.vaultName,
+        })
+        await this.rebuild()
+        return
+      }
+      for (const [filePath, keys] of Object.entries(data.listProperties)) {
+        if (Array.isArray(keys) && keys.length > 0) this.fileListKeys.set(filePath, new Set(keys))
       }
       for (const [filePath, targets] of Object.entries(data.embeds)) {
         if (targets.length > 0) this.fileEmbeds.set(filePath, new Set(targets))
@@ -1234,7 +1269,8 @@ export class LinkIndexService implements ILinkIndex {
     this.forwardLinks.set(normalizedPath, targets)
     this.setEmbeds(normalizedPath, parsedLinks)
 
-    const properties = extractProperties(content)
+    const { properties, listKeys } = extractPropertiesDetailed(content)
+    this.setListKeys(normalizedPath, listKeys)
     if (Object.keys(properties).length > 0) {
       this.fileProperties.set(normalizedPath, new Map(Object.entries(properties)))
     } else {
@@ -1465,6 +1501,11 @@ export class LinkIndexService implements ILinkIndex {
         tags: this.serializeTags(),
         properties: this.serializeProperties(),
         embeds: Object.fromEntries(Array.from(this.fileEmbeds, ([k, v]) => [k, Array.from(v)])),
+        listProperties: Object.fromEntries(
+          Array.from(this.fileListKeys)
+            .filter(([k]) => this.fileProperties.has(k))
+            .map(([k, v]) => [k, Array.from(v)]),
+        ),
       }
 
       const json = JSON.stringify(data, null, 2)

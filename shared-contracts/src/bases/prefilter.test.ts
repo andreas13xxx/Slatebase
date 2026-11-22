@@ -169,3 +169,39 @@ describe('buildCombinedPrefilter', () => {
     expect(buildCombinedPrefilter('price < 10', undefined)).toBeNull()
   })
 })
+
+describe('buildPrefilterNode — property existence', () => {
+  it('pushes file.hasProperty as an exists condition', () => {
+    expect(buildPrefilterNode('file.hasProperty("status")')).toEqual({ property: 'status', op: 'exists' })
+  })
+
+  it('strips a note. prefix from hasProperty', () => {
+    expect(buildPrefilterNode('file.hasProperty("note.status")')).toEqual({ property: 'status', op: 'exists' })
+  })
+
+  it('pushes a bare property used as a condition', () => {
+    expect(buildPrefilterNode('status && file.hasTag("a")')).toEqual({
+      and: [{ property: 'status', op: 'exists' }, { tag: 'a' }],
+    })
+  })
+
+  it('never pushes a bare this/file/formula reference', () => {
+    expect(buildPrefilterNode('this.status')).toBeNull()
+    expect(buildPrefilterNode('formula.x')).toBeNull()
+    expect(buildPrefilterNode('file.size')).toBeNull()
+  })
+
+  it('does not push a negated existence check', () => {
+    expect(buildPrefilterNode('!file.hasProperty("status")')).toBeNull()
+  })
+})
+
+describe('buildPrefilterNode — variadic hasTag', () => {
+  it('pushes several literal tags as an OR', () => {
+    expect(buildPrefilterNode('file.hasTag("a", "#b")')).toEqual({ or: [{ tag: 'a' }, { tag: 'b' }] })
+  })
+
+  it('pushes nothing when one tag argument is not a literal', () => {
+    expect(buildPrefilterNode('file.hasTag("a", this.tag)')).toBeNull()
+  })
+})

@@ -81,6 +81,18 @@ describe('filterRows', () => {
   })
 })
 
+describe('file.hasTag with several values', () => {
+  it('matches a note that has ANY of the tags', () => {
+    const rows = [
+      wire('a.md', {}, { tags: ['x'] }),
+      wire('b.md', {}, { tags: ['y'] }),
+      wire('c.md', {}, { tags: ['z'] }),
+    ]
+    const d: BaseDocument = { filters: 'file.hasTag("x", "#y")', views: [] }
+    expect(filterRows(rows, d, { type: 'table' }).rows.map((r) => r.path)).toEqual(['a.md', 'b.md'])
+  })
+})
+
 describe('filters over formulas, lists and file fields', () => {
   it('filters on a formula value', () => {
     const rows = [wire('a.md', { due: ['2000-01-01'] }), wire('b.md', { due: ['2999-01-01'] })]
