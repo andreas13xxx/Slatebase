@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useTranslation } from '../i18n'
 import { useLineNumbers } from '../hooks/useLineNumbers'
 import { useReadableLineLength } from '../hooks/useReadableLineLength'
@@ -9,6 +9,7 @@ import { showToast } from './ToastNotification'
 import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
 import type { IEditorHandle, EditorFormattingAction } from '../editor/types'
 import type { LivePreviewOptions } from '../editor/live-preview'
+import type { InlineTitleOptions } from '../editor/inline-title'
 import { buildInternalLinkText } from '../utils/internalLink'
 
 /**
@@ -22,6 +23,8 @@ export interface EditModeProps {
   saving: boolean
   error: string | null
   readOnly?: boolean
+  /** Inline title shown as the editable first line of the document; omit for none. */
+  inlineTitle?: InlineTitleOptions | null
   /** Path of the currently open file (used for relative link computation on drop). */
   filePath?: string
   /** Unique tab ID for per-tab state management in CodeMirror. */
@@ -47,7 +50,7 @@ const INTERNAL_DRAG_TYPE = 'application/x-slatebase-path'
  * Validates: Requirements 1.1, 1.5, 1.6, 1.7, 1.8, 1.9, 10.1, 10.2, 10.3, 10.4, 10.5
  */
 
-export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath, tabId, onExternalFileDrop, onImagePaste, livePreviewMode, livePreviewOptions }: EditModeProps) {
+export function EditMode({ content, onChange, onSave, onCancel: _onCancel, saving, error, readOnly, filePath, tabId, onExternalFileDrop, onImagePaste, livePreviewMode, livePreviewOptions, inlineTitle }: EditModeProps) {
   const { t } = useTranslation()
   const [status, setStatus] = useState<SaveStatus>('idle')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -55,6 +58,22 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   const wasSavingRef = useRef(false)
   const onSaveRef = useRef(onSave)
   useEffect(() => { onSaveRef.current = onSave })
+  // A rename moves the file under a pending auto-save: the timer (and the flush on the following tab-id
+  // change) would write to the old path and recreate the file. Dropping the timer is safe because the
+  // rename handler saves the current buffer itself before renaming.
+  const inlineTitleForEditor = useMemo(() => {
+    if (!inlineTitle) return null
+    return {
+      ...inlineTitle,
+      onRename: (newTitle: string) => {
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current)
+          debounceRef.current = null
+        }
+        return inlineTitle.onRename(newTitle)
+      },
+    }
+  }, [inlineTitle])
 
   // Editor handle ref for imperative operations (undo/redo, formatting commands)
   const editorRef = useRef<IEditorHandle>(null)
@@ -380,6 +399,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
             spellcheck={spellcheckEnabled}
             spellcheckLanguage={spellcheckLanguage}
             editorRef={editorRef}
+            inlineTitle={inlineTitleForEditor}
             onImagePaste={onImagePaste}
           />
         </div>

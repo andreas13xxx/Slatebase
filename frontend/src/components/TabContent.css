@@ -110,3 +110,22 @@
 .tab-content-link-error-dismiss:hover {
   opacity: 0.7;
 }
+
+/* Editable inline title inside the CM6 document (editor modes). */
+.cm-inline-title {
+  padding: 0.6rem 0 0.2rem;
+}
+
+.cm-inline-title-input {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-normal, var(--text-primary));
+}
