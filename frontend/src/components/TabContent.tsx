@@ -331,6 +331,8 @@ export function TabContent() {
   const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const showInlineTitle = useAppConfigValue('showInlineTitle')
   // Editable inline title of the editor modes: renaming the title renames the file (keeps `.md`).
+  const activeTabRef = useRef(activeTab)
+  useEffect(() => { activeTabRef.current = activeTab })
   const inlineTitleVaultId = activeTab?.vaultId
   const inlineTitlePath = activeTab?.filePath
   const inlineTitleReadOnly = appState.vaults.find((v) => v.id === inlineTitleVaultId)?.permission === 'read'
@@ -350,6 +352,11 @@ export function TabContent() {
           throw new Error(invalid)
         }
         try {
+          // Persist unsaved edits under the old path first, so no pending save can land there afterwards.
+          const tab = activeTabRef.current
+          if (tab && tab.filePath === oldPath && tab.editBuffer !== null && tab.editBuffer !== tab.content) {
+            await saveTab(tabDispatch, apiClient, vaultId, oldPath, tab.editBuffer)
+          }
           await apiClient.renameContent(vaultId, oldPath, newName)
         } catch (err: unknown) {
           showToast('error', extractErrorMessage(err, t('fileOps.renameError')))

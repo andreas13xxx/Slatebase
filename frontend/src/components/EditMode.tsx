@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useTranslation } from '../i18n'
 import { useLineNumbers } from '../hooks/useLineNumbers'
 import { useReadableLineLength } from '../hooks/useReadableLineLength'
@@ -58,6 +58,22 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
   const wasSavingRef = useRef(false)
   const onSaveRef = useRef(onSave)
   useEffect(() => { onSaveRef.current = onSave })
+  // A rename moves the file under a pending auto-save: the timer (and the flush on the following tab-id
+  // change) would write to the old path and recreate the file. Dropping the timer is safe because the
+  // rename handler saves the current buffer itself before renaming.
+  const inlineTitleForEditor = useMemo(() => {
+    if (!inlineTitle) return null
+    return {
+      ...inlineTitle,
+      onRename: (newTitle: string) => {
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current)
+          debounceRef.current = null
+        }
+        return inlineTitle.onRename(newTitle)
+      },
+    }
+  }, [inlineTitle])
 
   // Editor handle ref for imperative operations (undo/redo, formatting commands)
   const editorRef = useRef<IEditorHandle>(null)
@@ -383,7 +399,7 @@ export function EditMode({ content, onChange, onSave, onCancel: _onCancel, savin
             spellcheck={spellcheckEnabled}
             spellcheckLanguage={spellcheckLanguage}
             editorRef={editorRef}
-            inlineTitle={inlineTitle ?? null}
+            inlineTitle={inlineTitleForEditor}
             onImagePaste={onImagePaste}
           />
         </div>
