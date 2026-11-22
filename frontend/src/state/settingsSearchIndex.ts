@@ -1012,3 +1012,19 @@ export const SETTINGS_SEARCH_KEYS: Record<SettingsSection, TranslationKey[]> = {
 export function sectionContentMatches(section: SettingsSection, query: string): boolean {
   return SETTINGS_SEARCH_KEYS[section].some((key) => translateNow(key).toLowerCase().includes(query))
 }
+
+/** Placeholders (`{name}`) mean the text is only a template; the rendered text differs, so it cannot be located. */
+const HAS_PLACEHOLDER = /\{[^}]*\}/
+
+/**
+ * All distinct texts of a section's content that contain the (already lower-cased) query, in the
+ * current language. Template strings with `{placeholders}` are left out: they are never shown verbatim.
+ */
+export function findSectionHits(section: SettingsSection, query: string): string[] {
+  const hits = new Set<string>()
+  for (const key of SETTINGS_SEARCH_KEYS[section]) {
+    const text = translateNow(key)
+    if (!HAS_PLACEHOLDER.test(text) && text.toLowerCase().includes(query)) hits.add(text)
+  }
+  return [...hits]
+}

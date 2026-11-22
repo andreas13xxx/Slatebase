@@ -7,7 +7,9 @@
  */
 
 import { translateNow } from '../../i18n'
-import React, { useRef, useEffect, lazy, Suspense } from 'react'
+import React, { useRef, useEffect, useSyncExternalStore, lazy, Suspense } from 'react'
+import { subscribeSettingsReveal, getSettingsRevealRequest } from '../../state/settingsSearchTarget'
+import { revealSettingText } from './revealSettingText'
 import { useSettingsContext } from '../../state/settingsContext'
 import { useAppContext } from '../../state'
 import { useFeatureContext } from '../../state/featureContext'
@@ -64,10 +66,20 @@ export function SettingsContent() {
     headingRef.current?.focus()
   }, [state.section])
 
+  // A search hit asks to scroll to and highlight a setting; the section may still be loading, so the
+  // lookup waits for it (see revealSettingText).
+  const revealRequest = useSyncExternalStore(subscribeSettingsReveal, getSettingsRevealRequest)
+  const contentRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const root = contentRef.current
+    if (!root || revealRequest === null || revealRequest.section !== state.section) return
+    return revealSettingText(root, revealRequest.text)
+  }, [revealRequest, state.section])
+
   const label = SECTION_LABELS[state.section]
 
   return (
-    <div className="settings-content">
+    <div ref={contentRef} className="settings-content">
       <h2 ref={headingRef} tabIndex={-1} className="settings-content-heading">
         {label}
       </h2>

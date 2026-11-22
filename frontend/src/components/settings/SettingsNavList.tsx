@@ -20,7 +20,8 @@ import type { SettingsAction, SettingsCategory, SettingsSection } from '../../st
 import type { SettingsNavState } from '../../state/settingsState'
 import type { ISettingsRegistry, ISettingsSectionDef } from '../../state/settingsRegistry'
 import { SECTION_LABELS, CATEGORY_LABELS } from '../../state/settingsLabels'
-import { sectionContentMatches } from '../../state/settingsSearchIndex'
+import { sectionContentMatches, findSectionHits } from '../../state/settingsSearchIndex'
+import { requestSettingsReveal } from '../../state/settingsSearchTarget'
 import './SettingsNavList.css'
 
 /** Props for the SettingsNavList component. */
@@ -111,6 +112,12 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
     onNavSelect?.()
   }, [dispatch, onNavSelect])
 
+  const handleHitClick = useCallback((category: SettingsCategory, section: SettingsSection, text: string) => {
+    dispatch({ type: 'NAVIGATE', payload: { category, section } })
+    requestSettingsReveal(section, text)
+    onNavSelect?.()
+  }, [dispatch, onNavSelect])
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLUListElement>) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
 
@@ -119,7 +126,7 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
     if (list === null) return
 
     const buttons = Array.from(list.querySelectorAll<HTMLButtonElement>(
-      'button.settings-nav-list__section-btn:not(:disabled)'
+      'button.settings-nav-list__section-btn:not(:disabled), button.settings-nav-list__hit-btn'
     ))
     if (buttons.length === 0) return
 
@@ -222,6 +229,22 @@ export function SettingsNavList({ state, isAdmin, registry, dispatch, onNavSelec
                       <SectionIcon size={15} aria-hidden="true" />
                       {label}
                     </button>
+                    {query !== '' && !isDisabled && (
+                      <ul className="settings-nav-list__hits" role="list">
+                        {findSectionHits(def.id, query).filter((hit) => hit.toLowerCase() !== label.toLowerCase()).map((hit) => (
+                          <li key={hit} role="presentation">
+                            <button
+                              type="button"
+                              className="settings-nav-list__hit-btn"
+                              title={hit}
+                              onClick={() => { handleHitClick(def.category, def.id, hit) }}
+                            >
+                              {hit}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 )
               })}
