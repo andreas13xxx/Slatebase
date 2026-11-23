@@ -287,9 +287,27 @@ export function seedKanbanMarkdownEmbed(): void {
         return this.cmInstance
       }
       /** Obsidian's `MarkdownEditor.editor` wrapper: plugins reach the view through `editor.cm`. */
-      get editor(): { cm: unknown; getValue(): string; setValue(value: string): void; focus(): void } {
+      get editor(): {
+        cm: unknown
+        getValue(): string
+        setValue(value: string): void
+        focus(): void
+        hasFocus(): boolean
+        somethingSelected(): boolean
+        getSelection(): string
+      } {
+        const cm = this.cm as {
+          hasFocus?: boolean
+          state?: { selection: { main: { empty: boolean; from: number; to: number } }; sliceDoc(from: number, to: number): string }
+        } | null
         return {
           cm: this.cm,
+          hasFocus: () => cm?.hasFocus === true,
+          somethingSelected: () => cm?.state?.selection.main.empty === false,
+          getSelection: () => {
+            const main = cm?.state?.selection.main
+            return main ? (cm?.state?.sliceDoc(main.from, main.to) ?? '') : ''
+          },
           getValue: () => this.get(),
           setValue: (value: string) => this.set(value),
           focus: () => this.focus(),
