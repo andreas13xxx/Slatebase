@@ -140,21 +140,27 @@ export function GlobalTooltip() {
 
   if (!target) return null
 
+  // The host wrapper is what React inserts and removes. Plugins sweep every `.tooltip`
+  // out of the document (TaskNotes does this on drag and on closing a view); if React
+  // owned that node directly, its later removeChild would throw "not a child" and
+  // unmount the whole tree. A swept tooltip simply disappears, like in Obsidian.
   return (
-    <div
-      ref={tooltipRef}
-      // `tooltip` is Obsidian's class for this element; plugin stylesheets
-      // restyle tooltips through it, and would not match our own name.
-      className={`tooltip global-tooltip global-tooltip--${placement?.side ?? 'above'}`}
-      // Hidden until measured, so it never flashes at the wrong position.
-      style={{
-        top: placement?.top ?? 0,
-        left: placement?.left ?? 0,
-        visibility: placement ? 'visible' : 'hidden',
-      }}
-      role="tooltip"
-    >
-      {target.label}
+    <div className="global-tooltip-host">
+      <div
+        ref={tooltipRef}
+        // `tooltip` is Obsidian's class for this element; plugin stylesheets
+        // restyle tooltips through it, and would not match our own name.
+        className={`tooltip global-tooltip global-tooltip--${placement?.side ?? 'above'}`}
+        // Hidden until measured, so it never flashes at the wrong position.
+        style={{
+          top: placement?.top ?? 0,
+          left: placement?.left ?? 0,
+          visibility: placement ? 'visible' : 'hidden',
+        }}
+        role="tooltip"
+      >
+        {target.label}
+      </div>
     </div>
   )
 }

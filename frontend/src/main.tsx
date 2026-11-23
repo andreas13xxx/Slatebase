@@ -5,6 +5,9 @@ import './plugins/appearance/theme-bridge.css'
 import './plugins/appearance/builtin/obsidian.css'
 import { App } from './App.tsx'
 import { tokenFromPath } from './public-share/publicVault'
+import { installDomMutationGuard } from './utils/domMutationGuard'
+
+installDomMutationGuard()
 
 const root = createRoot(document.getElementById('root')!)
 const shareToken = tokenFromPath(window.location.pathname)

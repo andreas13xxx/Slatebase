@@ -35,6 +35,27 @@ describe('GlobalTooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
+  it('survives a plugin removing every .tooltip element from the document', () => {
+    render(
+      <div>
+        <button aria-label="Hint">•</button>
+        <GlobalTooltip />
+      </div>,
+    )
+    const button = screen.getByRole('button')
+    fireEvent.mouseOver(button)
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+    // What TaskNotes does when a view closes or a drag starts.
+    document.querySelectorAll('.tooltip').forEach((el) => el.remove())
+
+    expect(() => {
+      fireEvent.mouseOut(button, { relatedTarget: document.body })
+    }).not.toThrow()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
   it('does not show a tooltip for elements without aria-label', () => {
     render(
       <div>
