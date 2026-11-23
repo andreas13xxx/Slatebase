@@ -38,6 +38,7 @@ import type { SettingsCategory, SettingsSection } from '../../state/settingsStat
 import { MAX_BOOKMARK_ITEMS } from '@slatebase/shared-contracts'
 import { favoritesStore } from '../../state/favoritesStore'
 import { requestReveal } from '../../state/revealFileBridge'
+import { requestViewTab } from '../../state/viewTabBridge'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
 import { showToast } from '../../components/ToastNotification'
 import { buildActiveTabLink, copyLinkWithFeedback, isVaultFileTabPath } from '../../deep-link/copyDeepLink'
@@ -772,7 +773,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
     // The `unsupported` specs below each name the concept Slatebase lacks; pinning
     // and closed-tab history sit among them because they *do* have an equivalent.
     // No empty tab exists; the quick switcher is the closest thing to Obsidian's blank tab ("open a file").
-    { id: 'workspace:new-tab', name: 'New tab', run: (h) => h.onOpenQuickSwitcher() },
+    // Obsidian's new tab is an empty one with actions; the switcher is the fallback when no tab host is mounted.
+    { id: 'workspace:new-tab', name: 'New tab', run: (h) => { if (!requestViewTab({ type: 'empty' })) h.onOpenQuickSwitcher() } },
     { id: 'workspace:toggle-pin', name: 'Toggle pin', run: toggleActiveTabPin },
     { id: 'workspace:split-vertical', name: 'Split right', run: (h) => h.onSplitPane('horizontal') },
     { id: 'workspace:split-horizontal', name: 'Split down', run: (h) => h.onSplitPane('vertical') },
@@ -894,6 +896,8 @@ function buildSpecs(): CoreAppCommandSpec[] {
     { id: 'outgoing-links:open-for-current', name: 'Outgoing links: Open outgoing links for the current file', run: (h) => setPanelView(h, 'links') },
     { id: 'tag-pane:open', name: 'Tags view: Show tags', run: (h) => setPanelView(h, 'tags') },
     { id: 'bookmarks:open', name: 'Bookmarks: Show bookmarks', run: (h) => setPanelView(h, 'favorites') },
+    { id: 'properties:open', name: 'Properties view: Show all properties', run: (h) => setPanelView(h, 'properties') },
+    { id: 'properties:open-local', name: 'Properties view: Show file properties', run: (h) => setPanelView(h, 'properties') },
     { id: 'bookmarks:bookmark-current-view', name: 'Bookmarks: Bookmark...', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.add(h.vaultId, t.filePath) } },
     { id: 'bookmarks:unbookmark-current-view', name: 'Bookmarks: Remove bookmark for the current file', run: (h) => { const t = getActiveTab(h); if (t && h.vaultId) favoritesStore.remove(h.vaultId, t.filePath) } },
     { id: 'file-recovery:open', name: 'File recovery: Open local history', run: (h) => { const t = getActiveTab(h); if (t) window.dispatchEvent(new CustomEvent('slatebase:open-file-recovery', { detail: { vaultId: t.vaultId, filePath: t.filePath } })) } },

@@ -1030,6 +1030,24 @@ export const en: TranslationShape = {
     panelLabel: 'File content',
     emptyPanelLabel: 'No content — no file open',
   },
+  viewTabs: {
+    empty: {
+      title: 'Empty tab',
+      panelLabel: 'Empty tab — choose an action',
+      newNote: 'Create new note',
+      newCanvas: 'Create new canvas',
+      newBase: 'Create new base',
+      goToFile: 'Go to file',
+      recent: 'Recently opened',
+      close: 'Close',
+    },
+    recovery: {
+      title: 'Versions — {name}',
+      panelLabel: 'File recovery',
+      loading: 'Loading file…',
+      loadError: 'The file could not be loaded: {error}',
+    },
+  },
 
   statusBar: {
     ariaLabel: 'Status bar',

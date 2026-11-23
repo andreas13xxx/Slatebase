@@ -6,6 +6,7 @@ import { history } from '@codemirror/commands'
 import { CommandRegistry } from './command-registry'
 import { registerCoreAppCommands, INLINE_BASE_TEMPLATE, type CoreAppCommandHandlers } from './core-commands-app'
 import { parseBase } from '../../bases'
+import { NATIVE_VIEWS } from './native-views'
 import { EditorShim, setEditorViewAccessor } from './editor-shim'
 import { setActiveEditorView } from '../../editor/plugin-extensions'
 import { setActiveCanvasController } from '../../state/activeCanvasBridge'
@@ -165,6 +166,20 @@ describe('registerCoreAppCommands', () => {
     // Unprefixed core commands (no leading namespace, matches real Obsidian exactly).
     expect(registry.getCommand('daily-notes')).toBeDefined()
     expect(registry.getCommand('insert-template')).toBeDefined()
+  })
+
+  it('registers the core command behind every native panel view type', () => {
+    for (const [type, view] of Object.entries(NATIVE_VIEWS)) {
+      if (view.kind !== 'command') continue
+      expect(registry.getCommand(view.commandId), `${type} -> ${view.commandId}`).toBeDefined()
+    }
+  })
+
+  it('properties:open and properties:open-local show the Properties panel', () => {
+    registry.executeCommand('properties:open')
+    registry.executeCommand('properties:open-local')
+    const shown = rightPanelDispatch.mock.calls.filter(([a]) => a.type === 'SET_ACTIVE_VIEW' && a.viewId === 'properties')
+    expect(shown).toHaveLength(2)
   })
 
   it('workspace:close closes the active tab', () => {

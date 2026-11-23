@@ -23,6 +23,7 @@ import { parseFrontmatter } from '../context-panel/utils/parseFrontmatter'
 import { dispatchRealtimeVaultChange, onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { requestVaultTreeRefresh } from '../../state/vaultTreeRefreshBridge'
 import { requestReveal } from '../../state/revealFileBridge'
+import { consumePendingBasesView, onBasesViewRequest } from '../../state/basesViewBridge'
 import { setActiveBasesController, clearActiveBasesController, tableToTsv, tableToCsv, csvFileName } from '../../state/activeBasesBridge'
 import type { ActiveBasesController } from '../../state/activeBasesBridge'
 import { extractErrorMessage } from '../../utils/error'
@@ -82,6 +83,13 @@ export const BasesView = memo(function BasesView({
   useEffect(() => { modeRef.current = mode }, [mode])
   const showView = useCallback(() => { if (modeRef.current === 'source') showViewRef.current?.() }, [])
   const [selectedViewIndex, setSelectedViewIndex] = useState(0)
+  // A plugin asked for a named view (`setViewState({ type: 'bases', state: { viewName } })`): taken from
+  // the bridge when the view mounts, followed while it stays open. Resolved against the parsed views below.
+  const [requestedViewName, setRequestedViewName] = useState<string | null>(() => (hostPath ? consumePendingBasesView(hostPath) : null))
+  useEffect(() => {
+    if (!hostPath) return undefined
+    return onBasesViewRequest(hostPath, setRequestedViewName)
+  }, [hostPath])
   const [searchQuery, setSearchQuery] = useState('')
   const [rows, setRows] = useState<BaseRow[]>([])
   // The row `this` stands for in filters and formulas (the host note); undefined when the base is opened on its own.
@@ -104,6 +112,13 @@ export const BasesView = memo(function BasesView({
   const parseResult = useMemo(() => parseBase(source), [source])
   const doc: BaseDocument | null = parseResult.success ? parseResult.document : null
   const views = doc?.views ?? []
+  useEffect(() => {
+    if (requestedViewName === null || !doc) return
+    const index = views.findIndex((view) => view.name === requestedViewName)
+    // An unknown name keeps the current view: the request is consumed either way.
+    if (index >= 0) setSelectedViewIndex(index)
+    setRequestedViewName(null)
+  }, [requestedViewName, doc, views])
   const safeIndex = selectedViewIndex < views.length ? selectedViewIndex : 0
   const activeView: BaseView | undefined = views[safeIndex]
 

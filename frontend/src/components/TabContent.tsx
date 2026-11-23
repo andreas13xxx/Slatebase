@@ -21,6 +21,10 @@ const BasesView = lazy(() => import('./bases/BasesView').then((m) => ({ default:
 const ActivityTimelineView = lazy(() => import('./activity/ActivityTimelineView').then((m) => ({ default: m.ActivityTimelineView })))
 const WebViewer = lazy(() => import('./WebViewer').then((m) => ({ default: m.WebViewer })))
 import { useTranslation } from '../i18n'
+import { EmptyTabView } from './EmptyTabView'
+import { FileRecoveryView } from './FileRecoveryView'
+import { getRecent } from '../state/recentFilesStore'
+import { EMPTY_TAB_PATH, RECOVERY_TAB_PREFIX } from '../plugins/compat/pane-layout'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
 import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
@@ -176,7 +180,7 @@ export function TabContent() {
   // Determine if the active tab's content matches a plugin file view
   const fileViewMatch = activeTab && !activeTab.loading && !activeTab.error && !activeTab.isBinary
     && !activeTab.filePath.startsWith('__view::') && !activeTab.filePath.startsWith('__graph__')
-    && !activeTab.filePath.startsWith('__webview::')
+    && !activeTab.filePath.startsWith('__webview::') && !activeTab.filePath.startsWith(RECOVERY_TAB_PREFIX)
     && !activeTab.fileName.endsWith('.canvas')
     && !activeTab.fileName.endsWith('.base')
     ? findFileViewMatch(activeTab.filePath, activeTab.content)
@@ -471,6 +475,43 @@ export function TabContent() {
           </Suspense>
         </ErrorBoundary>
       </div>
+    )
+  }
+
+  // Empty tab (Obsidian's `empty` view) — actions instead of a document
+  if (activeTab.filePath === EMPTY_TAB_PATH) {
+    const emptyTabId = activeTab.id
+    return (
+      <EmptyTabView
+        recentFiles={getRecent().filter((entry) => entry.vaultId === activeTab.vaultId)}
+        onRunCommand={(commandId) => pluginContext?.commandRegistry.executeCommand(commandId)}
+        onOpenFile={(path) => {
+          if (!apiClient) return
+          void openTab(tabDispatch, appDispatch, apiClient, activeTab.vaultId, path, path.split('/').pop() ?? path)
+            .then(() => tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: emptyTabId } }))
+        }}
+        onClose={() => tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: emptyTabId } })}
+      />
+    )
+  }
+
+  // File recovery tab (Obsidian's `file-recovery` view) — version browser for one file
+  if (activeTab.filePath.startsWith(RECOVERY_TAB_PREFIX) && apiClient) {
+    const recoveredPath = activeTab.filePath.slice(RECOVERY_TAB_PREFIX.length)
+    const recoveredVaultId = activeTab.vaultId
+    return (
+      <FileRecoveryView
+        vaultId={recoveredVaultId}
+        filePath={recoveredPath}
+        apiClient={apiClient}
+        onRestored={(content) => {
+          // An open tab of the restored file would otherwise keep showing (and re-saving) the old text.
+          const openTabOfFile = tabState.tabs.find((tab) => tab.vaultId === recoveredVaultId && tab.filePath === recoveredPath)
+          if (openTabOfFile) {
+            tabDispatch({ type: 'TAB_CONTENT_LOADED', payload: { tabId: openTabOfFile.id, content, isBinary: false } })
+          }
+        }}
+      />
     )
   }
 

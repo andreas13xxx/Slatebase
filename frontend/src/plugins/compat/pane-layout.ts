@@ -18,19 +18,22 @@
 
 import type { PaneTree, PaneTreeNode, SplitDirection } from '../../state/paneTreeState'
 import type { TabEntry } from '../../state/tabState'
+import { nativeViewTypeForExtension } from './native-views'
 import { WorkspaceSplit, WorkspaceTabs, type WorkspaceItem, type WorkspaceLeaf, type WorkspaceParent } from './view-registry'
 
 /** Tab path prefix of plugin-view tabs (`__view::<viewType>`). */
 export const VIEW_TAB_PREFIX = '__view::'
 
+/** Tab path of the empty tab (`empty` view). */
+export const EMPTY_TAB_PATH = '__view::empty'
+
+/** Tab path prefix of the file-recovery tab (`__recovery::<file path>`). */
+export const RECOVERY_TAB_PREFIX = '__recovery::'
+
 /** Slatebase split direction → Obsidian's (which names the divider). */
 export function paneToObsidianDirection(direction: SplitDirection): 'vertical' | 'horizontal' {
   return direction === 'horizontal' ? 'vertical' : 'horizontal'
 }
-
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'])
-const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'webm'])
-const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'mkv', 'ogv'])
 
 /** Obsidian view type a tab corresponds to (`markdown`, `canvas`, a plugin view type, …). */
 export function viewTypeForTab(tab: Pick<TabEntry, 'filePath'>): string {
@@ -38,15 +41,10 @@ export function viewTypeForTab(tab: Pick<TabEntry, 'filePath'>): string {
   if (path.startsWith(VIEW_TAB_PREFIX)) return path.slice(VIEW_TAB_PREFIX.length)
   if (path === '__graph__') return 'graph'
   if (path.startsWith('__webview::')) return 'webview'
-  const ext = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : ''
-  if (ext === 'md') return 'markdown'
-  if (ext === 'canvas') return 'canvas'
-  if (ext === 'base') return 'bases'
-  if (ext === 'pdf') return 'pdf'
-  if (IMAGE_EXTENSIONS.has(ext)) return 'image'
-  if (AUDIO_EXTENSIONS.has(ext)) return 'audio'
-  if (VIDEO_EXTENSIONS.has(ext)) return 'video'
-  return 'markdown'
+  if (path.startsWith(RECOVERY_TAB_PREFIX)) return 'file-recovery'
+  if (path.startsWith('__local-graph::')) return 'localgraph'
+  const ext = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1) : ''
+  return nativeViewTypeForExtension(ext) ?? 'markdown'
 }
 
 /** Resolves the leaf object (if any) that represents one tab of one pane. */
