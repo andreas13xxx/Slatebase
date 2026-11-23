@@ -35,6 +35,54 @@ describe('GlobalTooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
+  it('shows a title as our own tooltip and hides the native one while it shows', () => {
+    render(
+      <div>
+        <button title="Native text">•</button>
+        <GlobalTooltip />
+      </div>,
+    )
+    const button = screen.getByRole('button')
+    fireEvent.mouseOver(button)
+    // Taken off at once, before the browser's own delay runs out.
+    expect(button).not.toHaveAttribute('title')
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Native text')
+
+    fireEvent.mouseOut(button, { relatedTarget: document.body })
+    expect(button).toHaveAttribute('title', 'Native text')
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('prefers aria-label over title when an element has both', () => {
+    render(
+      <div>
+        <button aria-label="Label" title="Title">•</button>
+        <GlobalTooltip />
+      </div>,
+    )
+    const button = screen.getByRole('button')
+    fireEvent.mouseOver(button)
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Label')
+  })
+
+  it('leaves an iframe title alone', () => {
+    render(
+      <div>
+        <iframe title="Frame name" />
+        <GlobalTooltip />
+      </div>,
+    )
+    const frame = document.querySelector('iframe')!
+    fireEvent.mouseOver(frame)
+    expect(frame).toHaveAttribute('title', 'Frame name')
+  })
+
   it('survives a plugin removing every .tooltip element from the document', () => {
     render(
       <div>

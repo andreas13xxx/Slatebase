@@ -1,5 +1,6 @@
 /**
- * Renders a visible tooltip for any element carrying an `aria-label`.
+ * Renders a visible tooltip for any element carrying an `aria-label` or a `title`
+ * (the browser's own tooltip for a `title` is suppressed while ours shows).
  *
  * Obsidian treats `aria-label` as its tooltip mechanism: the host renders a
  * bubble on hover/focus, so plugins (and our own compat layer's
@@ -21,6 +22,15 @@ import './GlobalTooltip.css'
 /** How long the pointer/focus must rest before the tooltip appears. */
 const SHOW_DELAY_MS = 300
 
+/** Elements that carry tooltip text: Obsidian's `aria-label`, or a plain `title`. Iframes keep theirs (it names the frame). */
+const LABELLED_SELECTOR = '[aria-label], [title]:not(iframe)'
+
+/** Tooltip text of an element: `aria-label` wins over `title`; blank means none. */
+function tooltipLabel(el: HTMLElement): string {
+  const label = el.getAttribute('aria-label')?.trim()
+  return label || el.getAttribute('title')?.trim() || ''
+}
+
 interface TooltipTarget {
   el: HTMLElement
   label: string
@@ -32,6 +42,7 @@ export function GlobalTooltip() {
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const currentEl = useRef<HTMLElement | null>(null)
+  const heldTitle = useRef<{ el: HTMLElement; title: string } | null>(null)
 
   // Track hover/focus globally rather than per-element, since the labelled
   // elements are largely plugin-rendered DOM outside React's tree.
@@ -43,8 +54,18 @@ export function GlobalTooltip() {
       }
     }
 
+    // `title` is hidden while its element is the target, so the browser's own
+    // tooltip never shows next to ours; it goes back the moment the target changes.
+    const restoreTitle = (): void => {
+      const held = heldTitle.current
+      if (!held) return
+      heldTitle.current = null
+      if (held.el.isConnected && !held.el.hasAttribute('title')) held.el.setAttribute('title', held.title)
+    }
+
     const dismiss = (): void => {
       clearShowTimer()
+      restoreTitle()
       currentEl.current = null
       setTarget(null)
       setPlacement(null)
@@ -52,19 +73,23 @@ export function GlobalTooltip() {
 
     const resolveTarget = (source: EventTarget | null): HTMLElement | null => {
       if (!(source instanceof Element)) return null
-      const el = source.closest<HTMLElement>('[aria-label]')
-      if (!el) return null
-      const label = el.getAttribute('aria-label')
-      return label && label.trim() ? el : null
+      const el = source.closest<HTMLElement>(LABELLED_SELECTOR)
+      return el && tooltipLabel(el) ? el : null
     }
 
     const activate = (el: HTMLElement | null): void => {
       if (el === currentEl.current) return
       clearShowTimer()
+      restoreTitle()
       currentEl.current = el
       setTarget(null)
       setPlacement(null)
       if (!el) return
+      const title = el.getAttribute('title')
+      if (title) {
+        heldTitle.current = { el, title }
+        el.removeAttribute('title')
+      }
       showTimer.current = setTimeout(() => {
         // The element can be gone by the time the delay elapses (a re-render
         // swapped it out, a plugin tore down its UI). Checking here rather
@@ -73,7 +98,9 @@ export function GlobalTooltip() {
           currentEl.current = null
           return
         }
-        setTarget({ el, label: el.getAttribute('aria-label') ?? '' })
+        // The `title` was taken off the element above, so it is read back from the hold.
+        const heldFor = heldTitle.current?.el === el ? heldTitle.current.title.trim() : ''
+        setTarget({ el, label: el.getAttribute('aria-label')?.trim() || heldFor })
       }, SHOW_DELAY_MS)
     }
 
@@ -109,6 +136,7 @@ export function GlobalTooltip() {
 
     return () => {
       clearShowTimer()
+      restoreTitle()
       document.removeEventListener('mouseover', onOver)
       document.removeEventListener('mouseout', onOut)
       document.removeEventListener('focusin', onFocusIn)
