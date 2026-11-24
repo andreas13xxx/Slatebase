@@ -957,6 +957,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * so it's always safe to update mostRecentMainLeaf alongside activeLeaf here.
    */
   setActiveLeafInternal(leaf: WorkspaceLeaf | null): void {
+    if (leaf) leaf.activeTime = Date.now();
     this.activeLeaf = leaf;
     this.mostRecentMainLeaf = leaf;
   }

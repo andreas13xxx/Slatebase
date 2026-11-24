@@ -545,9 +545,31 @@ export class WorkspaceLeaf extends WorkspaceItem {
   // that shows this leaf's tab — kept current by WorkspaceShim.setPaneLayout().
   // Sidebar leaves and leaves without a tab stay `null`.
 
+  /** Rendered width of the leaf in pixels (undocumented `leaf.width`); 0 while detached. */
+  get width(): number {
+    return this.containerEl.clientWidth
+  }
+
+  /** Rendered height of the leaf in pixels (undocumented `leaf.height`). */
+  get height(): number {
+    return this.containerEl.clientHeight
+  }
+
+  /** True while the leaf's content is attached and laid out (undocumented `isVisible()`). */
+  isVisible(): boolean {
+    const el = (this.view as unknown as { containerEl?: HTMLElement } | null)?.containerEl ?? this.containerEl
+    return el.isConnected && el.getClientRects().length > 0
+  }
+
+  /** Stable leaf id (undocumented `leaf.id` in Obsidian; plugins use it as a map key). */
+  readonly id: string = Math.random().toString(16).slice(2, 18).padEnd(16, '0')
+  /** Epoch ms of the last activation (`leaf.activeTime`), 0 = never active. */
+  activeTime = 0
+  /** Pin state (undocumented `leaf.pinned` read; change it via `setPinned()`). */
+  pinned = false
+
   private readonly registry: ViewRegistry
   private readonly leafEvents = new EventSystem()
-  private pinned = false
 
   constructor(app: unknown, registry: ViewRegistry, location: LeafLocation) {
     super()
@@ -1027,6 +1049,12 @@ export class WorkspaceLeaf extends WorkspaceItem {
       'loadIfDeferred',
       'detach',
       'openFile',
+      'width',
+      'height',
+      'id',
+      'activeTime',
+      'pinned',
+      'isVisible',
     ]);
 
     return new Proxy(instance, {
