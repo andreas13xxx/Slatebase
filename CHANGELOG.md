@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.94.0](https://github.com/andreas13xxx/Slatebase/compare/v0.93.0...v0.94.0) (2026-11-24)
+
+
+### Features
+
+* **bases:** keep one-element lists, push more filters, variadic hasTag ([#441](https://github.com/andreas13xxx/Slatebase/issues/441)) ([4ba7ab3](https://github.com/andreas13xxx/Slatebase/commit/4ba7ab308a1430c70ac3606207e120f4a31a2b49))
+* **compat:** implement window/open-in-app commands and persist folds ([#442](https://github.com/andreas13xxx/Slatebase/issues/442)) ([b4ce812](https://github.com/andreas13xxx/Slatebase/commit/b4ce812ed0a1704debee38c7a4c4dbf88e527d9f))
+* **editor:** editable inline title inside the document ([#443](https://github.com/andreas13xxx/Slatebase/issues/443)) ([12efb2f](https://github.com/andreas13xxx/Slatebase/commit/12efb2f8deebfe81b9cbf10c50ec66bf49b650af))
+* **plugin-compat:** implement showReleaseNotes, rename prompt, previewMode ([#439](https://github.com/andreas13xxx/Slatebase/issues/439)) ([507c083](https://github.com/andreas13xxx/Slatebase/commit/507c08318774d9b92763dfeb78598b5259174ff1))
+* **settings:** search finds settings inside sections ([#444](https://github.com/andreas13xxx/Slatebase/issues/444)) ([d3e9942](https://github.com/andreas13xxx/Slatebase/commit/d3e99420c100d2899d33e003c37fcd4cf045d719))
+* **toolbar:** toolbar visibility follows showRibbon in appearance.json ([#445](https://github.com/andreas13xxx/Slatebase/issues/445)) ([c97a79e](https://github.com/andreas13xxx/Slatebase/commit/c97a79e6b527fd000c55dc8fb3dda2eedd8ce2a9))
+
+
+### Bugfixes
+
+* **compat:** TaskNotes compatibility, native view types, tooltips ([#446](https://github.com/andreas13xxx/Slatebase/issues/446)) ([4443f9b](https://github.com/andreas13xxx/Slatebase/commit/4443f9bf661f3fce1ac6c931ae0e3847ad1217d1))
+
 ## [0.93.0](https://github.com/andreas13xxx/Slatebase/compare/v0.92.0...v0.93.0) (2026-11-21)
 
 
