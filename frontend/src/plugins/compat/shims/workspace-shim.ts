@@ -1119,6 +1119,11 @@ export class WorkspaceShim implements IWorkspaceShim {
     debugOnce('WorkspaceShim.requestSaveLayout', '[WorkspaceShim] requestSaveLayout: Slatebase does not persist workspace layout — no-op.');
   }
 
+  /** Re-measure the layout: Obsidian's way to tell views the pane sizes changed. Maps to a window `resize`. */
+  requestResize(): void {
+    window.dispatchEvent(new Event('resize'));
+  }
+
   /**
    * viewStateReceivers — Array of callbacks that receive view state updates.
    * Kanban registers/removes itself during load/unload.
@@ -1374,6 +1379,7 @@ export class WorkspaceShim implements IWorkspaceShim {
       'onLayoutReady',
       'layoutReady',
       'requestSaveLayout',
+      'requestResize',
       'registerHoverLinkSource',
       'unregisterHoverLinkSource',
       'hoverLinkSources',

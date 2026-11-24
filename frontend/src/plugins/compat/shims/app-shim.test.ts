@@ -529,4 +529,29 @@ describe('AppShim', () => {
       expect(openLinkText).toHaveBeenCalledWith('Note.md', '');
     });
   });
+
+  describe('theme and DOM handles', () => {
+    it('exposes dom, customCss and getTheme without a gap warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      expect(app.dom.appContainerEl).toBeInstanceOf(HTMLElement);
+      expect(app.customCss.theme).toBe('');
+      expect(app.customCss.enabledSnippets).toBeInstanceOf(Set);
+      document.body.classList.add('theme-dark');
+      expect(app.getTheme()).toBe('obsidian');
+      document.body.classList.remove('theme-dark');
+      expect(app.getTheme()).toBe('moonstone');
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('lists applied snippets', () => {
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      const style = document.createElement('style');
+      style.setAttribute('data-snippet-id', 'mine');
+      document.head.appendChild(style);
+      expect(app.customCss.snippets).toContain('mine');
+      expect(app.customCss.enabledSnippets.has('mine')).toBe(true);
+      style.remove();
+    });
+  });
 });

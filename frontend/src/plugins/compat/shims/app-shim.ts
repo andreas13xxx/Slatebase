@@ -475,6 +475,54 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * `app.dom` — Obsidian's app-level DOM handles. Plugins anchor floating UI to
+   * `appContainerEl`; a getter, so it points at the live element after re-renders.
+   */
+  get dom(): { appContainerEl: HTMLElement } {
+    return { appContainerEl: document.querySelector<HTMLElement>('.app') ?? document.body };
+  }
+
+  /**
+   * `app.customCss` — read-only view of the applied theme and snippets
+   * (Style Settings and theme-aware plugins read it). Slatebase manages themes
+   * and snippets in its own settings, so the mutating methods only warn.
+   */
+  readonly customCss = {
+    /** Active theme id; empty string means the default look. */
+    get theme(): string {
+      return document.documentElement.getAttribute('data-obsidian-theme') ?? '';
+    },
+    themes: {} as Record<string, unknown>,
+    /** Ids of the CSS snippets currently applied. */
+    get snippets(): string[] {
+      return [...document.querySelectorAll('style[data-snippet-id]')]
+        .map((el) => el.getAttribute('data-snippet-id') ?? '')
+        .filter(Boolean);
+    },
+    get enabledSnippets(): Set<string> {
+      return new Set(this.snippets);
+    },
+    setTheme: (): void => {
+      warnOnce('AppShim.customCss.setTheme', '[AppShim] customCss.setTheme: themes are managed in Slatebase settings — no-op.');
+    },
+    setCssEnabledStatus: (): void => {
+      warnOnce('AppShim.customCss.setCssEnabledStatus', '[AppShim] customCss.setCssEnabledStatus: snippets are managed in Slatebase settings — no-op.');
+    },
+    requestLoadTheme: (): void => {},
+    requestLoadSnippets: (): void => {},
+  };
+
+  /** Base colour scheme in Obsidian's vocabulary: `obsidian` is dark, `moonstone` is light. */
+  getTheme(): 'obsidian' | 'moonstone' {
+    return document.body.classList.contains('theme-dark') ? 'obsidian' : 'moonstone';
+  }
+
+  /** Slatebase's colour scheme follows the user's own setting, so a plugin cannot switch it. */
+  changeTheme(): void {
+    warnOnce('AppShim.changeTheme', '[AppShim] changeTheme: the colour scheme is a user setting in Slatebase — no-op.');
+  }
+
+  /**
    * metadataTypeManager — Obsidian-internal registry of frontmatter property
    * types (undocumented; backs the Properties view's type icons/pickers).
    * obsidian-tasks-plugin reads `getAllProperties()` on startup and calls
@@ -819,6 +867,10 @@ export class AppShim implements IAppShim {
       'keymap',
       'scope',
       'metadataTypeManager',
+      'dom',
+      'customCss',
+      'getTheme',
+      'changeTheme',
       'renderContext',
       'viewRegistry',
       'isMobile',
