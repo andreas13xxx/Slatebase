@@ -2114,8 +2114,11 @@ export class ApiClient implements IApiClient {
    * Handles a response, checking for 401 and 403 CSRF_INVALID (both confirmed
    * against the server before any teardown), and other errors.
    * Returns the parsed JSON body for successful responses, or undefined for 204.
+   *
+   * `retry` re-sends the request; it is used once, when a missing CSRF token had to be fetched again
+   * (the session is alive, so the user's first write must not fail for a token this client merely lacked).
    */
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private async handleResponse<T>(response: Response, retry?: () => Promise<Response>): Promise<T> {
     if (response.status === 401) {
       await this.handleAuthFailure()
       await handleErrorResponse(response)
@@ -2130,6 +2133,7 @@ export class ApiClient implements IApiClient {
           // No token here at all: the session is not necessarily gone (a dev hot reload re-creates this client
           // while the page keeps its login). Fetch the token again instead of leaving every write failing.
           await this.restoreCsrfToken()
+          if (retry && this.csrfToken !== null) return this.handleResponse<T>(await retry())
         } else {
           await this.handleAuthFailure()
         }
@@ -2168,8 +2172,8 @@ export class ApiClient implements IApiClient {
       init.body = JSON.stringify(body)
     }
 
-    const response = await fetch(url, init)
-    return this.handleResponse<T>(response)
+    const send = (): Promise<Response> => fetch(url, { ...init, headers: { ...this.buildHeaders(method, hasBody), ...extraHeaders } })
+    return this.handleResponse<T>(await fetch(url, init), send)
   }
 
   /**
@@ -2183,8 +2187,12 @@ export class ApiClient implements IApiClient {
       headers['X-CSRF-Token'] = this.csrfToken
     }
 
-    const response = await fetch(url, { method, headers, body: formData })
-    await this.handleResponse<void>(response)
+    const send = (): Promise<Response> => fetch(url, {
+      method,
+      headers: CSRF_METHODS.has(method) && this.csrfToken ? { 'X-CSRF-Token': this.csrfToken } : {},
+      body: formData,
+    })
+    await this.handleResponse<void>(await fetch(url, { method, headers, body: formData }), send)
   }
 
   /**

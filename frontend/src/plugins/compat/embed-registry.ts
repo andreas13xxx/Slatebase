@@ -229,6 +229,8 @@ export function seedKanbanMarkdownEmbed(): void {
     const FakeEditor = class {
       private cmInstance: unknown = null
       private cmBuilt = false
+      /** Failed builds so far; a build that threw is retried on the next access, up to a cap. */
+      private cmFailures = 0
       containerEl: HTMLElement
       owner: unknown
       // Real Obsidian's MarkdownEditor exposes `win` (the window owning its DOM,
@@ -253,6 +255,9 @@ export function seedKanbanMarkdownEmbed(): void {
         this.app = args[0]
         this.owner = args[2]
         this.win = this.containerEl.ownerDocument?.defaultView ?? window
+        // The view is built lazily (see `cm`), but an embed nobody reads still needs its DOM: by the next
+        // microtask the subclass constructor has finished, so building then sees all of its fields.
+        queueMicrotask(() => { void this.cm })
       }
       /**
        * The CM6 view, built on first access rather than in the constructor: a subclass's
@@ -283,7 +288,12 @@ export function seedKanbanMarkdownEmbed(): void {
             const state = ES.create({ doc: '', extensions })
             this.cmInstance = new EV({ state, parent: this.containerEl })
           }
-        } catch { /* CM6 not available — cm stays null */ }
+        } catch {
+          // CM6 not available, or a subclass hook read a field that is not assigned yet: cm stays null,
+          // but a later access may succeed, so the build is not marked as done (capped, so a hook that
+          // always throws does not run on every read).
+          if (++this.cmFailures < 3) this.cmBuilt = false
+        }
         return this.cmInstance
       }
       /** Obsidian's `MarkdownEditor.editor` wrapper: plugins reach the view through `editor.cm`. */

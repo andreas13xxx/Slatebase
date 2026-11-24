@@ -56,6 +56,25 @@ describe('GlobalTooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
+  it('stays on the target when the pointer moves to a child of a title-only element', () => {
+    render(
+      <div>
+        <button title="Native text"><span data-testid="icon">•</span></button>
+        <GlobalTooltip />
+      </div>,
+    )
+    const button = screen.getByRole('button')
+    fireEvent.mouseOver(button)
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+
+    // The title is off the button now; the move onto the icon must not dismiss the tooltip.
+    fireEvent.mouseOver(screen.getByTestId('icon'))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Native text')
+  })
+
   it('prefers aria-label over title when an element has both', () => {
     render(
       <div>

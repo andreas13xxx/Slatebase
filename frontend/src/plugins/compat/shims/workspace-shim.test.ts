@@ -55,6 +55,25 @@ describe('WorkspaceShim', () => {
       proxied.activeEditor = null;
       expect(proxied.activeEditor).toBeNull();
     });
+
+    it('drops a claim whose editor was taken out of the document without a blur', () => {
+      const proxied = WorkspaceShim.wrapWithProxy(workspace) as unknown as { activeEditor: unknown };
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+      const owner = { editor: { containerEl }, file: null };
+      proxied.activeEditor = owner;
+      expect(proxied.activeEditor).toBe(owner);
+
+      containerEl.remove();
+      expect(proxied.activeEditor).toBeNull();
+    });
+
+    it('keeps a claim that exposes no element, since it cannot be judged stale', () => {
+      const proxied = WorkspaceShim.wrapWithProxy(workspace) as unknown as { activeEditor: unknown };
+      const owner = { editor: {}, file: null };
+      proxied.activeEditor = owner;
+      expect(proxied.activeEditor).toBe(owner);
+    });
   });
 
   describe('leftRibbon / rightRibbon', () => {

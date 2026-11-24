@@ -73,8 +73,13 @@ export function GlobalTooltip() {
 
     const resolveTarget = (source: EventTarget | null): HTMLElement | null => {
       if (!(source instanceof Element)) return null
-      const el = source.closest<HTMLElement>(LABELLED_SELECTOR)
-      return el && tooltipLabel(el) ? el : null
+      const found = source.closest<HTMLElement>(LABELLED_SELECTOR)
+      // The target's own `title` is off while it shows, so a child of it (an icon in a button) no longer matches
+      // the selector. Staying on the target avoids a dismiss and restart for every move inside it, unless a closer
+      // labelled element sits between the child and the target.
+      const current = currentEl.current
+      if (current && current.contains(source) && (!found || found.contains(current))) return current
+      return found && tooltipLabel(found) ? found : null
     }
 
     const activate = (el: HTMLElement | null): void => {

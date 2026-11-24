@@ -8,6 +8,17 @@ describe('basesViewBridge', () => {
     expect(consumePendingBasesView('a.base')).toBeNull()
   })
 
+  it('forgets a parked request that no view picked up in time', () => {
+    vi.useFakeTimers()
+    try {
+      requestBasesView('c.base', 'Old')
+      vi.advanceTimersByTime(11_000)
+      expect(consumePendingBasesView('c.base')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reaches a mounted view directly instead of parking', () => {
     const listener = vi.fn()
     const off = onBasesViewRequest('b.base', listener)

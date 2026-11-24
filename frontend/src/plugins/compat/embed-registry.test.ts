@@ -267,4 +267,61 @@ describe('seedKanbanMarkdownEmbed', () => {
     delete g['__codemirrorView']
     delete g['__codemirrorState']
   })
+
+  function createSubclassFixture(): { Subclass: new (app: unknown, containerEl: HTMLElement) => { editorEl: HTMLElement; destroy(): void }; cleanup: () => void } {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    class Subclass extends MarkdownEditor {
+      options: { marker: string } | undefined
+      constructor(app: unknown, containerEl: HTMLElement) {
+        super(app, containerEl, {})
+        this.options = { marker: 'set' }
+      }
+      buildLocalExtensions(): unknown[] {
+        void this.options!.marker
+        return super.buildLocalExtensions()
+      }
+    }
+    return { Subclass, cleanup: () => { delete g['__codemirrorView']; delete g['__codemirrorState'] } }
+  }
+
+  it('builds the editor DOM even when nothing reads cm, editor or editorEl', async () => {
+    const { Subclass, cleanup } = createSubclassFixture()
+    const containerEl = document.createElement('div')
+    const instance = new Subclass({}, containerEl)
+    expect(containerEl.querySelector('.cm-editor')).toBeNull()
+    await Promise.resolve()
+    expect(containerEl.querySelector('.cm-editor')).not.toBeNull()
+    instance.destroy()
+    cleanup()
+  })
+
+  it('retries the build after a subclass hook threw, instead of staying without an editor for good', () => {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    let calls = 0
+    class Flaky extends MarkdownEditor {
+      buildLocalExtensions(): unknown[] {
+        if (calls++ === 0) throw new Error('field not assigned yet')
+        return super.buildLocalExtensions()
+      }
+    }
+    const instance = new Flaky({}, document.createElement('div'), {})
+    // The first build threw inside the hook; the next access builds again rather than giving up.
+    expect(instance.editor.cm).toBeTruthy()
+    expect(calls).toBe(2)
+    instance.destroy()
+    delete g['__codemirrorView']
+    delete g['__codemirrorState']
+  })
 })

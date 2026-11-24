@@ -232,6 +232,20 @@ interface EmptyLeafView {
  * stubs on below — real Obsidian's `getLeaf(false)` reuses an idle "New tab" leaf rather
  * than piling up empty tabs, and that's exactly what an empty-view leaf here represents.
  */
+/**
+ * Whether the editor behind an `activeEditor` claim has been taken out of the document. A claim does not have
+ * to expose an element; without one it is never judged stale (the plugin is then trusted to clear it).
+ */
+function isDetachedEditorClaim(claim: { editor: IEditor; file: TFile | null }): boolean {
+  const c = claim as unknown as {
+    containerEl?: unknown
+    editorEl?: unknown
+    editor?: { containerEl?: unknown; cm?: { dom?: unknown } }
+  }
+  const element = [c.containerEl, c.editorEl, c.editor?.containerEl, c.editor?.cm?.dom].find((candidate) => candidate instanceof HTMLElement)
+  return element instanceof HTMLElement && !element.isConnected
+}
+
 function isReusableEmptyLeaf(leaf: WorkspaceLeaf): boolean {
   return leaf.view === null || leaf.view.getViewType() === 'empty';
 }
@@ -275,7 +289,13 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Plugins access this via `app.workspace.activeEditor?.editor`.
    */
   get activeEditor(): { editor: IEditor; file: TFile | null } | null {
-    if (this.activeEditorOverride) return this.activeEditorOverride;
+    const claim = this.activeEditorOverride;
+    if (claim) {
+      // A modal that is closed without a blur never clears its claim. Its editor's DOM is gone with it, so a
+      // claim whose element is no longer in the document is stale and must not shadow the real active editor.
+      if (!isDetachedEditorClaim(claim)) return claim;
+      this.activeEditorOverride = null;
+    }
     if (!this.activeFile) return null;
     return { editor: this.editorShim, file: this.activeFile };
   }

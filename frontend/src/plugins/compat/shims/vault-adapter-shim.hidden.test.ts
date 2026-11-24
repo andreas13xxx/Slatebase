@@ -58,6 +58,55 @@ describe('VaultAdapterShim hidden paths', () => {
     expect(await adapter.exists('_mdbase/types/a.md')).toBe(false)
   })
 
+  it('reports the size of its own write, not 0', async () => {
+    const apiClient = { saveFile: vi.fn().mockResolvedValue({}) } as unknown as IApiClient
+    const adapter = VaultAdapterShim.wrapWithProxy(
+      new VaultAdapterShim('v1', apiClient, () => ({ name: '', path: '', type: 'directory', children: [] })),
+    )
+    await adapter.write('notes/a.md', 'äb')
+    expect((await adapter.stat('notes/a.md'))?.size).toBe(3)
+  })
+
+  it('treats everything below a removed folder as gone', async () => {
+    const tree = {
+      name: '', path: '', type: 'directory',
+      children: [{ name: 'dir', path: 'dir', type: 'directory', children: [{ name: 'c.md', path: 'dir/c.md', type: 'file' }] }],
+    }
+    const apiClient = { deleteContent: vi.fn().mockResolvedValue(undefined) } as unknown as IApiClient
+    const adapter = VaultAdapterShim.wrapWithProxy(new VaultAdapterShim('v1', apiClient, () => tree as never))
+    expect(await adapter.exists('dir/c.md')).toBe(true)
+    await adapter.remove('dir')
+    expect(await adapter.exists('dir/c.md')).toBe(false)
+    expect(await adapter.stat('dir/c.md')).toBeNull()
+  })
+
+  it('finds the children of a renamed folder before the tree catches up, and after', async () => {
+    let tree = {
+      name: '', path: '', type: 'directory',
+      children: [{ name: 'old', path: 'old', type: 'directory', children: [{ name: 'c.md', path: 'old/c.md', type: 'file', size: 7 }] }],
+    }
+    const apiClient = { moveContent: vi.fn().mockResolvedValue(undefined) } as unknown as IApiClient
+    const adapter = VaultAdapterShim.wrapWithProxy(new VaultAdapterShim('v1', apiClient, () => tree as never))
+    await adapter.rename('old', 'new')
+    expect(await adapter.exists('new/c.md')).toBe(true)
+    expect((await adapter.stat('new/c.md'))?.size).toBe(7)
+    expect(await adapter.exists('old/c.md')).toBe(false)
+    // The realtime refresh lands: the tree now lists the new path and not the old one.
+    tree = {
+      name: '', path: '', type: 'directory',
+      children: [{ name: 'new', path: 'new', type: 'directory', children: [{ name: 'c.md', path: 'new/c.md', type: 'file', size: 7 }] }],
+    }
+    expect(await adapter.exists('new/c.md')).toBe(true)
+  })
+
+  it('does not download a hidden file again for every poll', async () => {
+    const fetchFileContent = vi.fn().mockResolvedValue({ path: '.x/data.json', content: '{}' })
+    const adapter = createAdapter(fetchFileContent)
+    await Promise.all([adapter.exists('.x/data.json'), adapter.exists('.x/data.json'), adapter.stat('.x/data.json')])
+    await adapter.exists('.x/data.json')
+    expect(fetchFileContent).toHaveBeenCalledTimes(1)
+  })
+
   it('answers getBasePath without a gap warning', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect((createAdapter(vi.fn())['getBasePath'] as () => string)()).toBe('/')

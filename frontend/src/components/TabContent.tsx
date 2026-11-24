@@ -1,4 +1,4 @@
-import { useState, useCallback, useContext, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import { useState, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore, lazy, Suspense } from 'react'
 import { useTabContext } from '../state/tabContext'
 import { useAppContext } from '../state'
 import { useFeatureContext } from '../state/featureContext'
@@ -15,6 +15,9 @@ import { PageLoadingFallback } from './PageLoadingFallback'
 
 // Graph (pulls in d3-force) and Canvas are only needed for their respective
 // tab types — code-split so a plain note tab never pays for either bundle (AP8).
+/** Empty-tab actions that end in a new file's tab, which then takes the empty tab's place. */
+const CREATING_COMMANDS: ReadonlySet<string> = new Set(['file-explorer:new-file', 'canvas:new-file', 'bases:new-file'])
+
 const GraphView = lazy(() => import('./GraphView').then((m) => ({ default: m.GraphView })))
 const CanvasView = lazy(() => import('./canvas/CanvasView').then((m) => ({ default: m.CanvasView })))
 const BasesView = lazy(() => import('./bases/BasesView').then((m) => ({ default: m.BasesView })))
@@ -23,7 +26,7 @@ const WebViewer = lazy(() => import('./WebViewer').then((m) => ({ default: m.Web
 import { useTranslation } from '../i18n'
 import { EmptyTabView } from './EmptyTabView'
 import { FileRecoveryView } from './FileRecoveryView'
-import { getRecent } from '../state/recentFilesStore'
+import { getRecent, subscribe as subscribeRecentFiles, getVersion as getRecentFilesVersion } from '../state/recentFilesStore'
 import { EMPTY_TAB_PATH, RECOVERY_TAB_PREFIX } from '../plugins/compat/pane-layout'
 import { extractErrorMessage } from '../utils/error'
 import { PluginContext } from '../plugins/compat/plugin-context'
@@ -115,6 +118,20 @@ export function TabContent() {
 
   const { tabs, activeTabId } = tabState
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) ?? null : null
+
+  // ─── Empty tab ─────────────────────────────────────────────────────────────
+  // The recent-files list follows the store; `getRecent()` is a fresh array each call, so the version is the key.
+  const recentFilesVersion = useSyncExternalStore(subscribeRecentFiles, getRecentFilesVersion)
+  const recentFiles = useMemo(() => getRecent(), [recentFilesVersion])
+  // "Create ..." on the empty tab should replace it, as in Obsidian, but only once the new file's tab shows up:
+  // the explorer may ask for a name first, and cancelling must leave the empty tab where it was.
+  const replaceEmptyTab = useRef<{ emptyTabId: string; knownTabIds: Set<string> } | null>(null)
+  useEffect(() => {
+    const pending = replaceEmptyTab.current
+    if (!pending || !activeTabId || activeTabId === pending.emptyTabId || pending.knownTabIds.has(activeTabId)) return
+    replaceEmptyTab.current = null
+    tabDispatch({ type: 'CLOSE_TAB', payload: { tabId: pending.emptyTabId } })
+  }, [activeTabId, tabDispatch])
   // Reducer updates replace the tab object on every keystroke (editBuffer
   // changes), so anything that only needs the vault ID should depend on this
   // instead of `activeTab` itself — otherwise every callback derived from it
@@ -483,8 +500,13 @@ export function TabContent() {
     const emptyTabId = activeTab.id
     return (
       <EmptyTabView
-        recentFiles={getRecent().filter((entry) => entry.vaultId === activeTab.vaultId)}
-        onRunCommand={(commandId) => pluginContext?.commandRegistry.executeCommand(commandId)}
+        recentFiles={recentFiles.filter((entry) => entry.vaultId === activeTab.vaultId)}
+        onRunCommand={(commandId) => {
+          if (CREATING_COMMANDS.has(commandId)) {
+            replaceEmptyTab.current = { emptyTabId, knownTabIds: new Set(tabs.map((tab) => tab.id)) }
+          }
+          pluginContext?.commandRegistry.executeCommand(commandId)
+        }}
         onOpenFile={(path) => {
           if (!apiClient) return
           void openTab(tabDispatch, appDispatch, apiClient, activeTab.vaultId, path, path.split('/').pop() ?? path)

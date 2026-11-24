@@ -80,7 +80,11 @@ export class VaultAdapterShim implements IVaultAdapter {
    * refreshes after the realtime round-trip, so a plugin that writes a file and checks it right away (TaskNotes'
    * metadata staging) would see "missing". Entries expire, so a later external change is not masked for long.
    */
-  private readonly overlay = new Map<string, { present: boolean; type: 'file' | 'folder'; at: number }>()
+  private readonly overlay = new Map<string, { present: boolean; type: 'file' | 'folder'; size: number; at: number }>()
+  /** Own renames the snapshot has not caught up with: lookups under `to` are answered from `from`. Expire like the overlay. */
+  private readonly moves = new Map<string, { from: string; at: number }>()
+  /** Recent probes of hidden files, so a plugin polling `exists`/`stat` does not download the file on every call. */
+  private readonly hiddenStats = new Map<string, { at: number; stat: Promise<DataAdapterStat | null> }>()
 
   constructor(vaultId: string, apiClient: IApiClient, getTree: () => DirectoryTree) {
     this.vaultId = vaultId
@@ -105,13 +109,25 @@ export class VaultAdapterShim implements IVaultAdapter {
     if (!path || path === '/' || path === '') return true
     const own = this.overlayEntry(path)
     if (own) return own.present
-    const node = findNodeByPath(this.getTree(), path)
+    const node = this.findInSnapshot(path)
     if (node) return true
-    if (isHiddenPath(path)) return (await this.statHiddenFile(path)) !== null
+    if (isHiddenPath(path)) return (await this.statHiddenFile(this.snapshotPath(path))) !== null
     return false
   }
 
-  private overlayEntry(path: string): { present: boolean; type: 'file' | 'folder' } | null {
+  private overlayEntry(path: string): { present: boolean; type: 'file' | 'folder'; size: number } | null {
+    const entry = this.liveOverlay(path)
+    if (entry) return entry
+    // A removed or renamed-away folder takes everything below it along, whatever the snapshot still lists.
+    const parts = path.split('/')
+    for (let i = parts.length - 1; i >= 1; i--) {
+      const ancestor = this.liveOverlay(parts.slice(0, i).join('/'))
+      if (ancestor && !ancestor.present) return { present: false, type: 'file', size: 0 }
+    }
+    return null
+  }
+
+  private liveOverlay(path: string): { present: boolean; type: 'file' | 'folder'; size: number } | null {
     const entry = this.overlay.get(path)
     if (!entry) return null
     if (Date.now() - entry.at > OVERLAY_TTL_MS) {
@@ -121,15 +137,38 @@ export class VaultAdapterShim implements IVaultAdapter {
     return entry
   }
 
+  /** The tree node for a path: where the path is now, or else where an own rename moved it from. */
+  private findInSnapshot(path: string): DirectoryTree | null {
+    const tree = this.getTree()
+    return findNodeByPath(tree, path) ?? findNodeByPath(tree, this.snapshotPath(path))
+  }
+
+  /** The path the snapshot still knows a renamed path under, or the path itself when no own rename covers it. */
+  private snapshotPath(path: string): string {
+    const parts = path.split('/')
+    for (let i = parts.length; i >= 1; i--) {
+      const prefix = parts.slice(0, i).join('/')
+      const move = this.moves.get(prefix)
+      if (!move) continue
+      if (Date.now() - move.at > OVERLAY_TTL_MS) {
+        this.moves.delete(prefix)
+        continue
+      }
+      return [move.from, ...parts.slice(i)].join('/')
+    }
+    return path
+  }
+
   /** Records a local change; a present path also makes its parent folders present. */
-  private markOverlay(path: string, present: boolean, type: 'file' | 'folder' = 'file'): void {
+  private markOverlay(path: string, present: boolean, type: 'file' | 'folder' = 'file', size = 0): void {
     const at = Date.now()
-    this.overlay.set(path, { present, type, at })
+    this.overlay.set(path, { present, type, size, at })
+    this.hiddenStats.delete(path)
     if (!present) return
     const parts = path.split('/')
     for (let i = 1; i < parts.length; i++) {
       const parent = parts.slice(0, i).join('/')
-      if (!this.overlay.get(parent)?.present) this.overlay.set(parent, { present: true, type: 'folder', at })
+      if (!this.overlay.get(parent)?.present) this.overlay.set(parent, { present: true, type: 'folder', size: 0, at })
     }
   }
 
@@ -146,14 +185,20 @@ export class VaultAdapterShim implements IVaultAdapter {
    * The file endpoint can read them; a failed request counts as "not found" here, never as proof
    * of absence for anything but this one lookup. Folders cannot be probed this way.
    */
-  private async statHiddenFile(path: string): Promise<DataAdapterStat | null> {
-    try {
-      const result = await this.apiClient.fetchFileContent(this.vaultId, path)
-      const now = Date.now()
-      return { type: 'file', size: result.size ?? result.content.length, mtime: now, ctime: now }
-    } catch {
-      return null
-    }
+  private statHiddenFile(path: string): Promise<DataAdapterStat | null> {
+    const cached = this.hiddenStats.get(path)
+    if (cached && Date.now() - cached.at < HIDDEN_STAT_TTL_MS) return cached.stat
+    const stat = (async (): Promise<DataAdapterStat | null> => {
+      try {
+        const result = await this.apiClient.fetchFileContent(this.vaultId, path)
+        const now = Date.now()
+        return { type: 'file', size: result.size ?? result.content.length, mtime: now, ctime: now }
+      } catch {
+        return null
+      }
+    })()
+    this.hiddenStats.set(path, { at: Date.now(), stat })
+    return stat
   }
 
   /**
@@ -176,7 +221,7 @@ export class VaultAdapterShim implements IVaultAdapter {
   async write(path: string, data: string): Promise<void> {
     try {
       await this.apiClient.saveFile(this.vaultId, path, data)
-      this.markOverlay(path, true)
+      this.markOverlay(path, true, 'file', new TextEncoder().encode(data).byteLength)
       markPluginWrite(path)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -225,11 +270,11 @@ export class VaultAdapterShim implements IVaultAdapter {
     if (own) {
       if (!own.present) return null
       const now = Date.now()
-      return { type: own.type, size: 0, mtime: now, ctime: now }
+      return { type: own.type, size: own.size, mtime: now, ctime: now }
     }
 
-    const node = findNodeByPath(this.getTree(), path)
-    if (!node) return isHiddenPath(path) ? this.statHiddenFile(path) : null
+    const node = this.findInSnapshot(path)
+    if (!node) return isHiddenPath(path) ? this.statHiddenFile(this.snapshotPath(path)) : null
 
     return {
       type: node.type === 'file' ? 'file' : 'folder',
@@ -270,8 +315,10 @@ export class VaultAdapterShim implements IVaultAdapter {
   async rename(oldPath: string, newPath: string): Promise<void> {
     try {
       await this.apiClient.moveContent(this.vaultId, oldPath, newPath)
+      const known = this.findInSnapshot(oldPath)
       this.markOverlay(oldPath, false)
-      this.markOverlay(newPath, true)
+      this.markOverlay(newPath, true, known?.type === 'directory' ? 'folder' : 'file', known?.size ?? 0)
+      this.moves.set(newPath, { from: this.snapshotPath(oldPath), at: Date.now() })
       markPluginWrite(newPath)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -322,7 +369,7 @@ export class VaultAdapterShim implements IVaultAdapter {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      this.markOverlay(path, true)
+      this.markOverlay(path, true, 'file', data.byteLength)
       markPluginWrite(path)
     } catch (err: unknown) {
       const appErr = err as { message?: string }
@@ -402,6 +449,9 @@ export class VaultAdapterShim implements IVaultAdapter {
 
 /** How long an own write overrides the directory-tree snapshot. */
 const OVERLAY_TTL_MS = 30_000
+
+/** How long a probe of a hidden file is reused; the file endpoint has no cheaper way to ask than reading it. */
+const HIDDEN_STAT_TTL_MS = 3_000
 
 /** True when any path segment starts with a dot (hidden from the directory tree). */
 function isHiddenPath(path: string): boolean {
