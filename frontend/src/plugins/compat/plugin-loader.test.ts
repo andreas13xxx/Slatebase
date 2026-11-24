@@ -279,7 +279,7 @@ describe('PluginLoader', () => {
       expect(deps.onStatusChange).toHaveBeenCalledWith('test-plugin', 'error', expect.any(String));
     });
 
-    it('should throw LifecycleError when onload() exceeds 10s timeout', async () => {
+    it('should throw LifecycleError when onload() exceeds 60s timeout', async () => {
       vi.useFakeTimers();
 
       const onloadFn = () => new Promise<void>(() => {}); // never resolves
@@ -291,8 +291,8 @@ describe('PluginLoader', () => {
 
       const activatePromise = loader.activatePlugin('test-plugin');
 
-      // Advance timers past the 10s timeout
-      vi.advanceTimersByTime(10_001);
+      // Advance timers past the 60s timeout
+      vi.advanceTimersByTime(60_001);
 
       await expect(activatePromise).rejects.toThrow(LifecycleError);
       expect(loader.getStatus('test-plugin')).toBe('error');

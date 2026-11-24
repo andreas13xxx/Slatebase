@@ -6,7 +6,7 @@
  * - Instantiate exported Plugin class with AppShim
  * - Handle missing/invalid exports, syntax errors, runtime exceptions
  * - Async loading after First Contentful Paint (max 50ms FCP delay)
- * - Lifecycle: activate (onload with 10s timeout), deactivate (onunload + full cleanup)
+ * - Lifecycle: activate (onload with 60s timeout), deactivate (onunload + full cleanup)
  * - Exception handling: mark as error, log, continue with remaining plugins
  *
  * CSP: Plugin bundles are executed via Blob URL + dynamic import() (see evaluateBundle()).
@@ -95,7 +95,7 @@ export interface PluginLoaderDeps {
 }
 
 /** Timeout for onload() in milliseconds */
-const ONLOAD_TIMEOUT_MS = 10_000;
+const ONLOAD_TIMEOUT_MS = 60_000;
 
 /**
  * How long deactivatePlugin() waits for an `async onunload()` to settle before
