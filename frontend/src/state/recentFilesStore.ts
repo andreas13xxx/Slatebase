@@ -40,6 +40,8 @@ let entries: RecentFileEntry[] = loadFromStorage()
 let apiClient: IApiClient | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 let syncInProgress = false
+let version = 0
+const listeners = new Set<() => void>()
 
 // ─── Initialization ──────────────────────────────────────────────────────────
 
@@ -185,8 +187,24 @@ function loadFromStorage(): RecentFileEntry[] {
   }
 }
 
+/**
+ * Follow changes to the list (for `useSyncExternalStore`). Pair with {@link getVersion}: `getRecent()` returns
+ * a fresh array each call, so a changing number is the stable snapshot to compare.
+ */
+export function subscribe(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+/** Counts list changes; see {@link subscribe}. */
+export function getVersion(): number {
+  return version
+}
+
 /** Persist current entries to localStorage. Silently fails if unavailable. */
 function persistLocal(): void {
+  version++
+  listeners.forEach((listener) => listener())
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {
@@ -237,4 +255,6 @@ async function syncToServer(): Promise<void> {
  */
 export function _reload(): void {
   entries = loadFromStorage()
+  version++
+  listeners.forEach((listener) => listener())
 }

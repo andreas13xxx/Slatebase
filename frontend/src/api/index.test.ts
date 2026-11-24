@@ -287,6 +287,77 @@ describe('ApiClient', () => {
       expect(client.getCsrfToken()).toBe('old-csrf')
     })
 
+    // Regression: a client without any CSRF token (e.g. re-created by a dev hot reload while the page stayed logged
+    // in) sent every write without the header and never recovered, since the failure handler assumed "already torn down".
+    it('fetches the CSRF token again from the session when the client has none and the session is alive', async () => {
+      const onExpired = vi.fn()
+      client.setOnSessionExpired(onExpired)
+
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'CSRF_INVALID', message: 'Missing CSRF token' }),
+          { status: 403 },
+        ))
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ user: { id: 'u1' }, csrfToken: 'fresh-csrf', expiresAt: 'x' }),
+          { status: 200 },
+        ))
+        // The request itself is sent once more with the restored token.
+        .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+
+      await expect(client.fetchVaults()).resolves.toEqual([])
+
+      expect(client.getCsrfToken()).toBe('fresh-csrf')
+      expect(onExpired).not.toHaveBeenCalled()
+    })
+
+    it('sends a write again with the restored token, so the first save does not fail', async () => {
+      fetchMock
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 'CSRF_INVALID', message: 'Missing CSRF token' }), { status: 403 }))
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ user: { id: 'u1' }, csrfToken: 'fresh-csrf', expiresAt: 'x' }),
+          { status: 200 },
+        ))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ etag: 'e' }), { status: 200 }))
+
+      await client.saveFile('v1', 'a.md', 'hello')
+
+      const retried = fetchMock.mock.calls[2]?.[1] as RequestInit
+      expect((retried.headers as Record<string, string>)['X-CSRF-Token']).toBe('fresh-csrf')
+      expect(retried.body).toBe(JSON.stringify({ path: 'a.md', content: 'hello' }))
+    })
+
+    it('retries only once: a second CSRF failure is reported', async () => {
+      const csrfFailure = () => new Response(JSON.stringify({ code: 'CSRF_INVALID', message: 'nope' }), { status: 403 })
+      fetchMock
+        .mockResolvedValueOnce(csrfFailure())
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ user: { id: 'u1' }, csrfToken: 'fresh-csrf', expiresAt: 'x' }),
+          { status: 200 },
+        ))
+        .mockResolvedValueOnce(csrfFailure())
+        .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+
+      await expect(client.fetchVaults()).rejects.toMatchObject({ code: 'CSRF_INVALID' })
+    })
+
+    it('stays without a token and keeps quiet when the session is gone', async () => {
+      const onExpired = vi.fn()
+      client.setOnSessionExpired(onExpired)
+
+      fetchMock
+        .mockResolvedValueOnce(new Response(
+          JSON.stringify({ code: 'CSRF_INVALID', message: 'Missing CSRF token' }),
+          { status: 403 },
+        ))
+        .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+
+      await expect(client.fetchVaults()).rejects.toMatchObject({ code: 'CSRF_INVALID' })
+
+      expect(client.getCsrfToken()).toBeNull()
+      expect(onExpired).not.toHaveBeenCalled()
+    })
+
     it('re-throws CSRF_INVALID error regardless of session liveness', async () => {
       client.setCsrfToken('csrf')
       client.setOnSessionExpired(vi.fn())

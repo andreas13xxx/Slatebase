@@ -36,6 +36,9 @@ import {
 } from './editor/spellcheck/personal-dictionary'
 import { useZoom } from './state/zoomStore'
 import { I18nProvider, useTranslation, translateNow } from './i18n'
+import { setViewTabHandler } from './state/viewTabBridge'
+import { generateTabId } from './state/tabState'
+import { EMPTY_TAB_PATH, RECOVERY_TAB_PREFIX } from './plugins/compat/pane-layout'
 import { RealtimeProvider, type RealtimeEventHandlers } from './components/RealtimeProvider'
 import { ToastNotification, showToast } from './components/ToastNotification'
 import { GlobalTooltip } from './components/GlobalTooltip'
@@ -292,6 +295,42 @@ function AppContent() {
     window.addEventListener('slatebase:open-file-recovery', handleOpenFileRecovery)
     return () => window.removeEventListener('slatebase:open-file-recovery', handleOpenFileRecovery)
   }, [])
+
+  // Opens Slatebase's own non-file tabs by Obsidian view type: `workspace:new-tab` and
+  // `leaf.setViewState({ type: 'empty' | 'file-recovery' })` reach this through viewTabBridge.
+  // The handler is registered once and reads the latest state through a ref, so a request can never arrive in
+  // the gap between one registration being torn down and the next being set up.
+  const viewTabContextRef = useRef({ vaultId: state.selectedVaultId, tabs: tabState.tabs, activeTabId: tabState.activeTabId })
+  useEffect(() => {
+    viewTabContextRef.current = { vaultId: state.selectedVaultId, tabs: tabState.tabs, activeTabId: tabState.activeTabId }
+  }, [state.selectedVaultId, tabState.tabs, tabState.activeTabId])
+  useEffect(() => {
+    return setViewTabHandler((request) => {
+      const { vaultId, tabs, activeTabId } = viewTabContextRef.current
+      if (!vaultId) return false
+      let filePath: string
+      let fileName: string
+      if (request.type === 'empty') {
+        filePath = EMPTY_TAB_PATH
+        fileName = translateNow('viewTabs.empty.title')
+      } else {
+        const active = tabs.find((t) => t.id === activeTabId)
+        const target = request.file ?? (active && !active.filePath.startsWith('__') ? active.filePath : null)
+        if (!target) return false
+        filePath = RECOVERY_TAB_PREFIX + target
+        fileName = translateNow('viewTabs.recovery.title', { name: target.split('/').pop() ?? target })
+      }
+      setActiveSettingsPage(null)
+      const tabId = generateTabId(vaultId, filePath)
+      if (tabs.some((t) => t.id === tabId)) {
+        tabDispatch({ type: 'ACTIVATE_TAB', payload: { tabId } })
+        return true
+      }
+      tabDispatch({ type: 'OPEN_TAB', payload: { vaultId, filePath, fileName } })
+      tabDispatch({ type: 'TAB_CONTENT_LOADED', payload: { tabId, content: '', isBinary: false } })
+      return true
+    })
+  }, [tabDispatch])
 
   // Aktive Datei im Explorer verfolgen (Requirement 4): when enabled, reveal the
   // active tab's file in the explorer on every tab change — the same mechanism

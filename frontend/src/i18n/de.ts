@@ -1024,6 +1024,24 @@ export const de = {
     panelLabel: 'Dateiinhalt',
     emptyPanelLabel: 'Kein Inhalt — keine Datei geöffnet',
   },
+  viewTabs: {
+    empty: {
+      title: 'Leerer Tab',
+      panelLabel: 'Leerer Tab — Aktion wählen',
+      newNote: 'Neue Notiz erstellen',
+      newCanvas: 'Neues Canvas erstellen',
+      newBase: 'Neue Base erstellen',
+      goToFile: 'Zu Datei springen',
+      recent: 'Zuletzt geöffnet',
+      close: 'Schließen',
+    },
+    recovery: {
+      title: 'Versionen — {name}',
+      panelLabel: 'Datei-Wiederherstellung',
+      loading: 'Datei wird geladen…',
+      loadError: 'Die Datei konnte nicht geladen werden: {error}',
+    },
+  },
 
   statusBar: {
     ariaLabel: 'Statusleiste',

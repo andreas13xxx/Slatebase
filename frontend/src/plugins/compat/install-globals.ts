@@ -914,7 +914,10 @@ export function installObsidianGlobals(): void {
       registerEvent(ref: unknown): void {
         if (!ref || typeof ref !== 'object') return
         if (!isOwnedEventRef(ref)) {
-          warnNoOp('Component', 'registerEvent', 'The event ref did not come from a Slatebase emitter and will not be deregistered on unload.')
+          debugOnce(
+            'no-op::Component::registerEvent',
+            '[PluginCompat] A component registered an event ref that did not come from a Slatebase emitter; it cannot be deregistered on unload.',
+          )
           return
         }
         this._eventRefs.push(ref)
@@ -1780,7 +1783,12 @@ export function installObsidianGlobals(): void {
        */
       registerObsidianProtocolHandler(action: string, _handler: unknown): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
-        warnNoOp(pluginId, 'registerObsidianProtocolHandler', `Slatebase is a web app and cannot handle obsidian://${action} links.`)
+        // A deliberate trade-off, not a gap: plugins register these for external sign-in callbacks and
+        // keep working without them, so this is informational rather than a warning.
+        debugOnce(
+          `no-op::${pluginId}::registerObsidianProtocolHandler::${action}`,
+          `[PluginCompat] ${pluginId} registered an obsidian://${action} handler; Slatebase is a web app and cannot receive obsidian:// links, so it is never invoked.`,
+        )
       }
       /** Remove a previously registered command. Wired to the CommandRegistry per instance. */
       removeCommand(_commandId: string): void {
@@ -1793,7 +1801,11 @@ export function installObsidianGlobals(): void {
        */
       registerCliHandler(command: string, _description: string, _flags: unknown, _handler: unknown): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
-        warnNoOp(pluginId, 'registerCliHandler', `Slatebase has no CLI, so "${command}" is unreachable.`)
+        // A deliberate trade-off: the plugin's other features are unaffected, so this is informational.
+        debugOnce(
+          `no-op::${pluginId}::registerCliHandler::${command}`,
+          `[PluginCompat] ${pluginId} registered the CLI command "${command}"; Slatebase has no CLI, so it is unreachable.`,
+        )
       }
     }) as unknown as Record<string, unknown>
   }

@@ -227,7 +227,10 @@ export function seedKanbanMarkdownEmbed(): void {
   if (isExtensionRegistered('md')) return
   registerExtension('md', (): EmbedComponent => {
     const FakeEditor = class {
-      cm: unknown
+      private cmInstance: unknown = null
+      private cmBuilt = false
+      /** Failed builds so far; a build that threw is retried on the next access, up to a cap. */
+      private cmFailures = 0
       containerEl: HTMLElement
       owner: unknown
       // Real Obsidian's MarkdownEditor exposes `win` (the window owning its DOM,
@@ -252,8 +255,19 @@ export function seedKanbanMarkdownEmbed(): void {
         this.app = args[0]
         this.owner = args[2]
         this.win = this.containerEl.ownerDocument?.defaultView ?? window
-        // Lazy-init CM6: dynamically import to avoid top-level dep issues
-        this.cm = null
+        // The view is built lazily (see `cm`), but an embed nobody reads still needs its DOM: by the next
+        // microtask the subclass constructor has finished, so building then sees all of its fields.
+        queueMicrotask(() => { void this.cm })
+      }
+      /**
+       * The CM6 view, built on first access rather than in the constructor: a subclass's
+       * `buildLocalExtensions()` override reads its own fields (TaskNotes: `this.options`), which are
+       * only assigned after `super()` returns, so building during construction made it throw and left
+       * the editor without a view. Every later access sees a fully constructed subclass.
+       */
+      get cm(): unknown {
+        if (this.cmBuilt) return this.cmInstance
+        this.cmBuilt = true
         try {
           const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
           const cmState = (globalThis as unknown as { __codemirrorState?: { EditorState: unknown } }).__codemirrorState
@@ -272,10 +286,48 @@ export function seedKanbanMarkdownEmbed(): void {
             // newline-insertion instead of calling Kanban's submit handler.
             const extensions = this.buildLocalExtensions()
             const state = ES.create({ doc: '', extensions })
-            this.cm = new EV({ state, parent: this.containerEl })
+            this.cmInstance = new EV({ state, parent: this.containerEl })
           }
-        } catch { /* CM6 not available — cm stays null */ }
+        } catch {
+          // CM6 not available, or a subclass hook read a field that is not assigned yet: cm stays null,
+          // but a later access may succeed, so the build is not marked as done (capped, so a hook that
+          // always throws does not run on every read).
+          if (++this.cmFailures < 3) this.cmBuilt = false
+        }
+        return this.cmInstance
       }
+      /** Obsidian's `MarkdownEditor.editor` wrapper: plugins reach the view through `editor.cm`. */
+      get editor(): {
+        cm: unknown
+        getValue(): string
+        setValue(value: string): void
+        focus(): void
+        hasFocus(): boolean
+        somethingSelected(): boolean
+        getSelection(): string
+      } {
+        const cm = this.cm as {
+          hasFocus?: boolean
+          state?: { selection: { main: { empty: boolean; from: number; to: number } }; sliceDoc(from: number, to: number): string }
+        } | null
+        return {
+          cm: this.cm,
+          hasFocus: () => cm?.hasFocus === true,
+          somethingSelected: () => cm?.state?.selection.main.empty === false,
+          getSelection: () => {
+            const main = cm?.state?.selection.main
+            return main ? (cm?.state?.sliceDoc(main.from, main.to) ?? '') : ''
+          },
+          getValue: () => this.get(),
+          setValue: (value: string) => this.set(value),
+          focus: () => this.focus(),
+        }
+      }
+      /** The editor's root element (Obsidian's `.cm-editor`), where plugins add their own classes. */
+      get editorEl(): HTMLElement {
+        return (this.cm as { dom?: HTMLElement } | null)?.dom ?? this.containerEl
+      }
+      onUpdate(): void { /* no-op: plugins override it to react to CM6 updates */ }
       buildLocalExtensions(): unknown[] {
         const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
         if (!cmView) return []
@@ -308,7 +360,7 @@ export function seedKanbanMarkdownEmbed(): void {
         return cm ? cm.state.doc.toString() : ''
       }
       destroy() {
-        const cm = this.cm as { destroy(): void } | null
+        const cm = this.cmInstance as { destroy(): void } | null
         if (cm) cm.destroy()
       }
       getDoc() { return { getValue: () => this.get() } }

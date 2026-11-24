@@ -44,6 +44,38 @@ describe('WorkspaceShim', () => {
     resetLogDedup();
   });
 
+  // Regression: TaskNotes' embedded editors assign `workspace.activeEditor = owner` on focus; the getter-only
+  // property threw "setting getter-only property".
+  describe('activeEditor assignment', () => {
+    it('accepts an embedded editor as active editor and falls back when cleared', () => {
+      const proxied = WorkspaceShim.wrapWithProxy(workspace) as unknown as { activeEditor: unknown };
+      const owner = { editor: {}, file: null };
+      expect(() => { proxied.activeEditor = owner; }).not.toThrow();
+      expect(proxied.activeEditor).toBe(owner);
+      proxied.activeEditor = null;
+      expect(proxied.activeEditor).toBeNull();
+    });
+
+    it('drops a claim whose editor was taken out of the document without a blur', () => {
+      const proxied = WorkspaceShim.wrapWithProxy(workspace) as unknown as { activeEditor: unknown };
+      const containerEl = document.createElement('div');
+      document.body.appendChild(containerEl);
+      const owner = { editor: { containerEl }, file: null };
+      proxied.activeEditor = owner;
+      expect(proxied.activeEditor).toBe(owner);
+
+      containerEl.remove();
+      expect(proxied.activeEditor).toBeNull();
+    });
+
+    it('keeps a claim that exposes no element, since it cannot be judged stale', () => {
+      const proxied = WorkspaceShim.wrapWithProxy(workspace) as unknown as { activeEditor: unknown };
+      const owner = { editor: {}, file: null };
+      proxied.activeEditor = owner;
+      expect(proxied.activeEditor).toBe(owner);
+    });
+  });
+
   describe('leftRibbon / rightRibbon', () => {
     beforeEach(async () => {
       await __resetToolbarStoreForTests();

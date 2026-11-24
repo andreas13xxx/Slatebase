@@ -1042,6 +1042,8 @@ export class ApiClient implements IApiClient {
   private onSessionExpired: (() => void) | null = null
   /** In-flight session probe shared by concurrent auth failures. See handleAuthFailure(). */
   private authFailureProbe: Promise<SessionProbe> | null = null
+  /** In-flight CSRF re-fetch shared by concurrent failures. See restoreCsrfToken(). */
+  private csrfRestore: Promise<void> | null = null
 
   /** Set the CSRF token for state-changing requests. */
   setCsrfToken(csrfToken: string | null): void {
@@ -2112,8 +2114,11 @@ export class ApiClient implements IApiClient {
    * Handles a response, checking for 401 and 403 CSRF_INVALID (both confirmed
    * against the server before any teardown), and other errors.
    * Returns the parsed JSON body for successful responses, or undefined for 204.
+   *
+   * `retry` re-sends the request; it is used once, when a missing CSRF token had to be fetched again
+   * (the session is alive, so the user's first write must not fail for a token this client merely lacked).
    */
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private async handleResponse<T>(response: Response, retry?: () => Promise<Response>): Promise<T> {
     if (response.status === 401) {
       await this.handleAuthFailure()
       await handleErrorResponse(response)
@@ -2124,7 +2129,14 @@ export class ApiClient implements IApiClient {
       if (body?.code === 'CSRF_INVALID') {
         // A stale CSRF token and a dead session look identical from here — ask
         // the server which it is before touching local auth state.
-        await this.handleAuthFailure()
+        if (this.csrfToken === null) {
+          // No token here at all: the session is not necessarily gone (a dev hot reload re-creates this client
+          // while the page keeps its login). Fetch the token again instead of leaving every write failing.
+          await this.restoreCsrfToken()
+          if (retry && this.csrfToken !== null) return this.handleResponse<T>(await retry())
+        } else {
+          await this.handleAuthFailure()
+        }
         // Re-throw the original error either way (caller gets CSRF_INVALID)
         await handleErrorResponse(response)
       }
@@ -2160,8 +2172,8 @@ export class ApiClient implements IApiClient {
       init.body = JSON.stringify(body)
     }
 
-    const response = await fetch(url, init)
-    return this.handleResponse<T>(response)
+    const send = (): Promise<Response> => fetch(url, { ...init, headers: { ...this.buildHeaders(method, hasBody), ...extraHeaders } })
+    return this.handleResponse<T>(await fetch(url, init), send)
   }
 
   /**
@@ -2175,8 +2187,12 @@ export class ApiClient implements IApiClient {
       headers['X-CSRF-Token'] = this.csrfToken
     }
 
-    const response = await fetch(url, { method, headers, body: formData })
-    await this.handleResponse<void>(response)
+    const send = (): Promise<Response> => fetch(url, {
+      method,
+      headers: CSRF_METHODS.has(method) && this.csrfToken ? { 'X-CSRF-Token': this.csrfToken } : {},
+      body: formData,
+    })
+    await this.handleResponse<void>(await fetch(url, { method, headers, body: formData }), send)
   }
 
   /**
@@ -2194,6 +2210,26 @@ export class ApiClient implements IApiClient {
       return resp.status === 401 ? 'dead' : 'unknown'
     } catch {
       return 'unknown'
+    }
+  }
+
+  /**
+   * Re-reads the CSRF token from `GET /auth/session` when this client has none. The token is derived from the
+   * session on the server, so a live session always yields one. Concurrent failures share one request. A dead or
+   * unreachable session changes nothing: only a 401 on a real request ends a session.
+   */
+  private async restoreCsrfToken(): Promise<void> {
+    this.csrfRestore ??= (async () => {
+      const result = await this.getSession()
+      if (result.status === 'alive' && this.csrfToken === null) {
+        this.csrfToken = result.csrfToken
+        window.__slatebaseCsrfToken = result.csrfToken
+      }
+    })()
+    try {
+      await this.csrfRestore
+    } finally {
+      this.csrfRestore = null
     }
   }
 

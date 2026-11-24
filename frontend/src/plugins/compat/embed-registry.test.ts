@@ -1,4 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
+import * as cmView from '@codemirror/view'
+import * as cmState from '@codemirror/state'
 import {
   embedByExtension,
   registerExtension,
@@ -229,5 +231,97 @@ describe('seedKanbanMarkdownEmbed', () => {
     const instance = new MarkdownEditor(app, containerEl, {})
     expect(instance.app).toBe(app)
     expect(instance.win).toBe(window)
+  })
+
+  // Regression: TaskNotes extends the extracted class, overrides buildLocalExtensions() to read `this.options`
+  // (assigned only after super() returns) and then touches `editorEl` and `editor.cm`. Building the view inside
+  // the constructor made the override throw, so the modal editors failed with "this.editorEl is undefined".
+  it('builds the view lazily so a subclass override sees its own fields, and exposes editor.cm and editorEl', () => {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+
+    class Subclass extends MarkdownEditor {
+      options: { marker: string } | undefined
+      constructor(app: unknown, containerEl: HTMLElement) {
+        super(app, containerEl, {})
+        this.options = { marker: 'set' }
+      }
+      buildLocalExtensions(): unknown[] {
+        void this.options!.marker
+        return super.buildLocalExtensions()
+      }
+    }
+
+    const instance = new Subclass({}, document.createElement('div'))
+    expect(instance.editorEl).toBeInstanceOf(HTMLElement)
+    expect(instance.editor.cm).toBeTruthy()
+    instance.set('hello')
+    expect(instance.get()).toBe('hello')
+    expect(instance.editor.getValue()).toBe('hello')
+    instance.destroy()
+    delete g['__codemirrorView']
+    delete g['__codemirrorState']
+  })
+
+  function createSubclassFixture(): { Subclass: new (app: unknown, containerEl: HTMLElement) => { editorEl: HTMLElement; destroy(): void }; cleanup: () => void } {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    class Subclass extends MarkdownEditor {
+      options: { marker: string } | undefined
+      constructor(app: unknown, containerEl: HTMLElement) {
+        super(app, containerEl, {})
+        this.options = { marker: 'set' }
+      }
+      buildLocalExtensions(): unknown[] {
+        void this.options!.marker
+        return super.buildLocalExtensions()
+      }
+    }
+    return { Subclass, cleanup: () => { delete g['__codemirrorView']; delete g['__codemirrorState'] } }
+  }
+
+  it('builds the editor DOM even when nothing reads cm, editor or editorEl', async () => {
+    const { Subclass, cleanup } = createSubclassFixture()
+    const containerEl = document.createElement('div')
+    const instance = new Subclass({}, containerEl)
+    expect(containerEl.querySelector('.cm-editor')).toBeNull()
+    await Promise.resolve()
+    expect(containerEl.querySelector('.cm-editor')).not.toBeNull()
+    instance.destroy()
+    cleanup()
+  })
+
+  it('retries the build after a subclass hook threw, instead of staying without an editor for good', () => {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    let calls = 0
+    class Flaky extends MarkdownEditor {
+      buildLocalExtensions(): unknown[] {
+        if (calls++ === 0) throw new Error('field not assigned yet')
+        return super.buildLocalExtensions()
+      }
+    }
+    const instance = new Flaky({}, document.createElement('div'), {})
+    // The first build threw inside the hook; the next access builds again rather than giving up.
+    expect(instance.editor.cm).toBeTruthy()
+    expect(calls).toBe(2)
+    instance.destroy()
+    delete g['__codemirrorView']
+    delete g['__codemirrorState']
   })
 })

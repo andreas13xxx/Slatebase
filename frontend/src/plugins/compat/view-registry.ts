@@ -15,6 +15,7 @@ import { setMarkdownOverride, clearMarkdownOverride } from './file-view-registry
 import { Scope } from './obsidian-api-extensions'
 import { getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 import { EventSystem } from './event-system'
+import { openNativeView } from './native-views'
 import { findTabHeaderEl, findTabTitleEl, findTabIconEl } from './tab-header-dom'
 import type { EventRef } from './types'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from './api-gap-registry'
@@ -733,7 +734,19 @@ export class WorkspaceLeaf extends WorkspaceItem {
         }
         return
       }
-      console.warn(`[WorkspaceLeaf] No view registered for type "${viewType}"`)
+      // A view Slatebase renders itself (a tab by file extension, or a panel via a core
+      // command) -- see native-views.ts. Only a type in neither place is a real gap.
+      const opened = openNativeView(viewType, state.state, {
+        openFile: (filePath) => {
+          const workspace = (this.app as { workspace?: { openFileDirectly?: (filePath: string) => void } })?.workspace
+          workspace?.openFileDirectly?.(filePath)
+        },
+        executeCommand: (commandId) => {
+          const commands = (this.app as { commands?: { executeCommandById?: (id: string) => boolean } })?.commands
+          return commands?.executeCommandById?.(commandId) === true
+        },
+      })
+      if (!opened) console.warn(`[WorkspaceLeaf] No view registered for type "${viewType}"`)
       return
     }
 

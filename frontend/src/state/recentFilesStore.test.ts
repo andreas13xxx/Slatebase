@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { add, getRecent, remove, updatePath, _reload, initialize, disconnect } from './recentFilesStore'
+import { add, getRecent, remove, updatePath, _reload, initialize, disconnect, subscribe, getVersion } from './recentFilesStore'
 import type { IApiClient } from '../api'
 import { hasSyncedBefore, markSyncedBefore } from './preferenceSync'
 
@@ -10,6 +10,25 @@ describe('recentFilesStore', () => {
     // localStorage is cleared in test-setup.ts beforeEach
     // Re-initialize the module state from empty localStorage
     _reload()
+  })
+
+  describe('subscribe', () => {
+    it('notifies listeners and bumps the version on every change, until unsubscribed', () => {
+      const listener = vi.fn()
+      const before = getVersion()
+      const off = subscribe(listener)
+
+      add('v', 'a.md')
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(getVersion()).toBeGreaterThan(before)
+
+      remove('v', 'a.md')
+      expect(listener).toHaveBeenCalledTimes(2)
+
+      off()
+      add('v', 'b.md')
+      expect(listener).toHaveBeenCalledTimes(2)
+    })
   })
 
   describe('add', () => {
