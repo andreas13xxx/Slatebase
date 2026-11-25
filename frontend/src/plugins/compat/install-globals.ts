@@ -109,6 +109,9 @@ import {
   WorkspaceRoot,
   WorkspaceSidedock,
   WorkspaceRibbon,
+  WorkspaceMobileDrawer,
+  WorkspaceFloating,
+  WorkspaceWindow,
 } from './view-registry'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { VaultShim } from './shims/vault-shim'
@@ -1050,6 +1053,7 @@ export function installObsidianGlobals(): void {
         this.app = (controller as { app?: unknown } | undefined)?.app
         this.config = (controller as { config?: unknown } | undefined)?.config
       }
+      // Intentionally empty: subclasses (plugin Bases views) override this to render.
       onDataUpdated(): void {}
       /** Creates a note scoped to this base and opens it, then lets the plugin edit its frontmatter. */
       async createFileForView(
@@ -1158,14 +1162,7 @@ export function installObsidianGlobals(): void {
     window.obsidian.PopoverSuggest = class PopoverSuggest<T> extends (ComponentClass as unknown as { new (): { load(): void; unload(): void; onload(): void; onunload(): void; register(cb: unknown): void; registerEvent(ref: unknown): void; registerDomEvent(el: EventTarget, event: string, handler: EventListenerOrEventListenerObject): void; registerInterval(id: number): number; addChild<C>(c: C): C; removeChild<C>(c: C): C } }) {
       app: unknown
       suggestEl: HTMLElement
-      scope = {
-        keys: [] as unknown[],
-        register: (_modifiers: string[], _key: string | null, _callback: () => boolean | void) => {
-          const handler = { modifiers: _modifiers, key: _key, func: _callback }
-          return handler
-        },
-        unregister: (_handler: unknown) => {},
-      }
+      scope = new Scope()
       constructor(app: unknown) {
         super()
         this.app = app
@@ -1241,12 +1238,13 @@ export function installObsidianGlobals(): void {
               canvas: (_leaf: unknown) => ({
                 canvas: {
                   createFileNode: (_opts: unknown) => ({
-                    setFilePath: (_path: string, _subpath?: string) => {},
-                    render: () => {},
+                    setFilePath: (_path: string, _subpath?: string) => { warnNoOp('canvas', 'createFileNode().setFilePath', 'Slatebase has no embeddable canvas node; the file is not shown.') },
+                    render: () => { warnNoOp('canvas', 'createFileNode().render', 'Slatebase has no embeddable canvas node; nothing is drawn.') },
                     containerEl: document.createElement('div'),
                   }),
+                  // Nodes created above are never attached, so there is nothing to remove.
                   removeNode: (_node: unknown) => {},
-                  setReadonly: (_readonly: boolean) => {},
+                  setReadonly: (_readonly: boolean) => { warnNoOp('canvas', 'setReadonly', 'Slatebase has no embeddable canvas to lock.') },
                 },
               }),
             },
@@ -2149,12 +2147,13 @@ export function installObsidianGlobals(): void {
 
   // Layout tree classes — same reasoning as WorkspaceLeaf above: these are the
   // classes WorkspaceShim actually builds `rootSplit` and its pane mirror from
-  // (see pane-layout.ts), so `x instanceof WorkspaceTabs` etc. hold. Only
-  // WorkspaceMobileDrawer/WorkspaceWindow/WorkspaceFloating stay generic stubs
-  // from registerFallbackShims(): Slatebase has no mobile drawer or popout.
+  // (see pane-layout.ts), so `x instanceof WorkspaceTabs` etc. hold. The
+  // mobile drawer, popout window and floating group are real classes too, for
+  // `instanceof`/`extends`; Slatebase creates no popout instances.
   const layoutClasses: Record<string, unknown> = {
     WorkspaceItem, WorkspaceParent, WorkspaceSplit, WorkspaceTabs,
     WorkspaceContainer, WorkspaceRoot, WorkspaceSidedock, WorkspaceRibbon,
+    WorkspaceMobileDrawer, WorkspaceFloating, WorkspaceWindow,
   }
   for (const [name, cls] of Object.entries(layoutClasses)) {
     if (!window.obsidian[name]) window.obsidian[name] = cls as Record<string, unknown>
