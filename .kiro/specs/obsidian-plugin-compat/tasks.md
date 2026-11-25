@@ -95,7 +95,7 @@ Implementierung eines Compatibility Layers für Obsidian Community Plugins in Sl
     - Load plugin bundles as ES modules, instantiate exported Plugin class
     - Handle missing/invalid exports, syntax errors, runtime exceptions
     - Async loading after First Contentful Paint (max 50ms FCP delay)
-    - Lifecycle: activate (onload with 10s timeout), deactivate (onunload + full cleanup)
+    - Lifecycle: activate (onload with 60s timeout), deactivate (onunload + full cleanup)
     - Startup: load all active plugins in registration order
     - Exception handling: mark as error, log, continue with remaining plugins
     - Full resource cleanup on deactivation regardless of onunload exceptions
