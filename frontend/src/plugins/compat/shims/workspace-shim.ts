@@ -474,16 +474,14 @@ export class WorkspaceShim implements IWorkspaceShim {
             return getActiveEditorContainerEl() ?? (containerElFallback ??= createMarkdownSourceViewPlaceholder());
           },
         };
-        this.activeLeaf = this.fileLeaf;
-        this.mostRecentMainLeaf = this.fileLeaf;
+        this.markActive(this.fileLeaf);
       }
     } else {
       // Real Obsidian's active leaf is (almost) never null — even with no file
       // open there's a leaf with view type "empty". getOrCreateEmptyLeaf()
       // returns null only when there's truly no leaf infrastructure available
       // (no ViewRegistry/app attached) to hand plugins anything.
-      this.activeLeaf = this.getOrCreateEmptyLeaf();
-      this.mostRecentMainLeaf = this.activeLeaf;
+      this.markActive(this.getOrCreateEmptyLeaf());
     }
 
     // Only emit events if the file actually changed
@@ -683,6 +681,7 @@ export class WorkspaceShim implements IWorkspaceShim {
     if (leaf.location === 'main') {
       this.mostRecentMainLeaf = leaf;
     }
+    leaf.activeTime = Date.now();
     this.events.trigger('active-leaf-change', leaf);
   }
 
@@ -957,6 +956,11 @@ export class WorkspaceShim implements IWorkspaceShim {
    * so it's always safe to update mostRecentMainLeaf alongside activeLeaf here.
    */
   setActiveLeafInternal(leaf: WorkspaceLeaf | null): void {
+    this.markActive(leaf);
+  }
+
+  /** Single place that makes a leaf the active (and most recent main) one and stamps `activeTime`. */
+  private markActive(leaf: WorkspaceLeaf | null): void {
     if (leaf) leaf.activeTime = Date.now();
     this.activeLeaf = leaf;
     this.mostRecentMainLeaf = leaf;
@@ -1245,6 +1249,13 @@ export class WorkspaceShim implements IWorkspaceShim {
    * active pane, otherwise none (see pane-layout.ts for why).
    */
   private leafForTab(tab: TabEntry, ctx: { isActivePane: boolean; isActiveTab: boolean }): WorkspaceLeaf | null {
+    const leaf = this.resolveLeafForTab(tab, ctx);
+    // The tab is the source of truth for pinning; mirror it (fires `pinned-change` on a real change).
+    leaf?.setPinned(Boolean(tab.pinned));
+    return leaf;
+  }
+
+  private resolveLeafForTab(tab: TabEntry, ctx: { isActivePane: boolean; isActiveTab: boolean }): WorkspaceLeaf | null {
     if (tab.filePath.startsWith(VIEW_TAB_PREFIX)) {
       const viewType = tab.filePath.slice(VIEW_TAB_PREFIX.length);
       // A view tab duplicated into a second pane still has one leaf;

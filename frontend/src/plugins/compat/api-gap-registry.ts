@@ -25,7 +25,7 @@
  */
 
 /** Which shim the missing API was reached for on. */
-export type GapShim = 'App' | 'Workspace' | 'Vault' | 'VaultAdapter' | 'MetadataCache' | 'FileManager' | 'WorkspaceLeaf' | 'FileExplorerView' | 'Editor' | 'Fallback'
+export type GapShim = 'App' | 'Workspace' | 'Vault' | 'VaultAdapter' | 'MetadataCache' | 'FileManager' | 'WorkspaceLeaf' | 'FileExplorerView' | 'Editor' | 'AppDom' | 'CustomCss' | 'Fallback'
 
 /** One unimplemented API, aggregated across accesses. */
 export interface ApiGap {

@@ -547,17 +547,22 @@ export class WorkspaceLeaf extends WorkspaceItem {
 
   /** Rendered width of the leaf in pixels (undocumented `leaf.width`); 0 while detached. */
   get width(): number {
-    return this.containerEl.clientWidth
+    return this.renderedEl().clientWidth
   }
 
   /** Rendered height of the leaf in pixels (undocumented `leaf.height`). */
   get height(): number {
-    return this.containerEl.clientHeight
+    return this.renderedEl().clientHeight
+  }
+
+  /** The element that is actually on screen: the view's own container, else the leaf wrapper. */
+  private renderedEl(): HTMLElement {
+    return (this.view as unknown as { containerEl?: HTMLElement } | null)?.containerEl ?? this.containerEl
   }
 
   /** True while the leaf's content is attached and laid out (undocumented `isVisible()`). */
   isVisible(): boolean {
-    const el = (this.view as unknown as { containerEl?: HTMLElement } | null)?.containerEl ?? this.containerEl
+    const el = this.renderedEl()
     return el.isConnected && el.getClientRects().length > 0
   }
 
@@ -565,8 +570,16 @@ export class WorkspaceLeaf extends WorkspaceItem {
   readonly id: string = Math.random().toString(16).slice(2, 18).padEnd(16, '0')
   /** Epoch ms of the last activation (`leaf.activeTime`), 0 = never active. */
   activeTime = 0
-  /** Pin state (undocumented `leaf.pinned` read; change it via `setPinned()`). */
-  pinned = false
+  private pinnedState = false
+
+  /**
+   * Pin state (undocumented `leaf.pinned` read). Read-only: change it through
+   * `setPinned()` so `pinned-change` fires. For a leaf shown in a tab, the
+   * workspace shim mirrors the tab's pin state into it on every layout refresh.
+   */
+  get pinned(): boolean {
+    return this.pinnedState
+  }
 
   private readonly registry: ViewRegistry
   private readonly leafEvents = new EventSystem()
@@ -606,12 +619,12 @@ export class WorkspaceLeaf extends WorkspaceItem {
    * round-trips and fires the real 'pinned-change' event plugins may listen for.
    */
   togglePinned(): void {
-    this.setPinned(!this.pinned)
+    this.setPinned(!this.pinnedState)
   }
 
   setPinned(pinned: boolean): void {
-    if (this.pinned === pinned) return
-    this.pinned = pinned
+    if (this.pinnedState === pinned) return
+    this.pinnedState = pinned
     this.leafEvents.trigger('pinned-change', pinned)
   }
 
