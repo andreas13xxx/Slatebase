@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildLayoutJson, mirrorPaneTree, paneLayoutSignature, viewTypeForTab } from './pane-layout'
-import { ViewRegistry, WorkspaceRoot, WorkspaceSplit, WorkspaceTabs, type WorkspaceLeaf } from './view-registry'
+import { registerMainWindowContainer, ViewRegistry, WorkspaceContainer, WorkspaceRoot, WorkspaceSidedock, WorkspaceSplit, WorkspaceTabs, type WorkspaceLeaf } from './view-registry'
 import type { PaneTree } from '../../state/paneTreeState'
 import type { TabEntry, TabState } from '../../state/tabState'
 
@@ -28,6 +28,24 @@ function sideBySide(): PaneTree {
     },
   }
 }
+
+describe('getContainer fallback', () => {
+  it('returns the main window container for detached and sidedock items', () => {
+    const detached = new WorkspaceTabs()
+    const container = detached.getContainer()
+    expect(container).toBeInstanceOf(WorkspaceContainer)
+    expect(container.doc).toBe(document)
+
+    const dock = new WorkspaceSidedock('right')
+    expect(dock.getContainer()).toBe(container)
+  })
+
+  it('prefers the registered main window container', () => {
+    const main = registerMainWindowContainer(new WorkspaceRoot())
+    expect(new WorkspaceTabs().getContainer()).toBe(main)
+    expect(new WorkspaceSidedock('left').getContainer()).toBe(main)
+  })
+})
 
 describe('mirrorPaneTree', () => {
   it('builds split/tabs nodes with Obsidian directions and parent links', () => {

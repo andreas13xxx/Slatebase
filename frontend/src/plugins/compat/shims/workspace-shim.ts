@@ -4,7 +4,7 @@ import { goToLine } from '../../../hooks/useCursorPosition';
 import { resolveWikilinkTarget } from '../../link-resolver';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
-import { ViewRegistry, WorkspaceLeaf, WorkspaceRibbon, WorkspaceRoot, WorkspaceSidedock } from '../view-registry';
+import { registerMainWindowContainer, ViewRegistry, WorkspaceLeaf, WorkspaceRibbon, WorkspaceRoot, WorkspaceSidedock } from '../view-registry';
 import { buildLayoutJson, mirrorPaneTree, paneLayoutSignature, VIEW_TAB_PREFIX } from '../pane-layout';
 import type { TabEntry } from '../../../state/tabState';
 import { EditorShim } from '../editor-shim';
@@ -1241,7 +1241,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    * splits are `WorkspaceSidedock`s without a tree (Slatebase's sidebars are
    * section lists, not tab groups).
    */
-  readonly rootSplit = new WorkspaceRoot();
+  readonly rootSplit = registerMainWindowContainer(new WorkspaceRoot());
   readonly leftSplit = new WorkspaceSidedock('left');
   readonly rightSplit = new WorkspaceSidedock('right');
 
