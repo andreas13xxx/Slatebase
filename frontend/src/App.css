@@ -6190,16 +6190,28 @@
 
 /* Obsidian modal classes used by plugin-spawned modals */
 .modal-bg {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  z-index: 9999; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 0; background: rgba(0,0,0,0.5);
   backdrop-filter: blur(2px);
 }
 .modal-container {
-  background: var(--bg-elevated); border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-  max-width: 840px; width: 90vw; max-height: 85vh; overflow-y: auto; padding: 20px;
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
 }
-.modal-content { display: flex; flex-direction: column; gap: 12px; }
+/* The dialog card itself — Obsidian's `.modal`; plugin CSS sizes it via `container > .modal`. */
+.modal-container > .modal {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column;
+  box-sizing: border-box;
+  width: var(--dialog-width, 560px); max-width: var(--dialog-max-width, 80vw);
+  max-height: var(--dialog-max-height, 85vh);
+  padding: var(--size-4-4, 16px);
+  overflow-y: auto;
+  background: var(--bg-elevated); color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--modal-radius, var(--radius-lg)); box-shadow: var(--shadow-lg);
+  font-family: var(--font-interface, inherit); font-size: var(--font-ui-medium, 15px); line-height: 1.4;
+}
+.modal-content { flex: 1 1 auto; min-height: 0; }
 .modal-content h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
 .modal-button-container { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .modal-button-container button {

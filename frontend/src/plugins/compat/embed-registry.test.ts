@@ -18,6 +18,7 @@ import {
   type EmbedComponent,
   type EmbedContext,
 } from './embed-registry'
+import { setEmbeddedEditorExtensionsFactory } from '../../editor/embedded-editor-bridge'
 
 /** A minimal, spec-conformant EmbedComponent for exercising the mount lifecycle. */
 function makeComponent(overrides: Partial<EmbedComponent> = {}): EmbedComponent & { loaded: boolean; loadedFile: boolean; unloaded: boolean } {
@@ -321,6 +322,50 @@ describe('seedKanbanMarkdownEmbed', () => {
     expect(instance.editor.cm).toBeTruthy()
     expect(calls).toBe(2)
     instance.destroy()
+    delete g['__codemirrorView']
+    delete g['__codemirrorState']
+  })
+
+  it('reports document changes through onUpdate and keeps a loaded value out of the undo history', () => {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    const changes: string[] = []
+    class Details extends MarkdownEditor {
+      onUpdate(update: unknown, changed: boolean): void {
+        super.onUpdate(update, changed)
+        if (changed) changes.push(this.get())
+      }
+    }
+    const instance = new Details({}, document.createElement('div'), {})
+    instance.set('# Titel')
+    expect(changes).toEqual(['# Titel'])
+    const view = instance.editor.cm as cmView.EditorView
+    expect(cmState.Transaction.addToHistory).toBeTruthy()
+    view.dispatch({ changes: { from: view.state.doc.length, insert: '!' } })
+    expect(changes).toEqual(['# Titel', '# Titel!'])
+    instance.destroy()
+    delete g['__codemirrorView']
+    delete g['__codemirrorState']
+  })
+
+  it('builds the view with the extensions the editor module registered', () => {
+    const g = globalThis as unknown as Record<string, unknown>
+    g['__codemirrorView'] = cmView
+    g['__codemirrorState'] = cmState
+    resetEmbedRegistry()
+    seedKanbanMarkdownEmbed()
+    setEmbeddedEditorExtensionsFactory(() => [cmView.EditorView.editorAttributes.of({ class: 'embedded-marker' })])
+    const component = embedByExtension['md']({} as EmbedContext, {} as never, undefined) as EmbedComponent & { editMode: object }
+    const MarkdownEditor = Object.getPrototypeOf(Object.getPrototypeOf(component.editMode)).constructor
+    const instance = new MarkdownEditor({}, document.createElement('div'), {})
+    expect((instance.editorEl as HTMLElement).classList.contains('embedded-marker')).toBe(true)
+    instance.destroy()
+    setEmbeddedEditorExtensionsFactory(null)
     delete g['__codemirrorView']
     delete g['__codemirrorState']
   })

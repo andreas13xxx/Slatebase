@@ -88,6 +88,23 @@ describe('BasesQueryController entries', () => {
     ctrl.stop()
   })
 
+  it('exposes the raw note properties as entry.properties (TaskNotes cards)', async () => {
+    const taskView: BaseView = { type: 'tasknotesTaskList', order: ['note.status', 'note.contexts', 'note.timeEstimate', 'file.tags'] } as BaseView
+    const taskApi = {
+      queryBase: vi.fn().mockResolvedValue({
+        rows: [{ path: 'T.md', fileName: 'T', values: { status: ['in-progress'], contexts: ['@büro'], timeEstimate: ['60'], 'file.tags': ['task'] } }],
+        total: 1,
+      }),
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [{ key: 'contexts', type: 'list' }, { key: 'timeEstimate', type: 'number' }] }),
+    } as unknown as IApiClient
+    const target: DrivableBasesView = { onDataUpdated: vi.fn() }
+    const ctrl = new BasesQueryController({ apiClient: taskApi, vaultId: 'v', doc, view: taskView, target })
+    await ctrl.start()
+    const entry = (target.data as { get(i: number): { properties: Record<string, unknown> } }).get(0)
+    expect(entry.properties).toEqual({ status: 'in-progress', contexts: ['@büro'], timeEstimate: 60 })
+    ctrl.stop()
+  })
+
   it('resolves file.name even when it is not a displayed column (chart X axis)', async () => {
     const chartView: BaseView = { type: 'chart-bar', order: ['start'], _unknown: { x: 'file.name' } } as BaseView
     const target: DrivableBasesView = { onDataUpdated: vi.fn() }

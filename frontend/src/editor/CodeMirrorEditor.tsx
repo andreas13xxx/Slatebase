@@ -6,7 +6,8 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { GFM } from '@lezer/markdown'
 import { tokenClassNodePropSource } from './token-class-node-prop'
-
+// Registers the embedded-editor extension factory the compat layer's fake MarkdownEditor uses.
+import './embedded-markdown-extensions'
 /**
  * Pre-configured Markdown parser with tokenClassNodeProp set on all NodeTypes.
  * This ensures Lezer trees have the prop values that plugins like Dataview expect.

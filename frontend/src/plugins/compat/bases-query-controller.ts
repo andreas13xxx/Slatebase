@@ -30,6 +30,10 @@ import { warnOnce } from './log'
 import { getActiveVaultShimRef, treeNodeToTFile } from './shims/vault-shim'
 import type { DirectoryTree } from '../../types'
 
+/** Rows whose note content is read ahead for the metadata cache, and how many reads run at once. */
+const PREFETCH_MAX_ROWS = 100
+const PREFETCH_CONCURRENCY = 5
+
 /** The subset of a BasesView instance this controller drives. */
 export interface DrivableBasesView {
   type?: string
@@ -181,8 +185,52 @@ export class BasesQueryController {
       } catch (err) {
         warnOnce('BasesQueryController.onDataUpdated', '[BasesQueryController] plugin onDataUpdated() threw:', err)
       }
+      void this.prefetchContent(rows)
     } catch (err) {
       if (!this.stopped) this.onError(extractErrorMessage(err, 'Die Base-Abfrage ist fehlgeschlagen'))
+    }
+  }
+
+  /**
+   * Reads the notes of the first rows so `metadataCache.getCache(path)` knows their
+   * sections, headings and links — real Obsidian has this for every note up front.
+   * Plugin cards use it, e.g. TaskNotes' "task has details" icon is shown only
+   * when the cache reports a non-frontmatter section. Reads are bounded and run in
+   * the background; the view is refreshed once if anything new was learned.
+   */
+  private async prefetchContent(rows: BaseRow[]): Promise<void> {
+    const app = (window as unknown as { app?: {
+      vault?: { getFileByPath?(p: string): unknown; read?(f: unknown): Promise<string> }
+      metadataCache?: { getCache?(p: string): unknown }
+    } }).app
+    const vault = app?.vault
+    const cache = app?.metadataCache
+    if (!vault?.getFileByPath || !vault.read || !cache?.getCache) return
+    const pending = rows
+      .slice(0, PREFETCH_MAX_ROWS)
+      .filter((r) => r.path.toLowerCase().endsWith('.md') && !cache.getCache?.(r.path))
+    if (pending.length === 0) return
+    let learned = 0
+    let next = 0
+    const worker = async (): Promise<void> => {
+      while (!this.stopped && next < pending.length) {
+        const row = pending[next++]!
+        const file = vault.getFileByPath?.(row.path)
+        if (!file) continue
+        try {
+          await vault.read?.(file)
+          learned++
+        } catch {
+          // An unreadable note simply keeps an empty cache entry.
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: PREFETCH_CONCURRENCY }, worker))
+    if (this.stopped || learned === 0) return
+    try {
+      this.target.onDataUpdated?.()
+    } catch (err) {
+      warnOnce('BasesQueryController.onDataUpdated', '[BasesQueryController] plugin onDataUpdated() threw:', err)
     }
   }
 
@@ -247,7 +295,28 @@ export class BasesQueryController {
       entry.setValue(key, toValue(toStringList(row.values[key]), this.declaredTypes.get(key)))
     }
 
+    // Plugins such as TaskNotes build their cards from the note's raw properties
+    // (`entry.properties`), not from `getValue()`. Without them only the title is
+    // left. Bare keys, formulas and `file.*` excluded — those are not frontmatter.
+    ;(entry as { properties?: Record<string, unknown> }).properties = this.rawProperties(row)
+
     return entry
+  }
+
+  /** The row's note properties as plain frontmatter-shaped values (bare keys). */
+  private rawProperties(row: BaseRow): Record<string, unknown> {
+    const props: Record<string, unknown> = {}
+    for (const [key, raw] of Object.entries(row.values)) {
+      if (key.startsWith('file.') || key.startsWith('formula.')) continue
+      const bare = key.replace(/^note\./, '')
+      const list = toStringList(raw)
+      if (list.length === 0) continue
+      const type = this.declaredTypes.get(key) ?? this.declaredTypes.get(bare)
+      if (list.length > 1 || type === 'list' || type === 'tags') props[bare] = list
+      else if (type === 'number' && list[0] !== undefined && list[0].trim() !== '' && Number.isFinite(Number(list[0]))) props[bare] = Number(list[0])
+      else props[bare] = list[0]
+    }
+    return props
   }
 
   /** Unsubscribes from live updates. Safe to call more than once. */

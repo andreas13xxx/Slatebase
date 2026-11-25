@@ -167,6 +167,19 @@
   overflow: hidden;
 }
 
+/* The suggest-modal card keeps its own measures instead of the generic dialog card. */
+.modal-container > .modal.prompt {
+  padding: 0;
+  width: var(--prompt-width);
+  max-width: var(--prompt-max-width);
+  max-height: var(--prompt-max-height);
+  overflow: hidden;
+  background-color: var(--background-primary);
+  border: var(--prompt-border-width) solid var(--prompt-border-color);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+}
+
 .prompt-input-container {
   position: relative;
   display: flex;

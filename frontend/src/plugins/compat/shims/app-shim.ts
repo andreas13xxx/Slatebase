@@ -24,6 +24,19 @@ import { fromFileCommandId, hotkeyToShortcut, isHotkey, shortcutsToFileValue, to
 import { getFileBinding, getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
 
 /**
+ * Which plugin an `app` object handed out by `AppShim.create()` belongs to.
+ * Keyed by the plugin-facing (proxied) object, so a class that receives `app`
+ * in its constructor (Modal) can tag its DOM without relying on the ambient
+ * plugin context, which is gone when a modal opens from a DOM event handler.
+ */
+const appPluginIds = new WeakMap<object, string>();
+
+/** The plugin id an AppShim was created for, or undefined for any other object. */
+export function getAppPluginId(app: unknown): string | undefined {
+  return typeof app === 'object' && app !== null ? appPluginIds.get(app) : undefined;
+}
+
+/**
  * Wrap a small shim object in the gap safety net every plugin-facing surface has
  * (quality.md): a member the shim does not emulate is recorded in the api-gap
  * registry, warned about once, and answered with a callable no-op instead of a
@@ -906,7 +919,9 @@ export class AppShim implements IAppShim {
     };
   }): AppShim & Record<string, unknown> {
     const instance = new AppShim(options);
-    return AppShim.wrapWithProxy(instance);
+    const wrapped = AppShim.wrapWithProxy(instance);
+    appPluginIds.set(wrapped, options.pluginId);
+    return wrapped;
   }
 
   /**

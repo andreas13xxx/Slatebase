@@ -106,7 +106,14 @@ export class MetadataCacheShim implements IMetadataCacheShim {
    */
   getCache(path: string): CachedMetadata | null {
     if (!path) return null;
-    return this.cache.get(path) ?? null;
+    const cached = this.cache.get(path);
+    if (cached) return cached;
+    // Notes read so far are parsed on demand, like getFileCache(); unread ones stay unknown (null).
+    const content = this.contentStore.get(path);
+    if (content === undefined) return null;
+    const metadata = this.parseContentToMetadata(content);
+    this.cache.set(path, metadata);
+    return metadata;
   }
 
   /**
