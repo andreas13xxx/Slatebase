@@ -1120,6 +1120,13 @@
   text-align: left;
 }
 
+.bases-tb__view-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .bases-tb__view-item:hover,
 .bases-tb__view-item--active {
   background: var(--bg-hover, var(--bg-surface));
