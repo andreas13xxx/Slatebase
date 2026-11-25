@@ -8,6 +8,7 @@ import type {
   PluginInstance,
   PluginManifestData,
 } from '../types';
+import { createEventSurface, type EventSurface } from '../event-system';
 import { FileManagerShim } from './file-manager-shim';
 import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
@@ -311,7 +312,7 @@ export class AppShim implements IAppShim {
   readonly fileManager: IFileManagerShim;
 
   /** Plugin registry exposing active plugins, enabled set, and lookup */
-  readonly plugins: {
+  readonly plugins: EventSurface & {
     plugins: Record<string, PluginInstance>;
     enabledPlugins: Set<string>;
     manifests: Record<string, PluginManifestData>;
@@ -328,7 +329,7 @@ export class AppShim implements IAppShim {
    * own Component-like API directly (e.g. `canvas`, which Excalidraw reaches into via
    * `._loaded`/`.load()`/`.views.canvas(leaf)`) don't fit that shape, hence `unknown`.
    */
-  readonly internalPlugins: {
+  readonly internalPlugins: EventSurface & {
     plugins: Record<string, unknown>;
     getPluginById(id: string): { enabled: boolean; instance: unknown } | undefined;
     getEnabledPluginById(id: string): unknown;
@@ -431,8 +432,19 @@ export class AppShim implements IAppShim {
     // undefined, since an instance carries those under `.manifest`.
     this.manifestsMap = globalPlugins?.manifests ?? {};
 
+    // `app.plugins` is an `Events` in Obsidian (`changed`); share the global registry's emitter so
+    // every plugin's AppShim hears the same events.
+    const globalEvents = globalPlugins as unknown as Partial<EventSurface> | undefined;
+    const pluginEvents: EventSurface = globalEvents?.on && globalEvents.off && globalEvents.offref && globalEvents.trigger
+      ? (globalEvents as EventSurface)
+      : createEventSurface();
+
     // Create the plugins property with live references
     this.plugins = {
+      on: (event, callback, context) => pluginEvents.on(event, callback, context),
+      off: (event, callback) => pluginEvents.off(event, callback),
+      offref: (ref) => pluginEvents.offref(ref),
+      trigger: (event, ...args) => pluginEvents.trigger(event, ...args),
       plugins: this.pluginsMap,
       enabledPlugins: this.enabledPluginsSet,
       manifests: this.manifestsMap,
@@ -477,6 +489,7 @@ export class AppShim implements IAppShim {
       this.internalPlugins = globalInternalPlugins;
     } else {
       this.internalPlugins = {
+        ...createEventSurface(),
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
           'templates': { enabled: false, instance: { options: { folder: '' } } },

@@ -125,7 +125,7 @@ import { changeObsidianTheme, createAppDomShim, createCustomCssShim, getAppPlugi
 import { getActiveWorkspaceShim } from './active-workspace-shim'
 import { installApiGapInspector } from './api-gap-registry'
 import { debugOnce, warnNoOp, warnOnce } from './log'
-import { isOwnedEventRef, offrefAtOwner } from './event-system'
+import { createEventSurface, isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
 import { createEmbedRegistryShim } from './embed-registry'
 import { closingMarkType } from '../../editor/token-class-node-prop'
@@ -1209,8 +1209,12 @@ export function installObsidianGlobals(): void {
   // Many plugins and libraries (like obsidian-daily-notes-interface) access it directly.
   if (!(window as unknown as { app?: unknown }).app) {
     let stubRenderContext: { onOpenNote?: (p: string) => void } | null = null
+    // Both registries are Events in Obsidian (change / changed); plugins subscribe directly.
+    const internalPluginEvents = createEventSurface()
+    const pluginEvents = createEventSurface()
     ;(window as unknown as { app: Record<string, unknown> }).app = {
       internalPlugins: {
+        ...internalPluginEvents,
         plugins: {
           'daily-notes': { enabled: true, instance: { options: { format: 'YYYY-MM-DD', folder: '', template: '' } } },
           'templates': { enabled: false, instance: { options: { folder: '' } } },
@@ -1264,6 +1268,7 @@ export function installObsidianGlobals(): void {
         },
       },
       plugins: {
+        ...pluginEvents,
         plugins: {} as Record<string, unknown>,
         // Obsidian keys this by plugin id to the *manifest*, not the instance —
         // `app.plugins.manifests[id].version` is how plugins read each other's
@@ -1281,11 +1286,13 @@ export function installObsidianGlobals(): void {
           if (manifest) {
             (this as { manifests: Record<string, unknown> }).manifests[id] = manifest
           }
+          pluginEvents.trigger('changed')
         },
         unregisterPlugin(id: string) {
           delete (this as { plugins: Record<string, unknown> }).plugins[id]
           delete (this as { manifests: Record<string, unknown> }).manifests[id]
           ;(this as { enabledPlugins: Set<string> }).enabledPlugins.delete(id)
+          pluginEvents.trigger('changed')
         },
       },
       vault: {},

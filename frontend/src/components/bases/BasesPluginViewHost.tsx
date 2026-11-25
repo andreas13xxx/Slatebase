@@ -19,7 +19,7 @@ import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseView } from '@slatebase/shared-contracts'
 import { getBasesViewRegistrationWithOwner } from '../../plugins/compat/bases-view-registry'
 import { BasesQueryController, type DrivableBasesView } from '../../plugins/compat/bases-query-controller'
-import { warnOnce } from '../../plugins/compat/log'
+import { errorOnce, warnOnce } from '../../plugins/compat/log'
 import { withPluginContext } from '../../plugins/compat/plugin-execution-context'
 
 export interface BasesPluginViewHostProps {
@@ -169,6 +169,8 @@ export function BasesPluginViewHost({
       })
       void controller.start()
     } catch (err) {
+      // The banner carries only the message; the stack is what tells which plugin line threw.
+      errorOnce(`bases-plugin-view:${view.type}`, `Bases plugin view "${view.type}" failed to start:`, err)
       onError(err instanceof Error ? err.message : 'Die Plugin-View ist fehlgeschlagen.')
     }
 
