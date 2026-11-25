@@ -3,6 +3,7 @@ import {
   registerHoverLinkSource,
   unregisterHoverLinkSource,
   getHoverLinkSources,
+  getSeenHoverSourceIds,
   requestHoverPreview,
   dismissHoverPreview,
   onHoverPreview,
@@ -20,6 +21,15 @@ describe('hover-link-bus', () => {
       registerHoverLinkSource('kanban', { display: 'Kanban board' })
 
       expect(getHoverLinkSources()).toEqual([{ id: 'kanban', display: 'Kanban board', defaultMod: false }])
+    })
+
+    it('records sources that were never declared, once declared ones are left out', () => {
+      registerHoverLinkSource('declared')
+      requestHoverPreview({ linkPath: 'a.md', targetEl: document.createElement('div'), source: 'declared' })
+      requestHoverPreview({ linkPath: 'a.md', targetEl: document.createElement('div'), source: 'tasknotes-task-card' })
+      requestHoverPreview({ linkPath: 'a.md', targetEl: document.createElement('div'), source: 'internal-link' })
+
+      expect(getSeenHoverSourceIds()).toEqual(['tasknotes-task-card'])
     })
 
     it('records whether a source needs Ctrl by default', () => {

@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { useTranslation, translateNow } from '../../i18n'
 import { useAppContext } from '../../state'
 import { extractErrorMessage } from '../../utils/error'
-import { getHoverLinkSources } from '../../plugins/compat/hover-link-bus'
+import { getHoverLinkSources, getSeenHoverSourceIds } from '../../plugins/compat/hover-link-bus'
 import { PAGE_PREVIEW_SOURCES } from '../../state/pagePreviewSources'
 import {
   pagePreviewRequiresMod,
@@ -39,6 +39,9 @@ export function PagePreviewSection() {
     ...getHoverLinkSources()
       .filter((source) => !builtIn.has(source.id))
       .map((source) => ({ key: source.id, label: source.display })),
+    ...getSeenHoverSourceIds()
+      .filter((id) => !builtIn.has(id))
+      .map((id) => ({ key: id, label: id })),
   ]
 
   const change = async (key: string, value: boolean): Promise<void> => {

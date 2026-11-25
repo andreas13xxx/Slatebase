@@ -16,6 +16,7 @@
 import { useSyncExternalStore } from 'react'
 import type { IApiClient } from '../api'
 import { getHoverLinkSources } from '../plugins/compat/hover-link-bus'
+import { PAGE_PREVIEW_SOURCES } from './pagePreviewSources'
 
 /** Path of the file, as reported by `vault:change` events. */
 export const PAGE_PREVIEW_CONFIG_PATH = '.obsidian/page-preview.json'
@@ -51,12 +52,20 @@ export function pagePreviewKey(source: string): string {
   return source === INTERNAL_LINK_SOURCE ? PREVIEW_SOURCE_KEY : source
 }
 
-/** Whether previews of this source need Ctrl (Cmd) held. */
+/**
+ * Whether previews of this source need Ctrl (Cmd) held. Order: the file's own entry; a registered
+ * source's `defaultMod`; a built-in source hovers alone; any other source a plugin triggers
+ * (`hover-link` accepts any `source`, TaskNotes uses `tasknotes-task-card`) follows the "Vorschau"
+ * entry, since such previews are the same kind as those of rendered links.
+ */
 export function pagePreviewRequiresMod(source: string): boolean {
   const key = pagePreviewKey(source)
   const stored = fileFields[key]
   if (typeof stored === 'boolean') return stored
-  return getHoverLinkSources().find((entry) => entry.id === key)?.defaultMod ?? false
+  const registered = getHoverLinkSources().find((entry) => entry.id === key)
+  if (registered) return registered.defaultMod
+  if (PAGE_PREVIEW_SOURCES.some((entry) => entry.id === key)) return false
+  return fileFields[PREVIEW_SOURCE_KEY] === true
 }
 
 /** Subscribes a component to the file; the value is a counter that changes whenever the file does. */

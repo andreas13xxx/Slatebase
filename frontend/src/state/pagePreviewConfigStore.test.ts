@@ -47,6 +47,18 @@ describe('pagePreviewConfigStore', () => {
     expect(pagePreviewRequiresMod('tasknotes')).toBe(false)
   })
 
+  it('lets an unregistered plugin source follow the "preview" entry until the file names it', async () => {
+    client({ preview: true })
+    await setActiveVault('v1')
+    expect(pagePreviewRequiresMod('tasknotes-task-card')).toBe(true)
+    expect(pagePreviewRequiresMod('file-explorer')).toBe(false)
+
+    _reset()
+    client({ preview: true, 'tasknotes-task-card': false })
+    await setActiveVault('v1')
+    expect(pagePreviewRequiresMod('tasknotes-task-card')).toBe(false)
+  })
+
   it('writes optimistically and adopts the server copy', async () => {
     const api = client({})
     api.patchPagePreviewConfig.mockResolvedValue({ preview: true })

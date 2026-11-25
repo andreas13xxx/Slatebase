@@ -45,6 +45,7 @@ type DismissListener = () => void
 const sources = new Map<string, HoverLinkSource>()
 const requestListeners = new Set<RequestListener>()
 const dismissListeners = new Set<DismissListener>()
+const seenSources = new Set<string>()
 
 /** Declare a hover source. Mirrors `workspace.registerHoverLinkSource`. */
 export function registerHoverLinkSource(id: string, info?: { display?: string; defaultMod?: boolean }): void {
@@ -63,7 +64,16 @@ export function getHoverLinkSources(): HoverLinkSource[] {
 
 /** Ask for a preview. Ignored when nothing is listening. */
 export function requestHoverPreview(request: HoverPreviewRequest): void {
+  if (request.source !== 'internal-link') seenSources.add(request.source)
   for (const listener of requestListeners) listener(request)
+}
+
+/**
+ * Source ids that asked for a preview without being declared via `registerHoverLinkSource`
+ * (plugins may trigger `hover-link` with any `source`). Lets the settings list them too.
+ */
+export function getSeenHoverSourceIds(): string[] {
+  return [...seenSources].filter((id) => !sources.has(id))
 }
 
 /** Withdraw the current preview request. */
@@ -110,6 +120,7 @@ export function hoverLinkEventToRequest(payload: unknown): HoverPreviewRequest |
 /** Drop all state. Test-only. */
 export function resetHoverLinkBus(): void {
   sources.clear()
+  seenSources.clear()
   requestListeners.clear()
   dismissListeners.clear()
 }
