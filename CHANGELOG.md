@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.95.0](https://github.com/andreas13xxx/Slatebase/compare/v0.94.0...v0.95.0) (2026-11-25)
+
+
+### Features
+
+* **bases:** view settings dialog and TaskNotes view compat ([#451](https://github.com/andreas13xxx/Slatebase/issues/451)) ([e8a6ce5](https://github.com/andreas13xxx/Slatebase/commit/e8a6ce553820c7bf3c09a2beddde415f8fd72fec))
+* **compat:** fill undocumented Leaf, App and Workspace gaps ([#448](https://github.com/andreas13xxx/Slatebase/issues/448)) ([f156c46](https://github.com/andreas13xxx/Slatebase/commit/f156c467b771cc370605f602137d46b758c80c57))
+
+
+### Bugfixes
+
+* **compat:** implement or log silent no-ops in workspace and render shims ([#450](https://github.com/andreas13xxx/Slatebase/issues/450)) ([6eb69e6](https://github.com/andreas13xxx/Slatebase/commit/6eb69e6cb4a905c06be849f4284ad81155fb11ca))
+* **plugin-compat:** raise plugin onload timeout to 60s ([#447](https://github.com/andreas13xxx/Slatebase/issues/447)) ([61e7244](https://github.com/andreas13xxx/Slatebase/commit/61e7244241e3fa7cdc06d99fefa8949037732b7c))
+
 ## [0.94.0](https://github.com/andreas13xxx/Slatebase/compare/v0.93.0...v0.94.0) (2026-11-24)
 
 
