@@ -29,7 +29,7 @@ import { getCsrfToken } from '../../state/authContext'
 import DOMPurify from 'dompurify'
 import { recordGapRead } from './api-gap-registry'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
-import { debugLog } from './log'
+import { debugLog, warnNoOp } from './log'
 import { MenuItem, MenuSeparator } from './menu'
 import { OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
 
@@ -56,10 +56,10 @@ class FallbackComponent {
   onunload(): void {}
   addChild<T>(c: T): T { (c as { load?: () => void })?.load?.(); return c }
   removeChild<T>(c: T): T { (c as { unload?: () => void })?.unload?.(); return c }
-  register(): void {}
-  registerEvent(): void {}
+  register(): void { warnNoOp('FallbackComponent', 'register', 'The cleanup callback will never run.') }
+  registerEvent(): void { warnNoOp('FallbackComponent', 'registerEvent', 'The listener will not be removed on unload.') }
   registerInterval(id: number): number { return id }
-  registerDomEvent(..._args: unknown[]): void {}
+  registerDomEvent(..._args: unknown[]): void { warnNoOp('FallbackComponent', 'registerDomEvent', 'The listener is never attached.') }
 }
 
 class FallbackEditorSuggest {
@@ -758,6 +758,8 @@ export function registerFallbackShims(): void {
     'WorkspaceItem', 'WorkspaceParent', 'WorkspaceContainer',
     'WorkspaceTabs', 'WorkspaceRoot', 'WorkspaceSidedock', 'WorkspaceMobileDrawer',
     'WorkspaceWindow', 'WorkspaceFloating',
+    // (All real classes from view-registry.ts; these only fill in if
+    // installObsidianGlobals() has not registered them.)
   ]) {
     set(name, class WorkspaceLayoutItem {})
   }

@@ -478,12 +478,13 @@ export class AppShim implements IAppShim {
               canvas: (_leaf: unknown) => ({
                 canvas: {
                   createFileNode: (_opts: unknown) => ({
-                    setFilePath: (_path: string, _subpath?: string) => {},
-                    render: () => {},
+                    setFilePath: (_path: string, _subpath?: string) => { warnNoOp('canvas', 'createFileNode().setFilePath', 'Slatebase has no embeddable canvas node; the file is not shown.') },
+                    render: () => { warnNoOp('canvas', 'createFileNode().render', 'Slatebase has no embeddable canvas node; nothing is drawn.') },
                     containerEl: document.createElement('div'),
                   }),
+                  // Nodes created above are never attached, so there is nothing to remove.
                   removeNode: (_node: unknown) => {},
-                  setReadonly: (_readonly: boolean) => {},
+                  setReadonly: (_readonly: boolean) => { warnNoOp('canvas', 'setReadonly', 'Slatebase has no embeddable canvas to lock.') },
                 },
               }),
             },

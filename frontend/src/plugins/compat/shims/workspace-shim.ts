@@ -1,5 +1,6 @@
 import { EventSystem } from '../event-system';
 import { debugOnce, warnOnce } from '../log';
+import { goToLine } from '../../../hooks/useCursorPosition';
 import { resolveWikilinkTarget } from '../../link-resolver';
 import type { DirectoryTree } from '../../../types';
 import type { EventRef, IWorkspaceShim, TFile } from '../types';
@@ -179,6 +180,37 @@ function wrapFileExplorerView(view: FileExplorerLeafView): FileExplorerLeafView 
   }) as FileExplorerLeafView;
 }
 
+/**
+ * `setState` on the built-in synthetic views. Slatebase's tabs own the real
+ * state (open file, mode), so restoring a view state through this handle
+ * changes nothing - reported rather than silently accepted.
+ */
+async function syntheticViewSetState(): Promise<void> {
+  warnOnce(
+    'WorkspaceLeaf.view.setState',
+    '[WorkspaceShim] view.setState() on a built-in view has no effect: the open file and mode are owned by the tab, not the view.',
+  );
+}
+
+/**
+ * `setEphemeralState` on the built-in synthetic views. A `line` (0-indexed, as
+ * in Obsidian) moves the cursor of the live editor, which is what plugins use
+ * it for; scroll, cursor ranges and highlights are not applied.
+ */
+function syntheticViewSetEphemeralState(state?: unknown): void {
+  const line = (state as { line?: unknown } | null | undefined)?.line;
+  if (typeof line === 'number' && Number.isFinite(line)) {
+    goToLine(line + 1);
+    return;
+  }
+  if (state && typeof state === 'object' && Object.keys(state).length > 0) {
+    debugOnce(
+      'WorkspaceLeaf.view.setEphemeralState',
+      '[WorkspaceShim] view.setEphemeralState() only applies `line`; scroll, cursor, focus and highlight are ignored.',
+    );
+  }
+}
+
 /** Builds the (Proxy-wrapped) synthetic file-explorer view. */
 function createFileExplorerView(): FileExplorerLeafView {
   return wrapFileExplorerView({
@@ -186,9 +218,9 @@ function createFileExplorerView(): FileExplorerLeafView {
     getDisplayText: () => 'Files',
     getIcon: () => 'folder',
     getState: () => ({}),
-    setState: async () => {},
+    setState: syntheticViewSetState,
     getEphemeralState: () => ({}),
-    setEphemeralState: () => {},
+    setEphemeralState: syntheticViewSetEphemeralState,
     get containerEl() { return getFileExplorerContainerEl(); },
     get fileItems() { return createFileItemsProxy(); },
   });
@@ -467,9 +499,9 @@ export class WorkspaceShim implements IWorkspaceShim {
           getDisplayText: () => file?.basename ?? file?.name ?? 'Untitled',
           getIcon: () => 'document',
           getState: () => ({ file: file?.path ?? null, mode: 'source', source: true }),
-          setState: async () => {},
+          setState: syntheticViewSetState,
           getEphemeralState: () => ({}),
-          setEphemeralState: () => {},
+          setEphemeralState: syntheticViewSetEphemeralState,
           get containerEl() {
             return getActiveEditorContainerEl() ?? (containerElFallback ??= createMarkdownSourceViewPlaceholder());
           },
@@ -516,9 +548,9 @@ export class WorkspaceShim implements IWorkspaceShim {
       getDisplayText: () => 'New tab',
       getIcon: () => 'file',
       getState: () => ({ file: null }),
-      setState: async () => {},
+      setState: syntheticViewSetState,
       getEphemeralState: () => ({}),
-      setEphemeralState: () => {},
+      setEphemeralState: syntheticViewSetEphemeralState,
       get containerEl() {
         return getActiveEditorContainerEl() ?? (emptyContainerElFallback ??= createMarkdownSourceViewPlaceholder());
       },
@@ -598,9 +630,9 @@ export class WorkspaceShim implements IWorkspaceShim {
       getDisplayText: () => 'New tab',
       getIcon: () => 'file',
       getState: () => ({}),
-      setState: async () => {},
+      setState: syntheticViewSetState,
       getEphemeralState: () => ({}),
-      setEphemeralState: () => {},
+      setEphemeralState: syntheticViewSetEphemeralState,
       containerEl: document.createElement('div'),
       onClose: async () => {},
       onunload: () => {},
@@ -1210,8 +1242,8 @@ export class WorkspaceShim implements IWorkspaceShim {
    * section lists, not tab groups).
    */
   readonly rootSplit = new WorkspaceRoot();
-  readonly leftSplit = new WorkspaceSidedock();
-  readonly rightSplit = new WorkspaceSidedock();
+  readonly leftSplit = new WorkspaceSidedock('left');
+  readonly rightSplit = new WorkspaceSidedock('right');
 
   /** Latest pane tree from the pane-split bridge, null until the first publish. */
   private paneTree: PaneTree | null = null;

@@ -20,7 +20,7 @@ import {
   toSectionInfo,
   type MarkdownSectionInformation,
 } from './markdown-sections'
-import { errorOnce } from './log'
+import { debugOnce, errorOnce } from './log'
 
 export type { MarkdownSectionInformation }
 
@@ -80,7 +80,10 @@ export interface MarkdownPostProcessorContext {
  */
 export class MarkdownRenderChild {
   containerEl: HTMLElement
-  private _onunload: (() => void) | null = null
+  private cleanups: Array<() => void> = []
+  private children: unknown[] = []
+  private intervals: number[] = []
+  private domEvents: Array<{ el: EventTarget; type: string; cb: EventListener }> = []
 
   constructor(containerEl: HTMLElement) {
     this.containerEl = containerEl
@@ -88,9 +91,28 @@ export class MarkdownRenderChild {
 
   load(): void {}
 
+  /** Runs every registered cleanup, unloads attached children and detaches listeners/timers. */
   unload(): void {
-    if (this._onunload) {
-      this._onunload()
+    for (const id of this.intervals) clearInterval(id)
+    this.intervals = []
+    for (const { el, type, cb } of this.domEvents) el.removeEventListener(type, cb)
+    this.domEvents = []
+    for (const child of this.children) {
+      try {
+        (child as { unload?: () => void }).unload?.()
+      } catch (err) {
+        errorOnce('MarkdownRenderChild.childUnload', '[MarkdownRenderChild] A child failed to unload:', err)
+      }
+    }
+    this.children = []
+    const cleanups = this.cleanups
+    this.cleanups = []
+    for (const cb of cleanups) {
+      try {
+        cb()
+      } catch (err) {
+        errorOnce('MarkdownRenderChild.cleanup', '[MarkdownRenderChild] A cleanup callback failed:', err)
+      }
     }
   }
 
@@ -98,19 +120,38 @@ export class MarkdownRenderChild {
 
   onunload(): void {}
 
-  /** Register a callback for cleanup. */
-  register(cb: () => void): void {
-    this._onunload = cb
+  /**
+   * Attach a plugin-created child (what `ctx.addChild()` hands over): it is
+   * loaded now, unless the plugin already loaded it, and unloaded with this one.
+   */
+  addChild(child: unknown): void {
+    this.children.push(child)
+    const component = child as { _loaded?: boolean; load?: () => void }
+    if (!component._loaded) component.load?.()
   }
 
-  /** Register an event ref for auto-cleanup. */
-  registerEvent(_ref: unknown): void {}
+  /** Register a callback for cleanup. Every callback runs, not just the last. */
+  register(cb: () => void): void {
+    this.cleanups.push(cb)
+  }
+
+  /** Event refs from Slatebase emitters cannot be deregistered through this holder. */
+  registerEvent(_ref: unknown): void {
+    debugOnce(
+      'no-op::MarkdownRenderChild::registerEvent',
+      '[PluginCompat] registerEvent() on the internal render holder does not deregister the ref on unload.',
+    )
+  }
 
   /** Register a DOM event for auto-cleanup. */
-  registerDomEvent(_el: EventTarget, _type: string, _cb: EventListener): void {}
+  registerDomEvent(el: EventTarget, type: string, cb: EventListener): void {
+    el.addEventListener(type, cb)
+    this.domEvents.push({ el, type, cb })
+  }
 
   /** Register an interval for auto-cleanup. */
   registerInterval(id: number): number {
+    this.intervals.push(id)
     return id
   }
 }
@@ -325,7 +366,7 @@ export function processCodeBlocks(
       sourcePath,
       frontmatter: frontmatter ?? null,
       addChild(child: MarkdownRenderChild): void {
-        activeRenderChildren.add(child)
+        renderChild.addChild(child)
         children.push(child)
       },
       getSectionInfo(el: HTMLElement): MarkdownSectionInformation | null {
@@ -379,6 +420,8 @@ export function runPostProcessors(
     frontmatter: frontmatter ?? null,
     addChild(child: MarkdownRenderChild): void {
       activeRenderChildren.add(child)
+      const component = child as unknown as { _loaded?: boolean; load?: () => void }
+      if (!component._loaded) component.load?.()
     },
     getSectionInfo(el: HTMLElement): MarkdownSectionInformation | null {
       // Only elements inside a code-block container can be traced. Positions for

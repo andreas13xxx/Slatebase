@@ -989,8 +989,8 @@ class CodeBlockProcessorWidget extends WidgetType {
       sourcePath: this.sourcePath,
       frontmatter: null,
       addChild(child: MarkdownRenderChild): void {
-        // Track child for cleanup — widget destroy handles lifecycle
-        void child
+        // Loaded now, unloaded with the widget (destroy() unloads renderChild).
+        renderChild.addChild(child)
       },
       getSectionInfo(): null {
         return null

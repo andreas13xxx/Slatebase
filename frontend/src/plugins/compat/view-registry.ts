@@ -19,6 +19,8 @@ import { openNativeView } from './native-views'
 import { findTabHeaderEl, findTabTitleEl, findTabIconEl } from './tab-header-dom'
 import type { EventRef } from './types'
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from './api-gap-registry'
+import { debugOnce } from './log'
+import { getSidedockController, type SidedockSide } from './sidedock-bridge'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -94,7 +96,7 @@ export class ItemView {
     return this.icon
   }
 
-  /** Called when the size of this view is changed. No layout to react to here. */
+  /** Called when the size of this view is changed. Intentionally empty: plugins override it; Slatebase has no layout work to do. */
   onResize(): void {}
 
   /** Populates the pane's context menu. Plugins override to add menu items. */
@@ -494,17 +496,77 @@ export class WorkspaceContainer extends WorkspaceSplit {
 /** The main editing area's root split (`workspace.rootSplit`). */
 export class WorkspaceRoot extends WorkspaceContainer {}
 
+/** Whether the real side panel is hidden; `false` (and a one-time note) without a mounted host. */
+function isSidedockCollapsed(side: SidedockSide): boolean {
+  const host = getSidedockController()
+  if (!host) {
+    debugOnce('sidedock::no-host', '[Sidedock] No side panel host is mounted; sidedocks report "expanded" and ignore collapse/expand/toggle.')
+    return false
+  }
+  return host.isCollapsed(side)
+}
+
+/** Brings the real side panel into the requested state, toggling only when it differs. */
+function setSidedockCollapsed(side: SidedockSide, collapsed: boolean): void {
+  const host = getSidedockController()
+  if (!host) {
+    isSidedockCollapsed(side)
+    return
+  }
+  if (host.isCollapsed(side) !== collapsed) host.toggle(side)
+}
+
 /**
- * A sidebar split (`workspace.leftSplit`/`rightSplit`). Collapsing is not
- * wired to Slatebase's sidebars, so these stay no-ops and `collapsed` stays
- * `false` rather than reporting a state the UI does not show.
+ * A sidebar split (`workspace.leftSplit`/`rightSplit`), wired to Slatebase's
+ * real side panels through `sidedock-bridge.ts`: left = sidebar, right = context panel.
  */
 export class WorkspaceSidedock extends WorkspaceSplit {
-  readonly collapsed = false
-  toggle(): void {}
-  collapse(): void {}
-  expand(): void {}
+  private readonly side: SidedockSide
+
+  constructor(side: SidedockSide = 'left') {
+    super()
+    this.side = side
+  }
+
+  /** `true` while the panel is hidden. */
+  get collapsed(): boolean { return isSidedockCollapsed(this.side) }
+
+  toggle(): void { setSidedockCollapsed(this.side, !isSidedockCollapsed(this.side)) }
+  collapse(): void { setSidedockCollapsed(this.side, true) }
+  expand(): void { setSidedockCollapsed(this.side, false) }
 }
+
+/**
+ * The mobile drawer container. Slatebase's side panels already become drawers
+ * on small screens, so it controls the same panel as the sidedock of its side.
+ */
+export class WorkspaceMobileDrawer extends WorkspaceParent {
+  private readonly side: SidedockSide
+
+  constructor(side: SidedockSide = 'left') {
+    super()
+    this.side = side
+  }
+
+  /** `true` while the drawer is closed. */
+  get collapsed(): boolean { return isSidedockCollapsed(this.side) }
+
+  toggle(): void { setSidedockCollapsed(this.side, !isSidedockCollapsed(this.side)) }
+  collapse(): void { setSidedockCollapsed(this.side, true) }
+  expand(): void { setSidedockCollapsed(this.side, false) }
+}
+
+/**
+ * Floating (popout) layout group. Slatebase has no popout windows, so no
+ * instance is ever created; the class exists for `instanceof` and `extends`.
+ */
+export class WorkspaceFloating extends WorkspaceParent {}
+
+/**
+ * A popout window root. Slatebase has no popout windows, so no instance is
+ * ever created; the class exists for `instanceof` and `extends`.
+ */
+export class WorkspaceWindow extends WorkspaceContainer {}
 
 /**
  * WorkspaceLeaf — Stub for Obsidian's WorkspaceLeaf.
@@ -1128,7 +1190,18 @@ export class WorkspaceLeaf extends WorkspaceItem {
  * UI; this class exists purely so `WorkspaceShim.leftRibbon`/`rightRibbon` have
  * a correct `instanceof` identity instead of being anonymous object literals.
  */
-export class WorkspaceRibbon {}
+export class WorkspaceRibbon {
+  /**
+   * Obsidian's ribbon item list (`{ id, hidden, ... }`). Plugins iterate it to
+   * hide their own icons (TaskNotes: `for (const r of ribbon.items)`). Slatebase
+   * keeps plugin icons in the toolbar store, so the list is empty here — but it
+   * must exist, or `items is not iterable` aborts the plugin's onLayoutReady.
+   */
+  items: Array<{ id: string; hidden: boolean }> = [];
+
+  /** Re-render hook plugins call after mutating `items`; the toolbar needs no refresh. */
+  onChange(_changed?: boolean): void {}
+}
 
 // ─── View Registry ─────────────────────────────────────────────────────────────
 

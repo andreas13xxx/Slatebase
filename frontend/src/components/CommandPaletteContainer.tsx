@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type Dispatch } from 'react'
 import { CommandPalette } from './CommandPalette'
 import { usePluginContext } from '../plugins/compat/plugin-context'
+import { setSidedockController } from '../plugins/compat/sidedock-bridge'
 import { useFeatureContext } from '../state/featureContext'
 import { openPublicShareDialog } from '../public-share/publicShareEvents'
 import { useTabContext } from '../state/tabContext'
@@ -515,6 +516,18 @@ export function CommandPaletteContainer({
     registerCoreAppCommands(commandRegistry, () => coreHandlersRef.current, locale)
   }, [commandRegistry, locale])
 
+  // Plugins read and flip the side panels through `workspace.leftSplit`/`rightSplit`;
+  // the handlers ref always holds the current visibility and toggles.
+  useEffect(() => {
+    setSidedockController({
+      isCollapsed: (side) => !(side === 'left' ? coreHandlersRef.current.showSidebar : coreHandlersRef.current.showRightPanel),
+      toggle: (side) => {
+        if (side === 'left') coreHandlersRef.current.onToggleSidebar()
+        else coreHandlersRef.current.onToggleRightPanel()
+      },
+    })
+    return () => setSidedockController(null)
+  }, [])
   // ─── Open-in-split bridge (Ctrl/Cmd+Alt+click from any open surface) ─────────
   // A ref keeps the latest pane tree + wiring without re-subscribing on every
   // render; the subscription itself is mounted once.
