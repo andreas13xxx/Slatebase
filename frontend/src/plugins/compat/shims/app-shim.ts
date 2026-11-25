@@ -44,6 +44,7 @@ import { debugOnce, warnNoOp, warnOnce } from '../log';
 import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
 import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
+import { createAppInternals } from '../app-internals';
 import { resolveActiveTheme } from '../body-classes';
 import { getRegisteredExtensionTypeMap } from '../file-view-registry';
 import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
@@ -849,6 +850,17 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * Saves binary data as an attachment, at the path the vault's attachment setting dictates
+   * (`fileManager.getAvailablePathForAttachment`, which also picks a free name). Obsidian
+   * resolves with the created file.
+   */
+  async saveAttachment(name: string, extension: string, data: ArrayBuffer): Promise<unknown> {
+    const filename = extension ? `${name}.${extension}` : name;
+    const path = await this.fileManager.getAvailablePathForAttachment(filename);
+    return this.vault.createBinary(path, data);
+  }
+
+  /**
    * Obsidian's startup hook (undocumented): called once after the layout is restored, it opens
    * the default view. Plugins replace it to take over startup (Homepage: `app.runOpeningBehavior = …`).
    * The slot is shared by all plugins' AppShims — each has its own instance, but there is one
@@ -986,7 +998,9 @@ export class AppShim implements IAppShim {
    * @returns The Proxy-wrapped instance
    */
   static wrapWithProxy(instance: AppShim): AppShim & Record<string, unknown> {
+    const internals = createAppInternals();
     const emulatedProperties = new Set<string | symbol>([
+      'saveAttachment',
       'vault',
       'workspace',
       'metadataCache',
@@ -1025,6 +1039,10 @@ export class AppShim implements IAppShim {
 
     return new Proxy(instance, {
       get(target: AppShim, prop: string | symbol): unknown {
+        // Internal members shared with the `window.app` stub (app-internals.ts).
+        if (typeof prop === 'string' && Object.hasOwn(internals, prop)) {
+          return Reflect.get(internals, prop, internals);
+        }
         // Allow access to emulated properties directly. `target` (not the
         // Proxy) is passed as the receiver so getters run with `this` bound
         // to the real instance — see WorkspaceShim.wrapWithProxy for why a
