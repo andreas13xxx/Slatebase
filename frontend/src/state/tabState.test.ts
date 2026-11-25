@@ -372,7 +372,7 @@ describe('tabReducer', () => {
           { tabs: [createTab('v1', name, name, { loading: true })], activeTabId: `v1::${name}` },
           { type: 'TAB_CONTENT_LOADED', payload: { tabId: `v1::${name}`, content: 'x', isBinary } },
         ).tabs[0]!.mode
-      expect(open('a.md')).toBe('source')
+      expect(open('a.md')).toBe('live-preview')
       expect(open('a.txt')).toBe('reading')
       expect(open('image.png', true)).toBe('reading')
       expect(open('__local-graph::a.md')).toBe('reading')
@@ -383,6 +383,19 @@ describe('tabReducer', () => {
         { type: 'TAB_CONTENT_LOADED', payload: { tabId: 'v1::a.md', content: 'new', isBinary: false } },
       )
       expect(reloaded.tabs[0]!.mode).toBe('reading')
+      resetAppConfig()
+    })
+
+    it('opens a note in source mode when app.json says livePreview false', async () => {
+      resetAppConfig()
+      initializeAppConfig({ getAppConfig: async () => ({ defaultViewMode: 'source', livePreview: false }) } as unknown as IApiClient)
+      await setActiveVault('v1')
+      const { tabs } = tabReducer(
+        { tabs: [createTab('v1', 'a.md', 'a.md', { loading: true })], activeTabId: 'v1::a.md' },
+        { type: 'TAB_CONTENT_LOADED', payload: { tabId: 'v1::a.md', content: 'x', isBinary: false } },
+      )
+      expect(tabs[0]!.mode).toBe('source')
+      expect(tabs[0]!.lastEditMode).toBe('source')
       resetAppConfig()
     })
 

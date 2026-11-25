@@ -42,9 +42,17 @@ export function migratePersistedMode(value: unknown): TabMode | null {
   }
 }
 
+/**
+ * The vault's default editing mode (`livePreview` in `app.json`): Live Preview unless the file says
+ * `false`, which is Obsidian's "Source mode" choice. An absent key means Live Preview, as in Obsidian.
+ */
+export function defaultEditMode(): EditTabMode {
+  return getAppConfigFileValue('livePreview') === false ? 'source' : 'live-preview'
+}
+
 /** The editable mode a reading↔edit toggle should return to, derived from a mode. */
 export function editModeFor(mode: TabMode): EditTabMode {
-  return mode === 'reading' ? 'live-preview' : mode
+  return mode === 'reading' ? defaultEditMode() : mode
 }
 
 /** A single open tab entry with its associated state. */
@@ -155,7 +163,7 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
         fileName,
         icon,
         mode: 'reading', // default, will be confirmed on TAB_CONTENT_LOADED
-        lastEditMode: 'live-preview',
+        lastEditMode: defaultEditMode(),
         isBinary: false,
         content: '',
         editBuffer: null,
@@ -263,10 +271,11 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
             content,
             isBinary,
             // Initial mode: a note opened for the first time follows the vault's `defaultViewMode`
-            // (`source` → source editor, anything else → reading view), but only when it is the
-            // note's first load. A reload, and every other kind of tab (graph, plugin views,
-            // non-Markdown files), keeps the reading view.
-            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'reading',
+            // (`source` → the editor in the vault's default editing mode, `livePreview`; anything else
+            // → reading view), but only when it is the note's first load. A reload, and every other
+            // kind of tab (graph, plugin views, non-Markdown files), keeps the reading view.
+            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') === 'source' ? defaultEditMode() : 'reading',
+            lastEditMode: tab.loading && tab.content === '' ? defaultEditMode() : tab.lastEditMode,
             loading: false,
             error: null,
           }
