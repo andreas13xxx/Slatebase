@@ -20,6 +20,13 @@ import {
   refreshAppConfig,
   setActiveVault as setActiveAppConfigVault,
 } from '../state/vaultAppConfigStore'
+import {
+  PAGE_PREVIEW_CONFIG_PATH,
+  disconnect as disconnectPagePreviewConfig,
+  initialize as initializePagePreviewConfig,
+  refreshPagePreviewConfig,
+  setActiveVault as setActivePagePreviewVault,
+} from '../state/pagePreviewConfigStore'
 
 export function AppConfigLifecycle(): null {
   const { state, apiClient } = useAppContext()
@@ -27,19 +34,26 @@ export function AppConfigLifecycle(): null {
 
   useEffect(() => () => {
     disconnectAppConfig()
+    disconnectPagePreviewConfig()
     disconnectVaultSecretStorages()
   }, [])
 
   useEffect(() => {
-    if (apiClient) initializeAppConfig(apiClient)
+    if (apiClient) {
+      initializeAppConfig(apiClient)
+      initializePagePreviewConfig(apiClient)
+    }
   }, [apiClient])
 
   useEffect(() => {
     if (!apiClient) return
     void setActiveAppConfigVault(vaultId)
+    void setActivePagePreviewVault(vaultId)
     if (!vaultId) return
     return onRealtimeVaultChange((event) => {
-      if (event.vaultId === vaultId && event.path === APP_CONFIG_PATH) void refreshAppConfig(vaultId)
+      if (event.vaultId !== vaultId) return
+      if (event.path === APP_CONFIG_PATH) void refreshAppConfig(vaultId)
+      if (event.path === PAGE_PREVIEW_CONFIG_PATH) void refreshPagePreviewConfig(vaultId)
     })
   }, [apiClient, vaultId])
 

@@ -35,7 +35,7 @@ describe('Plugin.registerHoverLinkSource', () => {
 
     plugin.registerHoverLinkSource('kanban', { display: 'Kanban board' })
 
-    expect(getHoverLinkSources()).toEqual([{ id: 'kanban', display: 'Kanban board' }])
+    expect(getHoverLinkSources()).toEqual([{ id: 'kanban', display: 'Kanban board', defaultMod: false }])
   })
 
   it('withdraws the source again', () => {

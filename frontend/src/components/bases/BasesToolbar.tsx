@@ -10,11 +10,12 @@
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X, ListFilter, Settings } from 'lucide-react'
+import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Plus, Search, X, ListFilter, Settings } from 'lucide-react'
 import { rowValueKey } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause, BaseView } from '@slatebase/shared-contracts'
 import { useTranslation, translateNow } from '../../i18n'
 import { ColumnTypeIcon } from './base-column-icon'
+import { ViewTypeIcon } from './ViewTypeIcon'
 import { BasesViewOptionsDialog } from './BasesViewOptionsDialog'
 import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
@@ -775,7 +776,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
     : allTypeOptions
 
   return (
-    <Popover label={<><Table2 aria-hidden="true" className="bases-tb__btn-icon" />{active?.name ?? t('basesToolbar.viewFallback')}</>} title={t('basesToolbar.views')}>
+    <Popover label={<><ViewTypeIcon type={active?.type ?? 'table'} className="bases-tb__btn-icon" />{active?.name ?? t('basesToolbar.viewFallback')}</>} title={t('basesToolbar.views')}>
       <div className="bases-tb__section">
         <ul className="bases-tb__list" aria-label={t('basesToolbar.views')}>
           {doc.views.map((v, i) => {
@@ -810,7 +811,7 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
                   aria-current={i === activeIndex ? 'true' : undefined}
                   onClick={() => { setConfirmDelete(false); onSelectView(i) }}
                 >
-                  <span>{label}</span>
+                  <span className="bases-tb__view-name"><ViewTypeIcon type={v.type} className="bases-tb__btn-icon" />{label}</span>
                   <span className="bases-tb__type">{viewTypeLabel(v.type)}</span>
                 </button>
                 <button

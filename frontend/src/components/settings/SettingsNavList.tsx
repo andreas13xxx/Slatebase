@@ -13,7 +13,7 @@ import {
   ChevronDown, ChevronRight, UserCircle, Archive, ShieldCheck, User, KeyRound, Shield,
   MonitorSmartphone, Bot, Share2, Keyboard, Palette, UserX, Puzzle, FolderCog,
   FileText, Lock, Paintbrush, Code, GitBranch, Mail, Server, Users, Database,
-  ToggleRight, Power,
+  ToggleRight, Power, Eye,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { SettingsAction, SettingsCategory, SettingsSection } from '../../state/settingsState'
@@ -57,6 +57,7 @@ const SECTION_ICONS: Record<SettingsSection, LucideIcon> = {
   'plugins': Puzzle,
   'vault-config': FolderCog,
   'editor-files': FileText,
+  'page-preview': Eye,
   'keychain': Lock,
   'themes': Paintbrush,
   'css-snippets': Code,

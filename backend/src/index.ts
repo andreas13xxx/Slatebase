@@ -122,6 +122,8 @@ import { createHotkeysConfigRoutes } from './api/hotkeysConfigRoutes.js'
 import { createWorkspacesConfigRoutes } from './api/workspacesConfigRoutes.js'
 import { WorkspacesConfigService } from './obsidian-config/workspaces-config.js'
 import { HotkeysConfigService } from './obsidian-config/hotkeys-config.js'
+import { createPagePreviewConfigRoutes } from './api/pagePreviewConfigRoutes.js'
+import { PagePreviewConfigService } from './obsidian-config/page-preview-config.js'
 import { BookmarksConfigService } from './obsidian-config/bookmarks-config.js'
 import { GitSyncConfigStore, GitSyncStatusStore, GitCli, GitSyncEngine, GitSyncScheduler, SshKeyGenerator, SyncSideEffects } from './git-sync/index.js'
 import { createGitSyncRoutes } from './api/gitSyncRoutes.js'
@@ -841,6 +843,8 @@ const bookmarksConfigService = new BookmarksConfigService(appConfigDeviationRepo
 app.route('/api/v1/vaults/:vaultId/bookmarks-config', createBookmarksConfigRoutes({ bookmarksConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 const hotkeysConfigService = new HotkeysConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/hotkeys-config', createHotkeysConfigRoutes({ hotkeysConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
+const pagePreviewConfigService = new PagePreviewConfigService()
+app.route('/api/v1/vaults/:vaultId/page-preview-config', createPagePreviewConfigRoutes({ pagePreviewConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 const workspacesConfigService = new WorkspacesConfigService(appConfigDeviationReporter)
 app.route('/api/v1/vaults/:vaultId/workspaces-config', createWorkspacesConfigRoutes({ workspacesConfigService, accessControl: vaultAccessControl, vaultRegistry, eventBus, logger }))
 

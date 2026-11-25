@@ -8,6 +8,7 @@ import { resolveIconMarkupSync } from '../plugins/compat/lucide-icons'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { buildTabContextMenuItems } from './tab-context-menu'
 import { useLongPress } from '../hooks/useLongPress'
+import { hoverPreviewProps } from './hoverPreviewTrigger'
 import { useTouchTabDrag, type TouchTabDropTarget } from '../hooks/useTouchTabDrag'
 import { PaneTreeContext } from '../state/paneTreeContext'
 import { listPanes } from '../state/paneTreeState'
@@ -295,6 +296,7 @@ export function TabBar({ settingsTabs, isShowingSettings, onActivateFileTab, pan
             onClick={() => handleActivate(tab.id)}
             onContextMenu={(e) => handleTabContextMenu(e, index)}
             {...longPress}
+            {...(isGraphTab ? {} : hoverPreviewProps('tab-header', tab.filePath))}
             onPointerDown={(e) => { longPress.onPointerDown(e); touchDrag.onPointerDown(e, index) }}
             onPointerMove={(e) => { longPress.onPointerMove(e); touchDrag.onPointerMove(e) }}
             onPointerUp={(e) => { longPress.onPointerUp(); touchDrag.onPointerUp(e) }}

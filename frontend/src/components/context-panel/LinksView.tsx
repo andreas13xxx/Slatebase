@@ -13,6 +13,7 @@
 
 import { useState, useCallback, type ReactNode } from 'react'
 import { useLongPress } from '../../hooks/useLongPress'
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import { FileText, FolderOpen, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTranslation, translateNow } from '../../i18n'
 import type { LinkEntry, UnlinkedMentionEntry } from '../../state/documentPanelData'
@@ -224,6 +225,7 @@ function LinkItem({ link, onLinkClick }: LinkItemProps) {
           onClick={() => onLinkClick(openPath, true)}
           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
           {...longPress}
+          {...hoverPreviewProps('search', link.path)}
           title={openPath}
           type="button"
         >
@@ -282,6 +284,7 @@ function UnlinkedMentionItem({ entry, onClick, onLinkMention }: UnlinkedMentionI
         onClick={() => onClick(entry.filePath)}
         onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
         {...longPress}
+        {...hoverPreviewProps('search', entry.filePath)}
         title={entry.filePath}
         type="button"
       >

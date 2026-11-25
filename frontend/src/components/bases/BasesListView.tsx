@@ -13,6 +13,7 @@
  * already-fetched, already-sorted `rows`.
  */
 
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import { useTranslation } from '../../i18n'
 import { Fragment, memo, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
@@ -120,6 +121,7 @@ export const BasesListView = memo(function BasesListView({
               type="button"
               className="bases-list__entry"
               onClick={() => onOpenNote(row.path)}
+              {...hoverPreviewProps('bases', row.path)}
             >
               <span className="bases-list__title">{row.fileName}</span>
               {detailColumns.length > 0 && (

@@ -22,6 +22,7 @@ export const SECTION_LABELS: Record<SettingsSection, string> = {
   get 'plugins'() { return translateNow('commonUi.c_sl_plugins') },
   get 'vault-config'() { return translateNow('commonUi.c_sl_vault_config') },
   get 'editor-files'() { return translateNow('commonUi.c_sl_editor_files') },
+  get 'page-preview'() { return translateNow('commonUi.c_sl_page_preview') },
   get 'keychain'() { return translateNow('commonUi.c_sl_keychain') },
   get 'themes'() { return translateNow('commonUi.c_sl_themes') },
   get 'css-snippets'() { return translateNow('commonUi.c_sl_css_snippets') },

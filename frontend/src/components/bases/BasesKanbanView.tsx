@@ -14,6 +14,7 @@
  * their note. Editing other properties stays in the table view and the note.
  */
 
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import { useTranslation } from '../../i18n'
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { CSSProperties, DragEvent } from 'react'
@@ -382,6 +383,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
                     onDragEnd={draggable ? handleDragEnd : undefined}
                     onClick={() => onOpenNote(row.path)}
                     onContextMenu={(e) => openMenu(e, row.path)}
+                    {...hoverPreviewProps('bases', row.path)}
                   >
                     {coverFor(row)}
                     <span className="bases-kanban__card-title">{row.fileName}</span>

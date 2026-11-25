@@ -1197,7 +1197,7 @@ export class WorkspaceShim implements IWorkspaceShim {
    */
   registerHoverLinkSource(key: string, source: unknown): void {
     const info = typeof source === 'object' && source !== null
-      ? (source as { display?: string })
+      ? (source as { display?: string; defaultMod?: boolean })
       : undefined;
     registerHoverLinkSource(key, info);
   }
@@ -1214,10 +1214,10 @@ export class WorkspaceShim implements IWorkspaceShim {
    * unregisterHoverLinkSource() above; this getter just exposes the current
    * state of that same registry (hover-link-bus.ts).
    */
-  get hoverLinkSources(): Record<string, { display: string }> {
-    const out: Record<string, { display: string }> = {};
+  get hoverLinkSources(): Record<string, { display: string; defaultMod: boolean }> {
+    const out: Record<string, { display: string; defaultMod: boolean }> = {};
     for (const source of getHoverLinkSources()) {
-      out[source.id] = { display: source.display };
+      out[source.id] = { display: source.display, defaultMod: source.defaultMod };
     }
     return out;
   }

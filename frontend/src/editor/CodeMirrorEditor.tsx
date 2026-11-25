@@ -36,7 +36,7 @@ import { getEditorState, saveEditorState, editorHistoryExtension } from './state
 import { registerSyncView, unregisterSyncView, broadcastChanges, remoteSync } from './doc-sync-registry'
 import { applyFormatting as applyFormattingAction } from './formatting'
 import { inlineTitleExtension, type InlineTitleOptions } from './inline-title'
-import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, createLinkContextMenuHandler, type LivePreviewOptions } from './live-preview'
+import { createLivePreviewCompartmentExtension, createLivePreviewField, createLivePreviewClickHandler, createLinkContextMenuHandler, createLinkHoverPreviewHandler, type LivePreviewOptions } from './live-preview'
 import { warnOnce } from '../plugins/compat/log'
 import { setActiveEditorView, clearActiveEditorView, setActiveEditorContainerEl, getActivePluginExtensions, getActivePluginCompletions } from './plugin-extensions'
 import { editorInfoField, editorEditorField, editorLivePreviewField, livePreviewStateTracker } from './editor-state-fields'
@@ -795,7 +795,7 @@ export function CodeMirrorEditor({
     view.dispatch({
       effects: livePreviewCompartment.current.reconfigure(
         effectiveLivePreview
-          ? [createLivePreviewField(options), createLivePreviewClickHandler(options), createLinkContextMenuHandler(options)]
+          ? [createLivePreviewField(options), createLivePreviewClickHandler(options), createLinkContextMenuHandler(options), createLinkHoverPreviewHandler(options)]
           : []
       ),
     })

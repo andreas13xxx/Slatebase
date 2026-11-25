@@ -26,6 +26,8 @@ export interface HoverPreviewRequest {
   source: string
   /** Path of the note the link appears in, when known. */
   sourcePath?: string
+  /** Show only the section under this heading instead of the whole note. */
+  heading?: string
 }
 
 /** A hover source declared via `registerHoverLinkSource`. */
@@ -33,6 +35,8 @@ export interface HoverLinkSource {
   id: string
   /** Human-readable label Obsidian shows in its preview settings. */
   display: string
+  /** Whether the preview needs Ctrl (Cmd) held until the vault's page-preview.json says otherwise. */
+  defaultMod: boolean
 }
 
 type RequestListener = (request: HoverPreviewRequest) => void
@@ -41,10 +45,11 @@ type DismissListener = () => void
 const sources = new Map<string, HoverLinkSource>()
 const requestListeners = new Set<RequestListener>()
 const dismissListeners = new Set<DismissListener>()
+const seenSources = new Set<string>()
 
 /** Declare a hover source. Mirrors `workspace.registerHoverLinkSource`. */
-export function registerHoverLinkSource(id: string, info?: { display?: string }): void {
-  sources.set(id, { id, display: info?.display ?? id })
+export function registerHoverLinkSource(id: string, info?: { display?: string; defaultMod?: boolean }): void {
+  sources.set(id, { id, display: info?.display ?? id, defaultMod: info?.defaultMod === true })
 }
 
 /** Withdraw a previously declared source. */
@@ -59,7 +64,16 @@ export function getHoverLinkSources(): HoverLinkSource[] {
 
 /** Ask for a preview. Ignored when nothing is listening. */
 export function requestHoverPreview(request: HoverPreviewRequest): void {
+  if (request.source !== 'internal-link') seenSources.add(request.source)
   for (const listener of requestListeners) listener(request)
+}
+
+/**
+ * Source ids that asked for a preview without being declared via `registerHoverLinkSource`
+ * (plugins may trigger `hover-link` with any `source`). Lets the settings list them too.
+ */
+export function getSeenHoverSourceIds(): string[] {
+  return [...seenSources].filter((id) => !sources.has(id))
 }
 
 /** Withdraw the current preview request. */
@@ -106,6 +120,7 @@ export function hoverLinkEventToRequest(payload: unknown): HoverPreviewRequest |
 /** Drop all state. Test-only. */
 export function resetHoverLinkBus(): void {
   sources.clear()
+  seenSources.clear()
   requestListeners.clear()
   dismissListeners.clear()
 }

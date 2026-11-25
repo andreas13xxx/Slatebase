@@ -163,3 +163,27 @@ export class EventSystem implements IEventEmitter {
     return list.some(entry => entry.id === id);
   }
 }
+
+/** The `Events` surface (`on`/`off`/`offref`/`trigger`) as a plain object, for registries that are not classes. */
+export interface EventSurface {
+  on(event: string, callback: (...args: unknown[]) => void, context?: unknown): EventRef;
+  off(event: string, callback: (...args: unknown[]) => void): void;
+  offref(ref: EventRef): void;
+  trigger(event: string, ...args: unknown[]): void;
+}
+
+/**
+ * A fresh, independent event surface. Obsidian's `app.internalPlugins` and `app.plugins` are
+ * `Events` subclasses (`change` / `changed`), and plugins subscribe to them directly — TaskNotes'
+ * calendar view calls `app.internalPlugins.on('change', …)` on open. A registry object without
+ * `on` makes such a view throw before it renders anything.
+ */
+export function createEventSurface(): EventSurface {
+  const events = new EventSystem();
+  return {
+    on: (event, callback, context) => events.on(event, callback, context),
+    off: (event, callback) => events.off(event, callback),
+    offref: (ref) => events.offref(ref),
+    trigger: (event, ...args) => events.trigger(event, ...args),
+  };
+}

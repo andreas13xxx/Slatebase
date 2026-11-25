@@ -13,6 +13,7 @@ import type { MetadataSuggestApiClient } from '../suggest/metadata-complete'
 import type { IBasesEmbedApiClient } from '../../components/bases/BasesEmbed'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
 import { getAliasMapSnapshot } from '../../state/aliasStore'
+import { requestHoverPreview, dismissHoverPreview } from '../../plugins/compat/hover-link-bus'
 import { editorInfoField } from '../editor-state-fields'
 import { openExternalUrl } from '../../utils/externalUrl'
 
@@ -344,6 +345,7 @@ export function createLivePreviewCompartmentExtension(
     createLivePreviewField(options),
     createLivePreviewClickHandler(options),
     createLinkContextMenuHandler(options),
+    createLinkHoverPreviewHandler(options),
   ])
 }
 
@@ -390,6 +392,46 @@ export function createLinkContextMenuHandler(options: LivePreviewOptions): Exten
       },
     },
   )
+}
+
+/**
+ * Creates a ViewPlugin that asks for a page preview while the pointer rests on a rendered wikilink
+ * (hover source `editor`). The popover (`HoverPreview`) decides whether it shows: the vault's
+ * page-preview.json can require Ctrl for this source. A `[[Note#Heading]]` previews that section.
+ */
+export function createLinkHoverPreviewHandler(options: LivePreviewOptions): Extension {
+  return ViewPlugin.define((view) => {
+    function handleMouseover(event: MouseEvent) {
+      const link = (event.target as HTMLElement | null)?.closest('.cm-lp-wikilink') as HTMLElement | null
+      const raw = link?.getAttribute('data-target')
+      if (!link || !raw) return
+      const hash = raw.indexOf('#')
+      const note = hash === -1 ? raw : raw.slice(0, hash)
+      const heading = hash === -1 ? '' : raw.slice(hash + 1)
+      if (!note) return
+      const path = resolveWikilinkTarget(note, options.directoryTree, undefined, getAliasMapSnapshot())
+      if (!path) return
+      requestHoverPreview({
+        linkPath: path,
+        targetEl: link,
+        source: 'editor',
+        ...(heading && !heading.startsWith('^') ? { heading } : {}),
+      })
+    }
+    function handleMouseout(event: MouseEvent) {
+      if ((event.target as HTMLElement | null)?.closest('.cm-lp-wikilink')) dismissHoverPreview()
+    }
+
+    view.dom.addEventListener('mouseover', handleMouseover)
+    view.dom.addEventListener('mouseout', handleMouseout)
+
+    return {
+      destroy() {
+        view.dom.removeEventListener('mouseover', handleMouseover)
+        view.dom.removeEventListener('mouseout', handleMouseout)
+      }
+    }
+  })
 }
 
 /**

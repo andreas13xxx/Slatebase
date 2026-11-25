@@ -243,6 +243,7 @@ export function SidePanel({
               onHeadingJump={documentPanel.onHeadingJump}
               onHeadingFoldToggle={documentPanel.onHeadingFold}
               hasDocument={documentPanel.hasDocument}
+              documentPath={documentPanel.activeFilePath}
             />
           </div>
         )

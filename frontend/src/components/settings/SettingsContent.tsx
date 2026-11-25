@@ -30,6 +30,7 @@ import { GitSyncSection } from './GitSyncSection'
 import { MailImportSection } from './MailImportSection'
 import { KeychainSection } from './KeychainSection'
 import { EditorFilesSection } from './EditorFilesSection'
+import { PagePreviewSection } from './PagePreviewSection'
 import { PublicSharesSection } from '../../public-share/PublicSharesSection'
 import { KeybindingsSection } from './KeybindingsSection'
 import { AppearanceSection } from './AppearanceSection'
@@ -152,6 +153,8 @@ function renderSection(
       return <VaultConfigSection apiClient={apiClient} vaultId={selectedVaultId} />
     case 'editor-files':
       return <EditorFilesSection />
+    case 'page-preview':
+      return <PagePreviewSection />
     case 'keychain':
       return <KeychainSection />
     case 'themes':

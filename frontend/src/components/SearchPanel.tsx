@@ -5,6 +5,7 @@ import { useAppContext } from '../state'
 import { useTranslation } from '../i18n'
 import { performSearch, performMultiVaultSearch, performReplace, performSingleReplace } from '../state/searchActions'
 import { ConfirmModal } from './ConfirmModal'
+import { hoverPreviewProps } from './hoverPreviewTrigger'
 import { highlightSearchQuery } from './search-operator-highlight'
 import { SearchOperatorHelp } from './SearchOperatorHelp'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
@@ -806,6 +807,7 @@ function SearchFileGroup({
           onClick={() => setExpanded(prev => !prev)}
           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
           {...longPress}
+          {...(isActiveVault ? hoverPreviewProps('search', fileResult.filePath) : {})}
           title={fileResult.filePath}
           aria-expanded={expanded}
         >
