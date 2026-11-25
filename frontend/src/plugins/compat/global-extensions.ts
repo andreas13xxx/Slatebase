@@ -329,11 +329,14 @@ if (!('setChildrenInPlace' in Node.prototype)) {
  * also on events). Slatebase has a single window, so a plain `instanceof`
  * is correct; the prototype-name walk covers objects from another realm.
  */
-function instanceOfImpl(this: object, type: { name?: string; prototype?: object }): boolean {
+function instanceOfImpl(this: object, type: unknown): boolean {
+  // Arrow functions have no `prototype`, and `instanceof` would throw on them.
   if (typeof type !== 'function') return false
+  const ctor = type as { name?: string; prototype?: unknown }
+  if (typeof ctor.prototype !== 'object' || ctor.prototype === null) return false
   if (this instanceof (type as new () => unknown)) return true
   for (let p: object | null = Object.getPrototypeOf(this); p; p = Object.getPrototypeOf(p)) {
-    if (p.constructor?.name === type.name) return true
+    if (p.constructor?.name === ctor.name) return true
   }
   return false
 }

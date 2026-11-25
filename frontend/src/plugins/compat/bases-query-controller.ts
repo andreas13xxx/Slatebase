@@ -99,6 +99,8 @@ export class BasesQueryController {
   private unsubscribe: (() => void) | null = null
   private declaredTypes: Map<string, PropertyType> = new Map()
   private stopped = false
+  /** Notes whose prefetch read failed; not retried on every refresh. */
+  private readonly unreadable = new Set<string>()
 
   constructor(opts: {
     apiClient: IApiClient
@@ -208,7 +210,7 @@ export class BasesQueryController {
     if (!vault?.getFileByPath || !vault.read || !cache?.getCache) return
     const pending = rows
       .slice(0, PREFETCH_MAX_ROWS)
-      .filter((r) => r.path.toLowerCase().endsWith('.md') && !cache.getCache?.(r.path))
+      .filter((r) => r.path.toLowerCase().endsWith('.md') && !this.unreadable.has(r.path) && !cache.getCache?.(r.path))
     if (pending.length === 0) return
     let learned = 0
     let next = 0
@@ -221,7 +223,8 @@ export class BasesQueryController {
           await vault.read?.(file)
           learned++
         } catch {
-          // An unreadable note simply keeps an empty cache entry.
+          // An unreadable note keeps an empty cache entry and is not retried.
+          this.unreadable.add(row.path)
         }
       }
     }
@@ -314,6 +317,7 @@ export class BasesQueryController {
       const type = this.declaredTypes.get(key) ?? this.declaredTypes.get(bare)
       if (list.length > 1 || type === 'list' || type === 'tags') props[bare] = list
       else if (type === 'number' && list[0] !== undefined && list[0].trim() !== '' && Number.isFinite(Number(list[0]))) props[bare] = Number(list[0])
+      else if (type === 'checkbox' && (list[0] === 'true' || list[0] === 'false')) props[bare] = list[0] === 'true'
       else props[bare] = list[0]
     }
     return props

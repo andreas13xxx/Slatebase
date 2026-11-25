@@ -61,6 +61,15 @@ describe('BasesViewOptionsDialog', () => {
     expect(getViewOption(update(doc).views[0]!, 'enableSearch')).toBe(true)
   })
 
+  it('commits a rename while typing, so closing with Escape cannot lose it', () => {
+    const onChange = vi.fn()
+    render(<BasesViewOptionsDialog {...props(onChange)} />)
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: 'Heute' } })
+    expect(onChange).toHaveBeenCalledTimes(1)
+    const update = onChange.mock.calls[0]![0] as (d: BaseDocument) => BaseDocument
+    expect(update(doc).views[0]!.name).toBe('Heute')
+  })
+
   it('says so when the view type has no settings of its own', () => {
     render(<BasesViewOptionsDialog {...props(vi.fn())} />)
     expect(screen.getByText(/keine weiteren Einstellungen/)).toBeTruthy()

@@ -208,7 +208,9 @@ export function BasesViewOptionsDialog({ doc, index, columns, typeOptions, disab
               className="bases-tb__input"
               defaultValue={view.name ?? ''}
               disabled={disabled}
-              onBlur={(e) => { const name = e.target.value; if (name.trim() !== (view.name ?? '')) onChange((d) => renameView(d, index, name)) }}
+              // Committed per keystroke, not on blur: closing with Escape unmounts the
+              // field without a blur event, which would drop the pending rename.
+              onChange={(e) => { const name = e.target.value; if (name.trim() !== '' && name.trim() !== (view.name ?? '')) onChange((d) => renameView(d, index, name)) }}
             />
           </div>
           <div className="bases-opts__row">

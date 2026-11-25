@@ -105,6 +105,20 @@ describe('BasesQueryController entries', () => {
     ctrl.stop()
   })
 
+  it('converts checkbox properties to booleans', async () => {
+    const taskView: BaseView = { type: 'tasknotesTaskList', order: ['note.done'] } as BaseView
+    const taskApi = {
+      queryBase: vi.fn().mockResolvedValue({ rows: [{ path: 'T.md', fileName: 'T', values: { done: ['true'] } }], total: 1 }),
+      getPropertyTypes: vi.fn().mockResolvedValue({ entries: [{ key: 'done', type: 'checkbox' }] }),
+    } as unknown as IApiClient
+    const target: DrivableBasesView = { onDataUpdated: vi.fn() }
+    const ctrl = new BasesQueryController({ apiClient: taskApi, vaultId: 'v', doc, view: taskView, target })
+    await ctrl.start()
+    const entry = (target.data as { get(i: number): { properties: Record<string, unknown> } }).get(0)
+    expect(entry.properties).toEqual({ done: true })
+    ctrl.stop()
+  })
+
   it('resolves file.name even when it is not a displayed column (chart X axis)', async () => {
     const chartView: BaseView = { type: 'chart-bar', order: ['start'], _unknown: { x: 'file.name' } } as BaseView
     const target: DrivableBasesView = { onDataUpdated: vi.fn() }

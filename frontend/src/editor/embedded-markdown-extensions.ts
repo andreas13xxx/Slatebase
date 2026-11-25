@@ -55,7 +55,13 @@ export function createEmbeddedMarkdownExtensions(): Extension[] {
   ]
   // Live Preview needs the vault to resolve links and embeds; without one the text stays source.
   if (context) {
-    extensions.push(createLivePreviewField({ vaultId: context.vaultId, directoryTree: context.directoryTree }))
+    // The tree is read lazily (getter): the editor can stay open across file operations,
+    // and a snapshot taken here would resolve links against a stale tree.
+    const options = {
+      vaultId: context.vaultId,
+      get directoryTree(): DirectoryTree | null { return renderContext()?.directoryTree ?? null },
+    }
+    extensions.push(createLivePreviewField(options))
   }
   return extensions
 }
