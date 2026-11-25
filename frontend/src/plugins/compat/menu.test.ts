@@ -286,4 +286,25 @@ describe('Menu', () => {
     expect(menu.items[0]).toBeInstanceOf(ItemCtor)
     expect(menu.items[1]).toBeInstanceOf(SepCtor)
   })
+
+  // Regression: the internal renderer was a private `show(x, y)`. A plugin Menu
+  // subclass overriding `show(event)` (TaskNotes) was called with numbers by
+  // showAtMouseEvent and crashed.
+  it('showAtMouseEvent still works when a subclass overrides show()', () => {
+    class Sub extends (MenuCtor as unknown as { new (): MenuLike & { showAtMouseEvent(e: MouseEvent): unknown } }) {
+      show(e: { instanceOf(t: unknown): boolean }): void { e.instanceOf(MouseEvent) }
+    }
+    const menu = new Sub()
+    menu.addItem((i) => i.setTitle('X'))
+    expect(() => menu.showAtMouseEvent(new MouseEvent('contextmenu', { clientX: 5, clientY: 6 }))).not.toThrow()
+    expect(document.querySelectorAll('.menu')).toHaveLength(1)
+  })
+
+  it('provides instanceOf on nodes and events, and tolerates non-constructors', () => {
+    const el = document.createElement('div') as unknown as { instanceOf(t: unknown): boolean }
+    expect(el.instanceOf(HTMLElement)).toBe(true)
+    expect(el.instanceOf(HTMLInputElement)).toBe(false)
+    expect((new MouseEvent('click') as unknown as typeof el).instanceOf(MouseEvent)).toBe(true)
+    expect(el.instanceOf(() => 1)).toBe(false)
+  })
 })

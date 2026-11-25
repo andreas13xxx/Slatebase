@@ -121,7 +121,7 @@ import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installObsidianBodyClasses, resolveActiveTheme } from './body-classes'
-import { changeObsidianTheme, createAppDomShim, createCustomCssShim, getObsidianTheme } from './shims/app-shim'
+import { changeObsidianTheme, createAppDomShim, createCustomCssShim, getAppPluginId, getObsidianTheme } from './shims/app-shim'
 import { getActiveWorkspaceShim } from './active-workspace-shim'
 import { installApiGapInspector } from './api-gap-registry'
 import { debugOnce, warnNoOp, warnOnce } from './log'
@@ -2563,28 +2563,49 @@ export function installObsidianGlobals(): void {
       readonly scope: Scope = new Scope()
       /** Whether to restore the previous text selection on close (real Obsidian field; cosmetic here). */
       shouldRestoreSelection: boolean = true
-      private overlayEl: HTMLElement | null = null
+      private bgEl: HTMLElement
       private closeCallback: ((err?: Error) => unknown) | null = null
       constructor(app: unknown) {
         this.app = app
         this.containerEl = document.createElement('div')
-        this.containerEl.className = 'modal-container'
+        this.containerEl.className = 'modal-container mod-dim'
         // Modals attach straight to document.body (see open() below), outside
         // any plugin view container, so tag the root here the same way
         // createEl() does — otherwise CssInjector's [data-plugin-id] ancestor
         // scoping never matches anything inside, and the plugin's modal CSS
         // (grids, icon sizing, etc.) silently fails to apply.
-        const pluginId = getCurrentPluginId()
+        // Prefer the plugin the `app` object was built for: a modal is often opened
+        // from a DOM event handler, where no plugin context is active any more.
+        const pluginId = getAppPluginId(app) ?? getCurrentPluginId()
         if (pluginId) this.containerEl.setAttribute('data-plugin-id', pluginId)
         this.modalEl = document.createElement('div')
         this.modalEl.className = 'modal'
+        // Obsidian's DOM: .modal-container > (.modal-bg, .modal > (.modal-close-button, .modal-title, .modal-content)).
+        // Plugin CSS targets `container > .modal` directly, so the nesting is part of the contract.
+        this.bgEl = document.createElement('div')
+        this.bgEl.className = 'modal-bg'
+        this.bgEl.addEventListener('mousedown', () => this.close())
+        const closeButton = document.createElement('div')
+        closeButton.className = 'modal-close-button'
+        closeButton.setAttribute('role', 'button')
+        closeButton.setAttribute('tabindex', '0')
+        closeButton.setAttribute('aria-label', 'Close')
+        closeButton.addEventListener('click', () => this.close())
+        closeButton.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.close() }
+        })
         this.titleEl = document.createElement('div')
         this.titleEl.className = 'modal-title'
         this.contentEl = document.createElement('div')
         this.contentEl.className = 'modal-content'
+        this.modalEl.appendChild(closeButton)
         this.modalEl.appendChild(this.titleEl)
         this.modalEl.appendChild(this.contentEl)
+        this.containerEl.appendChild(this.bgEl)
         this.containerEl.appendChild(this.modalEl)
+        this.containerEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') { e.preventDefault(); this.close() }
+        })
       }
       setTitle(title: string): unknown {
         this.titleEl.textContent = title
@@ -2600,7 +2621,7 @@ export function installObsidianGlobals(): void {
         return this
       }
       isShown(): boolean {
-        return this.overlayEl != null && this.overlayEl.parentNode != null
+        return this.containerEl.parentNode != null
       }
       /** Registers a callback invoked once the modal has closed. */
       setCloseCallback(closeCallback: (err?: Error) => unknown): unknown {
@@ -2608,21 +2629,7 @@ export function installObsidianGlobals(): void {
         return this
       }
       open() {
-        // Create overlay backdrop
-        this.overlayEl = document.createElement('div')
-        this.overlayEl.className = 'modal-bg'
-        this.overlayEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;'
-        this.containerEl.style.cssText = 'background:var(--bg-surface,#fff);border-radius:8px;padding:16px;max-width:840px;width:90%;max-height:85vh;overflow-y:auto;'
-        this.overlayEl.appendChild(this.containerEl)
-        // Close on backdrop click
-        this.overlayEl.addEventListener('mousedown', (e) => {
-          if (e.target === this.overlayEl) this.close()
-        })
-        // Close on Escape
-        this.overlayEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') { e.preventDefault(); this.close() }
-        })
-        document.body.appendChild(this.overlayEl)
+        document.body.appendChild(this.containerEl)
         // Real Obsidian pushes the modal's own scope while it's open, so hotkeys
         // plugins register on `this.scope` (e.g. a suggest modal's Mod+Enter) fire
         // — Escape/backdrop-close above are wired separately and unaffected.
@@ -2645,12 +2652,11 @@ export function installObsidianGlobals(): void {
         focusable?.focus()
       }
       close() {
+        // Backdrop, ×, Escape and plugin code can all close; tear down only once.
+        if (!this.isShown()) return
         (this.app as { keymap?: { popScope: (s: Scope) => void } } | undefined)?.keymap?.popScope(this.scope)
         this.onClose()
-        if (this.overlayEl && this.overlayEl.parentNode) {
-          this.overlayEl.parentNode.removeChild(this.overlayEl)
-        }
-        this.overlayEl = null
+        this.containerEl.remove()
         this.closeCallback?.()
       }
       onOpen() {}

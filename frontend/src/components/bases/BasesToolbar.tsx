@@ -10,11 +10,12 @@
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X, ListFilter } from 'lucide-react'
+import { ArrowUpDown, Rows3, SlidersHorizontal, Filter, Columns3, Table2, Plus, Search, X, ListFilter, Settings } from 'lucide-react'
 import { rowValueKey } from '@slatebase/shared-contracts'
 import type { BaseDocument, BaseFilterNode, BaseRow, BaseSortClause, BaseView } from '@slatebase/shared-contracts'
 import { useTranslation, translateNow } from '../../i18n'
 import { ColumnTypeIcon } from './base-column-icon'
+import { BasesViewOptionsDialog } from './BasesViewOptionsDialog'
 import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
   addFormula, addView, availableColumns, columnEntry, columnLabel, deleteView, duplicateView, effectiveColumns, indexAfterMove, isValidFormulaName,
@@ -721,12 +722,32 @@ function countConditions(node: BaseFilterNode | undefined): number {
 
 // ─── View menu ──────────────────────────────────────────────────────────────
 
-const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectView, onChange }: {
+/**
+ * Every selectable view type: built-ins first, then each plugin-registered type.
+ * The Bases view registry fills asynchronously as plugins (Maps, Base Graph, …)
+ * load, so this subscribes to its version — otherwise a plugin-registered type
+ * never appears in the "new view" / "change type" dropdowns until a `.base`
+ * already holds a view of that type.
+ */
+function useViewTypeIds(): string[] {
+  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
+  return useMemo<string[]>(() => {
+    void registryVersion
+    const types: string[] = [...VIEW_TYPES]
+    for (const { viewId } of listBasesViewRegistrations()) {
+      if (!types.includes(viewId)) types.push(viewId)
+    }
+    return types
+  }, [registryVersion])
+}
+
+const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectView, onChange, onConfigureView }: {
   doc: BaseDocument
   activeIndex: number
   disabled: boolean
   onSelectView: (index: number) => void
   onChange: (update: DocUpdate) => void
+  onConfigureView: (index: number) => void
 }) {
   const { t } = useTranslation()
   const active = doc.views[activeIndex]
@@ -745,20 +766,8 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
     // The open view stays the open one, wherever it ends up.
     onSelectView(indexAfterMove(activeIndex, from, to))
   }
-  // The Bases view registry fills asynchronously as plugins (Maps, Base Graph, …)
-  // load, so subscribe to its version — otherwise a plugin-registered type never
-  // appears in the "new view" / "change type" dropdowns until a `.base` already
-  // holds a view of that type.
-  const registryVersion = useSyncExternalStore(subscribeBasesViewRegistry, getBasesViewRegistryVersion)
   // Built-in types first, then every plugin-registered type (deduplicated).
-  const allTypeOptions = useMemo<string[]>(() => {
-    void registryVersion
-    const types: string[] = [...VIEW_TYPES]
-    for (const { viewId } of listBasesViewRegistrations()) {
-      if (!types.includes(viewId)) types.push(viewId)
-    }
-    return types
-  }, [registryVersion])
+  const allTypeOptions = useViewTypeIds()
   // "Change type" dropdown: all options plus the active view's own type as a
   // fallback (so an unknown/uninstalled type still shows instead of jumping).
   const typeOptions: string[] = active && !allTypeOptions.includes(active.type)
@@ -803,6 +812,15 @@ const ViewMenu = memo(function ViewMenu({ doc, activeIndex, disabled, onSelectVi
                 >
                   <span>{label}</span>
                   <span className="bases-tb__type">{viewTypeLabel(v.type)}</span>
+                </button>
+                <button
+                  type="button"
+                  className="bases-tb__icon-btn"
+                  aria-label={t('basesToolbar.configureViewNamed', { label })}
+                  title={t('basesToolbar.configureViewNamed', { label })}
+                  onClick={() => { setConfirmDelete(false); onSelectView(i); onConfigureView(i) }}
+                >
+                  <Settings aria-hidden="true" className="bases-tb__btn-icon" />
                 </button>
                 {canReorder && (
                   <>
@@ -890,7 +908,14 @@ export const BasesToolbar = memo(function BasesToolbar({
   const handleChange = useCallback((update: DocUpdate) => { if (!readOnly) onChange(update) }, [readOnly, onChange])
   const panelProps: PanelProps = { doc, index: activeIndex, columns, rows, disabled: readOnly, onChange: handleChange }
   const filterCount = countConditions(view?.filters) + countConditions(doc.filters)
-
+  const viewTypeIds = useViewTypeIds()
+  // The settings window of one view; held here, not in the view menu popover, which closes on outside clicks.
+  const [configIndex, setConfigIndex] = useState<number | null>(null)
+  const configView = configIndex !== null ? doc.views[configIndex] : undefined
+  const dialogTypeOptions = useMemo(() => {
+    const ids = configView && !viewTypeIds.includes(configView.type) ? [...viewTypeIds, configView.type] : viewTypeIds
+    return ids.map((id) => ({ id, label: viewTypeLabel(id) }))
+  }, [viewTypeIds, configView])
   // Quick search is open whenever it has text, or the user toggled it open.
   const [searchOpen, setSearchOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -908,7 +933,19 @@ export const BasesToolbar = memo(function BasesToolbar({
     <div className="bases-view__toolbar-wrap">
       <div className="bases-view__toolbar" role="toolbar" aria-label={t('basesToolbar.toolbarLabel')}>
         <div className="bases-tb__group-left">
-          <ViewMenu doc={doc} activeIndex={activeIndex} disabled={readOnly} onSelectView={onSelectView} onChange={handleChange} />
+          <ViewMenu doc={doc} activeIndex={activeIndex} disabled={readOnly} onSelectView={onSelectView} onChange={handleChange} onConfigureView={setConfigIndex} />
+          {configView && configIndex !== null && (
+            <BasesViewOptionsDialog
+              key={`${configIndex}-${configView.type}`}
+              doc={doc}
+              index={configIndex}
+              columns={columns}
+              typeOptions={dialogTypeOptions}
+              disabled={readOnly}
+              onChange={handleChange}
+              onClose={() => setConfigIndex(null)}
+            />
+          )}
           {mode === 'view' && !readOnly && onAddItem && (
             <button type="button" className="bases-tb__btn bases-tb__btn--primary" title={t('basesToolbar.newItemTitle')} onClick={onAddItem}>
               <Plus aria-hidden="true" className="bases-tb__btn-icon" />

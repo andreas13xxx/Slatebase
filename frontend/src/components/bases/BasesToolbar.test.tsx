@@ -55,6 +55,13 @@ describe('BasesToolbar — views', () => {
     expect(onSelectView).toHaveBeenCalledWith(1)
   })
 
+  it('jumps to the configuration of a view via its gear button', () => {
+    const { onSelectView } = setup()
+    open(/Offen/)
+    fireEvent.click(within(screen.getByRole('list', { name: 'Ansichten' })).getByRole('button', { name: 'Konfigurieren: Liste' }))
+    expect(onSelectView).toHaveBeenCalledWith(1)
+  })
+
   it('creates a view with name and type and selects it', () => {
     const { onChange, onSelectView } = setup()
     open(/Offen/)

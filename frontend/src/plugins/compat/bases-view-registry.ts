@@ -69,7 +69,7 @@ export interface BasesViewRegistration {
   name: string
   icon?: string
   factory: BasesViewFactory
-  options?: unknown
+  options?: (config: unknown) => unknown[]
 }
 
 /** A registration plus the id of the plugin that owns it. */

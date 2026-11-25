@@ -372,6 +372,11 @@ export class VaultShim implements IVaultShim {
     this.directoryTree = tree;
   }
 
+  /** The vault id and current tree, for host-side rendering (embedded editors resolving links). */
+  getRenderContext(): { vaultId: string; directoryTree: DirectoryTree } {
+    return { vaultId: this.vaultId, directoryTree: this.directoryTree };
+  }
+
   /**
    * Read the text content of a file.
    * Does not gate on the local directory tree cache — see delete() below for why
@@ -1179,6 +1184,7 @@ export class VaultShim implements IVaultShim {
       'configDir',
       'onFileRead',
       'updateTree',
+      'getRenderContext',
       'read',
       'modify',
       'create',

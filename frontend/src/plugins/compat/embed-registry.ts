@@ -19,6 +19,7 @@
 import type { TFile } from './types'
 import { buildTFileFromPath } from './plugin-event-bridge'
 import { errorOnce } from './log'
+import { getEmbeddedEditorExtensions } from '../../editor/embedded-editor-bridge'
 
 /** Context handed to an EmbedCreator — mirrors Obsidian's undocumented EmbedContext. */
 export interface EmbedContext {
@@ -285,7 +286,11 @@ export function seedKanbanMarkdownEmbed(): void {
             // keymap never got registered, so Enter fell through to CM6's native
             // newline-insertion instead of calling Kanban's submit handler.
             const extensions = this.buildLocalExtensions()
-            const state = ES.create({ doc: '', extensions })
+            // Slatebase's own Markdown editing (language, theme, Live Preview, history) — the base
+            // MarkdownEditor's built-in behaviour, so it sits here and not in the overridable hook.
+            const update = (cmView.EditorView as unknown as { updateListener: { of(fn: (u: { docChanged: boolean }) => void): unknown } })
+              .updateListener.of((u) => { this.onUpdate(u, u.docChanged) })
+            const state = ES.create({ doc: '', extensions: [...getEmbeddedEditorExtensions(), update, extensions] })
             this.cmInstance = new EV({ state, parent: this.containerEl })
           }
         } catch {
@@ -327,7 +332,12 @@ export function seedKanbanMarkdownEmbed(): void {
       get editorEl(): HTMLElement {
         return (this.cm as { dom?: HTMLElement } | null)?.dom ?? this.containerEl
       }
-      onUpdate(): void { /* no-op: plugins override it to react to CM6 updates */ }
+      /**
+       * Called on every CM6 update with whether the document changed — real
+       * Obsidian's signature. Subclasses override it (TaskNotes reports the new
+       * details text from here) and call `super.onUpdate()`.
+       */
+      onUpdate(_update?: unknown, _changed?: boolean): void { /* base: nothing to do */ }
       buildLocalExtensions(): unknown[] {
         const cmView = (globalThis as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView
         if (!cmView) return []
@@ -352,7 +362,11 @@ export function seedKanbanMarkdownEmbed(): void {
       set(value: string) {
         const cm = this.cm as { state: { doc: { length: number } }; dispatch(tr: unknown): void } | null
         if (cm) {
-          cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: value } })
+          // Loading a value is not an edit the user can undo (Obsidian behaves the same).
+          const Transaction = (globalThis as unknown as { __codemirrorState?: { Transaction?: { addToHistory?: { of(v: boolean): unknown } } } })
+            .__codemirrorState?.Transaction
+          const annotations = Transaction?.addToHistory ? [Transaction.addToHistory.of(false)] : []
+          cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: value }, annotations })
         }
       }
       get(): string {

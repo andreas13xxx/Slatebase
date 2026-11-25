@@ -72,6 +72,35 @@ export function setViewType(doc: BaseDocument, index: number, type: string): Bas
   return withView(doc, index, (v) => ({ ...v, type }))
 }
 
+/** View fields that have a typed slot in the model; every other option key lives in `_unknown`. */
+const TYPED_VIEW_OPTION_KEYS = new Set(['limit', 'image', 'imageFit', 'imageAspectRatio', 'cardSize'])
+
+/** The stored value of a plugin-defined view option (typed slot first, then the passthrough bucket). */
+export function getViewOption(view: BaseView, key: string): unknown {
+  if (TYPED_VIEW_OPTION_KEYS.has(key)) return (view as unknown as Record<string, unknown>)[key]
+  return view._unknown?.[key]
+}
+
+/**
+ * Sets (or, with `undefined`, removes) a view-specific option declared by a plugin's
+ * `registerBasesView({ options })`. These keys have no typed slot, so they travel in
+ * the view's passthrough bucket and are written back verbatim into the `.base` file.
+ */
+export function setViewOption(doc: BaseDocument, index: number, key: string, value: unknown): BaseDocument {
+  return withView(doc, index, (v) => {
+    if (TYPED_VIEW_OPTION_KEYS.has(key)) {
+      const next = { ...v } as unknown as Record<string, unknown>
+      if (value === undefined) delete next[key]
+      else next[key] = value
+      return next as unknown as BaseView
+    }
+    const unknown = { ...(v._unknown ?? {}) }
+    if (value === undefined) delete unknown[key]
+    else unknown[key] = value
+    return { ...v, _unknown: unknown }
+  })
+}
+
 /** A copy of `list` with the item at `from` moved to position `to`; the list itself when either index is out of range. */
 export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
   const next = [...list]

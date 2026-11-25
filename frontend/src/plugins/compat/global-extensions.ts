@@ -14,7 +14,7 @@
  * - Object: isEmpty, each
  * - Element: find, findAll, findAllSelf, matchParent, getCssPropertyValue, isActiveElement
  * - HTMLElement: isShown, toggle, toggleVisibility, trigger
- * - Node: insertAfter, indexOf, setChildrenInPlace
+ * - Node, Event: instanceOf (Node also: insertAfter, indexOf, setChildrenInPlace)
  * - Global: createSvg, fish, fishAll
  *
  * @module global-extensions
@@ -322,6 +322,33 @@ if (!('setChildrenInPlace' in Node.prototype)) {
     writable: true,
     configurable: true,
   })
+}
+
+/**
+ * Obsidian's popout-window-safe `instanceof` (`node.instanceOf(HTMLElement)`,
+ * also on events). Slatebase has a single window, so a plain `instanceof`
+ * is correct; the prototype-name walk covers objects from another realm.
+ */
+function instanceOfImpl(this: object, type: unknown): boolean {
+  // Arrow functions have no `prototype`, and `instanceof` would throw on them.
+  if (typeof type !== 'function') return false
+  const ctor = type as { name?: string; prototype?: unknown }
+  if (typeof ctor.prototype !== 'object' || ctor.prototype === null) return false
+  if (this instanceof (type as new () => unknown)) return true
+  for (let p: object | null = Object.getPrototypeOf(this); p; p = Object.getPrototypeOf(p)) {
+    if (p.constructor?.name === ctor.name) return true
+  }
+  return false
+}
+
+for (const proto of [Node.prototype, Event.prototype]) {
+  if (!('instanceOf' in proto)) {
+    Object.defineProperty(proto, 'instanceOf', {
+      value: instanceOfImpl,
+      writable: true,
+      configurable: true,
+    })
+  }
 }
 
 // ─── DocumentFragment Extensions ─────────────────────────────────────────────
