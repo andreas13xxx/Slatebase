@@ -1212,6 +1212,22 @@ export const en: TranslationShape = {
     command: 'Editor: Toggle properties in document',
   },
 
+  pagePreview: {
+    title: 'Page preview',
+    hint: 'Turn on to show the page preview on hover only while the Ctrl key (Mac: Cmd) is held. Off, it appears on hover alone (page-preview.json in the vault). More rows appear when a plugin registers its own preview source.',
+    sources: {
+      search: 'Search, backlinks and outgoing links',
+      preview: 'Preview',
+      editor: 'Editor',
+      tabHeader: 'Tabs',
+      fileExplorer: 'File explorer',
+      bookmarks: 'Bookmarks',
+      outline: 'Outline',
+      bases: 'Bases',
+      graph: 'Graph view',
+    },
+  },
+
   editorSettings: {
     smartIndentList: 'Continue lists on line break',
     smartIndentListHint: 'On: Enter in a list or quote starts the next line with a new marker. Off: Enter keeps only the indentation.',
@@ -2448,6 +2464,7 @@ export const en: TranslationShape = {
     c_sl_plugins: 'Plugins',
     c_sl_vault_config: 'Vault configuration',
     c_sl_editor_files: 'Editor and files',
+    c_sl_page_preview: 'Page preview',
     c_sl_keychain: 'Keychain',
     c_sl_themes: 'Themes',
     c_sl_css_snippets: 'CSS snippets',

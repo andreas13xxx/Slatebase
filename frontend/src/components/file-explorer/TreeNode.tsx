@@ -8,6 +8,7 @@ import type { DragState, ExternalDropState, InlineInputState } from './types'
 import { registerFileExplorerRow, unregisterFileExplorerRow } from '../../plugins/compat/file-explorer-dom-registry'
 import { isOpenInSplitModifier, requestOpenInSplit } from '../../state/openInSplitBridge'
 import { useLongPress } from '../../hooks/useLongPress'
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 
 /**
  * Props for the recursive TreeNode component.
@@ -318,6 +319,7 @@ export function TreeNode({
         onDragEnd={onDragEnd}
         onContextMenu={(e) => onContextMenu(e, node, vaultId)}
         {...longPress}
+        {...hoverPreviewProps('file-explorer', node.path)}
         title={node.path}
       >
         <span className="tree-node-name-wrapper nav-file-title-content tree-item-inner">

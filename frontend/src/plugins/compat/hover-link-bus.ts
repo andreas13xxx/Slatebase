@@ -26,6 +26,8 @@ export interface HoverPreviewRequest {
   source: string
   /** Path of the note the link appears in, when known. */
   sourcePath?: string
+  /** Show only the section under this heading instead of the whole note. */
+  heading?: string
 }
 
 /** A hover source declared via `registerHoverLinkSource`. */
@@ -33,6 +35,8 @@ export interface HoverLinkSource {
   id: string
   /** Human-readable label Obsidian shows in its preview settings. */
   display: string
+  /** Whether the preview needs Ctrl (Cmd) held until the vault's page-preview.json says otherwise. */
+  defaultMod: boolean
 }
 
 type RequestListener = (request: HoverPreviewRequest) => void
@@ -43,8 +47,8 @@ const requestListeners = new Set<RequestListener>()
 const dismissListeners = new Set<DismissListener>()
 
 /** Declare a hover source. Mirrors `workspace.registerHoverLinkSource`. */
-export function registerHoverLinkSource(id: string, info?: { display?: string }): void {
-  sources.set(id, { id, display: info?.display ?? id })
+export function registerHoverLinkSource(id: string, info?: { display?: string; defaultMod?: boolean }): void {
+  sources.set(id, { id, display: info?.display ?? id, defaultMod: info?.defaultMod === true })
 }
 
 /** Withdraw a previously declared source. */

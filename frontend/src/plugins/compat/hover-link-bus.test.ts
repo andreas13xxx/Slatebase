@@ -19,7 +19,13 @@ describe('hover-link-bus', () => {
     it('records a source with its display name', () => {
       registerHoverLinkSource('kanban', { display: 'Kanban board' })
 
-      expect(getHoverLinkSources()).toEqual([{ id: 'kanban', display: 'Kanban board' }])
+      expect(getHoverLinkSources()).toEqual([{ id: 'kanban', display: 'Kanban board', defaultMod: false }])
+    })
+
+    it('records whether a source needs Ctrl by default', () => {
+      registerHoverLinkSource('kanban', { defaultMod: true })
+
+      expect(getHoverLinkSources()[0]!.defaultMod).toBe(true)
     })
 
     it('falls back to the id when no display name is given', () => {

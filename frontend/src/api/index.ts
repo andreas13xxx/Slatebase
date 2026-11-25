@@ -778,6 +778,10 @@ export interface IApiClient {
   getHotkeysConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Sets (list), unbinds (empty list) or removes (`null`) single commands of the vault's hotkeys.json. */
   patchHotkeysConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
+  /** The vault's `.obsidian/page-preview.json` (hover source id → require Ctrl). */
+  getPagePreviewConfig(vaultId: string): Promise<Record<string, unknown>>
+  /** Sets (boolean) or removes (`null`) single hover sources of the vault's page-preview.json. */
+  patchPagePreviewConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>
   /** The vault's `.obsidian/workspaces.json` (`{ workspaces: { name: layout }, active }`). */
   getWorkspacesConfig(vaultId: string): Promise<Record<string, unknown>>
   /** Sets (layout) or deletes (`null`) single layouts of the vault's workspaces.json and sets `active`. */
@@ -1520,6 +1524,18 @@ export class ApiClient implements IApiClient {
 
   async patchHotkeysConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/hotkeys-config`, patch)
+    return result.config
+  }
+
+  // --- Vault page-preview.json ---
+
+  async getPagePreviewConfig(vaultId: string): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('GET', `/api/v1/vaults/${vaultId}/page-preview-config`)
+    return result.config
+  }
+
+  async patchPagePreviewConfig(vaultId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/v1/vaults/${vaultId}/page-preview-config`, patch)
     return result.config
   }
 

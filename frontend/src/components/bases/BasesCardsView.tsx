@@ -12,6 +12,7 @@
  * ungrouped case.
  */
 
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import { memo, useCallback, useContext, useMemo } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
@@ -117,7 +118,7 @@ export const BasesCardsView = memo(function BasesCardsView({ doc, view, rows, va
         }
         return (
           <li key={row.path} className="bases-cards__item">
-            <button type="button" className="bases-cards__card" onClick={() => onOpenNote(row.path)} onContextMenu={(e) => openMenu(e, row.path)}>
+            <button type="button" className="bases-cards__card" onClick={() => onOpenNote(row.path)} onContextMenu={(e) => openMenu(e, row.path)} {...hoverPreviewProps('bases', row.path)}>
               {cover}
               <span className="bases-cards__body">
                 <span className="bases-list__title">{row.fileName}</span>

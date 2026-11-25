@@ -1747,7 +1747,7 @@ export function installObsidianGlobals(): void {
        */
       registerHoverLinkSource(key: string, source: unknown): void {
         addHoverSource(key, typeof source === 'object' && source !== null
-          ? (source as { display?: string })
+          ? (source as { display?: string; defaultMod?: boolean })
           : undefined)
       }
       /** Withdraw a hover link source. Delegates to the workspace. */

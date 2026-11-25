@@ -4,7 +4,8 @@ export {
   createLivePreviewCompartmentExtension,
   createLivePreviewField,
   createLivePreviewClickHandler,
-  createLinkContextMenuHandler
+  createLinkContextMenuHandler,
+  createLinkHoverPreviewHandler
 } from './live-preview-extension'
 
 export type { InlineDecorationResult, HideableRange } from './inline-decorations'

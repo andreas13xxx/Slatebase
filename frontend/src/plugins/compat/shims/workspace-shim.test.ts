@@ -334,10 +334,10 @@ describe('WorkspaceShim', () => {
 
   describe('hoverLinkSources', () => {
     it('reflects sources declared via registerHoverLinkSource', () => {
-      workspace.registerHoverLinkSource('my-plugin', { display: 'My Plugin' });
+      workspace.registerHoverLinkSource('my-plugin', { display: 'My Plugin', defaultMod: true });
 
       expect(workspace.hoverLinkSources).toEqual({
-        'my-plugin': { display: 'My Plugin' },
+        'my-plugin': { display: 'My Plugin', defaultMod: true },
       });
     });
 

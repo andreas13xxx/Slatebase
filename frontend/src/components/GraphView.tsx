@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { showHoverPreview, hideHoverPreview } from './hoverPreviewTrigger'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3-force'
 import { useAppContext } from '../state'
@@ -1169,8 +1170,8 @@ export function GraphView({ vaultId, localGraphCenterPath }: GraphViewProps) {
                   onDoubleClick={(e) => handleNodeDoubleClick(e, node)}
                   onContextMenu={(e) => handleNodeContextMenu(e, node)}
                   {...longPress}
-                  onMouseEnter={() => handleNodeHoverEnter(node.id)}
-                  onMouseLeave={handleNodeHoverLeave}
+                  onMouseEnter={(e) => { handleNodeHoverEnter(node.id); if (node.exists && node.type === 'file') showHoverPreview('graph', node.path, e.currentTarget) }}
+                  onMouseLeave={() => { handleNodeHoverLeave(); hideHoverPreview() }}
                   style={{ cursor: node.exists ? 'pointer' : 'default', opacity: nodeOpacity, ...(nodeOpacity === 0 ? { pointerEvents: 'none' as const } : {}) }}
                 >
                   <circle

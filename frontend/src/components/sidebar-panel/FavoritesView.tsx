@@ -27,6 +27,7 @@ import type { FavoriteEntry } from '../../state/favoritesStore'
 import type { PanelState, PanelAction } from '../../state/panelState'
 import type { Dispatch } from 'react'
 import { useLongPress } from '../../hooks/useLongPress'
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import { useTranslation } from '../../i18n'
 import './FavoritesView.css'
 
@@ -505,6 +506,7 @@ export function FavoritesView({ vaultId, onOpenFile, onOpenSearch, refreshKey: _
                   onClick={() => handleEntryClick(entry)}
                   onContextMenu={(e) => handleContextMenuTrigger(e, entry)}
                   {...longPress}
+                  {...(group || entry.type === 'search' ? {} : hoverPreviewProps('bookmarks', entry.path, entry.type === 'heading' ? entry.heading : null))}
                   onKeyDown={(e) => handleKeyDownEntry(e, entry)}
                   title={getEntryTooltip(entry)}
                   type="button"

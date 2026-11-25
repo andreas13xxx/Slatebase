@@ -1206,6 +1206,22 @@ export const de = {
     command: 'Editor: Eigenschaften im Dokument ein-/ausblenden',
   },
 
+  pagePreview: {
+    title: 'Seitenvorschau',
+    hint: 'Einschalten, um die Seitenvorschau beim Schweben mit dem Mauszeiger nur bei gedrückter Strg-Taste (Mac: Cmd) zu zeigen. Ausgeschaltet erscheint sie beim bloßen Schweben (page-preview.json im Vault). Weitere Zeilen erscheinen, wenn ein Plugin eine eigene Vorschauquelle anmeldet.',
+    sources: {
+      search: 'Suche, Rückverweise und ausgehende Links',
+      preview: 'Vorschau',
+      editor: 'Editor',
+      tabHeader: 'Register',
+      fileExplorer: 'Dateiexplorer',
+      bookmarks: 'Lesezeichen',
+      outline: 'Gliederung',
+      bases: 'Basen',
+      graph: 'Graph-Ansicht',
+    },
+  },
+
   editorSettings: {
     smartIndentList: 'Listen beim Zeilenumbruch fortsetzen',
     smartIndentListHint: 'An: Enter in einer Liste oder einem Zitat beginnt die nächste Zeile mit einem neuen Aufzählungszeichen. Aus: Enter behält nur die Einrückung.',
@@ -2442,6 +2458,7 @@ export const de = {
     c_sl_plugins: 'Plugins',
     c_sl_vault_config: 'Vault-Konfiguration',
     c_sl_editor_files: 'Editor und Dateien',
+    c_sl_page_preview: 'Seitenvorschau',
     c_sl_keychain: 'Schlüsselbund',
     c_sl_themes: 'Themes',
     c_sl_css_snippets: 'CSS-Snippets',

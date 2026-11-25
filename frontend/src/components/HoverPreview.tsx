@@ -17,8 +17,10 @@ import { useAppConfigValue } from '../state/vaultAppConfigStore'
 import { resolveWikilinkTarget } from '../plugins/link-resolver'
 import { detectPlatform, readPlatformEnvironment } from '../plugins/compat/platform-detection'
 import { onHoverPreview, type HoverPreviewRequest } from '../plugins/compat/hover-link-bus'
+import { pagePreviewRequiresMod } from '../state/pagePreviewConfigStore'
 import { placeHoverPreview, type PopoverPlacement } from './hover-preview-position'
 import { locateFrontmatterBlock } from '../utils/frontmatterWriter'
+import { extractHeadingSection } from '../utils/headingSection'
 import './HoverPreview.css'
 
 /** How long the pointer must rest on a link before a preview appears. */
@@ -57,13 +59,35 @@ export function HoverPreview() {
       if (hideTimer.current) clearTimeout(hideTimer.current)
     }
 
-    return onHoverPreview(
+    // A source the vault's page-preview.json marks as "Ctrl required" only shows while Ctrl (Cmd) is
+    // held. Without it the request waits: holding the key while still on the link shows it.
+    let modHeld = false
+    let pending: HoverPreviewRequest | null = null
+    const onModifier = (e: KeyboardEvent | MouseEvent): void => {
+      modHeld = e.ctrlKey || e.metaKey
+      if (modHeld && pending && e.type === 'keydown') {
+        const next = pending
+        pending = null
+        setRequest(next)
+      }
+    }
+    window.addEventListener('keydown', onModifier, true)
+    window.addEventListener('keyup', onModifier, true)
+    window.addEventListener('mousemove', onModifier, true)
+
+    const unsubscribe = onHoverPreview(
       (next) => {
         clearTimers()
-        showTimer.current = setTimeout(() => setRequest(next), SHOW_DELAY_MS)
+        pending = null
+        const needsMod = pagePreviewRequiresMod(next.source)
+        showTimer.current = setTimeout(() => {
+          if (needsMod && !modHeld) pending = next
+          else setRequest(next)
+        }, SHOW_DELAY_MS)
       },
       () => {
         clearTimers()
+        pending = null
         hideTimer.current = setTimeout(() => {
           setRequest(null)
           setContent(null)
@@ -72,6 +96,12 @@ export function HoverPreview() {
         }, HIDE_DELAY_MS)
       },
     )
+    return () => {
+      unsubscribe()
+      window.removeEventListener('keydown', onModifier, true)
+      window.removeEventListener('keyup', onModifier, true)
+      window.removeEventListener('mousemove', onModifier, true)
+    }
   }, [isTouch])
 
   // Dismiss on Escape or when the page scrolls out from under the anchor.
@@ -109,7 +139,8 @@ export function HoverPreview() {
       .fetchFileContent(vaultId, path)
       .then((file) => {
         if (cancelled) return
-        const text = file.content ?? ''
+        const full = file.content ?? ''
+        const text = (request.heading ? extractHeadingSection(full, request.heading) : null) ?? full
         setResolvedPath(path)
         setContent(
           text.length > MAX_PREVIEW_CHARS ? `${text.slice(0, MAX_PREVIEW_CHARS)}\n\n…` : text,
@@ -163,7 +194,7 @@ export function HoverPreview() {
   const isMarkdown = (resolvedPath ?? '').toLowerCase().endsWith('.md')
   const selectedVault = appContext?.state.vaults.find((v) => v.id === vaultId)
   const hasWriteAccess = selectedVault?.permission === 'owner' || selectedVault?.permission === 'write'
-  const propertiesEditable = propertiesInDocument === 'visible' && !isTruncated && isMarkdown && resolvedPath !== null && apiClient !== null && vaultId !== null
+  const propertiesEditable = propertiesInDocument === 'visible' && !request.heading && !isTruncated && isMarkdown && resolvedPath !== null && apiClient !== null && vaultId !== null
 
   // When properties are shown as an editable block, strip the frontmatter from
   // the body so it is not rendered a second time by ViewMode's read-only table.

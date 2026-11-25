@@ -10,6 +10,7 @@
  * rows are split into collapsible groups (ordered/hidden by `view.groupOrder`).
  */
 
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import { useTranslation } from '../../i18n'
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
@@ -171,7 +172,7 @@ export const BasesTableView = memo(function BasesTableView({
               : (Array.isArray(firstVal) ? (firstVal[0] as string | undefined) : undefined) ?? row.fileName
             return (
               <td key={col} className={cellClass('bases-table__cell bases-table__cell--link', false, widthOf(col) !== undefined)} style={sizeStyle(col)}>
-                <button type="button" className="bases-table__link" onClick={() => onOpenNote(row.path)}>
+                <button type="button" className="bases-table__link" onClick={() => onOpenNote(row.path)} {...hoverPreviewProps('bases', row.path)}>
                   {linkText}
                 </button>
               </td>

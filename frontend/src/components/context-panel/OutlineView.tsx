@@ -13,6 +13,7 @@ import { useTranslation } from '../../i18n'
 import type { OutlineHeading } from '../../state/documentPanelData'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { useLongPress } from '../../hooks/useLongPress'
+import { hoverPreviewProps } from '../hoverPreviewTrigger'
 import './OutlineView.css'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -30,11 +31,13 @@ export interface OutlineViewProps {
   onHeadingFoldToggle?: (index: number, collapsed: boolean, anchor: string) => void
   /** Whether a document is currently open */
   hasDocument?: boolean
+  /** Vault path of the open note; with it, hovering a heading previews that section. */
+  documentPath?: string | null
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function OutlineView({ headings, activeAnchor, onHeadingClick, onHeadingJump, onHeadingFoldToggle, hasDocument = true }: OutlineViewProps) {
+export function OutlineView({ headings, activeAnchor, onHeadingClick, onHeadingJump, onHeadingFoldToggle, hasDocument = true, documentPath = null }: OutlineViewProps) {
   const { t } = useTranslation()
   const longPress = useLongPress()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; heading: OutlineHeading } | null>(null)
@@ -155,6 +158,7 @@ export function OutlineView({ headings, activeAnchor, onHeadingClick, onHeadingJ
                 onDoubleClick={() => onHeadingJump?.(index, heading.anchor)}
                 onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, heading }) }}
                 {...longPress}
+                {...hoverPreviewProps('outline', documentPath, heading.text)}
                 title={heading.text}
                 aria-current={isActive ? 'location' : undefined}
               >

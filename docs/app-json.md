@@ -172,6 +172,20 @@ open). Before a write, the file is read again and bookmarks added meanwhile (Obs
 API: `GET/PATCH /api/v1/vaults/:vaultId/hotkeys-config`. Store: `state/keybindingsStore`. UI: Settings →
 Tastaturkürzel (search, record, add a second shortcut, remove one, reset, conflicts).
 
+## page-preview.json
+
+Settings of Obsidian's core "Page preview" plugin: hover source id → `true` (preview only while Ctrl/Cmd is
+held) or `false` (on hover alone). Source ids: `preview` is Slatebase's own links (Obsidian's "Vorschau");
+plugins add theirs through `registerHoverLinkSource(id, { display, defaultMod })`. An absent entry means
+`defaultMod` of the registered source, else hover alone (Slatebase's long-standing behaviour). File name and
+key names are **not verified against a real vault**; Obsidian's other sources (search, editor, file explorer,
+…) are not offered because Slatebase has no hover preview there. API:
+`GET/PATCH /api/v1/vaults/:vaultId/page-preview-config`. Store: `state/pagePreviewConfigStore`. UI: Settings →
+Vault → Seitenvorschau (`components/settings/PagePreviewSection.tsx`, sources in `state/pagePreviewSources.ts`).
+Gate: `components/HoverPreview.tsx`. Triggers: `hoverPreviewProps()`/`showHoverPreview()` in
+`components/hoverPreviewTrigger.ts` (file explorer, tabs, links/backlinks, bookmarks, outline section, Bases
+views, graph nodes, Live Preview wikilinks); outline/heading bookmarks/`[[Note#Heading]]` preview the section.
+
 ```json
 { "editor:toggle-bold": [ { "modifiers": ["Mod"], "key": "B" } ],
   "app:open-settings": [] }
