@@ -529,4 +529,41 @@ describe('AppShim', () => {
       expect(openLinkText).toHaveBeenCalledWith('Note.md', '');
     });
   });
+
+  describe('theme and DOM handles', () => {
+    it('exposes dom, customCss and getTheme without a gap warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      expect(app.dom.appContainerEl).toBeInstanceOf(HTMLElement);
+      expect(app.customCss.theme).toBe('');
+      expect(app.customCss.enabledSnippets).toBeInstanceOf(Set);
+      document.documentElement.setAttribute('data-theme', 'dark');
+      expect(app.getTheme()).toBe('obsidian');
+      document.documentElement.setAttribute('data-theme', 'light');
+      expect(app.getTheme()).toBe('moonstone');
+      document.documentElement.removeAttribute('data-theme');
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('records non-emulated dom/customCss members as gaps instead of returning undefined', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      const missing = (app.customCss as unknown as Record<string, unknown>)['getSnippetPath'];
+      expect(typeof missing).toBe('function');
+      expect((missing as () => unknown)()).toBeUndefined();
+      expect((app.dom as unknown as Record<string, unknown>)['then']).toBeUndefined();
+      expect(typeof (app.dom as unknown as Record<string, unknown>)['workspaceTabsEl']).toBe('function');
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('lists applied snippets', () => {
+      const app = AppShim.create({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      const style = document.createElement('style');
+      style.setAttribute('data-snippet-id', 'mine');
+      document.head.appendChild(style);
+      expect(app.customCss.snippets).toContain('mine');
+      expect(app.customCss.enabledSnippets.has('mine')).toBe(true);
+      style.remove();
+    });
+  });
 });

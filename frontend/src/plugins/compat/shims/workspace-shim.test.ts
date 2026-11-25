@@ -189,6 +189,70 @@ describe('WorkspaceShim', () => {
       expect((right as WorkspaceTabs).children).toContain(leaf);
     });
 
+    describe('undocumented leaf fields', () => {
+      it('mirrors the tab pin state into the leaf and fires pinned-change, read-only for plugins', async () => {
+        const registry = new ViewRegistry();
+        workspace.setViewRegistry(registry, {});
+        class KanbanView extends ItemView {
+          override getViewType(): string { return 'kanban'; }
+        }
+        registry.registerView('kanban', (leaf) => new KanbanView(leaf as WorkspaceLeaf), 'kanban-plugin');
+        const leaf = workspace.getLeaf(true);
+        await leaf.setViewState({ type: 'kanban' });
+        const onPinned = vi.fn();
+        leaf.on('pinned-change', onPinned);
+        expect(leaf.pinned).toBe(false);
+
+        workspace.setPaneLayout(twoPanes([{ ...tabEntry('t2', '__view::kanban'), pinned: true }]));
+        expect(leaf.pinned).toBe(true);
+        expect(onPinned).toHaveBeenCalledWith(true);
+
+        workspace.setPaneLayout(twoPanes([tabEntry('t2', '__view::kanban')]));
+        expect(leaf.pinned).toBe(false);
+        expect(() => { (leaf as unknown as { pinned: boolean }).pinned = true; }).toThrow(TypeError);
+      });
+
+      it('stamps activeTime on every activation path and gives each leaf its own id', () => {
+        workspace.setViewRegistry(new ViewRegistry(), {});
+        const a = workspace.getLeaf(true);
+        const b = workspace.getLeaf(true);
+        expect(a.id).toMatch(/^[0-9a-f]{16}$/);
+        expect(a.id).not.toBe(b.id);
+        expect(a.activeTime).toBe(0);
+
+        workspace.setActiveLeaf(a);
+        const first = a.activeTime;
+        expect(first).toBeGreaterThan(0);
+
+        workspace.setActiveLeafInternal(b);
+        expect(b.activeTime).toBeGreaterThan(0);
+        expect(workspace.getActiveLeaf()).toBe(b);
+      });
+
+      it('reports size and visibility of the leaf container', () => {
+        workspace.setViewRegistry(new ViewRegistry(), {});
+        const leaf = workspace.getLeaf(true);
+        const el = (leaf.view as unknown as { containerEl?: HTMLElement } | null)?.containerEl ?? leaf.containerEl;
+        expect(leaf.isVisible()).toBe(false);
+        Object.defineProperty(el, 'clientWidth', { configurable: true, value: 320 });
+        Object.defineProperty(el, 'clientHeight', { configurable: true, value: 240 });
+        document.body.appendChild(el);
+        el.getClientRects = () => [{}] as unknown as DOMRectList;
+        expect(leaf.width).toBe(320);
+        expect(leaf.height).toBe(240);
+        expect(leaf.isVisible()).toBe(true);
+        el.remove();
+      });
+
+      it('requestResize dispatches a window resize event', () => {
+        const onResize = vi.fn();
+        window.addEventListener('resize', onResize);
+        workspace.requestResize();
+        window.removeEventListener('resize', onResize);
+        expect(onResize).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('fires layout-change on structural changes only', () => {
       const onLayout = vi.fn();
       workspace.on('layout-change', onLayout);

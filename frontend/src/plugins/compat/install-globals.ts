@@ -118,6 +118,7 @@ import { registerObsidianApiExtensions, OBSIDIAN_API_VERSION, compareApiVersions
 import { registerFallbackShims } from './fallback-shims'
 import { detectPlatform, readPlatformEnvironment } from './platform-detection'
 import { installObsidianBodyClasses, resolveActiveTheme } from './body-classes'
+import { changeObsidianTheme, createAppDomShim, createCustomCssShim, getObsidianTheme } from './shims/app-shim'
 import { getActiveWorkspaceShim } from './active-workspace-shim'
 import { installApiGapInspector } from './api-gap-registry'
 import { debugOnce, warnNoOp, warnOnce } from './log'
@@ -1325,6 +1326,12 @@ export function installObsidianGlobals(): void {
       // the bare stub and threw "isDarkMode is not a function" inside
       // onDataUpdated → the map never rendered. Mirror it here.
       isDarkMode: (): boolean => resolveActiveTheme() === 'dark',
+      // Same reason: AppShim carries dom/customCss/getTheme/changeTheme, so a plugin
+      // reaching them through window.app must find the same members.
+      dom: createAppDomShim(),
+      customCss: createCustomCssShim(),
+      getTheme: getObsidianTheme,
+      changeTheme: changeObsidianTheme,
       // Same reason: AppShim.renderContext exists, but a Bases view driven through
       // window.app (TaskNotes calls `value.renderTo(el, app.renderContext)`) must get
       // a real RenderContext too. Lazy, because the class is installed after this

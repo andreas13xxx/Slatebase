@@ -13,7 +13,7 @@ import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
-import { warnNoOp, warnOnce } from '../log';
+import { debugOnce, warnNoOp, warnOnce } from '../log';
 import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
 import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
@@ -22,6 +22,101 @@ import { getRegisteredExtensionTypeMap } from '../file-view-registry';
 import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
 import { fromFileCommandId, hotkeyToShortcut, isHotkey, shortcutsToFileValue, toFileCommandId } from '@slatebase/shared-contracts';
 import { getFileBinding, getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
+
+/**
+ * Wrap a small shim object in the gap safety net every plugin-facing surface has
+ * (quality.md): a member the shim does not emulate is recorded in the api-gap
+ * registry, warned about once, and answered with a callable no-op instead of a
+ * silent `undefined`. `target` is the receiver so getters keep the real `this`;
+ * `then` stays `undefined` so an `await` on the object cannot hang.
+ */
+function withGapNet<T extends object>(target: T, shim: 'AppDom' | 'CustomCss', label: string): T {
+  return new Proxy(target, {
+    get(obj, prop) {
+      if (typeof prop === 'symbol' || prop in obj) return Reflect.get(obj, prop, obj);
+      if (prop === 'then') return undefined;
+      if (isObjectPrototypeMember(prop)) return Reflect.get(obj, prop, obj);
+      if (recordGapRead(shim, prop)) {
+        warnOnce(
+          `${shim}-gap::${prop}`,
+          `[AppShim] Access to non-emulated ${label} member "${prop}". Slatebase returns a no-op function here, ` +
+            `which is truthy — feature detection like \`if (${label}.${prop})\` will take the wrong branch. ` +
+            `Inspect all gaps with window.__slatebasePluginApiGaps().`,
+        );
+      }
+      return () => {
+        recordGapCall(shim, prop);
+        return undefined;
+      };
+    },
+  });
+}
+
+/** `app.dom` handles; a getter-backed object so `appContainerEl` always points at the live element. */
+export function createAppDomShim(): { readonly appContainerEl: HTMLElement } {
+  return withGapNet(
+    {
+      get appContainerEl(): HTMLElement {
+        return document.querySelector<HTMLElement>('.app') ?? document.body;
+      },
+    },
+    'AppDom',
+    'app.dom',
+  );
+}
+
+/** Base colour scheme in Obsidian's vocabulary: `obsidian` is dark, `moonstone` is light. Same source as `isDarkMode()`. */
+export function getObsidianTheme(): 'obsidian' | 'moonstone' {
+  return resolveActiveTheme() === 'dark' ? 'obsidian' : 'moonstone';
+}
+
+/** Slatebase's colour scheme is a user setting, so a plugin cannot switch it. */
+export function changeObsidianTheme(): void {
+  warnOnce('AppShim.changeTheme', '[AppShim] changeTheme: the colour scheme is a user setting in Slatebase — no-op.');
+}
+
+/**
+ * `app.customCss` — read-only view of the applied theme and snippets (Style Settings and
+ * theme-aware plugins read it). Themes and snippets are managed in Slatebase's settings,
+ * so the mutating methods only warn. Shared by AppShim and the `window.app` stub.
+ */
+export function createCustomCssShim() {
+  return withGapNet(
+    {
+      /**
+       * Active theme id as Slatebase stores it (a vault theme folder name, or `builtin:<name>`),
+       * not Obsidian's display name; empty string means the default look.
+       */
+      get theme(): string {
+        return document.documentElement.getAttribute('data-obsidian-theme') ?? '';
+      },
+      themes: {} as Record<string, unknown>,
+      /** Ids of the CSS snippets currently applied. */
+      get snippets(): string[] {
+        return [...document.querySelectorAll('style[data-snippet-id]')]
+          .map((el) => el.getAttribute('data-snippet-id') ?? '')
+          .filter(Boolean);
+      },
+      get enabledSnippets(): Set<string> {
+        return new Set(this.snippets);
+      },
+      setTheme: (): void => {
+        warnOnce('AppShim.customCss.setTheme', '[AppShim] customCss.setTheme: themes are managed in Slatebase settings — no-op.');
+      },
+      setCssEnabledStatus: (): void => {
+        warnOnce('AppShim.customCss.setCssEnabledStatus', '[AppShim] customCss.setCssEnabledStatus: snippets are managed in Slatebase settings — no-op.');
+      },
+      requestLoadTheme: (): void => {
+        debugOnce('AppShim.customCss.requestLoadTheme', '[AppShim] customCss.requestLoadTheme: Slatebase applies themes itself — no-op.');
+      },
+      requestLoadSnippets: (): void => {
+        debugOnce('AppShim.customCss.requestLoadSnippets', '[AppShim] customCss.requestLoadSnippets: Slatebase applies snippets itself — no-op.');
+      },
+    },
+    'CustomCss',
+    'app.customCss',
+  );
+}
 
 /** The shape of Obsidian's internal `app.commands`. */
 export type CommandManagerShim = ReturnType<typeof createCommandManager>
@@ -474,6 +569,22 @@ export class AppShim implements IAppShim {
     return ctx;
   }
 
+  /** `app.dom` — app-level DOM handles; plugins anchor floating UI to `appContainerEl`. */
+  readonly dom = createAppDomShim();
+
+  /** `app.customCss` — read-only theme/snippet view, see `createCustomCssShim`. */
+  readonly customCss = createCustomCssShim();
+
+  /** Base colour scheme in Obsidian's vocabulary (`obsidian` = dark, `moonstone` = light). */
+  getTheme(): 'obsidian' | 'moonstone' {
+    return getObsidianTheme();
+  }
+
+  /** The colour scheme is a user setting in Slatebase; a plugin cannot switch it. */
+  changeTheme(): void {
+    changeObsidianTheme();
+  }
+
   /**
    * metadataTypeManager — Obsidian-internal registry of frontmatter property
    * types (undocumented; backs the Properties view's type icons/pickers).
@@ -819,6 +930,10 @@ export class AppShim implements IAppShim {
       'keymap',
       'scope',
       'metadataTypeManager',
+      'dom',
+      'customCss',
+      'getTheme',
+      'changeTheme',
       'renderContext',
       'viewRegistry',
       'isMobile',
