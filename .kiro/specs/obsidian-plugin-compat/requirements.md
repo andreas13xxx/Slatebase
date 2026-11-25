@@ -60,10 +60,10 @@ Dieses Feature implementiert einen Compatibility Layer für Obsidian Community P
 
 #### Acceptance Criteria
 
-1. WHEN ein Plugin aktiviert wird, THE Plugin_Loader SHALL die `onload()`-Methode der Plugin-Instanz aufrufen und maximal 10 Sekunden auf deren Abschluss warten
+1. WHEN ein Plugin aktiviert wird, THE Plugin_Loader SHALL die `onload()`-Methode der Plugin-Instanz aufrufen und maximal 60 Sekunden auf deren Abschluss warten
 2. WHEN ein Plugin deaktiviert wird, THE Plugin_Loader SHALL die `onunload()`-Methode der Plugin-Instanz aufrufen und alle vom Plugin registrierten Event-Listener, Commands und UI-Elemente entfernen
 3. WHEN Slatebase gestartet wird, THE Plugin_Loader SHALL alle als aktiv markierten Plugins in der Reihenfolge ihrer Registrierung laden und aktivieren
-4. IF ein Plugin während `onload()` eine Exception wirft oder das Timeout von 10 Sekunden überschreitet, THEN THE Plugin_Loader SHALL das Plugin als fehlerhaft markieren, den Fehler loggen und die Aktivierung der übrigen Plugins fortsetzen
+4. IF ein Plugin während `onload()` eine Exception wirft oder das Timeout von 60 Sekunden überschreitet, THEN THE Plugin_Loader SHALL das Plugin als fehlerhaft markieren, den Fehler loggen und die Aktivierung der übrigen Plugins fortsetzen
 5. THE Plugin_Registry SHALL den Aktivierungsstatus jedes Plugins im Backend persistent speichern, sodass der Status nach einem Seitenneuladen und über Geräte hinweg erhalten bleibt
 6. WHEN ein Plugin deaktiviert wird, THE Plugin_Loader SHALL alle vom Plugin erstellten DOM-Elemente, Timer (`setTimeout`, `setInterval`), registrierten Event-Listener und Referenzen auf die Plugin-Instanz entfernen
 7. IF ein Plugin während `onunload()` eine Exception wirft, THEN THE Plugin_Loader SHALL die Exception loggen und die Ressourcen-Bereinigung (Event-Listener, Commands, UI-Elemente, Timer) dennoch vollständig durchführen

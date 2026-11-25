@@ -697,7 +697,7 @@ interface PluginListResponse {
 
 ### Property 32: Plugin onload Timeout
 
-*For any* plugin whose `onload()` method takes longer than 10 seconds to resolve, the PluginLoader SHALL mark the plugin as errored and continue activating remaining plugins.
+*For any* plugin whose `onload()` method takes longer than 60 seconds to resolve, the PluginLoader SHALL mark the plugin as errored and continue activating remaining plugins.
 
 **Validates: Requirements 3.1, 3.4**
 
@@ -794,7 +794,7 @@ class PluginSettingsTooLargeError extends Error {
 | Manifest parse error (invalid JSON) | Log error, reject plugin, show error in UI | Plugin not loaded, others unaffected |
 | Bundle syntax error | Catch SyntaxError, mark plugin as `error` | Plugin disabled, app fully functional |
 | Bundle runtime exception | Catch in try/catch, mark as `error`, log | Plugin disabled, app fully functional |
-| `onload()` timeout (>10s) | AbortController + setTimeout, mark as `error` | Plugin disabled, others continue loading |
+| `onload()` timeout (>60s) | AbortController + setTimeout, mark as `error` | Plugin disabled, others continue loading |
 | `onload()` exception | Catch, mark as `error`, continue with next plugin | Plugin disabled, others load normally |
 | `onunload()` exception | Catch, log, still perform full cleanup | Resources cleaned up despite error |
 | Event callback exception | Catch per callback, log, continue dispatching | Other callbacks still execute |
@@ -917,7 +917,7 @@ backend/src/plugin/
 - **Frontend**: `vi.fn()` für API-Client-Methoden, hand-geschriebene Mock-Factories für Shim-Interfaces
 - **Backend**: Hand-geschriebene Mock-Factories (`createMockPluginStore()`, `createMockVaultService()`)
 - **DOM-Mocking**: jsdom (via Vitest) für CSS-Injection-Tests und DOM-Element-Tracking
-- **Timer-Mocking**: `vi.useFakeTimers()` für Timeout-Tests (onload 10s, main-thread 5s)
+- **Timer-Mocking**: `vi.useFakeTimers()` für Timeout-Tests (onload 60s, main-thread 5s)
 
 ### Ausführungsregeln
 

@@ -31,7 +31,7 @@ Von den 100 meistheruntergeladenen Community-Plugins:
 ```
 Plugin-Verwaltungsseite / Command Palette (UI)
         │
-PluginLoader (Bundle laden, Lifecycle: onload/onunload, 10s-Timeout)
+PluginLoader (Bundle laden, Lifecycle: onload/onunload, 60s-Timeout)
         │
 PluginSandbox (Netzwerk-Allowlist, Storage-Namespacing, Cross-Vault-Schutz)
         │
