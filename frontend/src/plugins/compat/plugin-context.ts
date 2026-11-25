@@ -54,7 +54,7 @@ import { FileManagerShim } from './shims/file-manager-shim'
 import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, removeActiveFileViewsForPlugin, registerExtensionsForPlugin } from './file-view-registry'
 import { registerCodeBlockProcessor, registerPostProcessor, unregisterAllForPlugin as unregisterAllCodeBlocksForPlugin } from './code-block-processor-registry'
 import { warnNoOp } from './log'
-import { AppShim, createCommandManager, createHotkeyManager } from './shims/app-shim'
+import { AppShim, createCommandManager, createHotkeyManager, resetOpeningBehavior, runVaultOpeningBehavior } from './shims/app-shim'
 import { Scope } from './obsidian-api-extensions'
 import { setEditorComponentAccessor, setEditorViewAccessor } from './editor-shim'
 import { withPluginContextAsync } from './plugin-execution-context'
@@ -1168,6 +1168,8 @@ export function PluginProvider({
           return
         }
         await registry.waitForPersistence()
+        // Obsidian calls app.runOpeningBehavior() once the layout and plugins are up.
+        if (isCurrentContext()) await runVaultOpeningBehavior()
       }
 
       if (isCurrentContext()) {
@@ -1203,6 +1205,7 @@ export function PluginProvider({
     await unloadLoaderPlugins(loader)
     // Recorded gaps belong to the plugins that just went away.
     clearApiGaps()
+    resetOpeningBehavior()
   }
 
   /**

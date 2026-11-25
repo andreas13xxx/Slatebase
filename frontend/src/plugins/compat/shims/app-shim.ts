@@ -14,6 +14,32 @@ import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
+
+type OpeningBehavior = (file?: unknown) => unknown
+
+/** Handler a plugin installed over `app.runOpeningBehavior`; `null` = the (empty) default. */
+let openingBehavior: OpeningBehavior | null = null
+
+function defaultOpeningBehavior(): void {
+  // Slatebase restores the previous tabs/panes itself — nothing to open here.
+}
+
+/** Drops a plugin-installed opening behavior (vault switch / plugin unload). */
+export function resetOpeningBehavior(): void {
+  openingBehavior = null
+}
+
+/**
+ * Runs the app's opening behavior once, after a vault's plugins are loaded — the point at which
+ * Obsidian calls `app.runOpeningBehavior()`. A throwing or rejecting handler is logged, never fatal.
+ */
+export async function runVaultOpeningBehavior(): Promise<void> {
+  try {
+    await (openingBehavior ?? defaultOpeningBehavior)()
+  } catch (err) {
+    console.error('[AppShim] runOpeningBehavior failed:', err)
+  }
+}
 import { debugOnce, warnNoOp, warnOnce } from '../log';
 import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
 import type { KeychainApiClient } from '../obsidian-api-extensions';
@@ -823,6 +849,22 @@ export class AppShim implements IAppShim {
   }
 
   /**
+   * Obsidian's startup hook (undocumented): called once after the layout is restored, it opens
+   * the default view. Plugins replace it to take over startup (Homepage: `app.runOpeningBehavior = …`).
+   * The slot is shared by all plugins' AppShims — each has its own instance, but there is one
+   * app — and `runVaultOpeningBehavior()` invokes it after a vault's plugins have loaded.
+   * The default is intentionally empty: Slatebase restores tabs and panes itself
+   * (`useWorkspaceRestore`), so there is nothing left for Obsidian's default to do.
+   */
+  get runOpeningBehavior(): (file?: unknown) => unknown {
+    return openingBehavior ?? defaultOpeningBehavior
+  }
+
+  set runOpeningBehavior(handler: (file?: unknown) => unknown) {
+    openingBehavior = typeof handler === 'function' ? handler : null
+  }
+
+  /**
    * viewRegistry — Obsidian-internal registry mapping a file extension to the
    * view type that opens it (undocumented; not in the public obsidian.d.ts).
    * Plugins read `app.viewRegistry.typeByExtension` to learn which file types
@@ -970,6 +1012,7 @@ export class AppShim implements IAppShim {
       'secretStorage',
       'setting',
       'showReleaseNotes',
+      'runOpeningBehavior',
       'getAccentColor',
       'isDarkMode',
       // Internal/utility properties
@@ -1016,6 +1059,13 @@ export class AppShim implements IAppShim {
         if (isObjectPrototypeMember(prop)) {
           const value = Reflect.get(target, prop, target);
           return typeof value === 'function' ? value.bind(target) : value;
+        }
+
+        // Own data properties a plugin assigned itself (`app.nvOrig_showReleaseNotes = …`, a
+        // saved original before monkey-patching) are real values — reading them back as a
+        // gap no-op would silently break the plugin's own bookkeeping.
+        if (Object.prototype.hasOwnProperty.call(target, prop)) {
+          return Reflect.get(target, prop, target);
         }
 
         // Non-emulated property: record the gap and warn once per property name.
