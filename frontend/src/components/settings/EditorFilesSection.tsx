@@ -115,6 +115,7 @@ export function EditorFilesSection() {
   // Subscribes to the key; the value shown is the file's own, since an absent key reads here (see the tab reducer)
   useAppConfigValue('defaultViewMode')
   const defaultViewMode = getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'preview'
+  const livePreview = useAppConfigValue('livePreview')
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
   const propertiesInDocument = useAppConfigValue('propertiesInDocument')
   const useTab = useAppConfigValue('useTab')
@@ -207,6 +208,18 @@ export function EditorFilesSection() {
           >
             <option value="preview">{t('settingsUi.misc_readingView')}</option>
             <option value="source">{t('settingsUi.misc_edit')}</option>
+          </select>
+        </SettingRow>
+        <SettingRow label={t('settingsUi.misc_defaultEditMode')} htmlFor="editor-default-edit-mode" hint={t('settingsUi.misc_defaultEditModeHint')}>
+          <select
+            id="editor-default-edit-mode"
+            className="settings-field-input"
+            value={livePreview ? 'live-preview' : 'source'}
+            disabled={disabled}
+            onChange={(e) => void save({ livePreview: e.target.value === 'live-preview' })}
+          >
+            <option value="live-preview">{t('settingsUi.misc_livePreview')}</option>
+            <option value="source">{t('settingsUi.misc_sourceMode')}</option>
           </select>
         </SettingRow>
         <SettingRow label={t('propertiesInDocument.label')} htmlFor="editor-properties-in-document" hint={t('propertiesInDocument.hint')}>
