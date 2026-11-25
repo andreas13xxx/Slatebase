@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.96.0](https://github.com/andreas13xxx/Slatebase/compare/v0.95.0...v0.96.0) (2026-11-25)
+
+
+### Features
+
+* default editing mode setting (livePreview in app.json) ([#453](https://github.com/andreas13xxx/Slatebase/issues/453)) ([9beed70](https://github.com/andreas13xxx/Slatebase/commit/9beed70b66a449d5232ce5b423aeac435b2d9ad3))
+* page preview per source with Ctrl option and new previews ([#455](https://github.com/andreas13xxx/Slatebase/issues/455)) ([4b771d2](https://github.com/andreas13xxx/Slatebase/commit/4b771d23213feb444ada5e987057fbf917d21ddb))
+
+
+### Bugfixes
+
+* **bases:** expose query and viewName to plugin Bases views ([#452](https://github.com/andreas13xxx/Slatebase/issues/452)) ([742a2b9](https://github.com/andreas13xxx/Slatebase/commit/742a2b978dbd5439fdcb53438bb39569ebda0cf5))
+
 ## [0.95.0](https://github.com/andreas13xxx/Slatebase/compare/v0.94.0...v0.95.0) (2026-11-25)
 
 
