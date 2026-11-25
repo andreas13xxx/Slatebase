@@ -279,12 +279,12 @@ export class Menu {
   }
 
   showAtMouseEvent(evt: MouseEvent): this {
-    this.show(evt.clientX, evt.clientY)
+    this.renderAt(evt.clientX, evt.clientY)
     return this
   }
 
   showAtPosition(pos: { x: number; y: number }): this {
-    this.show(pos.x, pos.y)
+    this.renderAt(pos.x, pos.y)
     return this
   }
 
@@ -295,7 +295,7 @@ export class Menu {
    * obsidian-compat.css so plugin and theme CSS can restyle menus the way it
    * does in Obsidian; only the caller-supplied position is set inline.
    */
-  private show(x: number, y: number): void {
+  private renderAt(x: number, y: number): void {
     this.close()
     const overlay = document.createElement('div')
     overlay.className = 'menu-overlay'
@@ -376,7 +376,7 @@ export class Menu {
     const submenu = item.submenu
     if (!submenu || !this.containerEl) return
     const rect = anchor.getBoundingClientRect()
-    submenu.show(rect.right, rect.top)
+    submenu.renderAt(rect.right, rect.top)
     this.submenuEl = submenu.containerEl
   }
 
