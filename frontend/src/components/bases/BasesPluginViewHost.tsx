@@ -119,6 +119,16 @@ export function BasesPluginViewHost({
         for (const [key, value] of Object.entries(forward)) config.setViewData(key, value)
       }
       ;(queryController as { config?: unknown }).config = config
+      // Obsidian's controller exposes the parsed base as `query` (its `views`
+      // with `name`/`groupBy`/…) plus the active `viewName`. TaskNotes' Kanban
+      // reads the grouping from there, not from `config`, and otherwise shows
+      // "requires a Group by property" despite a configured grouping.
+      const viewName = view.name ?? view.type
+      ;(queryController as { query?: unknown; viewName?: string }).query = {
+        ...doc,
+        views: (doc.views ?? []).map((v) => (v === view ? { ...v, name: viewName } : v)),
+      }
+      ;(queryController as { viewName?: string }).viewName = viewName
       // Backs `BasesView.createFileForView()`.
       ;(queryController as { _createFile?: unknown })._createFile = async (
         baseFileName?: string,
