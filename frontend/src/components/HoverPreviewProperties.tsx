@@ -111,6 +111,7 @@ export function HoverPreviewProperties({
         parseError={parseError}
         rawFrontmatter={rawFrontmatter}
         typeRegistry={typeRegistry}
+        sourcePath={filePath}
         hasDocument={true}
         isMarkdown={true}
         onCommit={(key, value) => {

@@ -149,3 +149,28 @@
     opacity: 1;
   }
 }
+
+/* Obsidian-shaped row parts: icon + key sit together in the key column */
+.properties-editor__key-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.properties-editor__key-cell .metadata-property-icon {
+  display: inline-flex;
+  flex: none;
+  padding-top: 3px;
+  color: var(--text-subtle);
+}
+
+.properties-editor__key-cell .metadata-property-icon:empty {
+  display: none;
+}
+
+/* Widgets a plugin draws (nested objects) bring their own layout and may be wider than the cell */
+.properties-editor__value[data-property-type='object'],
+.properties-editor__value[data-property-type='mixed list'] {
+  overflow: visible;
+}

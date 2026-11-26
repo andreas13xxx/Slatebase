@@ -8,12 +8,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Trash2, Plus } from 'lucide-react'
+import { getMetadataTypeManager, fromWidgetType, toWidgetType, type MetadataTypeManager } from '../../plugins/compat/metadata-type-manager'
+import { registerRenderedProperty } from '../../plugins/compat/metadata-editor-bridge'
+import { renderComponentIcon } from '../../plugins/compat/obsidian-api-extensions'
+import { warnOnce } from '../../plugins/compat/log'
+import type { PropertyWidget } from '../../plugins/compat/property-widgets'
+import { PluginPropertyWidget } from './PluginPropertyWidget'
 import {
   TextPropertyControl,
   NumberPropertyControl,
   DatePropertyControl,
   CheckboxPropertyControl,
   ListPropertyControl,
+  StructuredPropertyControl,
 } from './property-controls'
 import { useCommitOnUnmount } from './property-controls/useCommitOnUnmount'
 import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
@@ -50,6 +57,8 @@ export interface PropertiesEditorProps {
   hasDocument?: boolean
   /** Whether the file is a markdown file (non-md files show placeholder). */
   isMarkdown?: boolean
+  /** Path of the note the properties belong to; handed to plugin property widgets as `ctx.sourcePath`. */
+  sourcePath?: string
 }
 
 // ─── Type Inference ──────────────────────────────────────────────────────────
@@ -82,21 +91,59 @@ const ALL_PROPERTY_TYPES: PropertyType[] = [
 
 /**
  * Resolves the effective property type for a key.
- * Registry takes precedence, then inference from the value.
+ * Registry takes precedence, then a plugin-assigned type, then inference from the value.
  */
 function resolvePropertyType(
   key: string,
   value: unknown,
   registry: PropertyTypeEntry[] | null,
+  manager: MetadataTypeManager,
 ): PropertyType {
   if (registry) {
     const entry = registry.find((e) => e.key === key)
     if (entry) return entry.type
   }
+  // A type a plugin assigned through metadataTypeManager.setType()
+  const assigned = fromWidgetType(manager.getAssignedWidget(key) ?? '')
+  if ((ALL_PROPERTY_TYPES as string[]).includes(assigned)) return assigned as PropertyType
   // Well-known keys
   if (key === 'tags') return 'tags'
   if (key === 'aliases') return 'aliases'
   return inferPropertyType(value)
+}
+
+/** What draws a row's value: a built-in control, the YAML editor for nested data, or a widget from a plugin. */
+type RowKind =
+  | { kind: 'builtin'; type: PropertyType }
+  | { kind: 'structured' }
+  | { kind: 'widget'; widget: PropertyWidget }
+
+/** A nested object, or a list holding anything but strings: the built-in text/list controls would flatten it. */
+function isStructuredValue(value: unknown): boolean {
+  if (value === null || typeof value !== 'object' || value instanceof Date) return false
+  return !Array.isArray(value) || value.some((item) => item !== null && typeof item !== 'string')
+}
+
+/** The widget a plugin put in charge of this value (registered, or wrapped around a built-in), if any. */
+function pluginWidgetFor(manager: MetadataTypeManager, key: string, value: unknown): PropertyWidget | null {
+  try {
+    const expected = manager.getTypeInfo(key, value).expected
+    if (expected && !manager.isBuiltinWidget(expected) && typeof expected.render === 'function') return expected
+  } catch (err) {
+    warnOnce('property-type-info', '[PluginCompat] metadataTypeManager.getTypeInfo threw; the built-in control is used instead:', err)
+  }
+  return null
+}
+
+/** The user's registry choice wins; otherwise a plugin widget; nested data stays structured; else a built-in control. */
+function resolveRowKind(key: string, value: unknown, registry: PropertyTypeEntry[] | null, manager: MetadataTypeManager): RowKind {
+  const chosen = registry?.some((entry) => entry.key === key) === true
+  if (!chosen) {
+    const widget = pluginWidgetFor(manager, key, value)
+    if (widget) return { kind: 'widget', widget }
+  }
+  if (isStructuredValue(value)) return { kind: 'structured' }
+  return { kind: 'builtin', type: resolvePropertyType(key, value, registry, manager) }
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -115,8 +162,14 @@ export function PropertiesEditor({
   propertySuggestions = [],
   hasDocument = true,
   isMarkdown = true,
+  sourcePath = '',
 }: PropertiesEditorProps) {
   const { t } = useTranslation()
+  const manager = getMetadataTypeManager()
+  // Re-resolve every row when a plugin registers a widget or assigns a type.
+  const [, setTypesVersion] = useState(0)
+  useEffect(() => manager.onChange(() => { setTypesVersion((v) => v + 1) }), [manager])
+  useEffect(() => { manager.setVaultTypes(typeRegistry ?? []) }, [manager, typeRegistry])
 
   // Tracks the key of a property just created via "Add property", so its row
   // can open already in rename-edit mode — the generated placeholder key
@@ -171,7 +224,7 @@ export function PropertiesEditor({
   // ─── Editable state ────────────────────────────────────────────────────────
 
   return (
-    <div className="properties-editor">
+    <div className="properties-editor metadata-container">
       {entries.length === 0 && !parseError && (
         <p className="properties-editor__placeholder">
           {t('contextPanel.properties.empty')}
@@ -179,13 +232,14 @@ export function PropertiesEditor({
       )}
 
       {entries.length > 0 && (
-        <div className="properties-editor__list">
+        <div className="properties-editor__list metadata-properties">
           {entries.map(([key, value]) => (
             <PropertyRow
               key={key}
               propertyKey={key}
               value={value}
-              type={resolvePropertyType(key, value, typeRegistry)}
+              kind={resolveRowKind(key, value, typeRegistry, manager)}
+              sourcePath={sourcePath}
               existingKeys={entries.filter(([k]) => k !== key).map(([k]) => k)}
               startInEditMode={key === justAddedKey}
               onEditModeExited={() => setJustAddedKey((prev) => (prev === key ? null : prev))}
@@ -213,7 +267,8 @@ export function PropertiesEditor({
 interface PropertyRowProps {
   propertyKey: string
   value: unknown
-  type: PropertyType
+  kind: RowKind
+  sourcePath: string
   /** Other properties' keys, for duplicate-name rejection on rename. */
   existingKeys: string[]
   /** Whether this row should open with the key already in rename-edit mode (just added). */
@@ -230,7 +285,8 @@ interface PropertyRowProps {
 function PropertyRow({
   propertyKey,
   value,
-  type,
+  kind,
+  sourcePath,
   existingKeys,
   startInEditMode,
   onEditModeExited,
@@ -241,6 +297,8 @@ function PropertyRow({
   onTypeChange,
 }: PropertyRowProps) {
   const { t } = useTranslation()
+  const rowRef = useRef<HTMLDivElement>(null)
+  const iconRef = useRef<HTMLSpanElement>(null)
   const [isEditingKey, setIsEditingKey] = useState(startInEditMode)
   const [draftKey, setDraftKey] = useState(propertyKey)
   const keyInputRef = useRef<HTMLInputElement>(null)
@@ -249,6 +307,37 @@ function PropertyRow({
   // flag may not have re-rendered by the time this row unmounts. A row that
   // opens in rename mode (just added) starts out unresolved.
   const keyEditSettledRef = useRef(!startInEditMode)
+
+  // A plugin can set `entry.value` and force the row to draw again (metadataEditor.rendered[].renderProperty).
+  const [forced, setForced] = useState<{ from: unknown; value: unknown; nonce: number } | null>(null)
+  const shownValue = forced !== null && forced.from === value ? forced.value : value
+  const entryRef = useRef<{ key: string; value: unknown }>({ key: '', value: undefined })
+  const valueRef = useRef(value)
+  useEffect(() => {
+    entryRef.current.key = propertyKey
+    entryRef.current.value = value
+    valueRef.current = value
+  })
+  useEffect(() => {
+    const containerEl = rowRef.current
+    if (!containerEl) return undefined
+    return registerRenderedProperty({
+      containerEl,
+      entry: entryRef.current,
+      sourcePath,
+      renderProperty: (entry) => {
+        setForced((previous) => ({ from: valueRef.current, value: entry.value, nonce: (previous?.nonce ?? 0) + 1 }))
+      },
+    })
+  }, [sourcePath])
+
+  const widgetType = kind.kind === 'builtin' ? toWidgetType(kind.type) : kind.kind === 'widget' ? kind.widget.type : 'unknown'
+  const iconId = kind.kind === 'widget' ? kind.widget.icon : kind.kind === 'structured' ? 'lucide-braces' : getMetadataTypeManager().getWidget(widgetType)?.icon
+  useEffect(() => {
+    const iconEl = iconRef.current
+    // A plugin widget may already have drawn its own icon into the span (setIcon); keep that.
+    if (iconEl && iconId && !(kind.kind === 'widget' && iconEl.childElementCount > 0)) renderComponentIcon(iconEl, iconId)
+  }, [iconId, kind.kind])
 
   useEffect(() => {
     if (isEditingKey) {
@@ -308,49 +397,65 @@ function PropertyRow({
   }, [commitKeyEdit, cancelKeyEdit])
 
   return (
-    <div className="properties-editor__row">
-      {isEditingKey ? (
-        <input
-          ref={keyInputRef}
-          type="text"
-          className="properties-editor__key-input"
-          value={draftKey}
-          onChange={(e) => setDraftKey(e.target.value)}
-          onBlur={commitKeyEdit}
-          onKeyDown={handleKeyInputKeyDown}
-          aria-label={t('contextPanel.properties.propertyNameAriaLabel')}
-        />
-      ) : (
-        <button
-          type="button"
-          className="properties-editor__key"
-          title={t('contextPanel.properties.renamePropertyTitle')}
-          onClick={startEditingKey}
-        >
-          {propertyKey}
-        </button>
-      )}
-      <div className="properties-editor__value">
+    <div
+      ref={rowRef}
+      className="properties-editor__row metadata-property"
+      data-property-key={propertyKey}
+      data-property-type={widgetType}
+      tabIndex={kind.kind === 'widget' ? -1 : undefined}
+    >
+      <div className="properties-editor__key-cell metadata-property-key">
+        <span ref={iconRef} className="metadata-property-icon" aria-hidden="true" />
+        {isEditingKey ? (
+          <input
+            ref={keyInputRef}
+            type="text"
+            className="properties-editor__key-input metadata-property-key-input"
+            value={draftKey}
+            onChange={(e) => setDraftKey(e.target.value)}
+            onBlur={commitKeyEdit}
+            onKeyDown={handleKeyInputKeyDown}
+            aria-label={t('contextPanel.properties.propertyNameAriaLabel')}
+          />
+        ) : (
+          <button
+            type="button"
+            className="properties-editor__key"
+            title={t('contextPanel.properties.renamePropertyTitle')}
+            onClick={startEditingKey}
+          >
+            {propertyKey}
+          </button>
+        )}
+      </div>
+      <div className="properties-editor__value metadata-property-value" data-property-type={widgetType}>
         <PropertyValueControl
-          type={type}
-          value={value}
+          key={forced?.nonce ?? 0}
+          kind={kind}
+          propertyKey={propertyKey}
+          sourcePath={sourcePath}
+          value={shownValue}
           onChange={handleChange}
           tagSuggestions={tagSuggestions}
         />
       </div>
-      <select
-        className="properties-editor__type-select"
-        value={type}
-        onChange={handleTypeChange}
-        aria-label={t('contextPanel.properties.typeAriaLabel')}
-        title={t('contextPanel.properties.typeAriaLabel')}
-      >
-        {ALL_PROPERTY_TYPES.map((option) => (
-          <option key={option} value={option}>
-            {t(`contextPanel.properties.types.${option}`)}
-          </option>
-        ))}
-      </select>
+      {kind.kind === 'builtin' ? (
+        <select
+          className="properties-editor__type-select"
+          value={kind.type}
+          onChange={handleTypeChange}
+          aria-label={t('contextPanel.properties.typeAriaLabel')}
+          title={t('contextPanel.properties.typeAriaLabel')}
+        >
+          {ALL_PROPERTY_TYPES.map((option) => (
+            <option key={option} value={option}>
+              {t(`contextPanel.properties.types.${option}`)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span aria-hidden="true" />
+      )}
       <button
         type="button"
         className="properties-editor__delete-btn"
@@ -367,14 +472,22 @@ function PropertyRow({
 // ─── PropertyValueControl ────────────────────────────────────────────────────
 
 interface PropertyValueControlProps {
-  type: PropertyType
+  kind: RowKind
+  propertyKey: string
+  sourcePath: string
   value: unknown
   onChange: (newValue: unknown) => void
   tagSuggestions: string[]
 }
 
-function PropertyValueControl({ type, value, onChange, tagSuggestions }: PropertyValueControlProps) {
-  switch (type) {
+function PropertyValueControl({ kind, propertyKey, sourcePath, value, onChange, tagSuggestions }: PropertyValueControlProps) {
+  if (kind.kind === 'widget') {
+    return <PluginPropertyWidget widget={kind.widget} propertyKey={propertyKey} sourcePath={sourcePath} value={value} onChange={onChange} />
+  }
+  if (kind.kind === 'structured') {
+    return <StructuredPropertyControl value={value} onChange={onChange} />
+  }
+  switch (kind.type) {
     case 'checkbox':
       return <CheckboxPropertyControl value={value as boolean | string} onChange={onChange} />
 

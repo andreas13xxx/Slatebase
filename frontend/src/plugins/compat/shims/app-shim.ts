@@ -19,6 +19,7 @@ import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian
 import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
 import { createAppInternals } from '../app-internals';
+import { getMetadataTypeManager } from '../metadata-type-manager';
 import { resolveActiveTheme } from '../body-classes';
 import { getRegisteredExtensionTypeMap } from '../file-view-registry';
 import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
@@ -640,79 +641,11 @@ export class AppShim implements IAppShim {
   }
 
   /**
-   * metadataTypeManager — Obsidian-internal registry of frontmatter property
-   * types (undocumented; backs the Properties view's type icons/pickers).
-   * obsidian-tasks-plugin reads `getAllProperties()` on startup and calls
-   * `setType()` to register its own fields (e.g. "due" as a date) so they get
-   * the right editor in Obsidian's Properties view. Slatebase has no
-   * Properties view to reflect these into, so `setType` just records them —
-   * enough that `getAllProperties()`/`getPropertyInfo()` echo back what a
-   * plugin registered instead of crashing on a missing method.
-   *
-   * `registeredTypeWidgets` maps a widget type (`text`, `list`, ...) to its
-   * descriptor. Plugins such as Nested Properties read an entry and wrap or
-   * register their own; Slatebase renders properties itself, so the entries
-   * are inert descriptors (no-op `render`, accept-all `validate`).
+   * metadataTypeManager - Obsidian's registry of property types and their widgets. One
+   * window-wide instance (see metadata-type-manager.ts) shared with the property
+   * editor, so widgets and getTypeInfo patches a plugin installs take effect there.
    */
-  readonly metadataTypeManager = {
-    registeredTypeWidgets: Object.fromEntries(
-      ['text', 'multitext', 'list', 'number', 'checkbox', 'date', 'datetime', 'tags', 'aliases', 'unknown'].map(
-        (type) => [
-          type,
-          {
-            type,
-            icon: 'lucide-text',
-            name: () => type,
-            default: (): unknown => '',
-            validate: (): boolean => true,
-            render: (): void => {},
-          },
-        ],
-      ),
-    ) as Record<string, Record<string, unknown>>,
-    properties: {} as Record<string, { name: string; type: string }>,
-    getAllProperties: (): Record<string, { name: string; type: string }> => this.metadataTypeManager.properties,
-    getPropertyInfo: (property: string): { name: string; type: string } | undefined => {
-      const key = property.toLowerCase();
-      // Own keys only: a property named `constructor` must not resolve to Object.prototype's.
-      return Object.hasOwn(this.metadataTypeManager.properties, key) ? this.metadataTypeManager.properties[key] : undefined;
-    },
-    setType: (property: string, type: string): void => {
-      this.metadataTypeManager.properties[property.toLowerCase()] = { name: property, type };
-    },
-    /** Removes a registered type so the property falls back to inference. */
-    unsetType: (property: string): void => {
-      delete this.metadataTypeManager.properties[property.toLowerCase()];
-    },
-    /** Widget for a type name; unknown names resolve to the `unknown` widget, as in Obsidian. */
-    getWidget: (type: string): Record<string, unknown> | undefined => {
-      const widgets = this.metadataTypeManager.registeredTypeWidgets;
-      return Object.hasOwn(widgets, type) ? widgets[type] : widgets['unknown'];
-    },
-    /** Widget explicitly assigned to a property via `setType`, or null. */
-    getAssignedWidget: (property: string): Record<string, unknown> | null => {
-      const assigned = this.metadataTypeManager.getPropertyInfo(property)
-      const widgets = this.metadataTypeManager.registeredTypeWidgets
-      return assigned && Object.hasOwn(widgets, assigned.type) ? (widgets[assigned.type] ?? null) : null
-    },
-    /**
-     * `{ expected, inferred }` widgets for a property and value. `inferred` comes from the value's JS type,
-     * `expected` is the assigned widget, else the inferred one. Plugins patch this method, so it must exist.
-     */
-    getTypeInfo: (
-      property: string,
-      value: unknown,
-    ): { expected: Record<string, unknown> | undefined; inferred: Record<string, unknown> | undefined } => {
-      const manager = this.metadataTypeManager
-      let inferredType = 'unknown'
-      if (typeof value === 'boolean') inferredType = 'checkbox'
-      else if (typeof value === 'number') inferredType = 'number'
-      else if (typeof value === 'string') inferredType = 'text'
-      else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) inferredType = 'multitext'
-      const inferred = manager.getWidget(inferredType)
-      return { expected: manager.getAssignedWidget(property) ?? inferred, inferred }
-    },
-  }
+  readonly metadataTypeManager = getMetadataTypeManager()
 
   /**
    * keymap — Obsidian's hotkey scope manager. Views and modals push their own

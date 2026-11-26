@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { locateFrontmatterBlock, serializeFrontmatter, applyFrontmatterChange } from './frontmatterWriter'
+import { parseFrontmatter } from '../components/context-panel/utils/parseFrontmatter'
 
 describe('locateFrontmatterBlock', () => {
   it('returns location for valid frontmatter', () => {
@@ -150,5 +151,38 @@ describe('applyFrontmatterChange', () => {
     const content = '---\ntitle: x\n---'
     const result = applyFrontmatterChange(content, { title: 'New' })
     expect(result).toContain('title: New')
+  })
+})
+
+describe('serializeFrontmatter — nested values', () => {
+  const roundTrip = (data: Record<string, unknown>): unknown => {
+    const yaml = serializeFrontmatter(data)
+    const parsed = parseFrontmatter(`---\n${yaml}\n---\n`)
+    expect(parsed.parseError).toBeNull()
+    return parsed.data
+  }
+
+  it('writes nested objects as block YAML, never [object Object]', () => {
+    const yaml = serializeFrontmatter({ meta: { author: { name: 'Jörg', tags: ['a', 'b'] }, year: 2024 } })
+    expect(yaml).not.toContain('[object Object]')
+    expect(yaml).toContain('meta:\n  author:\n    name: Jörg')
+  })
+
+  it('round-trips objects, mixed lists, umlauts and special characters', () => {
+    const data = {
+      title: 'Plain',
+      meta: { 'ä key': 'Größe: 5 #x', nested: { deep: [1, 'two', { three: true }] }, empty: {}, nothing: null },
+      mixed: ['text', 2, false, { a: 'b' }, ['inner', 3]],
+      numbers: [1, 2, 3, 4, 5],
+    }
+    expect(roundTrip(data)).toEqual(data)
+  })
+
+  it('keeps numbers in lists typed instead of quoting them', () => {
+    expect(serializeFrontmatter({ n: [1, 2] })).toBe('n:\n  - 1\n  - 2')
+  })
+
+  it('keeps flat string lists on the compact path', () => {
+    expect(serializeFrontmatter({ tags: ['a', 'b'] })).toBe('tags: [a, b]')
   })
 })

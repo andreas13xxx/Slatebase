@@ -770,6 +770,9 @@ export const de = {
       notMarkdown: 'Keine Eigenschaften für diesen Dateityp',
       deleteProperty: 'Eigenschaft entfernen',
       deletePropertyAriaLabel: '{key} entfernen',
+      structuredAriaLabel: 'Verschachtelter Wert (YAML)',
+      structuredInvalid: 'Ungültiges YAML',
+      widgetError: 'Dieser Wert konnte nicht dargestellt werden',
       addProperty: 'Eigenschaft hinzufügen',
       renamePropertyTitle: 'Zum Umbenennen klicken',
       propertyNameAriaLabel: 'Name der Eigenschaft',
@@ -783,6 +786,7 @@ export const de = {
         list: 'Liste',
         tags: 'Tags',
         aliases: 'Aliase',
+        unknown: 'Unbekannt',
       },
     },
     propertiesOverview: {

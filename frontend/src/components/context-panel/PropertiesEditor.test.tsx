@@ -3,6 +3,8 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PropertiesEditor } from './PropertiesEditor'
 import type { PropertiesEditorProps } from './PropertiesEditor'
+import { getMetadataTypeManager } from '../../plugins/compat/metadata-type-manager'
+import type { PropertyWidget } from '../../plugins/compat/property-widgets'
 
 function renderEditor(overrides: Partial<PropertiesEditorProps> = {}) {
   const props: PropertiesEditorProps = {
@@ -131,5 +133,58 @@ describe('PropertiesEditor — type selection', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Typ' }), 'checkbox')
 
     expect(onTypeChange).toHaveBeenCalledWith('title', 'checkbox')
+  })
+})
+
+describe('PropertiesEditor - nested values and plugin widgets', () => {
+  it('shows a nested object as editable YAML instead of [object Object]', () => {
+    renderEditor({ data: { meta: { a: { b: 1 } } } })
+    const area = screen.getByRole('textbox', { name: 'Verschachtelter Wert (YAML)' })
+    expect(area).toHaveValue('a:\n  b: 1')
+  })
+
+  it('commits edited YAML of a nested value as data', async () => {
+    const onCommit = vi.fn()
+    renderEditor({ data: { meta: { a: 1 } }, onCommit })
+    const area = screen.getByRole('textbox', { name: 'Verschachtelter Wert (YAML)' })
+    await userEvent.clear(area)
+    await userEvent.type(area, 'z: 2')
+    await userEvent.tab()
+    expect(onCommit).toHaveBeenCalledWith('meta', { z: 2 })
+  })
+
+  it('draws a plugin-registered widget through render() and forwards ctx.onChange', async () => {
+    const manager = getMetadataTypeManager()
+    const widget: PropertyWidget = {
+      type: 'object',
+      icon: 'lucide-braces',
+      name: () => 'Object',
+      default: () => ({}),
+      validate: (v) => typeof v === 'object',
+      render: (el, value, ctx) => {
+        const b = document.createElement('button')
+        b.textContent = `custom:${ctx.key}:${JSON.stringify(value)}`
+        b.addEventListener('click', () => { ctx.onChange({ replaced: true }) })
+        el.appendChild(b)
+        return { type: 'object', focus: () => {} }
+      },
+    }
+    manager.registeredTypeWidgets['object'] = widget
+    const original = manager.getTypeInfo
+    manager.getTypeInfo = (key, value) => {
+      const info = original(key, value)
+      if (info.inferred?.type === 'unknown' && value !== null && typeof value === 'object') return { inferred: widget, expected: widget }
+      return info
+    }
+    try {
+      const onCommit = vi.fn()
+      renderEditor({ data: { meta: { a: 1 } }, onCommit, sourcePath: 'n.md' })
+      await userEvent.click(screen.getByRole('button', { name: 'custom:meta:{"a":1}' }))
+      expect(onCommit).toHaveBeenCalledWith('meta', { replaced: true })
+      expect(document.querySelector('.metadata-property[data-property-key="meta"]')).not.toBeNull()
+    } finally {
+      manager.getTypeInfo = original
+      delete manager.registeredTypeWidgets['object']
+    }
   })
 })

@@ -128,6 +128,8 @@ import { debugOnce, warnNoOp, warnOnce } from './log'
 import { createEventSurface, isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
 import { createEmbedRegistryShim } from './embed-registry'
+import { getMetadataTypeManager } from './metadata-type-manager'
+import { createMetadataEditorShim, type MetadataEditorHost } from './metadata-editor-shim'
 import { closingMarkType } from '../../editor/token-class-node-prop'
 // Aliased: the Plugin methods below carry the same names and would read as
 // recursive calls otherwise.
@@ -1337,6 +1339,8 @@ export function installObsidianGlobals(): void {
       // extraction hack; see embed-registry.ts's seedKanbanMarkdownEmbed for
       // why). A plugin registering through one must be visible through all.
       embedRegistry: createEmbedRegistryShim(),
+      // The same window-wide manager every AppShim hands out and the property editor reads.
+      metadataTypeManager: getMetadataTypeManager(),
       // Placeholder until PluginProvider swaps in the real manager backed by the
       // shared CommandRegistry (see plugin-context.ts). A plugin that reads
       // `window.app.commands` during bundle evaluation — before that swap — gets
@@ -2435,6 +2439,17 @@ export function installObsidianGlobals(): void {
         })
       }
       // previewMode is defined further down, once MarkdownPreviewView exists.
+    }
+    // `metadataEditor`: the properties block of the note, bound to the real editor.
+    if (MV?.prototype && !Object.getOwnPropertyDescriptor(MV.prototype, 'metadataEditor')) {
+      Object.defineProperty(MV.prototype, 'metadataEditor', {
+        get(this: MetadataEditorHost & { _metadataEditor?: unknown }) {
+          this._metadataEditor ??= createMetadataEditorShim(this)
+          return this._metadataEditor
+        },
+        configurable: true,
+        enumerable: true,
+      })
     }
   }
 
