@@ -89,7 +89,7 @@ Threshold rules live in `quality.md`.
 | hono | HTTP framework |
 | @hono/node-server | Node.js adapter for Hono |
 | @modelcontextprotocol/sdk | MCP SDK (Streamable HTTP transport) |
-| zod | Schema validation (v3 — frontend uses v4, versions are not shared across the two packages) |
+| zod | Schema validation (v4, exact pin — same major as frontend and `shared-contracts`; keep all three on one patched version) |
 | pino | Structured logging |
 | tsx | Dev server |
 | argon2 | Password hashing (argon2id) |
@@ -140,7 +140,7 @@ Threshold rules live in `quality.md`.
 | moment | Date/time formatting (Calendar plugin compat) |
 | buffer | Node `Buffer` polyfill for plugin bundles (obsidian-git/isomorphic-git reference it at module top level) |
 | dompurify | Sanitizes raw HTML blocks before they are rendered as real DOM (reading view) |
-| zod | Schema validation (canvas parser, frontend-side; v4 — backend uses v3, versions are not shared across the two packages) |
+| zod | Schema validation (canvas parser, frontend-side; v4, exact pin — same major as backend and `shared-contracts`) |
 | fast-check | Property-based testing (devDependency, `.pbt.test.ts` files, e.g. `chatState.bugfix.test.ts`, `chatState.preservation.test.ts`) |
 
 ### Geplant

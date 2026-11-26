@@ -40,7 +40,7 @@ Import tut. Aktivierung, Anzeige, Löschen und `vault:change`-Ereignisse bleiben
 | Datei | Inhalt |
 |---|---|
 | `types.ts` | `CommunityThemeEntry { name, author, repo, screenshot, modes, legacy? }`, `ThemeStoreUpdate { themeId, name, installed, latest, repo }`, `IThemeStoreClient`, `IThemeStoreService` |
-| `validation.ts` | Zod-Schema für Katalogeinträge (Backend nutzt Zod 3), `isValidRepo`, `normalizeScreenshotPath`, `isNewerVersion` (SemVer, tolerant gegenüber `v`-Präfix; nicht parsbar → `unknown`) |
+| `validation.ts` | Zod-Schema für Katalogeinträge (Backend nutzt Zod 4), `isValidRepo`, `normalizeScreenshotPath`, `isNewerVersion` (SemVer, tolerant gegenüber `v`-Präfix; nicht parsbar → `unknown`) |
 | `errors.ts` | `ThemeStoreFetchError`, `ThemeNotInCatalogError`, `ThemeStoreAssetTooLargeError`, `ThemeStoreOfflineError` |
 | `theme-store-client.ts` | `fetchCatalog()`, `fetchThemeFiles(repo)`, `fetchScreenshot(repo, path)`; baut URLs nur aus validiertem `repo`; Größenlimits aus R3/R5 |
 | `theme-store-cache.ts` | Katalog (TTL 1 h, Datei persistiert), Remote-Manifeste (TTL 15 min), Update-Ergebnisse pro Vault (TTL 15 min, nicht persistiert) |

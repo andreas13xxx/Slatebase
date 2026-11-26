@@ -17,12 +17,12 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "zod": "^4.5.4"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "typescript": "~6.0.2",
     "vitest": "^5.0.4",
-    "zod": "^4.5.4"
+    "zod": "4.6.7"
   },
   "dependencies": {
     "moment": "2.31.0",
