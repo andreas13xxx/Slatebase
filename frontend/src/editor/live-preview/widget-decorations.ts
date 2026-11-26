@@ -20,6 +20,8 @@ import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, 
 import { PropertiesEditor, type PropertiesEditorProps } from '../../components/context-panel/PropertiesEditor'
 import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
 import { serializeFrontmatter, locateFrontmatterBlock } from '../../utils/frontmatterWriter'
+import { translateNow } from '../../i18n'
+import { isPropertiesCollapsed, setPropertiesCollapsed } from '../../utils/propertiesCollapse'
 import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
 
 /**
@@ -1510,12 +1512,40 @@ class FrontmatterWidget extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
+    const outer = document.createElement('div')
+    outer.className = 'cm-lp-frontmatter'
+
+    const toggle = document.createElement('button')
+    toggle.type = 'button'
+    toggle.className = 'cm-lp-frontmatter-title'
+    toggle.textContent = translateNow('commonUi.c_properties')
+    toggle.setAttribute('aria-label', translateNow('commonUi.c_propertiesToggle'))
+    outer.appendChild(toggle)
+
     const container = document.createElement('div')
-    container.className = 'cm-lp-frontmatter'
+    container.className = 'cm-lp-frontmatter-body'
+    outer.appendChild(container)
+
+    const applyCollapsed = (): void => {
+      const folded = isPropertiesCollapsed()
+      container.hidden = folded
+      outer.classList.toggle('cm-lp-frontmatter--collapsed', folded)
+      toggle.setAttribute('aria-expanded', String(!folded))
+    }
+    applyCollapsed()
+    // Keep CM6 (cursor placement, reveal-raw-YAML on click) out of the header.
+    toggle.addEventListener('mousedown', (e) => { e.stopPropagation() })
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setPropertiesCollapsed(!isPropertiesCollapsed())
+      applyCollapsed()
+      view.requestMeasure()
+    })
 
     if (this.readOnly) {
       this.renderReadOnly(container)
-      return container
+      return outer
     }
 
     // Prevent CM6's own keymaps — and Prec.highest plugin keymaps, like the
@@ -1553,7 +1583,7 @@ class FrontmatterWidget extends WidgetType {
         view.requestMeasure()
       }
     })
-    return container
+    return outer
   }
 
   /**

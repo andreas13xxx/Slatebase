@@ -2440,6 +2440,8 @@ export const de = {
     c_vm_backToRef: 'Zurück zum Verweis',
     c_vm_openLink: 'Link öffnen',
     c_vm_footnotes: 'Fußnoten',
+    c_properties: 'Eigenschaften',
+    c_propertiesToggle: 'Eigenschaften ein- oder ausklappen',
     c_vm_open: 'Öffnen',
     c_dz_tooMany: 'Maximal {max} Dateien pro Drop-Vorgang erlaubt ({n} ausgewählt)',
     c_dz_tooBig: '"{name}" überschreitet die maximale Dateigröße von {mb} MB',

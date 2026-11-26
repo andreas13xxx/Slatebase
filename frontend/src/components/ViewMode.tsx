@@ -1,5 +1,6 @@
 import { type ReactNode, type PointerEvent as ReactPointerEvent, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
 import { translateNow } from '../i18n'
+import { isPropertiesCollapsed, setPropertiesCollapsed } from '../utils/propertiesCollapse'
 import { scrollToHeadingAnchor, scrollToBlockAnchor } from '../utils/scrollToAnchor'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -1098,7 +1099,15 @@ function renderFrontmatter(yamlContent: string, key: string): ReactNode {
       )
     })
 
-    return createElement('div', { key, className: 'view-mode-frontmatter' },
+    return createElement('details', {
+      key,
+      className: 'view-mode-frontmatter',
+      open: !isPropertiesCollapsed(),
+      onToggle: (e: React.SyntheticEvent<HTMLDetailsElement>) => {
+        setPropertiesCollapsed(!e.currentTarget.open)
+      },
+    },
+      createElement('summary', { className: 'view-mode-frontmatter-title' }, translateNow('commonUi.c_properties')),
       createElement('table', { className: 'view-mode-frontmatter-table' },
         createElement('tbody', null, ...rows),
       ),

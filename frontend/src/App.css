@@ -2406,6 +2406,13 @@
   margin-bottom: 16px;
   font-size: 13px;
 }
+.view-mode-frontmatter-title {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.view-mode-frontmatter:not([open]) .view-mode-frontmatter-title { margin-bottom: 0; }
 .view-mode-frontmatter-table { width: 100%; border-collapse: collapse; }
 .view-mode-frontmatter-table th {
   text-align: left;

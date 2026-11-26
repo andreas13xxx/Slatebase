@@ -2446,6 +2446,8 @@ export const en: TranslationShape = {
     c_vm_backToRef: 'Back to reference',
     c_vm_openLink: 'Open link',
     c_vm_footnotes: 'Footnotes',
+    c_properties: 'Properties',
+    c_propertiesToggle: 'Expand or collapse properties',
     c_vm_open: 'Open',
     c_dz_tooMany: 'A maximum of {max} files per drop is allowed ({n} selected)',
     c_dz_tooBig: '"{name}" exceeds the maximum file size of {mb} MB',

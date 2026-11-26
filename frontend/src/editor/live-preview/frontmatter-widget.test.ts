@@ -9,6 +9,7 @@ import { GFM } from '@lezer/markdown'
 import { createLivePreviewField, createLivePreviewClickHandler } from './live-preview-extension'
 import type { LivePreviewOptions } from './live-preview-extension'
 import type { PropertyTypeEntry } from '../../state/propertyTypes'
+import { setPropertiesCollapsed } from '../../utils/propertiesCollapse'
 
 /**
  * End-to-end checks (real EditorView + real DOM, no app/auth needed) for the
@@ -65,6 +66,25 @@ describe('Interactive frontmatter box', () => {
     expect(view.dom.querySelector('.properties-editor__key')?.textContent).toBe('title')
     // The old read-only text-parsing render's classes should not appear.
     expect(view.dom.querySelector('.cm-lp-frontmatter-key')).toBeNull()
+  })
+
+  it('shows an "Eigenschaften" heading that folds and unfolds the box', async () => {
+    const { view, parent } = mount(DOC)
+    cleanup = () => { view.destroy(); parent.remove(); setPropertiesCollapsed(false) }
+    await flushMicrotasks()
+
+    const toggle = view.dom.querySelector('.cm-lp-frontmatter-title') as HTMLButtonElement
+    const body = view.dom.querySelector('.cm-lp-frontmatter-body') as HTMLElement
+    expect(toggle.textContent).toBe('Eigenschaften')
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(body.hidden).toBe(false)
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(body.hidden).toBe(true)
+
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(false)
   })
 
   it('falls back to the read-only summary when the editor is read-only', () => {
