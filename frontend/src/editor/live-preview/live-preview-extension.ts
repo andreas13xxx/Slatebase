@@ -16,6 +16,7 @@ import { getAliasMapSnapshot } from '../../state/aliasStore'
 import { requestHoverPreview, dismissHoverPreview } from '../../plugins/compat/hover-link-bus'
 import { editorInfoField } from '../editor-state-fields'
 import { openExternalUrl } from '../../utils/externalUrl'
+import { resolveMarkdownLinkTarget } from '../../utils/internalLink'
 
 /** Narrows the host client, which may lack `searchVault`, for ```` ```query ```` blocks. */
 function hasSearch<T extends object>(client: T | null | undefined): client is T & ISearchEmbedApiClient {
@@ -467,7 +468,9 @@ export function createLivePreviewClickHandler(options: LivePreviewOptions): Exte
           event.preventDefault()
           event.stopPropagation()
           if (!openExternalUrl(url) && options.onInternalLinkClick) {
-            options.onInternalLinkClick(url)
+            const sourcePath = view.state.field(editorInfoField, false)?.file?.path ?? ''
+            const resolved = resolveMarkdownLinkTarget(url, sourcePath)
+            if (resolved) options.onInternalLinkClick(resolved)
           }
           return
         }

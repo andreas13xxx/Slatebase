@@ -40,3 +40,48 @@ export function resolveAttachmentTargetDir(attachmentFolderPath: string, notePat
   }
   return configured.replace(/^\/+|\/+$/g, '')
 }
+
+/**
+ * Turns the raw destination of a Markdown link (`[text](<./My note.md#Heading>)`) into a
+ * vault-relative note path, or `null` when nothing is left (e.g. a pure `#anchor`).
+ *
+ * Handles what the Lezer tree leaves untouched: the `<…>` wrapper (needed for spaces), `%20`
+ * escapes, a trailing `#anchor`, and `./` / `../` segments, which are relative to the folder
+ * of the note holding the link. A path without extension gets `.md`, as Obsidian does.
+ */
+export function resolveMarkdownLinkTarget(rawUrl: string, sourcePath: string): string | null {
+  let url = rawUrl.trim()
+  if (url.startsWith('<') && url.endsWith('>')) url = url.slice(1, -1).trim()
+
+  const hash = url.indexOf('#')
+  if (hash !== -1) url = url.slice(0, hash)
+  if (url === '') return null
+  // Other schemes (javascript:, data:, mailto:, …) are no vault paths: hand them back untouched.
+  if (/^[a-z][a-z0-9+.-]+:/i.test(url)) return rawUrl
+
+  try {
+    url = decodeURIComponent(url)
+  } catch {
+    // Malformed escape: keep the text as written.
+  }
+  url = url.replace(/\\/g, '/')
+
+  const isVaultRooted = url.startsWith('/')
+  const baseDir = !isVaultRooted && sourcePath.includes('/')
+    ? sourcePath.slice(0, sourcePath.lastIndexOf('/')).split('/')
+    : []
+  const segments = [...baseDir]
+  for (const part of url.split('/')) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      segments.pop()
+      continue
+    }
+    segments.push(part)
+  }
+  if (segments.length === 0) return null
+
+  const resolved = segments.join('/')
+  const last = segments[segments.length - 1] ?? ''
+  return last.includes('.') ? resolved : `${resolved}.md`
+}
