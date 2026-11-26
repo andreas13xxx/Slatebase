@@ -708,6 +708,49 @@
   font-style: italic;
 }
 
+.cm-lp-frontmatter-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cm-lp-frontmatter-title::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.12s ease;
+  transform: rotate(90deg);
+}
+
+.cm-lp-frontmatter--collapsed .cm-lp-frontmatter-title::before {
+  transform: none;
+}
+
+.cm-lp-frontmatter-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cm-lp-frontmatter-body {
+  margin-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-lp-frontmatter-title::before { transition: none; }
+}
+
 .cm-lp-frontmatter-row {
   display: flex;
   align-items: baseline;

@@ -4,6 +4,7 @@ import { syntaxTree } from '@codemirror/language'
 import type { HideableRange } from './inline-decorations'
 import { openExternalUrl } from '../../utils/externalUrl'
 import { resolveWikilinkTarget } from '../../plugins/link-resolver'
+import { resolveMarkdownLinkTarget } from '../../utils/internalLink'
 import type { DirectoryTree } from '../../types'
 import { getAliasMapSnapshot } from '../../state/aliasStore'
 
@@ -315,7 +316,8 @@ export function createLinkClickHandler(options: LinkDecorationOptions): Extensio
               // data:, vbscript:, vault paths) is treated as an internal link,
               // matching createLivePreviewClickHandler.
               if (!openExternalUrl(url) && options.onInternalLinkClick) {
-                options.onInternalLinkClick(url)
+                const target = resolveMarkdownLinkTarget(url, options.sourcePath ?? '')
+                if (target) options.onInternalLinkClick(target)
               }
               return true
             }

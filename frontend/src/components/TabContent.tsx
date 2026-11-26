@@ -29,6 +29,7 @@ import { FileRecoveryView } from './FileRecoveryView'
 import { getRecent, subscribe as subscribeRecentFiles, getVersion as getRecentFilesVersion } from '../state/recentFilesStore'
 import { EMPTY_TAB_PATH, RECOVERY_TAB_PREFIX } from '../plugins/compat/pane-layout'
 import { extractErrorMessage } from '../utils/error'
+import { ensureLinkTarget } from '../utils/ensureLinkTarget'
 import { PluginContext } from '../plugins/compat/plugin-context'
 import { findFileViewMatch, getActiveFileView, setActiveFileView, removeActiveFileView } from '../plugins/compat/file-view-registry'
 import { resolveAttachmentTargetDir } from '../utils/internalLink'
@@ -270,30 +271,30 @@ export function TabContent() {
       // Clear any previous link error
       setLinkError(null)
 
-      // Check if the file exists in the directory tree (broken link detection)
-      const fileExists = pathExistsInTree(appState.directoryTree, targetPath)
+      // Check the tree of the vault the link was clicked in (not the legacy single-vault tree).
+      const tree = appState.vaultTrees[activeTabVaultId] ?? appState.directoryTree
 
-      if (!fileExists) {
-        // Broken link: create the file with empty content first, then open tab
-        // Validates: Requirements 6.4, 6.5
-        try {
-          await apiClient.saveFile(activeTabVaultId, targetPath, '')
+      try {
+        const outcome = await ensureLinkTarget(
+          apiClient, activeTabVaultId, targetPath, pathExistsInTree(tree, targetPath),
+        )
+        if (outcome === 'created') {
           // Refresh the directory tree so the new file appears in the Explorer
-          const tree = await apiClient.fetchVaultTree(activeTabVaultId)
-          appDispatch({ type: 'TREE_LOADED', payload: tree })
-        } catch (err: unknown) {
-          // File creation failed — show error notification, maintain current view
-          const message = extractErrorMessage(err, t('tabContent.linkCreateUnexpected'))
-          setLinkError(t('tabContent.linkCreateError', { fileName, message }))
-          return
+          const newTree = await apiClient.fetchVaultTree(activeTabVaultId)
+          appDispatch({ type: 'VAULT_TREE_LOADED', payload: { vaultId: activeTabVaultId, tree: newTree } })
         }
+      } catch (err: unknown) {
+        // Lookup or creation failed — show error notification, maintain current view
+        const message = extractErrorMessage(err, t('tabContent.linkCreateUnexpected'))
+        setLinkError(t('tabContent.linkCreateError', { fileName, message }))
+        return
       }
 
       // Open the file in a new tab via the openTab action creator
       // Validates: Requirement 6.3
       await openTab(tabDispatch, appDispatch, apiClient, activeTabVaultId, targetPath, fileName)
     },
-    [activeTabVaultId, tabDispatch, appDispatch, appState.directoryTree, apiClient],
+    [activeTabVaultId, tabDispatch, appDispatch, appState.directoryTree, appState.vaultTrees, apiClient, t],
   )
 
   /**
