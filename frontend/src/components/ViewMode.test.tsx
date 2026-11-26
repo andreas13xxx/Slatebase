@@ -452,7 +452,25 @@ describe('ViewMode', () => {
       const link = container.querySelector('a.view-mode-link--internal')
       expect(link).not.toBeNull()
       link?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      expect(onClick).toHaveBeenCalledWith('./other.md')
+      expect(onClick).toHaveBeenCalledWith('other.md')
+    })
+
+    it('resolves ./ and <> links against the folder of the note (sourcePath)', () => {
+      const onClick = vi.fn()
+      const { container } = render(
+        <ViewMode {...defaultProps} sourcePath="docs/Index.md" content={"[N](<./01 Nested objects.md>)"} onInternalLinkClick={onClick} />
+      )
+      container.querySelector('a.view-mode-link--internal')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      expect(onClick).toHaveBeenCalledWith('docs/01 Nested objects.md')
+    })
+
+    it('does not open a note for a pure #anchor link', () => {
+      const onClick = vi.fn()
+      const { container } = render(
+        <ViewMode {...defaultProps} content={"[Top](#section)"} onInternalLinkClick={onClick} />
+      )
+      container.querySelector('a.view-mode-link--internal')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      expect(onClick).not.toHaveBeenCalled()
     })
   })
 

@@ -1,6 +1,7 @@
 import { type ReactNode, type PointerEvent as ReactPointerEvent, Fragment, createContext, createElement, useMemo, useState, useEffect, useContext, useId } from 'react'
 import { translateNow } from '../i18n'
 import { isPropertiesCollapsed, setPropertiesCollapsed } from '../utils/propertiesCollapse'
+import { resolveMarkdownLinkTarget } from '../utils/internalLink'
 import { scrollToHeadingAnchor, scrollToBlockAnchor } from '../utils/scrollToAnchor'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -2190,20 +2191,38 @@ function renderLink(
     return createElement('span', { key, className: 'view-mode-link--plain' }, ...children)
   }
 
-  // Internal link — check if target exists in tree
-  const exists = pathExistsInTree(directoryTree, url)
+  return createElement(MarkdownInternalLink, { key, url, directoryTree, onInternalLinkClick }, ...children)
+}
+
+/**
+ * Internal Markdown link. A component (not inline markup) so it can read the note it sits in
+ * from `HostPathContext`: `./` and `../` are relative to that note's folder, and `<…>`, `%20`
+ * and `#anchor` are normalised the same way as in Live Preview (`resolveMarkdownLinkTarget`).
+ */
+function MarkdownInternalLink({ url, directoryTree, onInternalLinkClick, children }: {
+  url: string
+  directoryTree: DirectoryTree | null
+  onInternalLinkClick: ((targetPath: string) => void) | undefined
+  children?: ReactNode
+}): ReactNode {
+  const hostPath = useContext(HostPathContext)
+  const target = resolveMarkdownLinkTarget(url, hostPath ?? '')
+  const exists = target !== null && pathExistsInTree(directoryTree, target)
   const className = exists
     ? 'view-mode-link view-mode-link--internal'
     : 'view-mode-link view-mode-link--internal view-mode-link--broken'
 
   return createElement('a', {
-    key,
     href: '#',
     className,
-    'data-link-path': exists ? url : undefined,
+    'data-link-path': exists ? target : undefined,
     onClick: (e: React.MouseEvent) => {
       e.preventDefault()
-      onInternalLinkClick?.(url)
+      if (target !== null) {
+        onInternalLinkClick?.(target)
+      } else if (url.startsWith('#')) {
+        scrollToHeadingAnchor(decodeURIComponent(url.slice(1)))
+      }
     },
-  }, ...children)
+  }, children)
 }
