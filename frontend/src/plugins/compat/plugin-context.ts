@@ -1169,7 +1169,8 @@ export function PluginProvider({
         }
         await registry.waitForPersistence()
         // Obsidian calls app.runOpeningBehavior() once the layout and plugins are up.
-        if (isCurrentContext()) await runVaultOpeningBehavior()
+        // Not awaited: opening a start page must not hold the loading state (Obsidian does not wait either).
+        if (isCurrentContext()) void runVaultOpeningBehavior()
       }
 
       if (isCurrentContext()) {

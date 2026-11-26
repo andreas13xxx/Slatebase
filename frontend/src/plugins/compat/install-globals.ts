@@ -1359,7 +1359,7 @@ export function installObsidianGlobals(): void {
       },
     }
     // foldManager, dragManager, getObsidianUrl, … — shared with every AppShim (app-internals.ts).
-    // Descriptors are copied so live getters (	itle) stay getters.
+    // Descriptors are copied so live getters (the `title` getter) stay getters.
     Object.defineProperties((window as unknown as { app: object }).app, Object.getOwnPropertyDescriptors(createAppInternals()))
   }
 

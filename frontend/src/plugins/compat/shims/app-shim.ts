@@ -14,6 +14,16 @@ import { detectPlatform, readPlatformEnvironment } from '../platform-detection';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 import type { Command, ICommandRegistry } from '../command-registry';
 import { scopeForPlugin } from '../plugin-execution-context';
+import { debugOnce, warnNoOp, warnOnce } from '../log';
+import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
+import type { KeychainApiClient } from '../obsidian-api-extensions';
+import { createEmbedRegistryShim } from '../embed-registry';
+import { createAppInternals } from '../app-internals';
+import { resolveActiveTheme } from '../body-classes';
+import { getRegisteredExtensionTypeMap } from '../file-view-registry';
+import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
+import { fromFileCommandId, hotkeyToShortcut, isHotkey, shortcutsToFileValue, toFileCommandId } from '@slatebase/shared-contracts';
+import { getFileBinding, getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
 
 type OpeningBehavior = (file?: unknown) => unknown
 
@@ -40,16 +50,6 @@ export async function runVaultOpeningBehavior(): Promise<void> {
     console.error('[AppShim] runOpeningBehavior failed:', err)
   }
 }
-import { debugOnce, warnNoOp, warnOnce } from '../log';
-import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
-import type { KeychainApiClient } from '../obsidian-api-extensions';
-import { createEmbedRegistryShim } from '../embed-registry';
-import { createAppInternals } from '../app-internals';
-import { resolveActiveTheme } from '../body-classes';
-import { getRegisteredExtensionTypeMap } from '../file-view-registry';
-import { IMAGE_EXTENSIONS, PDF_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS } from '../../types';
-import { fromFileCommandId, hotkeyToShortcut, isHotkey, shortcutsToFileValue, toFileCommandId } from '@slatebase/shared-contracts';
-import { getFileBinding, getFileBindings, resetShortcut, setShortcuts } from '../../../state/keybindingsStore';
 
 /**
  * Which plugin an `app` object handed out by `AppShim.create()` belongs to.
