@@ -47,16 +47,16 @@ describe('settingsRegistry', () => {
   describe('getSections', () => {
     it('returns 9 account sections', () => {
       const sections = registry.getSections('account', false)
-      expect(sections).toHaveLength(10)
+      expect(sections).toHaveLength(9)
       expect(sections.map((s) => s.id)).toEqual([
-        'profile', 'password', 'security', 'sessions', 'mcp-tokens', 'public-shares', 'keybindings', 'appearance', 'my-vaults', 'delete-account',
+        'profile', 'password', 'security', 'sessions', 'mcp-tokens', 'public-shares', 'appearance', 'my-vaults', 'delete-account',
       ])
     })
 
-    it('returns 9 vault sections', () => {
+    it('returns 11 vault sections', () => {
       const sections = registry.getSections('vault', false)
-      expect(sections).toHaveLength(10)
-      expect(sections.map((s) => s.id)).toEqual(['vault-config', 'plugins', 'editor-files', 'page-preview', 'keychain', 'vault-appearance', 'themes', 'css-snippets', 'git-sync', 'mail-import'])
+      expect(sections).toHaveLength(11)
+      expect(sections.map((s) => s.id)).toEqual(['vault-config', 'plugins', 'editor-files', 'keybindings', 'page-preview', 'keychain', 'vault-appearance', 'themes', 'css-snippets', 'git-sync', 'mail-import'])
     })
 
     it('returns 5 administration sections for admin', () => {
