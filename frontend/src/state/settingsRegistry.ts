@@ -52,6 +52,7 @@ export const SETTINGS_SECTIONS: ISettingsSectionDef[] = [
   { id: 'editor-files', labelKey: 'settings.sections.editorFiles', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'page-preview', labelKey: 'settings.sections.pagePreview', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'keychain', labelKey: 'settings.sections.keychain', category: 'vault', requiresAdmin: false, requiresVault: true },
+  { id: 'vault-appearance', labelKey: 'settings.sections.vaultAppearance', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'themes', labelKey: 'settings.sections.themes', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'css-snippets', labelKey: 'settings.sections.cssSnippets', category: 'vault', requiresAdmin: false, requiresVault: true },
   { id: 'git-sync', labelKey: 'settings.sections.gitSync', category: 'vault', requiresAdmin: false, requiresVault: true, feature: 'git-sync' },

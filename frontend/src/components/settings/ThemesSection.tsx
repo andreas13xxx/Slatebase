@@ -17,7 +17,6 @@ import { useFeatureContext } from '../../state/featureContext'
 import { ThemeImport } from './ThemeImport'
 import { ThemeManager } from './ThemeManager'
 import { ThemeStoreBrowser } from './ThemeStoreBrowser'
-import { VaultAppearanceSettings } from './VaultAppearanceSettings'
 import { SettingSection } from './ui'
 
 type ThemesTab = 'installed' | 'discover' | 'import'
@@ -59,8 +58,6 @@ export function ThemesSection() {
   const shown: ThemesTab = tabs.some((t) => t.id === tab) ? tab : 'installed'
 
   return (
-    <>
-    <VaultAppearanceSettings />
     <SettingSection title={t('settingsUi.themes')} description={t('settingsUi.themesDesc')}>
       <div className="themes-tabs" role="tablist" aria-label={t('settingsUi.themes')}>
         {tabs.map((tb) => (
@@ -92,6 +89,5 @@ export function ThemesSection() {
         {shown === 'import' && <ThemeImport key={state.selectedVaultId ?? ''} />}
       </div>
     </SettingSection>
-    </>
   )
 }

@@ -60,6 +60,7 @@ const SECTION_ICONS: Record<SettingsSection, LucideIcon> = {
   'page-preview': Eye,
   'keychain': Lock,
   'themes': Paintbrush,
+  'vault-appearance': Palette,
   'css-snippets': Code,
   'git-sync': GitBranch,
   'mail-import': Mail,

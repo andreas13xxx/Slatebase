@@ -5814,7 +5814,8 @@
   opacity: 0; width: 0; height: 0; position: absolute;
 }
 .plugin-card-toggle-slider {
-  position: absolute; inset: 0; background: var(--border-default);
+  position: absolute; inset: 0; background: var(--border-strong);
+  box-shadow: inset 0 0 0 1px var(--text-subtle);
   border-radius: var(--radius-full); transition: background 0.2s ease;
 }
 .plugin-card-toggle-slider::before {
@@ -5824,7 +5825,7 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 .plugin-card-toggle input:checked + .plugin-card-toggle-slider {
-  background: var(--accent);
+  background: var(--accent); box-shadow: none;
 }
 .plugin-card-toggle input:checked + .plugin-card-toggle-slider::before {
   transform: translateX(16px);
