@@ -2464,7 +2464,7 @@ export const de = {
     c_sl_editor_files: 'Editor und Dateien',
     c_sl_page_preview: 'Seitenvorschau',
     c_sl_keychain: 'Schlüsselbund',
-    c_sl_vault_appearance: 'Darstellung',
+    c_sl_vault_appearance: 'Darstellung des Vaults',
     c_sl_themes: 'Themes',
     c_sl_css_snippets: 'CSS-Snippets',
     c_sl_git_sync: 'Git-Synchronisation',

@@ -10,6 +10,7 @@
  */
 import { useTranslation, translateNow, type TranslationKey } from '../../i18n'
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import {
   appearanceConfigValueProblem,
   type AppearanceConfigValues,
@@ -133,16 +134,7 @@ function AppearanceForm({ stored, disabled, onSave }: {
 
       {FONT_FIELDS.map(({ key, labelKey }) => (
         <SettingRow key={key} label={t(labelKey)} htmlFor={`appearance-${key}`} hint={found[key] ?? t('settingsUi.misc_fontNamesHint')}>
-          <select
-            className="settings-field-input"
-            aria-label={t('settingsUi.misc_fontPick', { label: t(labelKey) })}
-            value=""
-            onChange={(e) => { if (e.target.value !== '') set(key)(e.target.value) }}
-            disabled={disabled}
-          >
-            <option value="">{t('settingsUi.misc_fontPickPlaceholder')}</option>
-            {fontOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
+          <div className="font-combo">
           <input
             id={`appearance-${key}`}
             type="text"
@@ -154,6 +146,18 @@ function AppearanceForm({ stored, disabled, onSave }: {
             autoComplete="off"
             spellCheck={false}
           />
+          <ChevronDown className="font-combo__icon" size={16} aria-hidden="true" />
+          <select
+            className="font-combo__select"
+            aria-label={t('settingsUi.misc_fontPick', { label: t(labelKey) })}
+            value=""
+            onChange={(e) => { if (e.target.value !== '') set(key)(e.target.value) }}
+            disabled={disabled}
+          >
+            <option value="" hidden />
+            {fontOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+          </div>
         </SettingRow>
       ))}
 

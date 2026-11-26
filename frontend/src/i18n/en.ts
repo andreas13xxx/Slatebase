@@ -2470,7 +2470,7 @@ export const en: TranslationShape = {
     c_sl_editor_files: 'Editor and files',
     c_sl_page_preview: 'Page preview',
     c_sl_keychain: 'Keychain',
-    c_sl_vault_appearance: 'Appearance',
+    c_sl_vault_appearance: 'Look of the vault',
     c_sl_themes: 'Themes',
     c_sl_css_snippets: 'CSS snippets',
     c_sl_git_sync: 'Git synchronization',
