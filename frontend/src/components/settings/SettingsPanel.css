@@ -538,3 +538,10 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+/* Text field with a dropdown triangle inside: the select is transparent and only its list shows. */
+.font-combo { position: relative; display: inline-flex; align-items: center; flex: 1; min-width: 0; }
+.font-combo .settings-field-input { width: 100%; padding-right: 32px; }
+.font-combo__icon { position: absolute; right: 10px; pointer-events: none; color: var(--text-subtle); }
+.font-combo__select { position: absolute; right: 0; top: 0; bottom: 0; width: 32px; opacity: 0; cursor: pointer; }
+.font-combo__select:disabled { cursor: not-allowed; }

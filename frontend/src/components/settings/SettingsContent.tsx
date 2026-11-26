@@ -26,6 +26,7 @@ import { ServerRestartSection } from './ServerRestartSection'
 import { VaultConfigSection } from './VaultConfigSection'
 import { CssSnippetsSection } from './CssSnippetsSection'
 import { ThemesSection } from './ThemesSection'
+import { VaultAppearanceSettings } from './VaultAppearanceSettings'
 import { GitSyncSection } from './GitSyncSection'
 import { MailImportSection } from './MailImportSection'
 import { KeychainSection } from './KeychainSection'
@@ -157,6 +158,11 @@ function renderSection(
       return <PagePreviewSection />
     case 'keychain':
       return <KeychainSection />
+    case 'vault-appearance':
+      if (selectedVaultId === null) {
+        return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>
+      }
+      return <VaultAppearanceSettings />
     case 'themes':
       if (selectedVaultId === null) {
         return <p className="settings-content-no-vault">{translateNow('settingsUi.noVault')}</p>

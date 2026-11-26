@@ -10,12 +10,14 @@
  */
 import { useTranslation, translateNow, type TranslationKey } from '../../i18n'
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import {
   appearanceConfigValueProblem,
   type AppearanceConfigValues,
 } from '@slatebase/shared-contracts'
 import { useAppContext } from '../../state'
 import { extractErrorMessage } from '../../utils/error'
+import { GENERIC_FONTS, canQueryLocalFonts, detectInstalledFonts, queryAllInstalledFonts } from '../../utils/installedFonts'
 import { showToast } from '../ToastNotification'
 import { updateAppearance, useAppearanceSnapshot } from '../../state/vaultAppearanceStore'
 import { SettingSection, SettingRow, Button } from './ui'
@@ -88,6 +90,17 @@ function AppearanceForm({ stored, disabled, onSave }: {
   const changed = JSON.stringify(draft) !== storedDraft
   const invalid = Object.keys(found).length > 0
   const set = (key: keyof Draft) => (value: string) => setDraft((current) => ({ ...current, [key]: value }))
+  const [detected] = useState(() => detectInstalledFonts())
+  const [allFonts, setAllFonts] = useState<string[] | null>(null)
+  const fontOptions = allFonts ?? [...GENERIC_FONTS, ...detected]
+
+  const loadAllFonts = async (): Promise<void> => {
+    try {
+      setAllFonts([...GENERIC_FONTS, ...await queryAllInstalledFonts()])
+    } catch {
+      showToast('error', translateNow('settingsUi.misc_fontListDenied'))
+    }
+  }
 
   return (
     <>
@@ -121,6 +134,7 @@ function AppearanceForm({ stored, disabled, onSave }: {
 
       {FONT_FIELDS.map(({ key, labelKey }) => (
         <SettingRow key={key} label={t(labelKey)} htmlFor={`appearance-${key}`} hint={found[key] ?? t('settingsUi.misc_fontNamesHint')}>
+          <div className="font-combo">
           <input
             id={`appearance-${key}`}
             type="text"
@@ -132,8 +146,28 @@ function AppearanceForm({ stored, disabled, onSave }: {
             autoComplete="off"
             spellCheck={false}
           />
+          <ChevronDown className="font-combo__icon" size={16} aria-hidden="true" />
+          <select
+            className="font-combo__select"
+            aria-label={t('settingsUi.misc_fontPick', { label: t(labelKey) })}
+            value=""
+            onChange={(e) => { if (e.target.value !== '') set(key)(e.target.value) }}
+            disabled={disabled}
+          >
+            <option value="" hidden />
+            {fontOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+          </div>
         </SettingRow>
       ))}
+
+      {canQueryLocalFonts() && allFonts === null && (
+        <div className="settings-actions">
+          <Button variant="secondary" disabled={disabled} onClick={() => void loadAllFonts()}>
+            {t('settingsUi.misc_fontListAll')}
+          </Button>
+        </div>
+      )}
 
       <div className="settings-actions">
         <Button variant="primary" disabled={disabled || !changed || invalid} onClick={() => onSave(draft)}>
