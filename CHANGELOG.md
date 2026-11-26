@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.97.0](https://github.com/andreas13xxx/Slatebase/compare/v0.96.0...v0.97.0) (2026-11-26)
+
+
+### Features
+
+* Darstellung-Seite, Schriftauswahl, sichtbare Schalter ([#458](https://github.com/andreas13xxx/Slatebase/issues/458)) ([65ec772](https://github.com/andreas13xxx/Slatebase/commit/65ec77218d97dcff426e8ea0f911c891a48e4b5a))
+* move keyboard shortcuts settings to the vault category ([#462](https://github.com/andreas13xxx/Slatebase/issues/462)) ([32775eb](https://github.com/andreas13xxx/Slatebase/commit/32775ebcf866fec47e82ec66c1c70a9fa02a43da))
+
+
+### Bugfixes
+
+* **compat:** getContainer, runOpeningBehavior, shared internal App members ([#456](https://github.com/andreas13xxx/Slatebase/issues/456)) ([b314ffb](https://github.com/andreas13xxx/Slatebase/commit/b314ffbd01962c4c2e9cb546ea003b4a78aaee56))
+* **deps:** bump zod to 4.6.7 (GHSA-mrhx-c7xc-m3w5) ([#464](https://github.com/andreas13xxx/Slatebase/issues/464)) ([3fe33e5](https://github.com/andreas13xxx/Slatebase/commit/3fe33e587853ccba4bc75b4a3b85492bff23e53b))
+* **explorer:** offer the vault root as a drop zone for internal moves ([#463](https://github.com/andreas13xxx/Slatebase/issues/463)) ([84b5cfa](https://github.com/andreas13xxx/Slatebase/commit/84b5cfa49f5656bc8495c382def964139423d55f))
+* Markdown link targets + collapsible Properties heading ([#465](https://github.com/andreas13xxx/Slatebase/issues/465)) ([152cbea](https://github.com/andreas13xxx/Slatebase/commit/152cbeaa82d397a693f38ddfcf70dfacbf8012cf))
+
+
+### Sonstige Änderungen
+
+* bump @testing-library/jest-dom from 7.0.1 to 8.0.0 in /frontend ([#461](https://github.com/andreas13xxx/Slatebase/issues/461)) ([db40d73](https://github.com/andreas13xxx/Slatebase/commit/db40d7381aaaa5fa024868e7b60f7c297594b5f0))
+* bump the minor-patch group in /backend with 9 updates ([#459](https://github.com/andreas13xxx/Slatebase/issues/459)) ([38894e7](https://github.com/andreas13xxx/Slatebase/commit/38894e760631dd7488f00a71d60dbe2d0ad41e93))
+* bump the minor-patch group in /frontend with 7 updates ([#460](https://github.com/andreas13xxx/Slatebase/issues/460)) ([665515b](https://github.com/andreas13xxx/Slatebase/commit/665515bdd9077dffaf9cacaa9f4ec996c269844f))
+
 ## [0.96.0](https://github.com/andreas13xxx/Slatebase/compare/v0.95.0...v0.96.0) (2026-11-25)
 
 
