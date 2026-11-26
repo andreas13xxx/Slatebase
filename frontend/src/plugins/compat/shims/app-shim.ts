@@ -599,9 +599,20 @@ export class AppShim implements IAppShim {
    * crashing on `app.setting.open is not a function`.
    */
   readonly setting = {
-    open: (): void => {},
-    close: (): void => {},
-    openTabById: (_id: string): boolean => false,
+    /** No settings tab is ever open from a plugin's point of view. */
+    activeTab: null as unknown,
+    open: (): void => { warnNoOp('app.setting', 'open', 'The settings dialog cannot be opened from a plugin; use Settings in the app.') },
+    close: (): void => { warnNoOp('app.setting', 'close') },
+    openTabById: (_id: string): boolean => {
+      warnNoOp('app.setting', 'openTabById', 'Plugin settings tabs open from Settings > Plugins.')
+      return false
+    },
+    addSettingTab: (_tab: unknown): void => {
+      warnNoOp('app.setting', 'addSettingTab', 'Only Plugin.addSettingTab() registers a tab; app-level tabs are not shown.')
+    },
+    removeSettingTab: (_tab: unknown): void => {
+      warnNoOp('app.setting', 'removeSettingTab', 'Only tabs added through Plugin.addSettingTab() exist.')
+    },
   }
 
   private _renderContext: unknown = null;
