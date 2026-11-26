@@ -1360,7 +1360,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
   const handleRootDragOver = useCallback((e: React.DragEvent<HTMLDivElement>, vaultId: string) => {
     // Internal DnD
-    if (dragState.validTargets.has('')) {
+    if (dragState.validTargets.has('') && dragState.draggedVaultId === vaultId) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'move'
       return
@@ -1377,7 +1377,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
         return { targetPath: '', targetVaultId: vaultId }
       })
     }
-  }, [dragState.validTargets, dragState.draggedPath, state.vaults])
+  }, [dragState.validTargets, dragState.draggedPath, dragState.draggedVaultId, state.vaults])
 
   const handleRootDrop = useCallback((e: React.DragEvent<HTMLDivElement>, vaultId: string) => {
     e.preventDefault()
@@ -1466,7 +1466,7 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
                 <React.Fragment key={vault.id}>
                 <div className="tree-node tree-node--vault">
                   <div
-                    className={`tree-node-row tree-node-row--vault${isSelected ? ' tree-node-row--vault-selected' : ''}${externalDropState.targetPath === '' && externalDropState.targetVaultId === vault.id ? ' tree-node--drop-target' : ''}`}
+                    className={`tree-node-row tree-node-row--vault${isSelected ? ' tree-node-row--vault-selected' : ''}${(externalDropState.targetPath === '' && externalDropState.targetVaultId === vault.id) || (dragState.draggedPath !== null && dragState.draggedVaultId === vault.id && dragState.validTargets.has('')) ? ' tree-node--drop-target' : ''}`}
                     onContextMenu={(e) => handleVaultContextMenu(e, vault)}
                     {...vaultLongPress}
                     onMouseEnter={() => handleVaultMouseEnter(vault.id)}
@@ -1495,7 +1495,12 @@ export function FileExplorer({ onRegisterCreateFile, onRegisterCreateFolder, onR
 
                   {/* Vault content (expanded) */}
                   {isExpanded && (
-                    <div className="tree-node-children tree-node-children--vault tree-item-children nav-folder-children" role="group">
+                    <div
+                      className="tree-node-children tree-node-children--vault tree-item-children nav-folder-children"
+                      role="group"
+                      onDragOver={(e) => { if (e.target === e.currentTarget) handleRootDragOver(e, vault.id) }}
+                      onDrop={(e) => { if (e.target === e.currentTarget) handleRootDrop(e, vault.id) }}
+                    >
                       {isLoading && (
                         <div className="tree-node tree-node--loading">
                           <span className="tree-node-loading-text">{t('common.loading')}</span>
