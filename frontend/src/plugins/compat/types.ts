@@ -122,6 +122,7 @@ export interface IVaultShim {
   read(file: TFile): Promise<string>;
   modify(file: TFile, content: string, options?: DataWriteOptions): Promise<void>;
   create(path: string, content?: string): Promise<TFile>;
+  createBinary(path: string, data: ArrayBuffer): Promise<TFile>;
   createFolder(path: string): Promise<TFolder>;
   delete(file: TAbstractFile): Promise<void>;
   rename(file: TAbstractFile, newPath: string): Promise<void>;
@@ -452,6 +453,7 @@ export interface Hotkey {
 export interface IFileManagerShim {
   /** Rename/move a file to a new path. Updates vault references. */
   renameFile(file: TFile, newPath: string): Promise<void>;
+  getAvailablePathForAttachment(filename: string, sourcePath?: string): Promise<string>;
   /** Read and optionally modify the frontmatter of a markdown file. */
   processFrontMatter(file: TFile, fn: (frontmatter: Record<string, unknown>) => void): Promise<void>;
   /** Generate a markdown link string to a file. */

@@ -38,7 +38,7 @@ import * as CmCommands from '@codemirror/commands'
 import * as CmAutocomplete from '@codemirror/autocomplete'
 import * as CmSearch from '@codemirror/search'
 import { getActiveEditorView } from '../../editor/plugin-extensions'
-import { getFoldVault, loadFileFolds, saveFileFolds, type FoldedLine } from '../../editor/foldPersistence'
+import { createAppInternals } from './app-internals'
 import * as CmLint from '@codemirror/lint'
 import * as LezerHighlight from '@lezer/highlight'
 import * as LezerCommon from '@lezer/common'
@@ -1298,26 +1298,6 @@ export function installObsidianGlobals(): void {
       vault: {},
       workspace: {},
       metadataCache: {},
-      // Obsidian persists per-file fold state here. Slatebase's editor keeps the
-      // same list per vault and file (`editor/foldPersistence.ts`), so a plugin
-      // reads and writes what the editor itself restores on the next open.
-      foldManager: {
-        load: (file: { path?: string } | null): { folds: FoldedLine[]; lines: number } | null => {
-          const vaultId = getFoldVault()
-          if (!vaultId || !file?.path) return null
-          return loadFileFolds(vaultId, file.path)
-        },
-        save: (file: { path?: string } | null, foldInfo: { folds?: FoldedLine[]; lines?: number } | null): void => {
-          const vaultId = getFoldVault()
-          if (!vaultId || !file?.path) return
-          const folds = Array.isArray(foldInfo?.folds) ? foldInfo.folds.map(({ from, to }) => ({ from, to })) : []
-          saveFileFolds(vaultId, file.path, { folds, lines: foldInfo?.lines ?? 0 })
-        },
-        getFolds: (file: { path?: string } | null): FoldedLine[] => {
-          const vaultId = getFoldVault()
-          return vaultId && file?.path ? loadFileFolds(vaultId, file.path)?.folds ?? [] : []
-        },
-      },
       // See AppShim.getAccentColor() for why this exists — kept in sync here
       // so views opened via createFileView's `sharedApp` (which reads through
       // window.app rather than owning its own AppShim) get the same method.
@@ -1378,6 +1358,9 @@ export function installObsidianGlobals(): void {
         listCommands: (): unknown[] => [],
       },
     }
+    // foldManager, dragManager, getObsidianUrl, … — shared with every AppShim (app-internals.ts).
+    // Descriptors are copied so live getters (the `title` getter) stay getters.
+    Object.defineProperties((window as unknown as { app: object }).app, Object.getOwnPropertyDescriptors(createAppInternals()))
   }
 
   // Obsidian extends HTMLElement with convenience methods.

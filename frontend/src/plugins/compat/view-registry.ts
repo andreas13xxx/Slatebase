@@ -459,10 +459,14 @@ export class WorkspaceItem {
     return this.parent ? this.parent.getRoot() : this
   }
 
-  /** The nearest enclosing container (the window root in a single-window app). */
-  getContainer(): WorkspaceContainer | null {
+  /**
+   * The nearest enclosing container. Never `null`, as in Obsidian: sidedock leaves and
+   * not-yet-attached items belong to the (single) main window, whose container plugins
+   * read `.doc`/`.win` from (Outliner's drag-and-drop does).
+   */
+  getContainer(): WorkspaceContainer {
     const root = this.getRoot()
-    return root instanceof WorkspaceContainer ? root : null
+    return root instanceof WorkspaceContainer ? root : getMainWindowContainer()
   }
 }
 
@@ -495,6 +499,19 @@ export class WorkspaceContainer extends WorkspaceSplit {
 
 /** The main editing area's root split (`workspace.rootSplit`). */
 export class WorkspaceRoot extends WorkspaceContainer {}
+
+let mainWindowContainer: WorkspaceContainer | null = null
+
+/** Registers the main window's container (the workspace's `rootSplit`) as `getContainer()` fallback. */
+export function registerMainWindowContainer<T extends WorkspaceContainer>(container: T): T {
+  mainWindowContainer = container
+  return container
+}
+
+/** The main window's container; a standalone root if no workspace has registered one yet. */
+export function getMainWindowContainer(): WorkspaceContainer {
+  return (mainWindowContainer ??= new WorkspaceRoot())
+}
 
 /** Whether the real side panel is hidden; `false` (and a one-time note) without a mounted host. */
 function isSidedockCollapsed(side: SidedockSide): boolean {
