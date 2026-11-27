@@ -101,6 +101,7 @@ For power users and specialized workflows:
 - [[Advanced/Plugins/Kanban|Plugin: Kanban]]
 - [[Advanced/Plugins/LiveSync|Plugin: LiveSync]]
 - [[Advanced/Plugins/Mind Map|Plugin: Mind Map]]
+- [[Advanced/Plugins/Nested Properties|Plugin: Nested Properties]]
 - [[Advanced/Plugins/Outliner|Plugin: Outliner]]
 - [[Advanced/Plugins/Paste URL into Selection|Plugin: Paste URL into Selection]]
 - [[Advanced/Plugins/Recent Files|Plugin: Recent Files]]

@@ -107,6 +107,7 @@ Diese Plugins wurden getestet und funktionieren in Slatebase:
 | Iconize | Eingeschränkt | Icon-Picker funktioniert, Icons im Dateibaum meist nicht sichtbar |
 | Day Planner | Gut | Timeline-Ansicht + Time Tracker, mit echtem Plugin-Bundle verifiziert |
 | Outliner | Gut | Ganze Äste verschieben/einrücken/zoomen/falten, optionale Vim-Tastenüberschreibung nicht funktional |
+| Nested Properties | Teilweise | Verschachtelte Frontmatter-Objekte als Gruppen im Eigenschaften-Editor (Seitenleiste, Live Preview, Hover-Vorschau, Lese-Ansicht nur Anzeige); frisch angebunden, Bases-Verhalten nicht geprüft |
 | Recent Files | Gut | Sidebar-Liste zuletzt geöffneter Notizen, Anpinnen/Ausschließen möglich |
 | Importer | Eingeschränkt | Migriert Notion/Evernote/Keep/HTML/Markdown; Apple Notes braucht macOS und funktioniert hier nicht |
 | Paste URL into Selection | Gut | URL über eine Markierung einfügen wandelt sie in einen Markdown-Link um |
@@ -204,6 +205,7 @@ Ausführliche Anleitungen mit Beispielen und Übungen für getestete Plugins:
 | Editing Toolbar | Formatierungsleiste für den Editor | [[Fortgeschritten/Plugins/Editing Toolbar]] |
 | Iconize | Individuelle Icons für Dateien und Ordner | [[Fortgeschritten/Plugins/Iconize]] |
 | Day Planner | Zeitlich geblockte Aufgaben als visuelle Timeline | [[Fortgeschritten/Plugins/Day Planner]] |
+| Nested Properties | Verschachteltes Frontmatter im Eigenschaften-Editor | [[Fortgeschritten/Plugins/Nested Properties]] |
 | Outliner | Outline-Bearbeitung für Aufzählungslisten | [[Fortgeschritten/Plugins/Outliner]] |
 | Recent Files | Sidebar-Liste zuletzt geöffneter Notizen | [[Fortgeschritten/Plugins/Recent Files]] |
 | Importer | Notizen aus Notion, Evernote und mehr migrieren | [[Fortgeschritten/Plugins/Importer]] |

@@ -131,6 +131,7 @@ These plugins have been tested and work with Slatebase:
 | Iconize | Partial | Icon picker works, icons usually not visible in the file tree |
 | Day Planner | Good | Timeline view + Time Tracker, verified with a real plugin bundle |
 | Outliner | Good | Move/indent/zoom/fold whole branches, optional Vim key override non-functional |
+| Nested Properties | Partial | Nested frontmatter objects as groups in the properties editor (sidebar, Live Preview, hover preview, reading view display only); newly wired up, Bases behavior not checked |
 | Recent Files | Good | Sidebar pane of recently opened notes, pin/omit support |
 | Importer | Partial | Migrates Notion/Evernote/Keep/HTML/Markdown; Apple Notes needs macOS and doesn't work here |
 | Paste URL into Selection | Good | Pasting a URL over a selection wraps it as a Markdown link |
@@ -201,6 +202,7 @@ Detailed guides with examples and exercises for tested plugins:
 | Editing Toolbar | Formatting toolbar for the editor | [[Advanced/Plugins/Editing Toolbar]] |
 | Iconize | Custom icons for files and folders | [[Advanced/Plugins/Iconize]] |
 | Day Planner | Time-blocked tasks as a visual timeline | [[Advanced/Plugins/Day Planner]] |
+| Nested Properties | Nested frontmatter in the properties editor | [[Advanced/Plugins/Nested Properties]] |
 | Outliner | Outline editing for bullet lists | [[Advanced/Plugins/Outliner]] |
 | Recent Files | Sidebar list of recently opened notes | [[Advanced/Plugins/Recent Files]] |
 | Importer | Migrate notes from Notion, Evernote, and more | [[Advanced/Plugins/Importer]] |

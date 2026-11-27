@@ -84,6 +84,7 @@ Detaillierte Anleitungen für einzelne Obsidian-Plugins:
 | [[Fortgeschritten/Plugins/Kanban\|Kanban]] | Visuelle Aufgaben-Boards |
 | [[Fortgeschritten/Plugins/LiveSync\|LiveSync]] | Vault-Synchronisation |
 | [[Fortgeschritten/Plugins/Mind Map\|Mind Map]] | Überschriften-Struktur als interaktive Mindmap |
+| [[Fortgeschritten/Plugins/Nested Properties\|Nested Properties]] | Verschachteltes Frontmatter als aufklappbare Gruppen im Eigenschaften-Editor |
 | [[Fortgeschritten/Plugins/Outliner\|Outliner]] | Listen als echter Outline-Editor |
 | [[Fortgeschritten/Plugins/Paste URL into Selection\|Paste URL into Selection]] | Markierten Text per Einfügen zum Link machen |
 | [[Fortgeschritten/Plugins/Recent Files\|Recent Files]] | Seitenleiste mit zuletzt geöffneten Notizen |
