@@ -41,11 +41,11 @@
 }
 
 .properties-editor__row {
-  display: grid;
-  grid-template-columns: minmax(60px, 0.4fr) 1fr auto auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
-  align-items: start;
-  padding: 3px 0;
+  padding: 3px 24px 3px 0;
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
 }
 
@@ -82,29 +82,17 @@
   color: var(--text-primary);
 }
 
-.properties-editor__type-select {
-  font-size: 10px;
-  color: var(--text-subtle);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm, 3px);
-  padding: 2px 2px;
-  max-width: 72px;
-}
-
-.properties-editor__type-select:hover,
-.properties-editor__type-select:focus {
-  color: var(--text-primary);
-  border-color: var(--border-subtle, rgba(0, 0, 0, 0.1));
-}
-
 .properties-editor__value {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
 }
 
 .properties-editor__delete-btn {
   all: unset;
+  position: absolute;
+  top: 3px;
+  right: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -148,4 +136,225 @@
   .properties-editor__delete-btn {
     opacity: 1;
   }
+}
+
+/* Obsidian-shaped row parts: icon + key sit together in the key column */
+.properties-editor__key-cell {
+  display: flex;
+  align-items: flex-start;
+  flex: 0 0 var(--metadata-label-width, 120px);
+  max-width: 40%;
+  gap: 4px;
+  min-width: 0;
+}
+
+.properties-editor__key-cell .metadata-property-icon {
+  display: inline-flex;
+  flex: none;
+  padding-top: 3px;
+  color: var(--text-subtle);
+}
+
+.properties-editor__key-cell .metadata-property-icon:empty {
+  display: none;
+}
+
+/* Widgets a plugin draws (nested objects) bring their own layout and may be wider than the cell */
+.properties-editor__value[data-property-type='object'],
+.properties-editor__value[data-property-type='mixed list'] {
+  overflow: visible;
+}
+
+/* Indent per nesting level (Obsidian indents a few pixels, not a label column) and the key width of nested rows */
+.metadata-container {
+  --metadata-nested-indent: var(--size-4-3, 12px);
+  --metadata-nested-label-width: min(var(--metadata-label-width, 120px), 40%);
+}
+
+/*
+ * Obsidian's base styling of the properties block, for rows a widget draws itself
+ * (nested objects and lists). Plugins ship CSS only for what they change and take
+ * these classes to be styled already; the editor's own rows above use the same
+ * class names, so both look alike. Tokens only: light and dark follow the theme.
+ */
+.metadata-container .metadata-property-value .metadata-property {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+  border-radius: var(--radius-md, 6px);
+}
+
+.metadata-container .metadata-property-value .metadata-property-key {
+  display: flex;
+  align-items: center;
+  /* Shrinks with the panel instead of claiming a full label column on every level */
+  flex: 0 1 var(--metadata-nested-label-width);
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.metadata-container .metadata-property-value .metadata-property-value {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.metadata-container .metadata-property-value .metadata-property-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-subtle);
+}
+
+.metadata-container .metadata-property-value .metadata-property-icon:empty {
+  display: none;
+}
+
+.metadata-container .metadata-property-key-input,
+.metadata-container .metadata-input {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 3px);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.metadata-container .metadata-property-key-input {
+  flex: 1 1 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.metadata-container .metadata-input-text,
+.metadata-container .metadata-input-number {
+  width: 100%;
+}
+
+.metadata-container .metadata-property-key-input:hover,
+.metadata-container .metadata-input:hover {
+  background: var(--bg-hover);
+}
+
+.metadata-container .metadata-property-key-input:focus,
+.metadata-container .metadata-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-primary);
+  outline: none;
+}
+
+.metadata-container .metadata-input-checkbox {
+  accent-color: var(--accent);
+}
+
+/*
+ * An expanded object puts its children on their own line, indented by one step. The widget's
+ * stylesheet is injected after this one and asks for 20px and a full-width cell; with the cell
+ * allowed to shrink (flex-basis 0, as every value cell has) it stays beside the key and pushes
+ * each level right by a whole label column. !important because that stylesheet is more specific.
+ */
+.metadata-container .metadata-property.nested-properties-collapsible:not(.is-collapsed) > .metadata-property-value {
+  flex: 1 1 calc(100% - var(--metadata-nested-indent)) !important;
+  width: auto !important;
+  min-width: 0;
+  margin-left: var(--metadata-nested-indent) !important;
+}
+
+/* An expanded object: a rounded frame around its children, one per level */
+.metadata-container .metadata-property-value .metadata-property:has(.metadata-property):not(.is-collapsed) {
+  border: 1px solid var(--border-default);
+  padding: 2px var(--size-4-1, 4px);
+}
+
+.metadata-container .metadata-property.is-collapsed .metadata-property-value {
+  font-style: italic;
+  color: var(--text-subtle);
+}
+
+/* Tag pills of the list widgets */
+.metadata-container .multi-select-container {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.metadata-container .multi-select-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  font-size: 11px;
+}
+
+.metadata-container .multi-select-pill-remove-button {
+  all: unset;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0 2px;
+}
+
+.metadata-container .multi-select-pill-remove-button:hover,
+.metadata-container .multi-select-pill-remove-button:focus-visible {
+  opacity: 1;
+}
+
+.metadata-container .multi-select-input {
+  flex: 1 1 60px;
+  min-width: 60px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+
+/* Read-only host (no write access): a disabled fieldset blocks every native control, nothing else changes */
+.properties-editor-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* The icon opens the type menu, as in Obsidian */
+.properties-editor__type-icon {
+  cursor: pointer;
+  border-radius: var(--radius-sm, 3px);
+}
+
+.properties-editor__type-icon:hover,
+.properties-editor__type-icon:focus-visible {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Display only: nothing invites a click, and disabled controls keep their normal look */
+.properties-editor--readonly .properties-editor__key--readonly {
+  cursor: default;
+}
+
+.properties-editor--readonly .properties-editor__row {
+  padding-right: 0;
+}
+
+.properties-editor--readonly input:disabled,
+.properties-editor--readonly textarea:disabled,
+.properties-editor--readonly select:disabled {
+  opacity: 1;
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
 }

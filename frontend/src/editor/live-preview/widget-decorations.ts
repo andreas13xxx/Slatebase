@@ -19,7 +19,8 @@ import { errorOnce } from '../../plugins/compat/log'
 import { findEmbedCreatorForTarget, getLinktextExtension, mountRegisteredEmbed, type EmbedComponent, type EmbedContext } from '../../plugins/compat/embed-registry'
 import { PropertiesEditor, type PropertiesEditorProps } from '../../components/context-panel/PropertiesEditor'
 import { parseFrontmatter } from '../../components/context-panel/utils/parseFrontmatter'
-import { serializeFrontmatter, locateFrontmatterBlock } from '../../utils/frontmatterWriter'
+import { commitFrontmatterData } from '../frontmatter-commit'
+import { editorInfoField } from '../editor-state-fields'
 import { translateNow } from '../../i18n'
 import { isPropertiesCollapsed, setPropertiesCollapsed } from '../../utils/propertiesCollapse'
 import type { PropertyType, PropertyTypeEntry } from '../../state/propertyTypes'
@@ -1601,38 +1602,13 @@ class FrontmatterWidget extends WidgetType {
       ...(parseFrontmatter(view.state.doc.toString()).data ?? {}),
     })
 
-    /**
-     * Writes a full replacement data object back into the document. Commits
-     * touch only the YAML span between the `---` delimiters (or, when the
-     * result is empty, the whole block including delimiters) — never the
-     * rest of the document — so the user's cursor/scroll position anywhere
-     * else in the note is left alone by CM6's change mapping instead of
-     * jumping to the top the way a full-document replace would.
-     */
-    const commitData = (newData: Record<string, unknown>): void => {
-      const freshContent = view.state.doc.toString()
-      const location = locateFrontmatterBlock(freshContent)
-      if (!location) return
-
-      // null is a property left blank, not an absent one — it still gets a
-      // line, so only a genuinely empty object may drop the whole block.
-      const remaining = Object.entries(newData).filter(([, v]) => v !== undefined)
-      if (remaining.length === 0) {
-        const blockEnd = freshContent.indexOf('\n', location.to + 1)
-        const to = blockEnd === -1 ? freshContent.length : blockEnd + 1
-        view.dispatch({ changes: { from: 0, to, insert: '' } })
-        return
-      }
-
-      view.dispatch({
-        changes: { from: location.from, to: location.to, insert: serializeFrontmatter(newData) },
-      })
-    }
+    const commitData = (newData: Record<string, unknown>): void => { commitFrontmatterData(view, newData) }
 
     return {
       data,
       parseError,
       rawFrontmatter,
+      sourcePath: view.state.field(editorInfoField, false)?.file?.path ?? '',
       typeRegistry: this.typeRegistry,
       onCommit: (key, value) => {
         const next = currentData()

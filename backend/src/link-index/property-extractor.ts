@@ -9,7 +9,7 @@
  * - Numeric values (converted to string): `priority: 3`
  * - Inline YAML arrays: `tags: [a, b, c]`
  * - Multi-line YAML arrays (dash syntax): `tags:\n  - a\n  - b`
- * - Skips complex nested objects (only top-level keys)
+ * - Nested objects, block scalars and empty values register the key with no values (top-level keys only)
  * - Returns empty object for missing/invalid frontmatter (never throws)
  */
 
@@ -101,14 +101,14 @@ function parseFrontmatterProperties(frontmatter: string): ExtractedProperties {
     }
 
     // Match a top-level key (no leading whitespace)
-    const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/)
+    const keyMatch = line.match(/^([^\s#:'"\-[{][^:]*?)\s*:(?:\s+(.*))?$/)
     if (!keyMatch) {
       i++
       continue
     }
 
     const key = keyMatch[1]!
-    const valueStr = keyMatch[2]!.trim()
+    const valueStr = (keyMatch[2] ?? '').trim()
 
     // Case 1: Inline array `[a, b, c]`
     if (valueStr.startsWith('[') && valueStr.endsWith(']')) {
@@ -148,7 +148,9 @@ function parseFrontmatterProperties(frontmatter: string): ExtractedProperties {
         continue
       }
 
-      // No dash items → skip this key (nested object or truly empty)
+      // No dash items: nested object or null. Register the key without values so it still
+      // counts as a property; its indented lines never match as top-level keys.
+      result[key] = []
       i++
       continue
     }
@@ -156,6 +158,7 @@ function parseFrontmatterProperties(frontmatter: string): ExtractedProperties {
     // Case 3: Simple scalar value (string, number, boolean, date, etc.)
     // Skip values that look like nested objects (contains `{` or starts with `|`/`>`)
     if (valueStr.startsWith('{') || valueStr.startsWith('|') || valueStr.startsWith('>')) {
+      result[key] = []
       i++
       continue
     }
@@ -163,6 +166,8 @@ function parseFrontmatterProperties(frontmatter: string): ExtractedProperties {
     const scalarValue = stripQuotes(valueStr)
     if (scalarValue !== '') {
       result[key] = [scalarValue]
+    } else {
+      result[key] = []
     }
 
     i++

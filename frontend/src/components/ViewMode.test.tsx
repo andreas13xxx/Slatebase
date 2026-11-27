@@ -899,6 +899,19 @@ def hello():
         expect(container.textContent).toContain('title: Hello')
         expect(container.textContent).toContain('---')
       })
+
+      it('shows the shared properties editor read-only, with or without write access', async () => {
+        resetAppConfig()
+        initializeAppConfig({ getAppConfig: async () => ({}) } as unknown as IApiClient)
+        await setActiveVault('v1')
+        const apiClient = { getPropertyTypes: vi.fn().mockResolvedValue({ entries: [] }), saveFile: vi.fn() } as unknown as IApiClient
+        const props = { ...defaultProps, content: note, sourcePath: 'n.md' }
+        const writable = render(<ViewMode {...props} propertiesEditing={{ apiClient, hasWriteAccess: true, onContentChange: vi.fn() }} />).container
+        expect(writable.querySelector('.view-mode-frontmatter .metadata-container')).not.toBeNull()
+        expect(writable.querySelector('fieldset')?.disabled).toBe(true)
+        const readOnly = render(<ViewMode {...props} propertiesEditing={{ apiClient, hasWriteAccess: false, onContentChange: vi.fn() }} />).container
+        expect(readOnly.querySelector('fieldset')?.disabled).toBe(true)
+      })
     })
 
     it('renders a literal <br> as a line break', () => {

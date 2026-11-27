@@ -128,6 +128,8 @@ import { debugOnce, warnNoOp, warnOnce } from './log'
 import { createEventSurface, isOwnedEventRef, offrefAtOwner } from './event-system'
 import type { EventRef } from './types'
 import { createEmbedRegistryShim } from './embed-registry'
+import { getMetadataTypeManager } from './metadata-type-manager'
+import { createMetadataEditorShim, type MetadataEditorHost } from './metadata-editor-shim'
 import { closingMarkType } from '../../editor/token-class-node-prop'
 // Aliased: the Plugin methods below carry the same names and would read as
 // recursive calls otherwise.
@@ -1337,6 +1339,8 @@ export function installObsidianGlobals(): void {
       // extraction hack; see embed-registry.ts's seedKanbanMarkdownEmbed for
       // why). A plugin registering through one must be visible through all.
       embedRegistry: createEmbedRegistryShim(),
+      // The same window-wide manager every AppShim hands out and the property editor reads.
+      metadataTypeManager: getMetadataTypeManager(),
       // Placeholder until PluginProvider swaps in the real manager backed by the
       // shared CommandRegistry (see plugin-context.ts). A plugin that reads
       // `window.app.commands` during bundle evaluation — before that swap — gets
@@ -1391,8 +1395,8 @@ export function installObsidianGlobals(): void {
           // createEl(tag, callback) — no options, second arg is the callback
           callback = o as (el: HTMLElement) => void
         } else if (o && typeof o === 'object') {
-          const options = o as { cls?: string; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
-          if (options.cls) el.className = options.cls
+          const options = o as { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+          if (options.cls) el.className = Array.isArray(options.cls) ? options.cls.join(' ') : options.cls
           if (options.text) applyElementText(el, options.text)
           if (options.attr) {
             for (const [k, v] of Object.entries(options.attr)) {
@@ -1613,8 +1617,8 @@ export function installObsidianGlobals(): void {
       if (typeof o === 'function') {
         callback = o as (el: HTMLElement) => void
       } else if (o && typeof o === 'object') {
-        const options = o as { cls?: string; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
-        if (options.cls) el.className = options.cls
+        const options = o as { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+        if (options.cls) el.className = Array.isArray(options.cls) ? options.cls.join(' ') : options.cls
         if (options.text) applyElementText(el, options.text)
         if (options.attr) {
           for (const [k, v] of Object.entries(options.attr)) {
@@ -2435,6 +2439,17 @@ export function installObsidianGlobals(): void {
         })
       }
       // previewMode is defined further down, once MarkdownPreviewView exists.
+    }
+    // `metadataEditor`: the properties block of the note, bound to the real editor.
+    if (MV?.prototype && !Object.getOwnPropertyDescriptor(MV.prototype, 'metadataEditor')) {
+      Object.defineProperty(MV.prototype, 'metadataEditor', {
+        get(this: MetadataEditorHost & { _metadataEditor?: unknown }) {
+          this._metadataEditor ??= createMetadataEditorShim(this)
+          return this._metadataEditor
+        },
+        configurable: true,
+        enumerable: true,
+      })
     }
   }
 

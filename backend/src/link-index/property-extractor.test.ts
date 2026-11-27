@@ -55,17 +55,17 @@ tags: [x, y]
     })
   })
 
-  it('skips nested objects', () => {
+  it('registers inline objects as value-less keys', () => {
     const content = `---
 simple: value
 nested: {a: 1, b: 2}
 ---
 # Content`
     const result = extractProperties(content)
-    expect(result).toEqual({ simple: ['value'] })
+    expect(result).toEqual({ simple: ['value'], nested: [] })
   })
 
-  it('skips block scalar indicators (| and >)', () => {
+  it('registers block scalars as value-less keys', () => {
     const content = `---
 title: Hello
 description: |
@@ -74,7 +74,30 @@ description: |
 ---
 # Content`
     const result = extractProperties(content)
-    expect(result).toEqual({ title: ['Hello'] })
+    expect(result).toEqual({ title: ['Hello'], description: [] })
+  })
+
+  it('keeps every top-level key of nested frontmatter, incl. null and spaced keys', () => {
+    const content = `---
+level1simple: a
+level1Nested:
+  address:
+    city: Berlin
+  geo:
+    lat: 1
+empty:
+my key: x
+tags:
+  - t1
+---
+# Content`
+    expect(extractProperties(content)).toEqual({
+      level1simple: ['a'],
+      level1Nested: [],
+      empty: [],
+      'my key': ['x'],
+      tags: ['t1'],
+    })
   })
 
   it('returns empty object when no frontmatter is present', () => {
@@ -137,9 +160,9 @@ empty:
 other: value
 ---
 # Content`
-    // 'empty:' with no value and no dash-items → skipped
+    // 'empty:' with no value and no dash-items → value-less key
     const result = extractProperties(content)
-    expect(result).toEqual({ other: ['value'] })
+    expect(result).toEqual({ empty: [], other: ['value'] })
   })
 
   it('handles keys with hyphens and underscores', () => {

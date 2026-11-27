@@ -776,6 +776,9 @@ export const en: TranslationShape = {
       notMarkdown: 'No properties for this file type',
       deleteProperty: 'Remove property',
       deletePropertyAriaLabel: 'Remove {key}',
+      structuredAriaLabel: 'Nested value (YAML)',
+      structuredInvalid: 'Invalid YAML',
+      widgetError: 'This value could not be displayed',
       addProperty: 'Add property',
       renamePropertyTitle: 'Click to rename',
       propertyNameAriaLabel: 'Property name',
@@ -789,6 +792,7 @@ export const en: TranslationShape = {
         list: 'List',
         tags: 'Tags',
         aliases: 'Aliases',
+        unknown: 'Unknown',
       },
     },
     propertiesOverview: {

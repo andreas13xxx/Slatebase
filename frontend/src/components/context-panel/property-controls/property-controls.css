@@ -167,3 +167,33 @@
 .property-control__suggestion-item:hover {
   background: var(--bg-hover);
 }
+
+/* Structured (nested object / mixed list) value edited as YAML */
+.property-control--structured {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.property-control__structured-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  padding: 4px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.1));
+  border-radius: var(--radius-sm, 3px);
+}
+
+.property-control__structured-input[aria-invalid='true'] {
+  border-color: var(--text-error, #e53e3e);
+}
+
+.property-control__error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-error, #e53e3e);
+}

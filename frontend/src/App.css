@@ -2414,6 +2414,8 @@
 }
 .view-mode-frontmatter:not([open]) .view-mode-frontmatter-title { margin-bottom: 0; }
 .view-mode-frontmatter-table { width: 100%; border-collapse: collapse; }
+/* The shared properties editor sits directly in the block: no popover spacing */
+.view-mode-frontmatter .hover-preview__properties { margin: 0; padding: 0; border: 0; }
 .view-mode-frontmatter-table th {
   text-align: left;
   padding: 3px 12px 3px 0;

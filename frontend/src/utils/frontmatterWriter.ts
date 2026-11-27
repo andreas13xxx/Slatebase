@@ -16,6 +16,8 @@
  * - undefined: key omitted entirely
  */
 
+import { stringify as stringifyYaml } from 'yaml'
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Result of locating a frontmatter block in a document. */
@@ -106,6 +108,13 @@ export function serializeFrontmatter(
       continue
     }
 
+    // Nested objects and lists holding non-strings (numbers, booleans, objects,
+    // lists) go through the YAML library, which keeps their structure and types.
+    if (needsStructuredYaml(value)) {
+      lines.push(...stringifyStructured(key, value))
+      continue
+    }
+
     const serialized = serializeValue(value)
     if (serialized === null) continue // skip undefined
 
@@ -165,6 +174,22 @@ export function applyFrontmatterChange(
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
+/**
+ * Whether a value has structure the flat line-builder below would flatten
+ * (`[object Object]`, numbers turned into quoted strings): a plain object, or a
+ * list with any item that is not a string.
+ */
+function needsStructuredYaml(value: unknown): boolean {
+  if (value === null || typeof value !== 'object' || value instanceof Date) return false
+  if (Array.isArray(value)) return value.some((item) => item !== null && item !== undefined && typeof item !== 'string')
+  return true
+}
+
+/** Block-style YAML lines for `key: value` with a structured value, indented by two spaces like Obsidian. */
+function stringifyStructured(key: string, value: unknown): string[] {
+  return stringifyYaml({ [key]: value }, { indent: 2, lineWidth: 0 }).replace(/\n$/, '').split('\n')
+}
+
 type SerializedValue = {
   multiline: false
   text: string
@@ -215,7 +240,8 @@ function serializeValue(value: unknown): SerializedValue | null {
     return { multiline: true, lines: items }
   }
 
-  // Objects — serialize as inline JSON (not a common case for frontmatter)
+  // Objects never get here from serializeFrontmatter (needsStructuredYaml
+  // takes them first); the JSON form is only a last-resort flow mapping.
   if (typeof value === 'object') {
     return { multiline: false, text: JSON.stringify(value) }
   }
