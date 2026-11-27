@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { within } from '@testing-library/dom'
+import { screen, within } from '@testing-library/dom'
 import { act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EditorView, keymap } from '@codemirror/view'
@@ -173,8 +173,10 @@ describe('Interactive frontmatter box', () => {
     cleanup = () => { view.destroy(); parent.remove() }
     await flushMicrotasks()
 
-    const select = within(view.dom.querySelector('.properties-editor') as HTMLElement).getByRole('combobox', { name: 'Typ' })
-    await user.selectOptions(select, 'checkbox')
+    // The type menu opens from the property's icon (it renders in a portal, outside the editor)
+    const row = view.dom.querySelector('.properties-editor__row[data-property-key="title"]') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Typ' }))
+    await user.click(await screen.findByText('Checkbox'))
 
     expect(received).toEqual({ key: 'title', type: 'checkbox' })
     expect(view.state.doc.toString()).toBe(DOC)
