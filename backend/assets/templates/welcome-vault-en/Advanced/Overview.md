@@ -84,6 +84,7 @@ Detailed guides for individual Obsidian plugins:
 | [[Advanced/Plugins/Kanban\|Kanban]] | Visual task boards |
 | [[Advanced/Plugins/LiveSync\|LiveSync]] | Vault synchronization |
 | [[Advanced/Plugins/Mind Map\|Mind Map]] | Heading structure as an interactive mind map |
+| [[Advanced/Plugins/Nested Properties\|Nested Properties]] | Nested frontmatter as collapsible groups in the properties editor |
 | [[Advanced/Plugins/Outliner\|Outliner]] | Lists as a real outline editor |
 | [[Advanced/Plugins/Paste URL into Selection\|Paste URL into Selection]] | Turn a selection into a link by pasting |
 | [[Advanced/Plugins/Recent Files\|Recent Files]] | Sidebar with recently opened notes |
