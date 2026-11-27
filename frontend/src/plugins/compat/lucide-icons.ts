@@ -149,7 +149,8 @@ const EXPLICIT_ALIASES: Record<string, readonly string[]> = {
   'up-arrow-with-tail': ['arrow-up'],
   'down-arrow-with-tail': ['arrow-down'],
   'up-and-down-arrows': ['arrow-up-down'],
-  'right-triangle': ['chevron-right'],
+  // Obsidian's collapse triangle points DOWN when open; stylesheets rotate it -90deg when collapsed.
+  'right-triangle': ['chevron-down'],
   'enlarge-glyph': ['maximize-2'],
   'compress-glyph': ['minimize-2'],
   'expand-vertically': ['unfold-vertical'],
