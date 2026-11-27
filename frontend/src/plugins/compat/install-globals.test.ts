@@ -73,6 +73,17 @@ describe('installObsidianGlobals', () => {
     })
   })
 
+  describe('createEl/createDiv class lists', () => {
+    it('accepts cls as an array on the window and element entry points', () => {
+      const win = window as unknown as { createEl: (tag: string, o?: unknown) => HTMLElement }
+      expect(win.createEl('div', { cls: ['a', 'b'] }).className).toBe('a b')
+      const parent = document.createElement('div')
+      const child = (parent as unknown as { createDiv: (o?: unknown) => HTMLElement }).createDiv({ cls: ['metadata-property', 'is-collapsed'] })
+      expect(child.classList.contains('is-collapsed')).toBe(true)
+      expect(child.classList.contains('metadata-property')).toBe(true)
+    })
+  })
+
   describe('WorkspaceLeaf/WorkspaceSplit/WorkspaceRibbon are the real classes, not disconnected stubs', () => {
     // Regression: window.obsidian.WorkspaceLeaf used to be a standalone stub
     // class unrelated to the real WorkspaceLeaf that flows through the app

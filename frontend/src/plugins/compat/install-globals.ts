@@ -1395,8 +1395,8 @@ export function installObsidianGlobals(): void {
           // createEl(tag, callback) — no options, second arg is the callback
           callback = o as (el: HTMLElement) => void
         } else if (o && typeof o === 'object') {
-          const options = o as { cls?: string; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
-          if (options.cls) el.className = options.cls
+          const options = o as { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+          if (options.cls) el.className = Array.isArray(options.cls) ? options.cls.join(' ') : options.cls
           if (options.text) applyElementText(el, options.text)
           if (options.attr) {
             for (const [k, v] of Object.entries(options.attr)) {
@@ -1617,8 +1617,8 @@ export function installObsidianGlobals(): void {
       if (typeof o === 'function') {
         callback = o as (el: HTMLElement) => void
       } else if (o && typeof o === 'object') {
-        const options = o as { cls?: string; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
-        if (options.cls) el.className = options.cls
+        const options = o as { cls?: string | string[]; text?: string | DocumentFragment; attr?: Record<string, string>; type?: string; href?: string; placeholder?: string; value?: string }
+        if (options.cls) el.className = Array.isArray(options.cls) ? options.cls.join(' ') : options.cls
         if (options.text) applyElementText(el, options.text)
         if (options.attr) {
           for (const [k, v] of Object.entries(options.attr)) {
