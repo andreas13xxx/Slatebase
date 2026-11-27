@@ -165,6 +165,12 @@
   overflow: visible;
 }
 
+/* Indent per nesting level (Obsidian indents a few pixels, not a label column) and the key width of nested rows */
+.metadata-container {
+  --metadata-nested-indent: var(--size-4-3, 12px);
+  --metadata-nested-label-width: min(var(--metadata-label-width, 120px), 40%);
+}
+
 /*
  * Obsidian's base styling of the properties block, for rows a widget draws itself
  * (nested objects and lists). Plugins ship CSS only for what they change and take
@@ -184,7 +190,8 @@
 .metadata-container .metadata-property-value .metadata-property-key {
   display: flex;
   align-items: center;
-  flex: 0 0 var(--metadata-label-width, 120px);
+  /* Shrinks with the panel instead of claiming a full label column on every level */
+  flex: 0 1 var(--metadata-nested-label-width);
   gap: 4px;
   min-width: 0;
   color: var(--text-subtle);
@@ -248,10 +255,23 @@
   accent-color: var(--accent);
 }
 
+/*
+ * An expanded object puts its children on their own line, indented by one step. The widget's
+ * stylesheet is injected after this one and asks for 20px and a full-width cell; with the cell
+ * allowed to shrink (flex-basis 0, as every value cell has) it stays beside the key and pushes
+ * each level right by a whole label column. !important because that stylesheet is more specific.
+ */
+.metadata-container .metadata-property.nested-properties-collapsible:not(.is-collapsed) > .metadata-property-value {
+  flex: 1 1 calc(100% - var(--metadata-nested-indent)) !important;
+  width: auto !important;
+  min-width: 0;
+  margin-left: var(--metadata-nested-indent) !important;
+}
+
 /* An expanded object: a rounded frame around its children, one per level */
 .metadata-container .metadata-property-value .metadata-property:has(.metadata-property):not(.is-collapsed) {
   border: 1px solid var(--border-default);
-  padding: 2px 4px;
+  padding: 2px var(--size-4-1, 4px);
 }
 
 .metadata-container .metadata-property.is-collapsed .metadata-property-value {
