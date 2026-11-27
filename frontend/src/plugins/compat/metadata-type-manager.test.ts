@@ -1,10 +1,27 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createMetadataTypeManager } from './metadata-type-manager'
 import type { PropertyWidget } from './property-widgets'
+import { withPluginContext } from './plugin-execution-context'
 
 const ctxFor = (onChange: (v: unknown) => void) => ({ app: null, blur: () => {}, key: 'k', onChange, sourcePath: 'n.md' })
 
 describe('metadataTypeManager', () => {
+  it('attributes a widget a plugin returns from a patched getTypeInfo to that plugin', () => {
+    const m = createMetadataTypeManager()
+    const objectWidget: PropertyWidget = { ...m.getWidget('text')!, type: 'object' }
+    const original = m.getTypeInfo
+    withPluginContext('nested-properties', () => {
+      m.getTypeInfo = (property: string, value: unknown) => {
+        const info = original(property, value)
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) info.expected = objectWidget
+        return info
+      }
+    })
+    expect(m.getTypeInfo('a', { b: 1 }).expected).toBe(objectWidget)
+    expect(m.getWidgetOwner(objectWidget)).toBe('nested-properties')
+    expect(m.getWidgetOwner(m.getWidget('text')!)).toBeNull()
+  })
+
   it('infers widgets from the value shape', () => {
     const m = createMetadataTypeManager()
     expect(m.getTypeInfo('x', true).inferred?.type).toBe('checkbox')

@@ -116,7 +116,7 @@ function resolvePropertyType(
 type RowKind =
   | { kind: 'builtin'; type: PropertyType }
   | { kind: 'structured' }
-  | { kind: 'widget'; widget: PropertyWidget }
+  | { kind: 'widget'; widget: PropertyWidget; pluginId: string | null }
 
 /** A nested object, or a list holding anything but strings: the built-in text/list controls would flatten it. */
 function isStructuredValue(value: unknown): boolean {
@@ -140,7 +140,7 @@ function resolveRowKind(key: string, value: unknown, registry: PropertyTypeEntry
   const chosen = registry?.some((entry) => entry.key === key) === true
   if (!chosen) {
     const widget = pluginWidgetFor(manager, key, value)
-    if (widget) return { kind: 'widget', widget }
+    if (widget) return { kind: 'widget', widget, pluginId: manager.getWidgetOwner(widget) }
   }
   if (isStructuredValue(value)) return { kind: 'structured' }
   return { kind: 'builtin', type: resolvePropertyType(key, value, registry, manager) }
@@ -402,6 +402,7 @@ function PropertyRow({
       className="properties-editor__row metadata-property"
       data-property-key={propertyKey}
       data-property-type={widgetType}
+      data-plugin-id={kind.kind === 'widget' ? kind.pluginId ?? undefined : undefined}
       tabIndex={kind.kind === 'widget' ? -1 : undefined}
     >
       <div className="properties-editor__key-cell metadata-property-key">
@@ -428,17 +429,27 @@ function PropertyRow({
           </button>
         )}
       </div>
-      <div className="properties-editor__value metadata-property-value" data-property-type={widgetType}>
-        <PropertyValueControl
+      {kind.kind === 'widget' ? (
+        <PluginPropertyWidget
           key={forced?.nonce ?? 0}
-          kind={kind}
+          widget={kind.widget}
+          pluginId={kind.pluginId}
           propertyKey={propertyKey}
           sourcePath={sourcePath}
           value={shownValue}
           onChange={handleChange}
-          tagSuggestions={tagSuggestions}
         />
-      </div>
+      ) : (
+        <div className="properties-editor__value metadata-property-value" data-property-type={widgetType}>
+          <PropertyValueControl
+            key={forced?.nonce ?? 0}
+            kind={kind}
+            value={shownValue}
+            onChange={handleChange}
+            tagSuggestions={tagSuggestions}
+          />
+        </div>
+      )}
       {kind.kind === 'builtin' ? (
         <select
           className="properties-editor__type-select"
@@ -473,17 +484,13 @@ function PropertyRow({
 
 interface PropertyValueControlProps {
   kind: RowKind
-  propertyKey: string
-  sourcePath: string
   value: unknown
   onChange: (newValue: unknown) => void
   tagSuggestions: string[]
 }
 
-function PropertyValueControl({ kind, propertyKey, sourcePath, value, onChange, tagSuggestions }: PropertyValueControlProps) {
-  if (kind.kind === 'widget') {
-    return <PluginPropertyWidget widget={kind.widget} propertyKey={propertyKey} sourcePath={sourcePath} value={value} onChange={onChange} />
-  }
+function PropertyValueControl({ kind, tagSuggestions, value, onChange }: PropertyValueControlProps) {
+  if (kind.kind === 'widget') return null
   if (kind.kind === 'structured') {
     return <StructuredPropertyControl value={value} onChange={onChange} />
   }

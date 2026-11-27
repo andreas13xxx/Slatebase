@@ -8,6 +8,7 @@
  */
 
 import { createBuiltinPropertyWidgets, type PropertyWidget } from './property-widgets'
+import { getCurrentPluginId } from './plugin-execution-context'
 
 /** `{ expected, inferred }` widgets for a property and value (Obsidian's `getTypeInfo`). */
 export interface PropertyTypeInfo {
@@ -53,9 +54,16 @@ export function createMetadataTypeManager() {
     })
   }
 
+  /** Which plugin a non-built-in widget came from, so its markup can be scoped to that plugin's CSS. */
+  const owners = new WeakMap<PropertyWidget, string>()
+  const claim = (candidate: PropertyWidget | undefined, pluginId: string | null): void => {
+    if (candidate && pluginId !== null && !owners.has(candidate) && !Object.values(builtins).includes(candidate)) owners.set(candidate, pluginId)
+  }
+
   // A proxy so `registeredTypeWidgets[type] = widget` / `delete` from a plugin reaches the editor.
   const registeredTypeWidgets = new Proxy<Record<string, PropertyWidget>>({ ...builtins }, {
     set(target, prop, value: PropertyWidget) {
+      claim(value, getCurrentPluginId())
       target[prop as string] = value
       notify()
       return true
@@ -74,6 +82,18 @@ export function createMetadataTypeManager() {
   let vaultTypes = new Map<string, string>()
 
   const hasWidget = (type: string): boolean => Object.hasOwn(registeredTypeWidgets, type)
+
+  /** The unpatched lookup: `inferred` from the value's shape, `expected` the assigned widget, else the inferred one. */
+  const baseGetTypeInfo = (property: string, value: unknown): PropertyTypeInfo => {
+    let inferredType = 'unknown'
+    if (typeof value === 'boolean') inferredType = 'checkbox'
+    else if (typeof value === 'number') inferredType = 'number'
+    else if (typeof value === 'string') inferredType = DATETIME_RE.test(value) ? 'datetime' : DATE_RE.test(value) ? 'date' : 'text'
+    else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) inferredType = 'multitext'
+    const inferred = manager.getWidget(inferredType)
+    const assigned = manager.getAssignedWidget(property)
+    return { expected: assigned !== null ? manager.getWidget(assigned) : inferred, inferred }
+  }
 
   const manager = {
     registeredTypeWidgets,
@@ -113,16 +133,10 @@ export function createMetadataTypeManager() {
      * `{ expected, inferred }` widgets for a property and value. `inferred` comes from the value's shape,
      * `expected` is the assigned widget, else the inferred one. Plugins patch this method, so editors must call it.
      */
-    getTypeInfo: (property: string, value: unknown): PropertyTypeInfo => {
-      let inferredType = 'unknown'
-      if (typeof value === 'boolean') inferredType = 'checkbox'
-      else if (typeof value === 'number') inferredType = 'number'
-      else if (typeof value === 'string') inferredType = DATETIME_RE.test(value) ? 'datetime' : DATE_RE.test(value) ? 'date' : 'text'
-      else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) inferredType = 'multitext'
-      const inferred = manager.getWidget(inferredType)
-      const assigned = manager.getAssignedWidget(property)
-      return { expected: assigned !== null ? manager.getWidget(assigned) : inferred, inferred }
-    },
+    getTypeInfo: baseGetTypeInfo,
+
+    /** The plugin whose code supplied this widget, or null for built-in widgets and unknown origins. */
+    getWidgetOwner: (candidate: PropertyWidget): string | null => owners.get(candidate) ?? null,
 
     /** Whether a widget is one of the built-in ones (not replaced or wrapped by a plugin). */
     isBuiltinWidget: (candidate: unknown): boolean => Object.values(builtins).includes(candidate as PropertyWidget),
@@ -141,6 +155,26 @@ export function createMetadataTypeManager() {
       return () => { listeners.delete(listener) }
     },
   }
+
+  // A plugin patches `getTypeInfo` by assignment. Whatever widget its patch returns is attributed to
+  // the plugin that was running when it installed the patch (Nested Properties' object widget).
+  let getTypeInfoImpl: (property: string, value: unknown) => PropertyTypeInfo = baseGetTypeInfo
+  Object.defineProperty(manager, 'getTypeInfo', {
+    enumerable: true,
+    configurable: true,
+    get: () => getTypeInfoImpl,
+    set: (next: (property: string, value: unknown) => PropertyTypeInfo) => {
+      const owner = getCurrentPluginId()
+      getTypeInfoImpl = owner === null
+        ? next
+        : (property, value) => {
+            const info = next(property, value)
+            claim(info.expected, owner)
+            claim(info.inferred, owner)
+            return info
+          }
+    },
+  })
 
   return manager
 }

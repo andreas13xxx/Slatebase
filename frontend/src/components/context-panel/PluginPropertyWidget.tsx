@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from '../../i18n'
 import { errorOnce } from '../../plugins/compat/log'
+import { withPluginContext } from '../../plugins/compat/plugin-execution-context'
 import type { PropertyWidget } from '../../plugins/compat/property-widgets'
 
 interface PluginPropertyWidgetProps {
@@ -16,6 +17,8 @@ interface PluginPropertyWidgetProps {
   propertyKey: string
   value: unknown
   sourcePath: string
+  /** Plugin that supplied the widget; scopes its stylesheet to the row. */
+  pluginId?: string | null
   onChange: (value: unknown) => void
 }
 
@@ -28,7 +31,7 @@ function valueSignature(value: unknown): string {
   }
 }
 
-export function PluginPropertyWidget({ widget, propertyKey, value, sourcePath, onChange }: PluginPropertyWidgetProps) {
+export function PluginPropertyWidget({ widget, propertyKey, value, sourcePath, pluginId = null, onChange }: PluginPropertyWidgetProps) {
   const { t } = useTranslation()
   const hostRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
@@ -46,13 +49,13 @@ export function PluginPropertyWidget({ widget, propertyKey, value, sourcePath, o
     host.replaceChildren()
     const row = host.closest<HTMLElement>('.metadata-property')
     try {
-      const handle = widget.render(host, valueRef.current, {
+      const handle = withPluginContext(pluginId, () => widget.render(host, valueRef.current, {
         app: (window as unknown as { app?: unknown }).app,
         blur: () => { row?.focus() },
         key: propertyKey,
         onChange: (next) => { onChangeRef.current(next) },
         sourcePath,
-      })
+      }))
       void handle
     } catch (err) {
       errorOnce(`property-widget:${widget.type}`, `[PluginCompat] The "${widget.type}" property widget failed to render "${propertyKey}":`, err)
@@ -65,7 +68,16 @@ export function PluginPropertyWidget({ widget, propertyKey, value, sourcePath, o
     }
     return () => { host.replaceChildren() }
     // The value enters through its signature: a new object with the same content must not rebuild the widget.
-  }, [widget, propertyKey, signature, sourcePath, t])
+  }, [widget, propertyKey, signature, sourcePath, pluginId, t])
 
-  return <div ref={hostRef} className="metadata-property-widget" data-property-type={widget.type} />
+  // The widget draws straight into the value cell: plugin CSS addresses `.metadata-property-value > …`.
+  // `data-plugin-id` puts everything the widget builds under its plugin's scoped stylesheet.
+  return (
+    <div
+      ref={hostRef}
+      className="properties-editor__value metadata-property-value"
+      data-property-type={widget.type}
+      data-plugin-id={pluginId ?? undefined}
+    />
+  )
 }

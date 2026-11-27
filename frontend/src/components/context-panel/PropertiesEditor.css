@@ -41,11 +41,11 @@
 }
 
 .properties-editor__row {
-  display: grid;
-  grid-template-columns: minmax(60px, 0.4fr) 1fr auto auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
-  align-items: start;
-  padding: 3px 0;
+  padding: 3px 56px 3px 0;
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
 }
 
@@ -83,6 +83,9 @@
 }
 
 .properties-editor__type-select {
+  position: absolute;
+  top: 3px;
+  right: 24px;
   font-size: 10px;
   color: var(--text-subtle);
   background: transparent;
@@ -99,12 +102,16 @@
 }
 
 .properties-editor__value {
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
 }
 
 .properties-editor__delete-btn {
   all: unset;
+  position: absolute;
+  top: 3px;
+  right: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -154,6 +161,8 @@
 .properties-editor__key-cell {
   display: flex;
   align-items: flex-start;
+  flex: 0 0 var(--metadata-label-width, 120px);
+  max-width: 40%;
   gap: 4px;
   min-width: 0;
 }
@@ -173,4 +182,149 @@
 .properties-editor__value[data-property-type='object'],
 .properties-editor__value[data-property-type='mixed list'] {
   overflow: visible;
+}
+
+/*
+ * Obsidian's base styling of the properties block, for rows a widget draws itself
+ * (nested objects and lists). Plugins ship CSS only for what they change and take
+ * these classes to be styled already; the editor's own rows above use the same
+ * class names, so both look alike. Tokens only: light and dark follow the theme.
+ */
+.metadata-container .metadata-property-value .metadata-property {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+  border-radius: var(--radius-md, 6px);
+}
+
+.metadata-container .metadata-property-value .metadata-property-key {
+  display: flex;
+  align-items: center;
+  flex: 0 0 var(--metadata-label-width, 120px);
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.metadata-container .metadata-property-value .metadata-property-value {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.metadata-container .metadata-property-value .metadata-property-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-subtle);
+}
+
+.metadata-container .metadata-property-value .metadata-property-icon:empty {
+  display: none;
+}
+
+.metadata-container .metadata-property-key-input,
+.metadata-container .metadata-input {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 3px);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.metadata-container .metadata-property-key-input {
+  flex: 1 1 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.metadata-container .metadata-input-text,
+.metadata-container .metadata-input-number {
+  width: 100%;
+}
+
+.metadata-container .metadata-property-key-input:hover,
+.metadata-container .metadata-input:hover {
+  background: var(--bg-hover);
+}
+
+.metadata-container .metadata-property-key-input:focus,
+.metadata-container .metadata-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-primary);
+  outline: none;
+}
+
+.metadata-container .metadata-input-checkbox {
+  accent-color: var(--accent);
+}
+
+/* An expanded object: a rounded frame around its children, one per level */
+.metadata-container .metadata-property-value .metadata-property:has(.metadata-property):not(.is-collapsed) {
+  border: 1px solid var(--border-default);
+  padding: 2px 4px;
+}
+
+.metadata-container .metadata-property.is-collapsed .metadata-property-value {
+  font-style: italic;
+  color: var(--text-subtle);
+}
+
+/* Tag pills of the list widgets */
+.metadata-container .multi-select-container {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.metadata-container .multi-select-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  font-size: 11px;
+}
+
+.metadata-container .multi-select-pill-remove-button {
+  all: unset;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0 2px;
+}
+
+.metadata-container .multi-select-pill-remove-button:hover,
+.metadata-container .multi-select-pill-remove-button:focus-visible {
+  opacity: 1;
+}
+
+.metadata-container .multi-select-input {
+  flex: 1 1 60px;
+  min-width: 60px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+
+/* Read-only host (no write access): a disabled fieldset blocks every native control, nothing else changes */
+.properties-editor-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
