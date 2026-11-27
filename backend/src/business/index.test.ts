@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
 import path from 'node:path'
+import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import { VaultService, VaultNotFoundError, VaultValidationError, StorageError, ConflictError, FileConflictError, InvalidMoveError, FileTooLargeError } from './index'
@@ -11,6 +12,14 @@ import type { ILogger } from '../logger/index'
 import type { IVaultRegistry, VaultRegistryEntry } from '../vault/registry'
 
 // --- Test Helpers ---
+
+// createVault() makes a real directory under `dataDir`. The default must therefore be a throwaway
+// folder: the old './data' created an empty vault folder in the developer's real data directory on
+// every test run (and nothing ever removed it).
+const DEFAULT_TEST_DATA_DIR = fsSync.mkdtempSync(path.join(os.tmpdir(), 'slatebase-business-test-'))
+afterAll(() => {
+  fsSync.rmSync(DEFAULT_TEST_DATA_DIR, { recursive: true, force: true })
+})
 
 function createMockLogger(): ILogger {
   return {
@@ -31,7 +40,7 @@ function createMockConfigService(overrides?: Partial<ServerConfig>): IConfigServ
     maxDirectoryDepth: 50,
     maxVaultsPerUser: 50,
     allowedOrigins: ['http://localhost:5173'],
-    dataDir: './data',
+    dataDir: DEFAULT_TEST_DATA_DIR,
     templatesDir: './assets/templates',
     maxImportFileSize: 524288000,
     maxImportFiles: 500,
