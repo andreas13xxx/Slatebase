@@ -122,17 +122,36 @@ describe('PropertiesEditor — key renaming', () => {
 })
 
 describe('PropertiesEditor — type selection', () => {
-  it('shows a type dropdown reflecting the inferred type', () => {
+  it('opens the type menu from the property icon, with the current type checked', async () => {
     renderEditor({ data: { count: 5 } })
-    expect(screen.getByRole('combobox', { name: 'Typ' })).toHaveValue('number')
+    expect(screen.queryByRole('combobox')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Typ' }))
+    expect(screen.getByRole('menuitemcheckbox', { name: /Zahl/ })).toBeInTheDocument()
   })
 
-  it('calls onTypeChange when a different type is selected', async () => {
+  it('calls onTypeChange when a type is picked from the menu', async () => {
     const onTypeChange = vi.fn()
     renderEditor({ data: { title: 'Hello' }, onTypeChange })
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Typ' }), 'checkbox')
+    await userEvent.click(screen.getByRole('button', { name: 'Typ' }))
+    await userEvent.click(screen.getByText('Checkbox'))
 
     expect(onTypeChange).toHaveBeenCalledWith('title', 'checkbox')
+  })
+})
+
+describe('PropertiesEditor — readOnly', () => {
+  it('offers no adding, renaming, deleting or type change', () => {
+    renderEditor({ data: { title: 'Hello' }, readOnly: true })
+    expect(screen.queryByRole('button', { name: 'title' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Typ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Eigenschaft hinzufügen/ })).toBeNull()
+    expect(screen.queryByTitle('Eigenschaft entfernen')).toBeNull()
+    expect(screen.getByText('title')).toBeInTheDocument()
+  })
+
+  it('disables the value controls', () => {
+    renderEditor({ data: { title: 'Hello' }, readOnly: true })
+    expect(document.querySelector('.properties-editor__list')).toBeDisabled()
   })
 })
 

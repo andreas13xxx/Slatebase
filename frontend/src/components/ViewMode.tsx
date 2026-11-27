@@ -112,6 +112,8 @@ function ReadingProperties({ fallback }: { fallback: ReactNode }): ReactNode {
     filePath: ctx.filePath,
     apiClient: ctx.apiClient,
     hasWriteAccess: ctx.hasWriteAccess,
+    // The reading view shows the properties, it does not edit them.
+    readOnly: true,
     onContentChange: ctx.onContentChange,
   })
 }

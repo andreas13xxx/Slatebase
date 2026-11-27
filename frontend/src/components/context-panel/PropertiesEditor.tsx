@@ -13,6 +13,7 @@ import { registerRenderedProperty } from '../../plugins/compat/metadata-editor-b
 import { renderComponentIcon } from '../../plugins/compat/obsidian-api-extensions'
 import { warnOnce } from '../../plugins/compat/log'
 import type { PropertyWidget } from '../../plugins/compat/property-widgets'
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { PluginPropertyWidget } from './PluginPropertyWidget'
 import {
   TextPropertyControl,
@@ -59,6 +60,11 @@ export interface PropertiesEditorProps {
   isMarkdown?: boolean
   /** Path of the note the properties belong to; handed to plugin property widgets as `ctx.sourcePath`. */
   sourcePath?: string
+  /**
+   * Display only: no adding, renaming, deleting or type change, and no editable values,
+   * not even in the rows a plugin widget draws itself. Reading view, and previews without write access.
+   */
+  readOnly?: boolean
 }
 
 // ─── Type Inference ──────────────────────────────────────────────────────────
@@ -163,6 +169,7 @@ export function PropertiesEditor({
   hasDocument = true,
   isMarkdown = true,
   sourcePath = '',
+  readOnly = false,
 }: PropertiesEditorProps) {
   const { t } = useTranslation()
   const manager = getMetadataTypeManager()
@@ -224,7 +231,7 @@ export function PropertiesEditor({
   // ─── Editable state ────────────────────────────────────────────────────────
 
   return (
-    <div className="properties-editor metadata-container">
+    <div className={`properties-editor metadata-container${readOnly ? ' properties-editor--readonly' : ''}`}>
       {entries.length === 0 && !parseError && (
         <p className="properties-editor__placeholder">
           {t('contextPanel.properties.empty')}
@@ -232,7 +239,7 @@ export function PropertiesEditor({
       )}
 
       {entries.length > 0 && (
-        <div className="properties-editor__list metadata-properties">
+        <fieldset className="properties-editor-fieldset properties-editor__list metadata-properties" disabled={readOnly}>
           {entries.map(([key, value]) => (
             <PropertyRow
               key={key}
@@ -248,16 +255,19 @@ export function PropertiesEditor({
               onDelete={onDeleteProperty}
               onRename={onRenameProperty}
               onTypeChange={onTypeChange}
+              readOnly={readOnly}
             />
           ))}
-        </div>
+        </fieldset>
       )}
 
-      <AddPropertyRow
-        existingKeys={entries.map(([k]) => k)}
-        suggestions={propertySuggestions}
-        onAdd={handleAdd}
-      />
+      {!readOnly && (
+        <AddPropertyRow
+          existingKeys={entries.map(([k]) => k)}
+          suggestions={propertySuggestions}
+          onAdd={handleAdd}
+        />
+      )}
     </div>
   )
 }
@@ -280,6 +290,7 @@ interface PropertyRowProps {
   onDelete: (key: string) => void
   onRename: (oldKey: string, newKey: string) => void
   onTypeChange: (key: string, type: PropertyType) => void
+  readOnly: boolean
 }
 
 function PropertyRow({
@@ -295,6 +306,7 @@ function PropertyRow({
   onDelete,
   onRename,
   onTypeChange,
+  readOnly,
 }: PropertyRowProps) {
   const { t } = useTranslation()
   const rowRef = useRef<HTMLDivElement>(null)
@@ -354,9 +366,20 @@ function PropertyRow({
     onDelete(propertyKey)
   }, [propertyKey, onDelete])
 
-  const handleTypeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    onTypeChange(propertyKey, e.target.value as PropertyType)
-  }, [propertyKey, onTypeChange])
+  // Like Obsidian, the type menu opens from the property's icon, not from a control beside the value.
+  const [typeMenu, setTypeMenu] = useState<{ x: number; y: number } | null>(null)
+  const currentType = kind.kind === 'builtin' ? kind.type : null
+  const typeMenuItems = useMemo<ContextMenuItem[]>(() => ALL_PROPERTY_TYPES.map((option) => ({
+    id: `type-${option}`,
+    label: t(`contextPanel.properties.types.${option}`),
+    checked: option === currentType,
+    run: () => { onTypeChange(propertyKey, option) },
+  })), [t, currentType, propertyKey, onTypeChange])
+  const openTypeMenu = useCallback((e: React.SyntheticEvent<HTMLElement>) => {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTypeMenu({ x: rect.left, y: rect.bottom + 2 })
+  }, [])
 
   const startEditingKey = useCallback(() => {
     keyEditSettledRef.current = false
@@ -406,8 +429,24 @@ function PropertyRow({
       tabIndex={kind.kind === 'widget' ? -1 : undefined}
     >
       <div className="properties-editor__key-cell metadata-property-key">
-        <span ref={iconRef} className="metadata-property-icon" aria-hidden="true" />
-        {isEditingKey ? (
+        {readOnly ? (
+          <span ref={iconRef} className="metadata-property-icon" aria-hidden="true" />
+        ) : (
+          <span
+            ref={iconRef}
+            className="metadata-property-icon properties-editor__type-icon"
+            role="button"
+            tabIndex={0}
+            aria-haspopup="menu"
+            aria-label={t('contextPanel.properties.typeAriaLabel')}
+            title={t('contextPanel.properties.typeAriaLabel')}
+            onClick={openTypeMenu}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTypeMenu(e) } }}
+          />
+        )}
+        {readOnly ? (
+          <span className="properties-editor__key properties-editor__key--readonly">{propertyKey}</span>
+        ) : isEditingKey ? (
           <input
             ref={keyInputRef}
             type="text"
@@ -438,6 +477,7 @@ function PropertyRow({
           sourcePath={sourcePath}
           value={shownValue}
           onChange={handleChange}
+          readOnly={readOnly}
         />
       ) : (
         <div className="properties-editor__value metadata-property-value" data-property-type={widgetType}>
@@ -450,32 +490,20 @@ function PropertyRow({
           />
         </div>
       )}
-      {kind.kind === 'builtin' ? (
-        <select
-          className="properties-editor__type-select"
-          value={kind.type}
-          onChange={handleTypeChange}
-          aria-label={t('contextPanel.properties.typeAriaLabel')}
-          title={t('contextPanel.properties.typeAriaLabel')}
+      {!readOnly && (
+        <button
+          type="button"
+          className="properties-editor__delete-btn"
+          onClick={handleDelete}
+          aria-label={t('contextPanel.properties.deletePropertyAriaLabel', { key: propertyKey })}
+          title={t('contextPanel.properties.deleteProperty')}
         >
-          {ALL_PROPERTY_TYPES.map((option) => (
-            <option key={option} value={option}>
-              {t(`contextPanel.properties.types.${option}`)}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span aria-hidden="true" />
+          <Trash2 size={12} />
+        </button>
       )}
-      <button
-        type="button"
-        className="properties-editor__delete-btn"
-        onClick={handleDelete}
-        aria-label={t('contextPanel.properties.deletePropertyAriaLabel', { key: propertyKey })}
-        title={t('contextPanel.properties.deleteProperty')}
-      >
-        <Trash2 size={12} />
-      </button>
+      {typeMenu && (
+        <ContextMenu x={typeMenu.x} y={typeMenu.y} items={typeMenuItems} onClose={() => setTypeMenu(null)} onSelect={() => {}} />
+      )}
     </div>
   )
 }

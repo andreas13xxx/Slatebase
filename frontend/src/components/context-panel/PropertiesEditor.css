@@ -45,7 +45,7 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  padding: 3px 56px 3px 0;
+  padding: 3px 24px 3px 0;
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
 }
 
@@ -80,25 +80,6 @@
   border-radius: var(--radius-sm, 3px);
   background: var(--bg-primary);
   color: var(--text-primary);
-}
-
-.properties-editor__type-select {
-  position: absolute;
-  top: 3px;
-  right: 24px;
-  font-size: 10px;
-  color: var(--text-subtle);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm, 3px);
-  padding: 2px 2px;
-  max-width: 72px;
-}
-
-.properties-editor__type-select:hover,
-.properties-editor__type-select:focus {
-  color: var(--text-primary);
-  border-color: var(--border-subtle, rgba(0, 0, 0, 0.1));
 }
 
 .properties-editor__value {
@@ -327,4 +308,33 @@
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* The icon opens the type menu, as in Obsidian */
+.properties-editor__type-icon {
+  cursor: pointer;
+  border-radius: var(--radius-sm, 3px);
+}
+
+.properties-editor__type-icon:hover,
+.properties-editor__type-icon:focus-visible {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Display only: nothing invites a click, and disabled controls keep their normal look */
+.properties-editor--readonly .properties-editor__key--readonly {
+  cursor: default;
+}
+
+.properties-editor--readonly .properties-editor__row {
+  padding-right: 0;
+}
+
+.properties-editor--readonly input:disabled,
+.properties-editor--readonly textarea:disabled,
+.properties-editor--readonly select:disabled {
+  opacity: 1;
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
 }

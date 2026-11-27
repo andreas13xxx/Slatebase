@@ -27,6 +27,8 @@ export interface HoverPreviewPropertiesProps {
   filePath: string
   apiClient: IApiClient
   hasWriteAccess: boolean
+  /** Show only: no editing even with write access (the reading view). */
+  readOnly?: boolean
   /** Called with the full new content after a successful save, so the popover re-renders. */
   onContentChange: (newContent: string) => void
 }
@@ -36,9 +38,11 @@ export function HoverPreviewProperties({
   vaultId,
   filePath,
   apiClient,
-  hasWriteAccess,
+  hasWriteAccess: hasWrite,
+  readOnly = false,
   onContentChange,
 }: HoverPreviewPropertiesProps) {
+  const hasWriteAccess = hasWrite && !readOnly
   const [typeRegistry, setTypeRegistry] = useState<PropertyTypeEntry[] | null>(null)
 
   // Load the vault's property-type registry once per vault, same source the
@@ -106,7 +110,6 @@ export function HoverPreviewProperties({
 
   return (
     <div className="hover-preview__properties">
-      <fieldset className="properties-editor-fieldset" disabled={!hasWriteAccess}>
       <PropertiesEditor
         data={data}
         parseError={parseError}
@@ -115,6 +118,7 @@ export function HoverPreviewProperties({
         sourcePath={filePath}
         hasDocument={true}
         isMarkdown={true}
+        readOnly={!hasWriteAccess}
         onCommit={(key, value) => {
           if (!hasWriteAccess) return
           const next = current()
@@ -147,7 +151,6 @@ export function HoverPreviewProperties({
           void apiClient.setPropertyType(vaultId, key, type).catch(() => {})
         }}
       />
-      </fieldset>
     </div>
   )
 }

@@ -900,7 +900,7 @@ def hello():
         expect(container.textContent).toContain('---')
       })
 
-      it('shows the shared properties editor when editing is wired up, read-only without write access', async () => {
+      it('shows the shared properties editor read-only, with or without write access', async () => {
         resetAppConfig()
         initializeAppConfig({ getAppConfig: async () => ({}) } as unknown as IApiClient)
         await setActiveVault('v1')
@@ -908,7 +908,7 @@ def hello():
         const props = { ...defaultProps, content: note, sourcePath: 'n.md' }
         const writable = render(<ViewMode {...props} propertiesEditing={{ apiClient, hasWriteAccess: true, onContentChange: vi.fn() }} />).container
         expect(writable.querySelector('.view-mode-frontmatter .metadata-container')).not.toBeNull()
-        expect(writable.querySelector('fieldset')?.disabled).toBe(false)
+        expect(writable.querySelector('fieldset')?.disabled).toBe(true)
         const readOnly = render(<ViewMode {...props} propertiesEditing={{ apiClient, hasWriteAccess: false, onContentChange: vi.fn() }} />).container
         expect(readOnly.querySelector('fieldset')?.disabled).toBe(true)
       })
