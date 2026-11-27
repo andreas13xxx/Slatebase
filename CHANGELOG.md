@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.98.0](https://github.com/andreas13xxx/Slatebase/compare/v0.97.0...v0.98.0) (2026-11-27)
+
+
+### Features
+
+* **properties:** real metadataTypeManager widgets and nested frontmatter ([#466](https://github.com/andreas13xxx/Slatebase/issues/466)) ([8af8ec1](https://github.com/andreas13xxx/Slatebase/commit/8af8ec124b57fec6a10db6d5df208696f2147ebc))
+
+
+### Sonstige Änderungen
+
+* **welcome-vault:** add Nested Properties plugin guide with live examples ([#467](https://github.com/andreas13xxx/Slatebase/issues/467)) ([b8d79ae](https://github.com/andreas13xxx/Slatebase/commit/b8d79aebfa85f973b749392e4775a6148c327e70))
+
 ## [0.97.0](https://github.com/andreas13xxx/Slatebase/compare/v0.96.0...v0.97.0) (2026-11-26)
 
 
