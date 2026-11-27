@@ -86,9 +86,11 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   const { t } = useTranslation()
   const { openMenu, menu: cardMenu } = useCardContextMenu(vaultId, onOpenNote, !onMoveCard)
   const { coverFor } = useCardCovers(doc, view, vaultId ?? '')
-  // View `cardSize`: the column width of the board, or the card width of grouped cards laid out as
-  // rows. Unset keeps the stylesheet defaults.
-  const boardSize = view.cardSize !== undefined ? clampTo(view.cardSize, CARD_SIZE.min, CARD_SIZE.max) : undefined
+  // A Kanban board takes its column width from `columnWidth` (what Obsidian writes); `cardSize`, which
+  // older Slatebase versions wrote there, still counts when `columnWidth` is absent. Grouped cards laid
+  // out as rows take the card width from `cardSize`. Unset keeps the stylesheet defaults.
+  const configuredSize = layout === 'columns' ? view.columnWidth ?? view.cardSize : view.cardSize
+  const boardSize = configuredSize !== undefined ? clampTo(configuredSize, CARD_SIZE.min, CARD_SIZE.max) : undefined
   const boardStyle = boardSize === undefined ? undefined : ({ '--bases-board-size': `${boardSize}px` } as CSSProperties)
   // The grouping property name (the new `groupBy` is an object `{property, direction}`).
   const groupBy = view.groupBy?.property
