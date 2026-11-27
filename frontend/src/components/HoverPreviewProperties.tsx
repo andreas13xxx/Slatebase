@@ -106,6 +106,7 @@ export function HoverPreviewProperties({
 
   return (
     <div className="hover-preview__properties">
+      <fieldset className="properties-editor-fieldset" disabled={!hasWriteAccess}>
       <PropertiesEditor
         data={data}
         parseError={parseError}
@@ -146,6 +147,7 @@ export function HoverPreviewProperties({
           void apiClient.setPropertyType(vaultId, key, type).catch(() => {})
         }}
       />
+      </fieldset>
     </div>
   )
 }

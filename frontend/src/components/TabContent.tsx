@@ -738,6 +738,7 @@ export function TabContent() {
   // switching into reading, and opens internal links the same way the editor does.
   if (activeTab.mode === 'reading') {
     const readingContent = activeTab.editBuffer ?? activeTab.content
+    const isReadingReadOnly = appState.vaults.find((v) => v.id === activeTab.vaultId)?.permission === 'read'
     return (
       <div className="tab-content tab-content--reading" role="tabpanel" aria-label={activeTab.fileName}>
         {linkError && (
@@ -759,6 +760,14 @@ export function TabContent() {
           directoryTree={directoryTreeForActiveVault}
           onInternalLinkClick={handleInternalLinkClick}
           sourcePath={activeTab.filePath}
+          {...(apiClient ? { propertiesEditing: {
+            apiClient,
+            hasWriteAccess: !isReadingReadOnly,
+            // The editor has saved already; this keeps the tab's text in step (and reverts it if the save failed).
+            onContentChange: (content: string) => {
+              tabDispatch({ type: 'SAVE_SUCCESS', payload: { tabId: activeTab.id, content } })
+            },
+          } } : {})}
         />
       </div>
     )

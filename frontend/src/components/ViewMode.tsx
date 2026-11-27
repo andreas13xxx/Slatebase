@@ -44,6 +44,8 @@ import { buildPluginMenuItems } from '../plugins/compat/plugin-menu-bridge'
 import { revealInExplorer } from '../state/fileNavigation'
 import { useAppConfigValue } from '../state/vaultAppConfigStore'
 import { applyPropertiesInDocument } from './viewModeProperties'
+import { HoverPreviewProperties } from './HoverPreviewProperties'
+import type { IApiClient } from '../api'
 
 /**
  * Mapping of callout types to their Lucide icon component and CSS color token.
@@ -77,6 +79,41 @@ export interface ViewModeProps {
   token?: string
   /** Vault-relative path of the note being rendered — what `this` refers to in an embedded base. */
   sourcePath?: string
+  /**
+   * Lets the reading view show the properties through the same editor as Live Preview
+   * (plugin widgets included). Without it the properties are a plain table.
+   */
+  propertiesEditing?: ReadingPropertiesEditing
+}
+
+/** What the reading view's properties block needs to edit and save the note's frontmatter. */
+export interface ReadingPropertiesEditing {
+  apiClient: IApiClient
+  hasWriteAccess: boolean
+  /** Receives the full new note text after an edit (and the old one if saving failed). */
+  onContentChange: (content: string) => void
+}
+
+interface ReadingPropertiesContextValue extends ReadingPropertiesEditing {
+  content: string
+  vaultId: string
+  filePath: string
+}
+
+const ReadingPropertiesContext = createContext<ReadingPropertiesContextValue | null>(null)
+
+/** The properties block of the reading view: the shared editor when editing is wired up, else a table. */
+function ReadingProperties({ fallback }: { fallback: ReactNode }): ReactNode {
+  const ctx = useContext(ReadingPropertiesContext)
+  if (!ctx) return fallback
+  return createElement(HoverPreviewProperties, {
+    content: ctx.content,
+    vaultId: ctx.vaultId,
+    filePath: ctx.filePath,
+    apiClient: ctx.apiClient,
+    hasWriteAccess: ctx.hasWriteAccess,
+    onContentChange: ctx.onContentChange,
+  })
 }
 
 /** The note a rendered base is embedded in (`this` in its filters); undefined when ViewMode has no `sourcePath`. */
@@ -232,7 +269,7 @@ function createSafePipeline(content: string, strictLineBreaks = false): Root {
  *
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 11.5, 11.6
  */
-export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, sourcePath }: ViewModeProps) {
+export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick, onTagClick, token, sourcePath, propertiesEditing }: ViewModeProps) {
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
   const rightToLeft = useAppConfigValue('rightToLeft')
   const propertiesInDocument = useAppConfigValue('propertiesInDocument')
@@ -365,17 +402,25 @@ export function ViewMode({ content, vaultId, directoryTree, onInternalLinkClick,
     return () => el.removeEventListener('contextmenu', onContextMenu)
   }, [rendered, viewModeId, onInternalLinkClick])
 
+  const readingProperties = useMemo<ReadingPropertiesContextValue | null>(
+    () => (propertiesEditing && sourcePath !== undefined ? { ...propertiesEditing, content, vaultId, filePath: sourcePath } : null),
+    [propertiesEditing, sourcePath, content, vaultId],
+  )
+
   return createElement(Fragment, null,
     createElement(HostPathContext.Provider, { value: sourcePath },
-      createElement('article', {
-        className: 'view-mode',
-        'aria-label': 'Markdown-Ansicht',
-        'data-viewmode-id': viewModeId,
-        ...linkLongPress,
-        onPointerDown: onLinkPointerDown,
-        // app.json `rightToLeft`
-        ...(rightToLeft ? { dir: 'rtl' } : {}),
-      }, rendered),
+      // Always provided, so a note embedded in this one does not inherit this note's editor.
+      createElement(ReadingPropertiesContext.Provider, { value: readingProperties },
+        createElement('article', {
+          className: 'view-mode',
+          'aria-label': 'Markdown-Ansicht',
+          'data-viewmode-id': viewModeId,
+          ...linkLongPress,
+          onPointerDown: onLinkPointerDown,
+          // app.json `rightToLeft`
+          ...(rightToLeft ? { dir: 'rtl' } : {}),
+        }, rendered),
+      ),
     ),
     contextMenu && createElement(ContextMenu, {
       x: contextMenu.x,
@@ -1109,9 +1154,11 @@ function renderFrontmatter(yamlContent: string, key: string): ReactNode {
       },
     },
       createElement('summary', { className: 'view-mode-frontmatter-title' }, translateNow('commonUi.c_properties')),
-      createElement('table', { className: 'view-mode-frontmatter-table' },
-        createElement('tbody', null, ...rows),
-      ),
+      createElement(ReadingProperties, {
+        fallback: createElement('table', { className: 'view-mode-frontmatter-table' },
+          createElement('tbody', null, ...rows),
+        ),
+      }),
     )
   } catch {
     // YAML parse error — fall back to code block
