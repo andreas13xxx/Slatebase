@@ -124,6 +124,7 @@ export function EditorFilesSection() {
   const autoPairMarkdown = useAppConfigValue('autoPairMarkdown')
   const rightToLeft = useAppConfigValue('rightToLeft')
   const smartIndentList = useAppConfigValue('smartIndentList')
+  const vimMode = useAppConfigValue('vimMode')
   const showIndentGuide = useAppConfigValue('showIndentGuide')
   const showInlineTitle = useAppConfigValue('showInlineTitle')
   const autoConvertHtml = useAppConfigValue('autoConvertHtml')
@@ -294,6 +295,15 @@ export function EditorFilesSection() {
             checked={smartIndentList}
             disabled={disabled}
             onChange={(e) => void save({ smartIndentList: e.target.checked })}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorSettings.vimMode')} htmlFor="editor-vim-mode" hint={t('editorSettings.vimModeHint')}>
+          <input
+            id="editor-vim-mode"
+            type="checkbox"
+            checked={vimMode}
+            disabled={disabled}
+            onChange={(e) => void save({ vimMode: e.target.checked })}
           />
         </SettingRow>
         <SettingRow label={t('editorSettings.showIndentGuide')} htmlFor="editor-show-indent-guide" hint={t('editorSettings.showIndentGuideHint')}>

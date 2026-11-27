@@ -19,6 +19,7 @@
  * @module bases-values
  */
 
+import { formatFormulaValue } from '@slatebase/shared-contracts'
 import { sanitizeHTMLToDom } from './obsidian-api-extensions'
 
 /**
@@ -218,14 +219,59 @@ export class DateValue extends NotNullValue {
   isTruthy(): boolean { return this.value != null && this.value !== '' }
 }
 
-/** Relative date (e.g. "in 3 days"). We render the absolute string as a safe default. */
-export class RelativeDateValue extends DateValue {}
+/** Relative date: `toString()` stays machine-readable (see DateValue), `renderTo()` reads "in 3 days". */
+export class RelativeDateValue extends DateValue {
+  renderTo(el: HTMLElement): void {
+    const d = new Date(String(this.value ?? '').trim())
+    if (Number.isNaN(d.getTime())) { el.textContent = String(this.value ?? ''); return }
+    const seconds = Math.round((d.getTime() - Date.now()) / 1000)
+    const steps: Array<[Intl.RelativeTimeFormatUnit, number]> = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]]
+    const [unit, size] = steps.find(([, size]) => Math.abs(seconds) >= size) ?? ['second', 1]
+    el.textContent = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(Math.round(seconds / size), unit)
+  }
+}
 
-/** Duration value. */
-export class DurationValue extends NotNullValue {}
+/** Calendar-month and fixed-time parts of a duration, as the formula engine keeps them. */
+export interface DurationParts { months: number; ms: number }
 
-/** File reference value. */
-export class FileValue extends NotNullValue {}
+/**
+ * Duration value. `value` (and `data`) is the length in milliseconds, which is what plugins
+ * do arithmetic with; `parts` keeps the calendar months apart when the source had them.
+ */
+export class DurationValue extends NotNullValue {
+  readonly parts: DurationParts
+  constructor(value?: unknown, parts?: DurationParts) {
+    super(typeof value === 'number' ? value : 0)
+    this.parts = parts ?? { months: 0, ms: typeof value === 'number' ? value : 0 }
+  }
+  toString(): string { return formatFormulaValue({ kind: 'duration', months: this.parts.months, ms: this.parts.ms }) }
+  isTruthy(): boolean { return this.value !== 0 }
+  equals(other: unknown): boolean { return other instanceof DurationValue && other.value === this.value }
+}
+
+/** File reference value: a `TFile`-like (`path`, `basename`) or a plain vault path. */
+export class FileValue extends NotNullValue {
+  /** Vault-relative path of the referenced file ('' when unknown). */
+  get path(): string {
+    const v = this.value as { path?: unknown } | string | null | undefined
+    const path = typeof v === 'string' ? v : v?.path
+    return typeof path === 'string' ? path : ''
+  }
+  toString(): string { return this.path }
+  isTruthy(): boolean { return this.path !== '' }
+  equals(other: unknown): boolean { return other instanceof FileValue && other.path === this.path }
+  renderTo(el: HTMLElement, ctx?: BasesRenderContext): void {
+    el.textContent = ''
+    const a = el.ownerDocument.createElement('a')
+    a.className = 'internal-link'
+    a.textContent = this.path
+    a.setAttribute('href', '#')
+    a.dataset['href'] = this.path
+    const onOpen = ctx?.onOpenNote
+    if (onOpen && this.path) a.addEventListener('click', (e) => { e.preventDefault(); onOpen(this.path) })
+    el.appendChild(a)
+  }
+}
 
 /** List/array value. Renders items comma-separated. */
 export class ListValue extends NotNullValue {
@@ -253,15 +299,31 @@ export class ListValue extends NotNullValue {
   }
 }
 
-/** Object/record value. */
+/** Object/record value (a plain record or a `Map`; entries may themselves be `Value`s). */
 export class ObjectValue extends NotNullValue {
-  toString(): string {
-    try { return JSON.stringify(this.value) } catch { return String(this.value) }
+  private plain(): Record<string, unknown> {
+    const v = this.value
+    if (v instanceof Map) return Object.fromEntries(v)
+    return v !== null && typeof v === 'object' ? v as Record<string, unknown> : {}
   }
+  toString(): string {
+    try {
+      return JSON.stringify(this.plain(), (_k, v: unknown) => (v instanceof Value ? v.toString() : v))
+    } catch { return String(this.value) }
+  }
+  isTruthy(): boolean { return Object.keys(this.plain()).length > 0 }
+  equals(other: unknown): boolean { return other instanceof ObjectValue && other.toString() === this.toString() }
 }
 
-/** Regular-expression value. */
-export class RegExpValue extends NotNullValue {}
+/** Regular-expression value: a `RegExp` or `{ source, flags }`. */
+export class RegExpValue extends NotNullValue {
+  toString(): string {
+    const v = this.value as { source?: unknown; flags?: unknown } | null
+    return v && typeof v.source === 'string' ? `/${v.source}/${typeof v.flags === 'string' ? v.flags : ''}` : ''
+  }
+  isTruthy(): boolean { return this.toString() !== '' }
+  equals(other: unknown): boolean { return other instanceof RegExpValue && other.toString() === this.toString() }
+}
 
 /**
  * URL-scheme allowlist for anchor/img rendering — the same posture as the rest

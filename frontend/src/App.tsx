@@ -129,6 +129,9 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
 import { useWorkspaceRestore, LAST_VAULT_KEY, getInitialPaneTree } from './hooks/useWorkspaceRestore'
 import { captureDeepLinkFromLocation } from './deep-link/captureDeepLink'
 import { useDeepLink } from './deep-link/useDeepLink'
+import { captureProtocolActionFromLocation } from './deep-link/protocolAction'
+import { useProtocolAction } from './deep-link/useProtocolAction'
+import { ConfirmModal } from './components/ConfirmModal'
 import { initialize as initializeWorkspace, getState as getWorkspaceState, clear as clearWorkspace } from './state/workspaceStore'
 import { requestReveal } from './state/revealFileBridge'
 import {
@@ -149,6 +152,8 @@ const dailyNoteService = createDailyNoteService(apiClient)
 initializeWorkspace()
 // A deep link (`/open?vault=…&file=…`) is read before the first render, while the address still holds it.
 captureDeepLinkFromLocation()
+// Likewise an `obsidian://` call (`/obsidian?action=…`); it runs a plugin handler only after the user confirms.
+captureProtocolActionFromLocation()
 
 // Compute the restored/migrated pane-tree layout once, synchronously, so
 // PaneTreeProvider is seeded with it before the first render (no post-mount
@@ -642,6 +647,7 @@ function AppContent() {
   // Must stay AFTER the vault-switch effect above (it clears/restores tabs on a vault change; the
   // link's tab has to be opened after that so it wins).
   useDeepLink({ vaults: state.vaults, selectedVaultId: state.selectedVaultId, dispatch, tabDispatch, apiClient })
+  const protocolAction = useProtocolAction()
 
   const handleLogout = useCallback(async () => {
     try { await apiClient.logout() } catch { /* ignore */ }
@@ -1214,6 +1220,19 @@ function AppContent() {
         workspace-tab-container above for the same pattern. */}
     <a href="#main-content" className="skip-link">{t('common.skipToContent')}</a>
     <div className="app app-container">
+      <ConfirmModal
+        open={protocolAction.prompt !== null}
+        title={t('deepLink.protocolTitle')}
+        message={protocolAction.prompt === null ? '' : t('deepLink.protocolMessage', {
+          plugin: protocolAction.prompt.pluginId,
+          action: protocolAction.prompt.request.action,
+          params: Object.entries(protocolAction.prompt.request.params).map(([k, v]) => `${k} = ${v.length > 200 ? `${v.slice(0, 200)}…` : v}`).join('\n') || '–',
+        })}
+        confirmLabel={t('deepLink.protocolRun')}
+        variant="primary"
+        onConfirm={protocolAction.confirm}
+        onCancel={protocolAction.cancel}
+      />
       <CommandPaletteContainer
         onNavigate={handleNavigate}
         onCreateVault={handleCreateVault}

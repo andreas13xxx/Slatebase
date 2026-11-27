@@ -186,4 +186,48 @@ describe('BasesKanbanView', () => {
     fireEvent.drop(section('done'), { dataTransfer: data })
     expect(onReorderColumns).toHaveBeenCalledWith(['todo', 'done', null])
   })
+  describe('what a board may change (Obsidian)', () => {
+    const onMoveCard = vi.fn()
+    const onAddCard = vi.fn()
+    const onReorderColumns = vi.fn()
+    const handlers = { onMoveCard, onAddCard, onReorderColumns, onOpenNote: vi.fn() }
+    const card = (name: string) => screen.getByText(name).closest('button') as HTMLElement
+
+    it('moves, adds and reorders when grouped by a note property', () => {
+      render(<BasesKanbanView doc={doc} view={view} rows={rows()} {...handlers} />)
+      expect(card('Task A').getAttribute('draggable')).toBe('true')
+      expect(screen.getAllByRole('button', { name: /neu|new|add|hinzu/i }).length).toBeGreaterThan(0)
+    })
+
+    it('is read-only when grouped by a formula', () => {
+      const formulaDoc: BaseDocument = { ...doc, formulas: { bucket: 'status' } }
+      const formulaView: BaseView = { ...view, groupBy: { property: 'formula.bucket' } }
+      render(<BasesKanbanView doc={formulaDoc} view={formulaView} rows={rows()} {...handlers} />)
+      expect(card('Task A').getAttribute('draggable')).toBe('false')
+      expect(screen.queryAllByRole('button', { name: /neu|new|add|hinzu/i })).toHaveLength(0)
+    })
+
+    it('is read-only when grouped by a file property other than file.folder', () => {
+      const fileView: BaseView = { ...view, groupBy: { property: 'file.ext' } }
+      render(<BasesKanbanView doc={doc} view={fileView} rows={rows()} {...handlers} />)
+      expect(card('Task A').getAttribute('draggable')).toBe('false')
+    })
+
+    it('lets only Markdown notes change columns by property', () => {
+      const mixed: BaseRow[] = [
+        { path: 'a.md', fileName: 'Task A', values: { status: ['todo'] } },
+        { path: 'scan.pdf', fileName: 'Scan', values: { status: ['todo'] } },
+      ]
+      render(<BasesKanbanView doc={doc} view={view} rows={mixed} {...handlers} />)
+      expect(card('Task A').getAttribute('draggable')).toBe('true')
+      expect(card('Scan').getAttribute('draggable')).toBe('false')
+    })
+
+    it('lets any file move when grouped by file.folder', () => {
+      const folderView: BaseView = { ...view, groupBy: { property: 'file.folder' } }
+      const files: BaseRow[] = [{ path: 'a/scan.pdf', fileName: 'Scan', values: {} }]
+      render(<BasesKanbanView doc={doc} view={folderView} rows={files} {...handlers} />)
+      expect(card('Scan').getAttribute('draggable')).toBe('true')
+    })
+  })
 })

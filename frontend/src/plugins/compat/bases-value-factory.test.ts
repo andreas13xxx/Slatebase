@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { toValue } from './bases-value-factory'
-import { NullValue, StringValue, NumberValue, BooleanValue, DateValue, ListValue } from './bases-values'
+import { NullValue, StringValue, NumberValue, BooleanValue, DateValue, ListValue, LinkValue } from './bases-values'
 
 describe('bases-value-factory', () => {
   it('empty / absent → NullValue', () => {
@@ -51,6 +51,24 @@ describe('bases-value-factory', () => {
     })
     it('single value declared list → ListValue', () => {
       expect(toValue(['one'], 'list')).toBeInstanceOf(ListValue)
+    })
+  })
+
+  describe('wikilinks', () => {
+    it('a lone wikilink becomes a LinkValue with target and display text', () => {
+      const v = toValue(['[[Folder/Note|Shown]]'], 'text') as LinkValue
+      expect(v).toBeInstanceOf(LinkValue)
+      expect(v.path).toBe('Folder/Note')
+      expect(v.toString()).toBe('Shown')
+    })
+    it('inferred text and list items get the same treatment', () => {
+      expect(toValue(['[[A]]'])).toBeInstanceOf(LinkValue)
+      const list = toValue(['[[A]]', 'plain'], 'list') as ListValue
+      expect((list.value as unknown[])[0]).toBeInstanceOf(LinkValue)
+      expect((list.value as unknown[])[1]).toBeInstanceOf(StringValue)
+    })
+    it('text that merely contains a wikilink stays a string', () => {
+      expect(toValue(['see [[A]] now'], 'text')).toBeInstanceOf(StringValue)
     })
   })
 })

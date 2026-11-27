@@ -22,6 +22,8 @@ import { getCsrfToken } from '../../state/authContext'
 import { addRibbonIcon as registerRibbonIcon } from './ribbon-icon-registry'
 import { addStatusBarItem as registerStatusBarItem } from './status-bar-registry'
 import { getCurrentPluginId, trackPluginTimer, withPluginContext } from './plugin-execution-context'
+import { registerProtocolHandler, type ProtocolHandler } from './protocol-handlers'
+import { createVimAdapter } from './vim-adapter'
 import { registerBasesView as registerBasesViewInRegistry, type BasesViewRegistration } from './bases-view-registry'
 import { BASES_VALUE_CLASSES } from './bases-values'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
@@ -1131,7 +1133,8 @@ export function installObsidianGlobals(): void {
        * without it every chart view reads "No properties selected".
        */
       get properties(): string[] { return this.visible.map(toPropertyId) }
-      hasKey(): boolean { return false }
+      /** Whether the entries are grouped (some group carries a key); an ungrouped result has none. */
+      hasKey(): boolean { return (this.groups ?? []).some((g) => (g as { key?: unknown } | null)?.key != null) }
       /**
        * Real Obsidian exposes the entries twice: flat (`data`) and as `groupedData`,
        * an array of `BasesEntryGroup`. Plugins (TaskNotes `isGrouped()`) read
@@ -1748,16 +1751,27 @@ export function installObsidianGlobals(): void {
       unregisterHoverLinkSource(key: string): void {
         removeHoverSource(key)
       }
-      /** Register a markdown post processor. Stored but not executed in Slatebase. */
+      /** Register a markdown post processor. Wired per instance by plugin-context.ts; this base only warns. */
       registerMarkdownPostProcessor(_postProcessor: unknown, _sortOrder?: number): unknown {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
         warnNoOp(pluginId, 'registerMarkdownPostProcessor')
         return _postProcessor
       }
-      /** Register a code block processor for a specific language. No-op stub. */
-      registerMarkdownCodeBlockProcessor(_language: string, _handler: unknown, _sortOrder?: number): unknown { return _handler }
-      /** Register a CodeMirror 6 extension. No-op in Slatebase. */
-      registerEditorExtension(_extension: unknown): void {}
+      /**
+       * Register a code block processor for a specific language. A plugin loaded through
+       * plugin-context.ts gets a working per-instance version; this base method only runs for a
+       * plugin built outside it, and says so.
+       */
+      registerMarkdownCodeBlockProcessor(language: string, handler: unknown, _sortOrder?: number): unknown {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerMarkdownCodeBlockProcessor', `The \`${language}\` processor is not attached to any renderer.`)
+        return handler
+      }
+      /** Register a CodeMirror 6 extension. Wired per instance by plugin-context.ts; this base only warns. */
+      registerEditorExtension(_extension: unknown): void {
+        const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
+        warnNoOp(pluginId, 'registerEditorExtension', 'The extension is not added to any editor.')
+      }
       /** Register file extensions for a view type. Not implemented in Slatebase. */
       registerExtensions(_extensions: string[], _viewType: string): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
@@ -1777,17 +1791,13 @@ export function installObsidianGlobals(): void {
         return registerBasesViewInRegistry(id, registration, pluginId)
       }
       /**
-       * Register an `obsidian://` protocol handler. Deliberately unsupported:
-       * Slatebase is a web app and cannot claim a custom URL scheme.
+       * Register an `obsidian://` protocol handler. Slatebase cannot claim the scheme, so the
+       * handler runs for `/obsidian?action=<action>&…` links opened in the app, after the user
+       * confirmed (see protocol-handlers.ts).
        */
-      registerObsidianProtocolHandler(action: string, _handler: unknown): void {
+      registerObsidianProtocolHandler(action: string, handler: unknown): void {
         const pluginId = (this.manifest as { id?: string })?.id ?? 'unknown'
-        // A deliberate trade-off, not a gap: plugins register these for external sign-in callbacks and
-        // keep working without them, so this is informational rather than a warning.
-        debugOnce(
-          `no-op::${pluginId}::registerObsidianProtocolHandler::${action}`,
-          `[PluginCompat] ${pluginId} registered an obsidian://${action} handler; Slatebase is a web app and cannot receive obsidian:// links, so it is never invoked.`,
-        )
+        registerProtocolHandler(pluginId, action, handler as ProtocolHandler)
       }
       /** Remove a previously registered command. Wired to the CommandRegistry per instance. */
       removeCommand(_commandId: string): void {
@@ -3179,25 +3189,13 @@ export function installObsidianGlobals(): void {
   // `.Vim` mirrors real Obsidian's `@replit/codemirror-vim` global, which
   // plugins probe to hook into Vim normal-mode commands (e.g.
   // obsidian-outliner's "override o/O behaviour" feature calls
-  // `Vim.defineAction`/`Vim.mapCommand` when present). Slatebase has no Vim
-  // keymap engine, so these are no-ops rather than a missing-adapter warning —
-  // same graceful-degradation approach as the ribbon/split stubs above.
+  // `Vim.defineAction`/`Vim.mapCommand` when present). Slatebase ships the same
+  // engine, so `.Vim` delegates to it (loading it on first use, see vim-adapter.ts).
   if (!(window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter) {
-    const vimNoOp = (method: string) => (): void => {
-      debugOnce(
-        `vim::${method}`,
-        `[PluginCompat] Vim.${method}() is a no-op — Slatebase has no Vim keymap ` +
-          `engine, so Vim normal-mode bindings a plugin registers never fire.`,
-      )
-    }
     ;(window as unknown as { CodeMirrorAdapter: Record<string, unknown> }).CodeMirrorAdapter = {
       commands: {},
-      Vim: {
-        defineAction: vimNoOp('defineAction'),
-        handleEx: vimNoOp('handleEx'),
-        enterInsertMode: vimNoOp('enterInsertMode'),
-        mapCommand: vimNoOp('mapCommand'),
-      },
+      // The real Vim engine (@replit/codemirror-vim), loaded on demand; see vim-adapter.ts.
+      Vim: createVimAdapter(),
     }
   }
 

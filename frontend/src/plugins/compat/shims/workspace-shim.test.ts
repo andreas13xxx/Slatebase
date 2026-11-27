@@ -6,6 +6,8 @@ import { ItemView, ViewRegistry, WorkspaceLeaf, WorkspaceSplit, WorkspaceRibbon,
 import type { PaneTree } from '../../../state/paneTreeState';
 import type { TabEntry } from '../../../state/tabState';
 import { resetLogDedup } from '../log';
+import { setFoldVault } from '../../../editor/foldPersistence';
+import { add as addRecentFile, _reload as reloadRecentFiles } from '../../../state/recentFilesStore';
 import { registerFileExplorerRow, clearFileExplorerDomRegistry } from '../file-explorer-dom-registry';
 import type { TFile } from '../types';
 import {
@@ -1284,6 +1286,37 @@ describe('WorkspaceShim', () => {
 
         expect(registry.hasViewType('my-view')).toBe(true);
       });
+    });
+  });
+
+  describe('getLastOpenFiles', () => {
+    afterEach(() => { setFoldVault(null); localStorage.clear(); reloadRecentFiles(); });
+
+    it('lists the open vault\'s recent files, newest first, and no other vault\'s', () => {
+      localStorage.clear();
+      reloadRecentFiles();
+      addRecentFile('v1', 'a.md');
+      addRecentFile('v2', 'other.md');
+      addRecentFile('v1', 'b.md');
+      setFoldVault('v1');
+      expect(workspace.getLastOpenFiles()).toEqual(['b.md', 'a.md']);
+    });
+
+    it('is empty while no vault is open', () => {
+      setFoldVault(null);
+      expect(workspace.getLastOpenFiles()).toEqual([]);
+    });
+  });
+
+  describe('viewStateReceivers', () => {
+    it('remove() takes a pushed receiver out again', () => {
+      const a = () => {};
+      const b = () => {};
+      workspace.viewStateReceivers.push(a, b);
+      workspace.viewStateReceivers.remove(a);
+      expect([...workspace.viewStateReceivers]).toEqual([b]);
+      workspace.viewStateReceivers.remove(a);
+      expect([...workspace.viewStateReceivers]).toEqual([b]);
     });
   });
 });

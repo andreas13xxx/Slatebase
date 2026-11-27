@@ -416,7 +416,16 @@ export class AppShim implements IAppShim {
     this.secretStorage = options.apiClient && options.vaultId
       ? getVaultSecretStorage(options.apiClient, options.vaultId)
       : new SecretStorage({
-          apiClient: { listKeychainSecrets: async () => [], getKeychainSecret: async () => null, setKeychainSecret: async () => {} },
+          // No server behind this keychain (no API client or vault): reads are empty, and a write is
+          // refused so SecretStorage rolls it back and warns, instead of pretending it was stored.
+          apiClient: {
+            listKeychainSecrets: async () => [],
+            getKeychainSecret: async () => null,
+            setKeychainSecret: async () => {
+              warnOnce('AppShim.secretStorage.detached', '[AppShim] app.secretStorage has no vault keychain behind it (no API client); secrets cannot be stored.');
+              throw new Error('No vault keychain is attached');
+            },
+          },
           vaultId: '',
         });
     // Scoped per-plugin: `on`/`onLayoutReady` bind options.pluginId into a

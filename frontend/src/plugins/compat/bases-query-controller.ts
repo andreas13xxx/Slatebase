@@ -20,12 +20,15 @@ import type { IApiClient } from '../../api'
 import type { BaseDocument, BaseRow, BaseView } from '@slatebase/shared-contracts'
 import type { PropertyType } from '../../state/propertyTypes'
 import { runBaseQuery } from '../../bases/query-engine'
-import { durationMs, evaluateFormulaColumn, formatFormulaValue, isDuration, rowValueKey } from '@slatebase/shared-contracts'
+import { durationMs, evaluateFormulaColumn, formatFormulaValue, isDuration, rowValueKey, type FormulaValue } from '@slatebase/shared-contracts'
 import { groupRows, UNGROUPED } from '../../components/bases/base-groups'
 import { onRealtimeVaultChange } from '../../state/realtimeVaultBridge'
 import { extractErrorMessage } from '../../utils/error'
 import { toValue } from './bases-value-factory'
-import { StringValue, NumberValue, BooleanValue, NullValue, type Value } from './bases-values'
+import {
+  StringValue, NumberValue, BooleanValue, NullValue, DateValue, DurationValue, FileValue, HTMLValue, IconValue,
+  ImageValue, LinkValue, ListValue, ObjectValue, RegExpValue, type Value,
+} from './bases-values'
 import { warnOnce } from './log'
 import { getActiveVaultShimRef, treeNodeToTFile } from './shims/vault-shim'
 import type { DirectoryTree } from '../../types'
@@ -52,13 +55,35 @@ export interface DrivableBasesView {
 function formulaValue(doc: BaseDocument, row: BaseRow, formulaKey: string, thisRow: BaseRow | undefined): Value {
   const result = evaluateFormulaColumn(doc, row, formulaKey, thisRow)
   if (!result.ok) return NullValue.value
-  const v = result.value
+  return toTypedValue(result.value)
+}
+
+/**
+ * Wraps a formula result in the `Value` subclass Obsidian would hand a plugin: a duration stays a
+ * `DurationValue` (its `data` is the length in ms), a link a `LinkValue`, an object an `ObjectValue`,
+ * and a list is a `ListValue` of its converted items.
+ */
+function toTypedValue(v: FormulaValue | undefined): Value {
   if (v === null || v === undefined) return NullValue.value
   if (typeof v === 'number') return new NumberValue(v)
   if (typeof v === 'boolean') return new BooleanValue(v)
-  // A duration reaches a plugin as its length in ms, like the arithmetic reads it.
-  if (isDuration(v)) return new NumberValue(durationMs(v))
-  return new StringValue(formatFormulaValue(v))
+  if (typeof v === 'string') return new StringValue(v)
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? NullValue.value : new DateValue(formatFormulaValue(v))
+  if (Array.isArray(v)) return new ListValue(v.map(toTypedValue))
+  if (isDuration(v)) return new DurationValue(durationMs(v), { months: v.months, ms: v.ms })
+  switch (v.kind) {
+    case 'link': {
+      const link = new LinkValue(v.path)
+      link.path = v.path
+      if (v.display !== undefined) link.displayText = v.display
+      return link
+    }
+    case 'html': return new HTMLValue(v.html)
+    case 'icon': return new IconValue(v.name)
+    case 'image': return new ImageValue(v.path)
+    case 'regex': return new RegExpValue({ source: v.source, flags: v.flags })
+    case 'object': return new ObjectValue(new Map([...v.entries].map(([k, item]) => [k, toTypedValue(item)])))
+  }
 }
 
 /** Normalizes a raw row value into a string[] for the value factory. */
@@ -276,6 +301,7 @@ export class BasesQueryController {
     // timeline's title field reads them without listing them in `order`.
     entry.setValue('file.name', new StringValue(row.fileName))
     entry.setValue('file.path', new StringValue(row.path))
+    for (const [key, value] of this.fileProperties(row, entry.file)) entry.setValue(key, value)
 
     // Displayed columns (incl. formula and file.* pseudo-columns).
     for (const col of columns) {
@@ -304,6 +330,28 @@ export class BasesQueryController {
     ;(entry as { properties?: Record<string, unknown> }).properties = this.rawProperties(row)
 
     return entry
+  }
+
+  /**
+   * The `file.*` properties derivable without a query column: from the path (`ext`, `folder`,
+   * `basename`, `file`) and from the file's stat when the vault shim has one (`size`, `ctime`,
+   * `mtime`). `file.tags` and `file.links` need the index, so they appear only as query columns.
+   */
+  private fileProperties(row: BaseRow, file: unknown): Array<[string, Value]> {
+    const slash = row.path.lastIndexOf('/')
+    const name = slash === -1 ? row.path : row.path.slice(slash + 1)
+    const dot = name.lastIndexOf('.')
+    const out: Array<[string, Value]> = [
+      ['file.ext', new StringValue(dot > 0 ? name.slice(dot + 1) : '')],
+      ['file.folder', new StringValue(slash === -1 ? '' : row.path.slice(0, slash))],
+      ['file.basename', new StringValue(row.fileName)],
+      ['file.file', new FileValue(file ?? row.path)],
+    ]
+    const stat = (file as { stat?: { size?: unknown; ctime?: unknown; mtime?: unknown } } | null)?.stat
+    if (typeof stat?.size === 'number') out.push(['file.size', new NumberValue(stat.size)])
+    if (typeof stat?.ctime === 'number' && stat.ctime > 0) out.push(['file.ctime', new DateValue(new Date(stat.ctime).toISOString())])
+    if (typeof stat?.mtime === 'number' && stat.mtime > 0) out.push(['file.mtime', new DateValue(new Date(stat.mtime).toISOString())])
+    return out
   }
 
   /** The row's note properties as plain frontmatter-shaped values (bare keys). */

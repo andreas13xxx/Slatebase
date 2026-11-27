@@ -55,7 +55,8 @@ no function yet), **durchgereicht** (kept for Obsidian and plugins, no function 
 | `showInlineTitle` | boolean | `true` | no | wirkt: an, der Dateiname steht als Überschrift über der Notiz (Editor und Leseansicht); reine Anzeige, nicht Teil des Inhalts |
 | `autoConvertHtml` | boolean | `false` | no | wirkt: an, wird beim Einfügen das `text/html` der Zwischenablage in Markdown umgewandelt statt roh eingefügt (eigener schlanker HTML→Markdown-Konverter, kein `turndown`) |
 | `showFrontmatter` (legacy), `trashOption` (`system` `local` `none`; Slatebase always uses its own trash), `userIgnoreFilters` | see `app-config.ts` | Obsidian-like | no | gespeichert |
-| `mobilePullAction` (verified), `vimMode`, `nativeMenus` | string / boolean | – | partly | durchgereicht |
+| `vimMode` | boolean | `false` | no | wirkt: an, nutzt der Editor Vim-Modi (`@replit/codemirror-vim`, wird erst beim ersten Einschalten geladen); gilt für alle, die den Vault öffnen. Settings → Editor and files hat eine Checkbox. `app.isVimEnabled()` für Plugins folgt dem Wert. `window.CodeMirrorAdapter.Vim` ist dieselbe Engine: Befehle, die Plugins dort registrieren, werden gemerkt und laufen, sobald sie geladen ist (`plugins/compat/vim-adapter.ts`) |
+| `mobilePullAction` (verified), `nativeMenus` | string / boolean | – | partly | durchgereicht |
 
 **Defaults.** `alwaysUpdateLinks` used to default to `true` in Slatebase. The first start of this
 version writes `alwaysUpdateLinks: true` once into each existing vault that has no `app.json`, or

@@ -157,4 +157,51 @@ describe('BasesQueryController', () => {
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('boom'))
     ctrl.stop()
   })
+
+  it('hands formula results to plugins as typed Values, not text', async () => {
+    const doc2: BaseDocument = {
+      formulas: {
+        age: 'now() - date("2020-01-01")',
+        dur: 'duration("1d")',
+        lnk: 'link("Other")',
+        obj: 'file.properties',
+        tags: 'list("a")',
+      },
+      views: [{ type: 'cards', order: ['formula.dur', 'formula.lnk', 'formula.tags'] }],
+    }
+    const view2: BaseView = doc2.views[0] as BaseView
+    const api = makeApiClient({ rows: [{ path: 'a.md', fileName: 'a', values: { title: ['Alpha'] } }], total: 1 })
+    const ctrl = new BasesQueryController({ apiClient: api, vaultId: 'v1', doc: doc2, view: view2, target })
+    await ctrl.start()
+    const O = window.obsidian as Record<string, new (...a: never[]) => unknown>
+    const entry = (target.data as { get(i: number): { getValue(k: string): unknown } }).get(0)
+    const dur = entry.getValue('formula.dur') as { data: number; toString(): string }
+    expect(dur).toBeInstanceOf(O['DurationValue'])
+    expect(dur.data).toBe(86_400_000)
+    expect(dur.toString()).toBe('1d')
+    expect(entry.getValue('formula.lnk')).toBeInstanceOf(O['LinkValue'])
+    expect(entry.getValue('formula.tags')).toBeInstanceOf(O['ListValue'])
+    ctrl.stop()
+  })
+
+  it('puts the path-derived file.* properties on every entry', async () => {
+    const api = makeApiClient({ rows: [{ path: 'Folder/Sub/note.md', fileName: 'note', values: {} }], total: 1 })
+    const ctrl = new BasesQueryController({ apiClient: api, vaultId: 'v1', doc, view, target })
+    await ctrl.start()
+    const O = window.obsidian as Record<string, new (...a: never[]) => unknown>
+    const entry = (target.data as { get(i: number): { getValue(k: string): { toString(): string } } }).get(0)
+    expect(entry.getValue('file.ext').toString()).toBe('md')
+    expect(entry.getValue('file.folder').toString()).toBe('Folder/Sub')
+    expect(entry.getValue('file.basename').toString()).toBe('note')
+    expect(entry.getValue('file.file')).toBeInstanceOf(O['FileValue'])
+    ctrl.stop()
+  })
+
+  it('BasesQueryResult.hasKey() is true only for a grouped result', async () => {
+    const O = window.obsidian as Record<string, new (...a: never[]) => unknown>
+    const Result = O['BasesQueryResult'] as unknown as new (e?: unknown[], g?: unknown[]) => { hasKey(): boolean }
+    expect(new Result([], undefined).hasKey()).toBe(false)
+    expect(new Result([], [{ key: null, entries: [] }]).hasKey()).toBe(false)
+    expect(new Result([], [{ key: 'x', entries: [] }]).hasKey()).toBe(true)
+  })
 })

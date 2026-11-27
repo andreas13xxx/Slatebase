@@ -11,6 +11,10 @@
  */
 import { buildDeepLink } from '../../deep-link/deepLink'
 import { getFoldVault, loadFileFolds, saveFileFolds, type FoldedLine } from '../../editor/foldPersistence'
+import { APPEARANCE_CONFIG_DEFAULTS } from '@slatebase/shared-contracts'
+import { SPELLCHECK_LANGUAGES } from '../../editor/spellcheck/protocol'
+import { getAppearanceValue, updateAppearance } from '../../state/vaultAppearanceStore'
+import { getAppConfigValue } from '../../state/vaultAppConfigStore'
 import { debugOnce, warnNoOp } from './log'
 
 type FileLike = { path?: string } | string | null | undefined
@@ -35,6 +39,20 @@ function desktopOnly<A extends unknown[], R>(method: string, detail: string, res
   return () => {
     warnNoOp('App', method, detail)
     return result
+  }
+}
+
+/** Writes `appearance.json`; a refused write (no write access, invalid file) is warned about, not swallowed. */
+function persistAppearance(method: string, change: Parameters<typeof updateAppearance>[0]): void {
+  updateAppearance(change).catch((error: unknown) => {
+    warnNoOp('App', method, `appearance.json could not be written: ${error instanceof Error ? error.message : String(error)}`)
+  })
+}
+
+/** An `update*()` hook whose effect Slatebase already derives from `appearance.json`. */
+function derivedFromAppearance(method: string): () => void {
+  return () => {
+    debugOnce(`app::${method}`, `[App] ${method}() has nothing to do: Slatebase applies appearance.json changes itself.`)
   }
 }
 
@@ -143,34 +161,41 @@ export function createAppInternals(): Record<string, unknown> {
       }
     },
 
-    // ── Features Slatebase does not have, answered truthfully ──
-    isVimEnabled: (): boolean => false,
+    // ── Answered from the vault's settings, or truthfully when Slatebase has no such feature ──
+    isVimEnabled: (): boolean => getAppConfigValue('vimMode'),
     debugMode: (enabled?: boolean): void => {
       debugOnce('app::debugMode', `[App] debugMode(${String(enabled)}) ignored: Slatebase has no Obsidian debug mode.`)
     },
 
-    // ── Spellcheck: Slatebase has its own (editor/spellcheck); the language list is Obsidian's OS dictionaries ──
-    getSpellcheckLanguages: (): string[] => [],
+    // ── Spellcheck: Slatebase has its own (editor/spellcheck); it offers its own dictionaries, not the OS ones ──
+    getSpellcheckLanguages: (): string[] => [...SPELLCHECK_LANGUAGES],
     setSpellcheckLanguages: desktopOnly('setSpellcheckLanguages', 'Slatebase picks the spellcheck language per editor, not from OS dictionaries.', undefined),
 
-    // ── Appearance. Slatebase applies appearance.json / theme changes itself, so the update* hooks have
-    //    nothing left to refresh; the setters would have to persist to appearance.json, which they do not yet. ──
-    getBaseFontSize: (): number => {
-      const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
-      return Number.isFinite(size) ? size : 16
+    // ── Appearance. The setters write `.obsidian/appearance.json`, the file Settings → Appearance edits
+    //    (needs write access). The update* hooks re-apply a setting to the UI; Slatebase derives all of that
+    //    from appearance.json itself, so they have nothing to trigger and say so once. ──
+    getBaseFontSize: (): number => getAppearanceValue('baseFontSize'),
+    setBaseFontSize: (size: number): void => {
+      const next = Math.round(Number(size))
+      if (!Number.isFinite(next)) {
+        warnNoOp('App', 'setBaseFontSize', `"${String(size)}" is not a number; the font size is unchanged.`)
+        return
+      }
+      persistAppearance('setBaseFontSize', { baseFontSize: next === APPEARANCE_CONFIG_DEFAULTS.baseFontSize ? null : next })
     },
-    setBaseFontSize: desktopOnly('setBaseFontSize', 'Change the font size in Settings → Appearance; it is not persisted from here.', undefined),
-    setAccentColor: desktopOnly('setAccentColor', 'Change the accent colour in Settings → Appearance; it is not persisted from here.', undefined),
-    updateAccentColor: (): void => {},
-    updateFontSize: (): void => {},
-    updateFontFamily: (): void => {},
-    updateTheme: (): void => {},
-    updateInlineTitleDisplay: (): void => {},
-    updateViewHeaderDisplay: (): void => {},
-    updateRibbonDisplay: (): void => {},
-    updateTabSize: (): void => {},
-    enableCssTransition: (): void => {},
-    disableCssTransition: (): void => {},
+    setAccentColor: (color: string): void => {
+      persistAppearance('setAccentColor', { accentColor: color === '' ? null : color })
+    },
+    updateAccentColor: derivedFromAppearance('updateAccentColor'),
+    updateFontSize: derivedFromAppearance('updateFontSize'),
+    updateFontFamily: derivedFromAppearance('updateFontFamily'),
+    updateTheme: derivedFromAppearance('updateTheme'),
+    updateInlineTitleDisplay: derivedFromAppearance('updateInlineTitleDisplay'),
+    updateViewHeaderDisplay: derivedFromAppearance('updateViewHeaderDisplay'),
+    updateRibbonDisplay: derivedFromAppearance('updateRibbonDisplay'),
+    updateTabSize: derivedFromAppearance('updateTabSize'),
+    enableCssTransition: derivedFromAppearance('enableCssTransition'),
+    disableCssTransition: derivedFromAppearance('disableCssTransition'),
 
     // ── Import helpers behind Obsidian's attachment/import UI ──
     importAttachments: desktopOnly('importAttachments', 'Use the upload route (drag & drop / paste) instead.', undefined),

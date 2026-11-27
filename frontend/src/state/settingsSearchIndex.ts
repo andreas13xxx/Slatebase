@@ -483,6 +483,8 @@ export const SETTINGS_SEARCH_KEYS: Record<SettingsSection, TranslationKey[]> = {
     'editorSettings.showUnsupportedFilesHint',
     'editorSettings.smartIndentList',
     'editorSettings.smartIndentListHint',
+    'editorSettings.vimMode',
+    'editorSettings.vimModeHint',
     'editorSettings.spellcheckLanguage',
     'editorSettings.spellcheckLanguageHint',
     'editorSettings.spellcheckPersonal',

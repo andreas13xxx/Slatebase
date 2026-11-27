@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   Value, NullValue, StringValue, NumberValue, BooleanValue, DateValue,
   ListValue, LinkValue, UrlValue, HTMLValue, TagValue,
+  DurationValue, FileValue, ObjectValue, RegExpValue, RelativeDateValue,
 } from './bases-values'
 
 describe('bases-values', () => {
@@ -86,6 +87,50 @@ describe('bases-values', () => {
     it('TagValue prefixes #', () => {
       expect(new TagValue('todo').toString()).toBe('#todo')
       expect(new TagValue('#done').toString()).toBe('#done')
+    })
+  })
+
+  describe('Duration, File, Object, RegExp, RelativeDate', () => {
+    it('DurationValue keeps ms as data, formats and compares', () => {
+      const d = new DurationValue(90_000, { months: 0, ms: 90_000 })
+      expect(d.data).toBe(90_000)
+      expect(d.toString()).toBe('1m 30s')
+      expect(d.isTruthy()).toBe(true)
+      expect(new DurationValue(0).isTruthy()).toBe(false)
+      expect(d.equals(new DurationValue(90_000))).toBe(true)
+    })
+
+    it('FileValue reads the path from a file or a string and renders a link', () => {
+      expect(new FileValue({ path: 'a/b.md' }).toString()).toBe('a/b.md')
+      expect(new FileValue('c.md').isTruthy()).toBe(true)
+      expect(new FileValue(null).isTruthy()).toBe(false)
+      const open = vi.fn()
+      const el = document.createElement('div')
+      new FileValue('c.md').renderTo(el, { onOpenNote: open })
+      el.querySelector('a')!.click()
+      expect(open).toHaveBeenCalledWith('c.md')
+    })
+
+    it('ObjectValue serializes a Map with nested Values and compares by content', () => {
+      const o = new ObjectValue(new Map([['n', new NumberValue(1)], ['s', new StringValue('x')]]))
+      expect(o.toString()).toBe('{"n":"1","s":"x"}')
+      expect(o.isTruthy()).toBe(true)
+      expect(new ObjectValue({}).isTruthy()).toBe(false)
+      expect(o.equals(new ObjectValue(new Map([['n', new NumberValue(1)], ['s', new StringValue('x')]])))).toBe(true)
+    })
+
+    it('RegExpValue prints the literal form', () => {
+      expect(new RegExpValue({ source: 'a+', flags: 'gi' }).toString()).toBe('/a+/gi')
+      expect(new RegExpValue(null).isTruthy()).toBe(false)
+    })
+
+    it('RelativeDateValue renders relative text but stays machine-readable in toString', () => {
+      const el = document.createElement('div')
+      const day = new Date(Date.now() + 3 * 86_400_000).toISOString()
+      const v = new RelativeDateValue(day)
+      v.renderTo(el)
+      expect(el.textContent).not.toBe(day)
+      expect(v.toString()).toBe(day)
     })
   })
 })

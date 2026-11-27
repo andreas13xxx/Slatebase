@@ -170,7 +170,14 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   // Draggable only when a move handler is wired (write access). We track the
   // dragged card's path + its source column, and the column currently hovered,
   // so we can show a drop target and skip a drop onto the source column.
-  const draggable = !!onMoveCard && !!groupBy
+  // Obsidian: grouping by a formula, or by a file property other than `file.folder`, leaves the
+  // board read-only (no card or column moves, no notes created from a column) — there is no
+  // frontmatter value to write. Only the folder case moves the file itself.
+  const groupWritable = !!groupBy && !groupBy.startsWith('formula.') && !formulaKeys.has(groupBy)
+    && (!groupBy.startsWith('file.') || groupBy === FOLDER_GROUP_PROPERTY)
+  const draggable = !!onMoveCard && groupWritable
+  // Only Markdown notes can change columns by their frontmatter; any file can by its folder.
+  const cardMovable = (path: string): boolean => draggable && (groupBy === FOLDER_GROUP_PROPERTY || /\.md$/i.test(path))
   const [dragPath, setDragPath] = useState<string | null>(null)
   const [dragFromKey, setDragFromKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
@@ -220,7 +227,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
   // Only when a reorder handler is wired (write access). Dropping a column onto
   // another reorders the live `columns` and persists the whole order as the
   // view's `groupOrder` (with `null` for the ungrouped column).
-  const reorderable = !!onReorderColumns && columns.length > 1
+  const reorderable = !!onReorderColumns && groupWritable && columns.length > 1
   const [colDragKey, setColDragKey] = useState<string | null>(null)
   const [colOverKey, setColOverKey] = useState<string | null>(null)
 
@@ -355,7 +362,7 @@ export const BasesKanbanView = memo(function BasesKanbanView({
                 <span className="bases-kanban__column-title">{column.label}</span>
                 <span className="bases-kanban__column-count">{column.rows.length}</span>
               </button>
-              {onAddCard && groupByKey && (
+              {onAddCard && groupByKey && groupWritable && (
                 <button
                   type="button"
                   className="bases-kanban__column-add"
@@ -374,13 +381,13 @@ export const BasesKanbanView = memo(function BasesKanbanView({
                     key={row.path}
                     type="button"
                     className={
-                      draggable && dragPath === row.path
+                      cardMovable(row.path) && dragPath === row.path
                         ? 'bases-kanban__card bases-kanban__card--dragging'
                         : 'bases-kanban__card'
                     }
-                    draggable={draggable}
-                    onDragStart={draggable ? (e) => handleCardDragStart(e, row.path, column.key) : undefined}
-                    onDragEnd={draggable ? handleDragEnd : undefined}
+                    draggable={cardMovable(row.path)}
+                    onDragStart={cardMovable(row.path) ? (e) => handleCardDragStart(e, row.path, column.key) : undefined}
+                    onDragEnd={cardMovable(row.path) ? handleDragEnd : undefined}
                     onClick={() => onOpenNote(row.path)}
                     onContextMenu={(e) => openMenu(e, row.path)}
                     {...hoverPreviewProps('bases', row.path)}
