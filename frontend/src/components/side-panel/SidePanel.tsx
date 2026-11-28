@@ -10,6 +10,7 @@
 import { useEffect, useRef, useCallback, useState, useContext } from 'react'
 import { usePanelContextForSide } from '../../state/panelContext'
 import { useTranslation } from '../../i18n'
+import { FeatureContext } from '../../state/featureContext'
 import { PanelTabBar } from './PanelTabBar'
 import { PanelSplitContainer } from './PanelSplitContainer'
 import { FavoritesView } from '../sidebar-panel/FavoritesView'
@@ -95,6 +96,7 @@ export function SidePanel({
 }: SidePanelProps) {
   const { state, dispatch } = usePanelContextForSide(side)
   const { t } = useTranslation()
+  const featureContext = useContext(FeatureContext)
   const panelBodyRef = useRef<HTMLDivElement>(null)
   const [panelHeight, setPanelHeight] = useState(400)
 
@@ -323,6 +325,7 @@ export function SidePanel({
           </div>
         )
       case 'activity':
+        if (featureContext !== null && !featureContext.isEnabled('activity-timeline')) return null
         return (
           <div className="side-panel__view-wrapper" key={viewId}>
             <h3 className="side-panel__view-header">{t('sidePanel.tabs.activity')}</h3>
