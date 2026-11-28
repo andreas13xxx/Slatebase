@@ -111,17 +111,16 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vaultId, apiClient, state.activeTypes, state.range, state.pathPrefix])
 
-  // Adopt the per-vault persisted range (full variant only). Reads the stored
+  // Adopt the per-vault persisted range (both variants share it). Reads the stored
   // value and syncs it into local state on mount / vault switch.
   const persistedRange = useVaultSetting('activityRange')
   useEffect(() => {
-    if (variant !== 'full') return
     const stored = VALID_RANGES.includes(persistedRange as ActivityRange)
       ? (persistedRange as ActivityRange)
       : DEFAULT_ACTIVITY_RANGE
     dispatch({ type: 'SET_RANGE', range: stored })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vaultId, variant, persistedRange])
+  }, [vaultId, persistedRange])
 
   // Lanes that actually have events (so empty chips never show).
   const presentLanes = useMemo<ActivityLane[]>(() => {
@@ -373,7 +372,7 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
           )}
         </div>
 
-        {variant === 'full' && vaultId && apiClient && (
+        {vaultId && apiClient && (
           <ActivityStatPanel
             events={state.events}
             heatmapEvents={state.heatmapEvents}
