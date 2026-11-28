@@ -235,8 +235,13 @@ export function PluginManagementPage({ apiClient, vaultId }: PluginManagementPag
     void (async () => {
       try {
         const result = await apiClient.checkPluginUpdates(vaultId)
-        const count = result.plugins.filter(p => p.hasUpdate).length
-        setUpdateCount(count)
+        const map = new Map<string, { latestVersion: string; repo: string }>()
+        for (const info of result.plugins) {
+          if (info.hasUpdate) map.set(info.pluginId, { latestVersion: info.latestVersion, repo: info.repo })
+        }
+        setUpdateInfo(map)
+        setUpdateCount(map.size)
+        setHasCheckedUpdates(true)
       } catch {
         // Non-critical: update check failure doesn't affect page functionality
       }
