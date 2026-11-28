@@ -495,8 +495,13 @@ export function renderLucideIconInto(parent: HTMLElement, iconId: string): void 
     return
   }
   if (cached === undefined) {
+    // Two renders of the same element can both be in flight before the first import resolves
+    // (effect re-run, StrictMode); the latest request wins and replaces rather than appends.
+    latestIconRequest.set(parent, iconId)
     resolveLucideIconNode(iconId).then(icon => {
-      if (icon) parent.appendChild(renderLucideIconNode(icon))
+      if (icon && latestIconRequest.get(parent) === iconId) parent.replaceChildren(renderLucideIconNode(icon))
     })
   }
 }
+
+const latestIconRequest = new WeakMap<HTMLElement, string>()
