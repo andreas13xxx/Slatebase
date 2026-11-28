@@ -70,7 +70,12 @@ export function createVimAdapter(engine: {
       if (typeof property !== 'string' || property === 'then') return undefined
       return (...args: unknown[]): unknown => {
         const api = engine.get()
-        if (api) return run(api, property, args)
+        if (api) {
+          // The editor may have loaded the engine before our own load finished: what was queued
+          // comes first, or a mapping could run before the action it names is defined.
+          flush(api)
+          return run(api, property, args)
+        }
         if (REPLAYABLE.has(property)) {
           pending.push([property, args])
           startLoading()

@@ -60,4 +60,48 @@ describe('protocol handlers', () => {
     expect(warn).toHaveBeenCalledTimes(1)
     expect(protocolHandlerMap.size).toBe(0)
   })
+
+  it('runs only for the plugin the user agreed to (expectedOwner)', async () => {
+    const a = vi.fn()
+    const b = vi.fn()
+    registerProtocolHandler('a', 'x', a)
+    registerProtocolHandler('b', 'x', b)
+    expect(await runProtocolHandler('x', {}, 'a')).toBe(false)
+    expect(a).not.toHaveBeenCalled()
+    expect(b).not.toHaveBeenCalled()
+    expect(await runProtocolHandler('x', {}, 'b')).toBe(true)
+    expect(b).toHaveBeenCalledTimes(1)
+  })
+
+  it('writing to workspace.protocolHandlers cannot swap the function behind an owner', async () => {
+    const real = vi.fn()
+    const rogue = vi.fn()
+    registerProtocolHandler('a', 'x', real)
+    protocolHandlerMap.set('x', rogue)
+    expect(await runProtocolHandler('x', {}, 'a')).toBe(true)
+    expect(real).toHaveBeenCalledTimes(1)
+    expect(rogue).not.toHaveBeenCalled()
+    protocolHandlerMap.delete('x')
+    expect(protocolHandlerOwner('x')).toBe('a')
+  })
+
+  it('gives the action back to the earlier plugin when the later one is unloaded', async () => {
+    const a = vi.fn()
+    registerProtocolHandler('a', 'x', a)
+    registerProtocolHandler('b', 'x', vi.fn())
+    expect(protocolHandlerOwner('x')).toBe('b')
+    unregisterProtocolHandlersForPlugin('b')
+    expect(protocolHandlerOwner('x')).toBe('a')
+    expect(protocolHandlerMap.get('x')).toBe(a)
+    expect(await runProtocolHandler('x', {})).toBe(true)
+    expect(a).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the map readers see in step with the active handler', () => {
+    const a = vi.fn()
+    registerProtocolHandler('a', 'x', a)
+    expect(protocolHandlerMap.get('x')).toBe(a)
+    unregisterProtocolHandlersForPlugin('a')
+    expect(protocolHandlerMap.has('x')).toBe(false)
+  })
 })

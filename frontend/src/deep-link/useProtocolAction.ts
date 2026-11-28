@@ -2,10 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { showToast } from '../components/ToastNotification'
 import { useTranslation } from '../i18n'
 import { protocolHandlerOwner, runProtocolHandler } from '../plugins/compat/protocol-handlers'
-import { consumeInvalidProtocolAction, consumePendingProtocolAction, type ProtocolActionRequest } from './protocolAction'
+import {
+  consumeInvalidProtocolAction,
+  consumePendingProtocolAction,
+  storePendingProtocolAction,
+  type ProtocolActionRequest,
+} from './protocolAction'
 
-/** How long a link waits for a plugin to register its handler (plugins load after the vault opens). */
-export const PROTOCOL_ACTION_WAIT_MS = 30_000
+/**
+ * How long a link waits for a plugin to register its handler (plugins load after the vault opens).
+ * A link nobody handled in that time is parked again, so a reload (or the next login) tries once
+ * more until the stored link expires.
+ */
+export const PROTOCOL_ACTION_WAIT_MS = 120_000
 
 const POLL_MS = 250
 
@@ -57,6 +66,7 @@ export function useProtocolAction(): UseProtocolAction {
       } else if (Date.now() - started > PROTOCOL_ACTION_WAIT_MS) {
         clearInterval(timer)
         showToast('error', tRef.current('deepLink.protocolNoHandler'))
+        storePendingProtocolAction(request)
         setRequest(null)
       }
     }, POLL_MS)
@@ -67,7 +77,8 @@ export function useProtocolAction(): UseProtocolAction {
     const current = prompt
     setPrompt(null)
     if (!current) return
-    void runProtocolHandler(current.request.action, current.request.params).then((ran) => {
+    // Only the plugin the user was shown: if another one took over the action meanwhile, nothing runs.
+    void runProtocolHandler(current.request.action, current.request.params, current.pluginId).then((ran) => {
       if (!ran) showToast('error', tRef.current('deepLink.protocolNoHandler'))
     })
   }, [prompt])

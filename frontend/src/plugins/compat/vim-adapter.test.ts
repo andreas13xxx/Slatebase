@@ -43,6 +43,24 @@ describe('CodeMirrorAdapter.Vim', () => {
     await vi.waitFor(() => expect(calls).toEqual(['action:outlinerO', 'map:o', 'action:outlinerBigO']))
   })
 
+  it('runs what was queued before a direct call when the engine got loaded by someone else', () => {
+    const calls: string[] = []
+    const api: Api = {
+      defineAction: (name) => { calls.push(`action:${String(name)}`) },
+      mapCommand: (keys) => { calls.push(`map:${String(keys)}`) },
+    }
+    let ready = false
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const adapter = createVimAdapter({ get: () => (ready ? api : null), load: async () => { await gate; return api } }) as Api
+    adapter['defineAction']!('a')
+    // The editor loads the engine first; the adapter's own load has not finished yet.
+    ready = true
+    adapter['mapCommand']!('k')
+    expect(calls).toEqual(['action:a', 'map:k'])
+    release()
+  })
+
   it('drops (and logs) a call that needs a live editor while the engine is not loaded', () => {
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
     const { engine, load } = controlledEngine({})

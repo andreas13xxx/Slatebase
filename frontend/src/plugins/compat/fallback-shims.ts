@@ -29,7 +29,7 @@ import { getCsrfToken } from '../../state/authContext'
 import DOMPurify from 'dompurify'
 import { recordGapRead } from './api-gap-registry'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
-import { debugLog, warnNoOp } from './log'
+import { debugLog, debugOnce, warnNoOp } from './log'
 import { MenuItem, MenuSeparator } from './menu'
 import { OBSIDIAN_API_VERSION, compareApiVersions, prepareFuzzySearch, prepareSimpleSearch } from './obsidian-api-extensions'
 
@@ -142,13 +142,13 @@ class FallbackSettingPage {
 
 class FallbackBaseComponent {
   then(cb: (self: this) => void): this { cb(this); return this }
-  setDisabled(): this { warnNoOp('FallbackBaseComponent', 'setDisabled'); return this }
+  setDisabled(): this { debugOnce('FallbackBaseComponent::setDisabled', '[PluginCompat] FallbackBaseComponent.setDisabled() has no effect on the minimal fallback component.'); return this }
 }
 
 class FallbackValueComponent extends FallbackBaseComponent {
   getValue(): unknown { return undefined }
   setValue(): this { warnNoOp('FallbackValueComponent', 'setValue'); return this }
-  registerOptionListener(): this { warnNoOp('FallbackValueComponent', 'registerOptionListener'); return this }
+  registerOptionListener(): this { debugOnce('FallbackValueComponent::registerOptionListener', '[PluginCompat] FallbackValueComponent.registerOptionListener() has no effect on the minimal fallback component.'); return this }
 }
 
 // ─── Utility functions ───────────────────────────────────────────────────────────
@@ -437,8 +437,8 @@ class FallbackAbstractInputSuggest {
 /** Shared no-op chainable helpers for the UI component fallbacks. */
 abstract class FallbackChainable {
   then(cb: (self: this) => void): this { cb(this); return this }
-  setDisabled(): this { warnNoOp('FallbackChainable', 'setDisabled'); return this }
-  onChange(): this { warnNoOp('FallbackChainable', 'onChange'); return this }
+  setDisabled(): this { debugOnce('FallbackChainable::setDisabled', '[PluginCompat] FallbackChainable.setDisabled() has no effect on the minimal fallback component.'); return this }
+  onChange(): this { debugOnce('FallbackChainable::onChange', '[PluginCompat] FallbackChainable.onChange() never fires on the minimal fallback component.'); return this }
 }
 
 class FallbackExtraButtonComponent extends FallbackChainable {
@@ -473,8 +473,8 @@ class FallbackMomentFormatComponent extends FallbackChainable {
   inputEl = document.createElement('input')
   sampleEl = document.createElement('span')
   constructor(el: HTMLElement) { super(); el.appendChild(this.inputEl) }
-  setDefaultFormat(): this { warnNoOp('FallbackMomentFormatComponent', 'setDefaultFormat'); return this }
-  setSampleEl(): this { warnNoOp('FallbackMomentFormatComponent', 'setSampleEl'); return this }
+  setDefaultFormat(): this { debugOnce('FallbackMomentFormatComponent::setDefaultFormat', '[PluginCompat] FallbackMomentFormatComponent.setDefaultFormat() has no effect on the minimal fallback component.'); return this }
+  setSampleEl(): this { debugOnce('FallbackMomentFormatComponent::setSampleEl', '[PluginCompat] FallbackMomentFormatComponent.setSampleEl() has no effect on the minimal fallback component.'); return this }
   getValue(): string { return this.inputEl.value }
   setValue(v: string): this { this.inputEl.value = v; return this }
 }

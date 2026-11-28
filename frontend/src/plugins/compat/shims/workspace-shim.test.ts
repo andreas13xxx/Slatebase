@@ -7,6 +7,7 @@ import type { PaneTree } from '../../../state/paneTreeState';
 import type { TabEntry } from '../../../state/tabState';
 import { resetLogDedup } from '../log';
 import { setFoldVault } from '../../../editor/foldPersistence';
+import { setActiveVaultShimRef } from './vault-shim';
 import { add as addRecentFile, _reload as reloadRecentFiles } from '../../../state/recentFilesStore';
 import { registerFileExplorerRow, clearFileExplorerDomRegistry } from '../file-explorer-dom-registry';
 import type { TFile } from '../types';
@@ -1300,6 +1301,20 @@ describe('WorkspaceShim', () => {
       addRecentFile('v1', 'b.md');
       setFoldVault('v1');
       expect(workspace.getLastOpenFiles()).toEqual(['b.md', 'a.md']);
+    });
+
+    it('follows the open vault (the active vault shim) even before an editor set the fold vault', () => {
+      localStorage.clear();
+      reloadRecentFiles();
+      addRecentFile('v1', 'a.md');
+      addRecentFile('v2', 'b.md');
+      setFoldVault(null);
+      setActiveVaultShimRef({ getRenderContext: () => ({ vaultId: 'v2' }) } as never);
+      try {
+        expect(workspace.getLastOpenFiles()).toEqual(['b.md']);
+      } finally {
+        setActiveVaultShimRef(null);
+      }
     });
 
     it('is empty while no vault is open', () => {

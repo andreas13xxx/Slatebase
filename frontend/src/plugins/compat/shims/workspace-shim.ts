@@ -23,6 +23,7 @@ import {
 import { requestPaneSplit } from '../pane-split-bridge';
 import { protocolHandlerMap } from '../protocol-handlers';
 import { getFoldVault } from '../../../editor/foldPersistence';
+import { getActiveVaultShimRef } from './vault-shim';
 import { getRecent as getRecentFiles } from '../../../state/recentFilesStore';
 import { flush as flushWorkspaceState } from '../../../state/workspaceStore';
 import type { PaneTree, SplitDirection } from '../../../state/paneTreeState';
@@ -1143,7 +1144,10 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get the filenames of the most recently opened files.
    */
   getLastOpenFiles(): string[] {
-    const vaultId = getFoldVault();
+    // The open vault is the one whose plugins are running (the active vault shim); the editor's
+    // fold vault is only a fallback, as it is unset until an editor has mounted.
+    const shim = getActiveVaultShimRef() as { getRenderContext?: () => { vaultId?: string } } | null;
+    const vaultId = shim?.getRenderContext?.().vaultId || getFoldVault();
     if (!vaultId) return [];
     return getRecentFiles().filter((entry) => entry.vaultId === vaultId).map((entry) => entry.path);
   }
