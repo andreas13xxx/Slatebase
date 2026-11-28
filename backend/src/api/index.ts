@@ -896,6 +896,13 @@ export class VaultController implements IVaultController {
       return c.json(apiError, 404)
     }
 
+    // Path is a directory, not a file (EISDIR) — a client probing whether a folder exists
+    if (isNodeError(error) && error.code === 'EISDIR') {
+      this.logger.warn('Path is a directory', { message: error.message })
+      const apiError = createApiError('IS_A_DIRECTORY', 'Path is a directory')
+      return c.json(apiError, 400)
+    }
+
     // Permission denied (EACCES)
     if (isNodeError(error) && error.code === 'EACCES') {
       this.logger.warn('Permission denied', { message: error.message })
