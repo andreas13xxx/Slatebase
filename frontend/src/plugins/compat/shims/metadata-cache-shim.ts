@@ -13,6 +13,31 @@ import type { DirectoryTree } from '../../../types';
 import { resolveWikilinkTarget, collectFilesSorted } from '../../link-resolver';
 import { computeLinkpath } from '../link-text';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
+import { warnOnce } from '../log';
+
+/**
+ * File-name lookup behind `uniqueFileLookup`. Closes over its map instead of using `this`, so a
+ * plugin (or a `monkey-around` wrapper) can detach `add`/`remove`/`get` and still call them.
+ */
+function createUniqueFileLookup() {
+  const map = new Map<string, TFile[]>();
+  return {
+    map,
+    add(name: string, file: TFile): void {
+      const list = map.get(name) ?? [];
+      if (!list.includes(file)) list.push(file);
+      map.set(name, list);
+    },
+    remove(name: string, file: TFile): void {
+      const rest = (map.get(name) ?? []).filter(f => f !== file);
+      if (rest.length > 0) map.set(name, rest);
+      else map.delete(name);
+    },
+    get(name: string): TFile[] {
+      return map.get(name) ?? [];
+    },
+  };
+}
 
 /** The slice of the vault the metadata cache needs to index files itself. */
 export interface MetadataCacheVault {
@@ -56,20 +81,7 @@ export class MetadataCacheShim implements IMetadataCacheShim {
   readonly fileCache: Record<string, { mtime: number; size: number; hash: string }> = {};
   readonly metadataCache: Record<string, CachedMetadata> = {};
   /** File-name lookup used by link resolution in Obsidian; plugins only ever `add()` to it. */
-  readonly uniqueFileLookup = {
-    map: new Map<string, TFile[]>(),
-    add(name: string, file: TFile): void {
-      const list = this.map.get(name) ?? [];
-      if (!list.includes(file)) list.push(file);
-      this.map.set(name, list);
-    },
-    remove(name: string, file: TFile): void {
-      this.map.set(name, (this.map.get(name) ?? []).filter(f => f !== file));
-    },
-    get(name: string): TFile[] {
-      return this.map.get(name) ?? [];
-    },
-  };
+  readonly uniqueFileLookup = createUniqueFileLookup();
   /** Per-file link maps a plugin assigned (`resolvedLinks[path] = {...}`); win over the computed ones. */
   private resolvedOverrides: Record<string, Record<string, number>> = {};
   private unresolvedOverrides: Record<string, Record<string, number>> = {};
@@ -98,9 +110,19 @@ export class MetadataCacheShim implements IMetadataCacheShim {
 
   /** Reads a file through the vault and (re)builds its cached metadata. */
   async computeFileMetadataAsync(file: TFile): Promise<void> {
-    if (!this.vault) return;
-    const bytes = await this.vault.readBinary(file);
-    this.refreshFileCache(file, new TextDecoder().decode(new Uint8Array(bytes)));
+    if (!this.vault) {
+      warnOnce('metadata-cache::computeFileMetadataAsync', '[MetadataCache] computeFileMetadataAsync() skipped: no vault is connected yet.');
+      return;
+    }
+    // Only Markdown has metadata Slatebase can derive. Parsing a .canvas or binary file as Markdown
+    // would invent tags and links; plugins that own such a type store its metadata themselves.
+    if (file.extension !== 'md') return;
+    try {
+      const bytes = await this.vault.readBinary(file);
+      this.refreshFileCache(file, new TextDecoder().decode(new Uint8Array(bytes)));
+    } catch (error) {
+      warnOnce(`metadata-cache::compute::${file.path}`, `[MetadataCache] Could not read "${file.path}" to index it: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /** Announces that a file's links are resolved. Resolution itself is computed on read (`resolvedLinks`). */
@@ -316,6 +338,11 @@ export class MetadataCacheShim implements IMetadataCacheShim {
         if (typeof prop === 'string') overrides[prop] = value;
         return Reflect.set(target, prop, value);
       },
+      // `delete resolvedLinks[path]` must stick, or the stale links come back on the next read.
+      deleteProperty(target, prop): boolean {
+        if (typeof prop === 'string') delete overrides[prop];
+        return Reflect.deleteProperty(target, prop);
+      },
     });
   }
 
@@ -420,6 +447,15 @@ export class MetadataCacheShim implements IMetadataCacheShim {
    * and start rejecting positions that are visibly correct in the editor.
    */
   refreshFileCache(file: TFile, content: string): void {
+    // The document changed, so metadata a plugin stored for an earlier version must not outrank
+    // the fresh parse. Other file types keep it: only their plugin can produce it.
+    if (file.extension === 'md') {
+      const stale = this.fileCache[file.path]
+      if (stale) {
+        delete this.metadataCache[stale.hash]
+        delete this.fileCache[file.path]
+      }
+    }
     this.contentStore.set(file.path, content);
     const metadata = this.parseContentToMetadata(content);
     this.cache.set(file.path, metadata);
@@ -441,6 +477,19 @@ export class MetadataCacheShim implements IMetadataCacheShim {
    */
   updateTree(tree: DirectoryTree | null): void {
     this.tree = tree;
+    if (!tree) return;
+    // Drop what plugins published for files that no longer exist, so a deleted or renamed
+    // file's links and metadata do not outlive it.
+    const existing = new Set(collectFilesSorted(tree).map(f => f.path));
+    for (const overrides of [this.resolvedOverrides, this.unresolvedOverrides]) {
+      for (const path of Object.keys(overrides)) if (!existing.has(path)) delete overrides[path];
+    }
+    for (const path of Object.keys(this.fileCache)) {
+      if (existing.has(path)) continue;
+      const entry = this.fileCache[path];
+      delete this.fileCache[path];
+      if (entry && !Object.values(this.fileCache).some(other => other.hash === entry.hash)) delete this.metadataCache[entry.hash];
+    }
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────
