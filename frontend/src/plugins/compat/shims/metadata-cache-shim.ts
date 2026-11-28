@@ -14,6 +14,12 @@ import { resolveWikilinkTarget, collectFilesSorted } from '../../link-resolver';
 import { computeLinkpath } from '../link-text';
 import { recordGapRead, recordGapCall, isObjectPrototypeMember } from '../api-gap-registry';
 
+/** The slice of the vault the metadata cache needs to index files itself. */
+export interface MetadataCacheVault {
+  readBinary(file: TFile): Promise<ArrayBuffer>;
+  getAbstractFileByPath(path: string): unknown;
+}
+
 /**
  * MetadataCacheShim — Obsidian-compatible MetadataCache emulation.
  *
@@ -41,6 +47,74 @@ export class MetadataCacheShim implements IMetadataCacheShim {
    */
   private indexedLinks: Map<string, string[]> = new Map();
 
+  /**
+   * Obsidian's internal two-level cache: `fileCache` maps a path to `{ mtime, size, hash }`,
+   * `metadataCache` maps that content hash to the parsed metadata. Plugins that teach Obsidian a
+   * new file type (Advanced Canvas indexes `.canvas`) read and write these directly, so they must
+   * exist as plain, mutable objects. `getFileCache()`/`getCache()` consult them first.
+   */
+  readonly fileCache: Record<string, { mtime: number; size: number; hash: string }> = {};
+  readonly metadataCache: Record<string, CachedMetadata> = {};
+  /** File-name lookup used by link resolution in Obsidian; plugins only ever `add()` to it. */
+  readonly uniqueFileLookup = {
+    map: new Map<string, TFile[]>(),
+    add(name: string, file: TFile): void {
+      const list = this.map.get(name) ?? [];
+      if (!list.includes(file)) list.push(file);
+      this.map.set(name, list);
+    },
+    remove(name: string, file: TFile): void {
+      this.map.set(name, (this.map.get(name) ?? []).filter(f => f !== file));
+    },
+    get(name: string): TFile[] {
+      return this.map.get(name) ?? [];
+    },
+  };
+  /** Per-file link maps a plugin assigned (`resolvedLinks[path] = {...}`); win over the computed ones. */
+  private resolvedOverrides: Record<string, Record<string, number>> = {};
+  private unresolvedOverrides: Record<string, Record<string, number>> = {};
+  /** The vault this cache indexes; set once the VaultShim exists (needed to read file bytes). */
+  vault: MetadataCacheVault | null = null;
+
+  /** Connects the vault used by `computeFileMetadataAsync()` / `resolveLinks()`. */
+  setVault(vault: MetadataCacheVault): void {
+    this.vault = vault;
+  }
+
+  /** Stores the `{ mtime, size, hash }` entry of a file (Obsidian-internal, used by plugins). */
+  saveFileCache(path: string, entry: { mtime: number; size: number; hash: string }): void {
+    this.fileCache[path] = entry;
+  }
+
+  /** Stores parsed metadata under its content hash (Obsidian-internal, used by plugins). */
+  saveMetaCache(hash: string, metadata: CachedMetadata): void {
+    this.metadataCache[hash] = metadata;
+  }
+
+  /** Parses raw bytes of a Markdown text into metadata (Obsidian-internal, used by plugins). */
+  async computeMetadataAsync(buffer: ArrayBuffer): Promise<CachedMetadata> {
+    return parseMetadata(new TextDecoder().decode(new Uint8Array(buffer)));
+  }
+
+  /** Reads a file through the vault and (re)builds its cached metadata. */
+  async computeFileMetadataAsync(file: TFile): Promise<void> {
+    if (!this.vault) return;
+    const bytes = await this.vault.readBinary(file);
+    this.refreshFileCache(file, new TextDecoder().decode(new Uint8Array(bytes)));
+  }
+
+  /** Announces that a file's links are resolved. Resolution itself is computed on read (`resolvedLinks`). */
+  resolveLinks(path: string): void {
+    const file = this.vault?.getAbstractFileByPath(path);
+    if (typeof file === 'object' && file !== null && 'extension' in file) this.events.trigger('resolve', file);
+  }
+
+  /** Metadata a plugin stored through `saveFileCache()` + `saveMetaCache()`, if complete. */
+  private hashedMetadata(path: string): CachedMetadata | null {
+    const hash = this.fileCache[path]?.hash;
+    return (hash && this.metadataCache[hash]) || null;
+  }
+
   /** Records a file's forward-link targets from the server's link index. */
   setIndexedLinks(path: string, targets: string[]): void {
     if (targets.length > 0) this.indexedLinks.set(path, targets);
@@ -61,6 +135,8 @@ export class MetadataCacheShim implements IMetadataCacheShim {
    * exclusively from the MetadataCache, not from raw file content.
    */
   getFileCache(file: TFile): CachedMetadata | null {
+    const hashed = this.hashedMetadata(file.path);
+    if (hashed) return hashed;
     const cached = this.cache.get(file.path);
     if (cached) return cached;
 
@@ -106,6 +182,8 @@ export class MetadataCacheShim implements IMetadataCacheShim {
    */
   getCache(path: string): CachedMetadata | null {
     if (!path) return null;
+    const hashed = this.hashedMetadata(path);
+    if (hashed) return hashed;
     const cached = this.cache.get(path);
     if (cached) return cached;
     // Notes read so far are parsed on demand, like getFileCache(); unread ones stay unknown (null).
@@ -190,7 +268,7 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       if (Object.keys(targets).length > 0) result[sourcePath] = targets;
     }
 
-    return result;
+    return this.withOverrides(result, this.resolvedOverrides);
   }
 
   /**
@@ -222,7 +300,23 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       }
     }
 
-    return result;
+    return this.withOverrides(result, this.unresolvedOverrides);
+  }
+
+  /**
+   * Merges per-file maps a plugin assigned and records further assignments on the returned object
+   * (`metadataCache.resolvedLinks[path] = {...}` is how Obsidian plugins publish links of their own file types).
+   */
+  private withOverrides(
+    computed: Record<string, Record<string, number>>,
+    overrides: Record<string, Record<string, number>>
+  ): Record<string, Record<string, number>> {
+    return new Proxy({ ...computed, ...overrides }, {
+      set(target, prop, value: Record<string, number>): boolean {
+        if (typeof prop === 'string') overrides[prop] = value;
+        return Reflect.set(target, prop, value);
+      },
+    });
   }
 
   /**
@@ -484,6 +578,16 @@ export class MetadataCacheShim implements IMetadataCacheShim {
       'resolvedLinks',
       'unresolvedLinks',
       'blockCache',
+      'fileCache',
+      'metadataCache',
+      'uniqueFileLookup',
+      'saveFileCache',
+      'saveMetaCache',
+      'computeMetadataAsync',
+      'computeFileMetadataAsync',
+      'resolveLinks',
+      'setVault',
+      'vault',
     ]);
 
     return new Proxy(instance, {
@@ -516,7 +620,7 @@ export class MetadataCacheShim implements IMetadataCacheShim {
 
         if (isObjectPrototypeMember(prop)) {
           const value = Reflect.get(target, prop, target);
-          return typeof value === 'function' ? value.bind(target) : value;
+          return typeof value === 'function' && prop !== 'constructor' ? value.bind(target) : value;
         }
 
         if (recordGapRead('MetadataCache', prop)) {

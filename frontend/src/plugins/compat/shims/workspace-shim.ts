@@ -166,7 +166,7 @@ function wrapFileExplorerView(view: FileExplorerLeafView): FileExplorerLeafView 
       if (prop === 'then') return undefined;
       if (isObjectPrototypeMember(prop)) {
         const value = Reflect.get(target, prop, target);
-        return typeof value === 'function' ? value.bind(target) : value;
+        return typeof value === 'function' && prop !== 'constructor' ? value.bind(target) : value;
       }
 
       if (recordGapRead('FileExplorerView', prop)) {
@@ -1511,7 +1511,7 @@ export class WorkspaceShim implements IWorkspaceShim {
         // must pass through untouched — see isObjectPrototypeMember's doc comment.
         if (isObjectPrototypeMember(prop)) {
           const value = Reflect.get(target, prop, target);
-          return typeof value === 'function' ? value.bind(target) : value;
+          return typeof value === 'function' && prop !== 'constructor' ? value.bind(target) : value;
         }
 
         // Non-emulated property: record the gap and warn once. The workspace is

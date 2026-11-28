@@ -49,7 +49,7 @@ import type { ICompatibilityAnalyzer } from './compatibility-analyzer'
 import { VaultShim } from './shims/vault-shim'
 import { WorkspaceShim } from './shims/workspace-shim'
 import { setActiveWorkspaceShim } from './active-workspace-shim'
-import { MetadataCacheShim } from './shims/metadata-cache-shim'
+import { MetadataCacheShim, type MetadataCacheVault } from './shims/metadata-cache-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
 import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, removeActiveFileViewsForPlugin, registerExtensionsForPlugin } from './file-view-registry'
 import { clearProtocolHandlers, unregisterProtocolHandlersForPlugin } from './protocol-handlers'
@@ -615,6 +615,7 @@ export function PluginProvider({
     // The app reference will be a minimal shared object — all plugins see the same vault/workspace/metadataCache
     const newVaultShim = VaultShim.wrapWithProxy(new VaultShim(newVaultId, vaultName, apiClient, directoryTree ?? { name: vaultName, type: 'directory' as const, children: [], itemCount: 0, path: '' }))
     vaultShimRef.current = newVaultShim
+    newMetadataCacheShim.setVault(newVaultShim as unknown as MetadataCacheVault)
 
     // Wire VaultShim to populate MetadataCache when files are read.
     // Dataview's worker relies on metadataCache.getFileCache() returning frontmatter/tags

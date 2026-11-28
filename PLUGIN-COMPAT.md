@@ -6,6 +6,7 @@
 
 ---
 
+
 ## Zusammenfassung
 
 Slatebase emuliert eine Teilmenge der Obsidian-Plugin-API (`App`, `Vault`, `Workspace`, `MetadataCache`, `FileManager`, Command-Palette, Event-System) im Browser, damit echte Obsidian-Community-Plugins im Web-Frontend laufen — ohne Electron, ohne Node.js, ohne lokales Dateisystem. Der Layer gilt weiterhin als **⚠️ experimentell**. Emulierte API-Version: **1.15.1** (APIs bis einschließlich 1.15.1 implementiert).
@@ -321,6 +322,31 @@ Die UI-Badges in der Plugin-Verwaltung heißen entsprechend „Voll kompatibel",
 
 ---
 
+### Advanced Canvas: Analyse (Stand 2026-11-28)
+
+Quelle: `src/patchers/*.ts` im Repo `Developer-Mike/obsidian-advanced-canvas`. Alle Patcher erben von `Patcher` (`patcher.ts`), der mit `monkey-around` Methoden überschreibt. Zwei Muster sind für Slatebase entscheidend:
+
+- `Patcher.patchPrototype(plugin, objekt, …)` patcht `objekt.constructor.prototype` und verlangt bei `OverrideExisting`, dass die Methode dort existiert (sonst `Error: Method … does not exist on target`).
+- `waitForViewRequest()` umhüllt Einträge von `app.viewRegistry.viewByType` (`canvas`, `search`, `file-properties`, `outgoing-link`) mit `around()`.
+
+| Patcher | Braucht | Stand in Slatebase |
+|---|---|---|
+| `MetadataCachePatcher` | `metadataCache.constructor.prototype` mit `getCache`, `computeFileMetadataAsync`, `resolveLinks`; intern `fileCache`, `metadataCache` (Hash → Metadaten), `uniqueFileLookup.add`, `saveFileCache`, `saveMetaCache`, `computeMetadataAsync`, `vault.readBinary`, schreibbares `resolvedLinks[pfad]` | **Umgesetzt** (`shims/metadata-cache-shim.ts`): `.canvas`-Dateien bekommen Frontmatter, Links und Embeds im Metadata-Cache, nur über den Plugin-Weg |
+| `PropertiesPatcher`, `OutgoingLinksPatcher`, `SearchPatcher` | `viewRegistry.viewByType` als Objekt | Startet (leeres Objekt). Die Plugin-Views gibt es bei uns nicht, die Patches bleiben ohne Wirkung |
+| `LinkSuggestionsPatcher` | `workspace.editorSuggest.suggests` mit Eintrag, der `suggestManager` hat | Nur Warnung `No suggest manager found` (harmlos) |
+| `CanvasPatcher` und die Canvas-Funktionen (Knotenfarben, Edges, Popup-Menü, Zoom, Verlauf) | Obsidians Canvas-Klasse: `view.canvas` mit `nodes`, `edges`, `selection`, `getData()`, `pushHistory()`, `zoomToSelection()`, `posFromEvt()`, `menu`, `nodeInteractionLayer` | **Nicht möglich ohne Brücke.** Slatebases Canvas ist eine React-Ansicht mit Reducer (`state/canvasState.ts`), keine solche Klasse |
+
+**Zwei Fehler, die den Start verhinderten (behoben):**
+
+1. Die Proxys der Shims gaben `constructor` per `.bind(target)` zurück. Eine gebundene Funktion hat kein `.prototype`; `patchPrototype` bekam `undefined` und warf `can't access property "getCache", target is undefined`. Betraf alle sieben Proxys (App, MetadataCache, Workspace, Vault, VaultAdapter, FileManager, ViewRegistry). `constructor` wird jetzt durchgereicht. Test: `shims/proxy-constructor.test.ts`.
+2. `app.viewRegistry.viewByType` fehlte (`undefined`).
+
+**Offen / Grenzen:**
+
+- Eine echte Anbindung der Canvas-Funktionen braucht die Leaf→CanvasView-Brücke aus „Geplant, aber noch nicht implementiert“ (Abschnitt `internalPlugins.plugins.canvas`) plus ein `canvas`-Objekt, das auf den Reducer zeigt. Aufwand: mittel (Tage). Ein vollständiger Nachbau von Obsidians Canvas-Rendering ist nicht sinnvoll.
+- `resolveLinks()` löst nur das `resolve`-Ereignis aus; aufgelöst wird beim Lesen von `resolvedLinks`.
+- Nicht im Browser mit dem echten Bundle geprüft, nur gegen die Quellen und Unit-Tests.
+
 ## Top 100 Community-Plugins nach Downloads
 
 **Datenquelle:** `community-plugin-stats.json` + `community-plugins.json` (`obsidianmd/obsidian-releases`, Obsidians eigener aggregierter Download-Feed — derselbe, den Slatebases Plugin-Store selbst nutzt), abgerufen 2026-08-11. „Downloads" ist die kumulative Zähler-Summe über alle Versionen laut diesem Feed.
@@ -372,7 +398,7 @@ Die ES5-Downlevel-Basisklassen-Kompatibilität (`_super.call(this, …)`-Aufruff
 | 32 | [Notebook Navigator](https://github.com/johansan/notebook-navigator) (`notebook-navigator`) | 838.390 | Johan Sanneblad | Nein | Ja | Teilweise kompatibel | Aktiv | – Nur statische Analyse | Plugin referenziert Node-Built-ins ohne Browser-Ersatz (`electron`) — sicher gestubbt (Warnung, kein Absturz), Badge daher gelb statt grün. |
 | 33 | [Advanced Slides](https://github.com/mszturc/obsidian-advanced-slides) (`obsidian-advanced-slides`) | 833.152 | mszturc | Ja | Nein (Store blockiert Install-Button) | Nicht unterstützt | ⚠️ Inaktiv seit 2024 | – Nur statische Analyse | Desktop-only (`manifest.json`: `isDesktopOnly: true`) — Node.js/Electron-APIs nicht im Browser verfügbar. Installation über den Plugin Store ist blockiert (kein Install-Button). |
 | 34 | [Periodic Notes](https://github.com/liamcain/obsidian-periodic-notes) (`periodic-notes`) | 735.568 | Liam Cain | Nein | Ja | Voll kompatibel | ⚠️ Kaputt (bestätigt) | – Nur statische Analyse | Statische Analyse: alle erkannten API-Zugriffe vollständig emuliert. |
-| 35 | [Advanced Canvas](https://github.com/developer-mike/obsidian-advanced-canvas) (`advanced-canvas`) | 724.860 | mika-dev | Nein | Ja | Voll kompatibel | Aktiv | – Nur statische Analyse | **Vermutlich falsch positiv:** Statische Analyse findet keine nicht-emulierten Zugriffe, aber die Regex-Erkennung sucht nur nach `this.app.<namespace>.<methode>`-Mustern — tief verschachtelte Pfade wie `internalPlugins.plugins.canvas.*` (auf die dieses Plugin praktisch vollständig angewiesen ist) erkennt sie gar nicht als API-Zugriff. Diese Internal-API ist in Slatebase aktuell reiner Absturz-Schutz, nichts wird wirklich eingebettet oder manipuliert (siehe „Geplant, aber noch nicht implementiert" oben) — das Plugin dürfte in der Praxis weitgehend wirkungslos bleiben, ungeachtet des Badges. |
+| 35 | [Advanced Canvas](https://github.com/developer-mike/obsidian-advanced-canvas) (`advanced-canvas`) | 724.860 | mika-dev | Nein | Ja | Voll kompatibel | Aktiv | – Nur statische Analyse | **Startet, Canvas-Teile wirkungslos:** Seit Stand 2026-11-28 laufen die Patcher für Metadaten, Properties, Suche und Link-Vorschläge ohne Startabsturz. Die Funktionen, die Obsidians interne Canvas-Klasse überschreiben (`view.canvas`), greifen in Slatebase nicht — Details im Abschnitt [Advanced Canvas](#advanced-canvas-analyse-stand-2026-11-28). |
 | 36 | [Highlightr](https://github.com/chetachiezikeuzor/Highlightr-Plugin) (`highlightr-plugin`) | 696.665 | chetachiezikeuzor | Nein | Ja | Voll kompatibel | ⚠️ Kaputt (bestätigt) | – Nur statische Analyse | Statische Analyse: alle erkannten API-Zugriffe vollständig emuliert. |
 | 37 | [PDF++](https://github.com/ryotaushio/obsidian-pdf-plus) (`pdf-plus`) | 679.335 | ryotaushio | Nein | Ja | Teilweise kompatibel | Aktiv | – Nur statische Analyse | `metadataCache.onCleanCache` ist nicht emuliert. (`workspace.getGroupLeaves` ist inzwischen echt.) |
 | 38 | [Local REST API with MCP](https://github.com/coddingtonbear/obsidian-local-rest-api) (`obsidian-local-rest-api`) | 653.801 | Adam Coddington | Ja | Nein (Store blockiert Install-Button) | Nicht unterstützt | Aktiv | – Nur statische Analyse | Desktop-only (`manifest.json`: `isDesktopOnly: true`) — Node.js/Electron-APIs nicht im Browser verfügbar. Installation über den Plugin Store ist blockiert (kein Install-Button). |
