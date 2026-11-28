@@ -256,8 +256,8 @@
   overflow-y: auto;
 }
 
-/* The stat panel is a fixed-width right column only in the full variant;
-   the compact variant never renders it. */
+/* The stat panel is a fixed-width right column in the full variant; the
+   compact variant stacks it under the list. */
 .activity-timeline--full .activity-stat-panel {
   flex: 0 0 26rem;
 }
@@ -265,6 +265,12 @@
 .activity-timeline--compact .activity-timeline__content {
   display: block;
   overflow-y: auto;
+}
+
+.activity-timeline--compact .activity-stat-panel {
+  border-left: 0;
+  border-top: 1px solid var(--border-subtle);
+  overflow-y: visible;
 }
 
 
