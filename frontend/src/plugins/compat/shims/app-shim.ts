@@ -610,6 +610,10 @@ export class AppShim implements IAppShim {
   readonly setting = {
     /** No settings tab is ever open from a plugin's point of view. */
     activeTab: null as unknown,
+    /** Tabs of installed community plugins (Obsidian: `app.setting.pluginTabs`). Plugins `find()` in it. */
+    pluginTabs: [] as unknown[],
+    /** Core settings tabs (Obsidian: `app.setting.settingTabs`). */
+    settingTabs: [] as unknown[],
     open: (): void => { warnNoOp('app.setting', 'open', 'The settings dialog cannot be opened from a plugin; use Settings in the app.') },
     close: (): void => { warnNoOp('app.setting', 'close') },
     openTabById: (_id: string): boolean => {

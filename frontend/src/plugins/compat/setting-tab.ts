@@ -37,9 +37,18 @@ export class PluginSettingTab {
   /** Reference to the plugin instance. */
   plugin: PluginInstance
 
+  /** Display name of the tab. Obsidian sets it to the plugin name; plugins read it in their constructor. */
+  name: string
+
+  /** Tab id. Obsidian uses the plugin id. */
+  id: string
+
   constructor(app: IAppShim, plugin: PluginInstance) {
     this.app = app
     this.plugin = plugin
+    const manifest = (plugin as { manifest?: { id?: string; name?: string } } | undefined)?.manifest
+    this.id = manifest?.id ?? ''
+    this.name = manifest?.name ?? manifest?.id ?? ''
     this.containerEl = document.createElement('div')
     this.containerEl.className = 'plugin-setting-tab'
   }
