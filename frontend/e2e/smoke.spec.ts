@@ -76,7 +76,8 @@ test('login, edit a file, save, reload, content persists', async ({ page }) => {
   // --- Type content ---
   // A new file opens in the editor (live preview). Only rotate the mode when it did not.
   const newFileToggle = page.locator('.breadcrumb-mode-btn').first()
-  const newFileHasEditor = await page.locator('.cm-content').isVisible({ timeout: 3000 }).catch(() => false)
+  // isVisible() does not wait, so wait for the editor explicitly before deciding.
+  const newFileHasEditor = await page.locator('.cm-content').waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false)
   if (!newFileHasEditor) await newFileToggle.click()
   const editorContent = page.locator('.cm-content')
   await editorContent.click()
@@ -96,7 +97,7 @@ test('login, edit a file, save, reload, content persists', async ({ page }) => {
 
   // Only rotate when the note reopened in reading mode (no editor yet).
   const editToggle = page.locator('.breadcrumb-mode-btn').first()
-  const hasEditor = await page.locator('.cm-content').isVisible({ timeout: 3000 }).catch(() => false)
+  const hasEditor = await page.locator('.cm-content').waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false)
   if (!hasEditor && await editToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
     await editToggle.click()
   }
