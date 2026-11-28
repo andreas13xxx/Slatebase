@@ -73,10 +73,11 @@ test('login, edit a file, save, reload, content persists', async ({ page }) => {
   await inlineInput.fill(fileName)
   await inlineInput.press('Enter')
 
-  // --- Switch to an editable mode and type content ---
-  // The breadcrumb has one button that rotates the mode; a new file opens in reading mode, so one
-  // click lands in an editable mode (source).
-  await page.locator('.breadcrumb-mode-btn').first().click()
+  // --- Type content ---
+  // A new file opens in the editor (live preview). Only rotate the mode when it did not.
+  const newFileToggle = page.locator('.breadcrumb-mode-btn').first()
+  const newFileHasEditor = await page.locator('.cm-content').isVisible({ timeout: 3000 }).catch(() => false)
+  if (!newFileHasEditor) await newFileToggle.click()
   const editorContent = page.locator('.cm-content')
   await editorContent.click()
   await editorContent.pressSequentially(editedText, { delay: 10 })
