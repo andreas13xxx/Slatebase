@@ -31,6 +31,19 @@ describe('plugin icon SVG sanitizing', () => {
     expect(out).toContain('href="#g"')
   })
 
+  it('keeps safe class-based paint colors from SVG style blocks', () => {
+    const out = sanitizeSvg(wrap('<style>.cls-1{fill:#123456;stroke-width:2}</style><path class="cls-1" d="M0 0"/>'))
+
+    expect(out).toContain('fill="#123456"')
+    expect(out).toContain('stroke-width="2"')
+  })
+
+  it('ignores selectors outside the simple class allowlist', () => {
+    const out = sanitizeSvg(wrap('<style>.123{fill:red}.a .b{fill:blue}</style><path class="123 a b" d="M0 0"/>'))
+
+    expect(out).not.toContain('fill=')
+  })
+
   it('wraps and sanitizes bare inner markup', () => {
     const out = sizeCustomIconSvg('<path d="M1 1" onclick="x()"/>', 16)
     expect(out).toContain('viewBox="0 0 100 100"')
