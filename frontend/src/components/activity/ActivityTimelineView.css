@@ -335,3 +335,9 @@
     overflow-y: visible;
   }
 }
+
+/* ─── Folded run of look-alike events ──────────────────────────────────── */
+
+.activity-row__children {
+  margin-left: 1.9rem;
+}

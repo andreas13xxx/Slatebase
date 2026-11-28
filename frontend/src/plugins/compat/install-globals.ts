@@ -27,7 +27,7 @@ import { createVimAdapter } from './vim-adapter'
 import { registerBasesView as registerBasesViewInRegistry, type BasesViewRegistration } from './bases-view-registry'
 import { BASES_VALUE_CLASSES } from './bases-values'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
-import { getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
+import { forgetResolvedIcon, getBuiltInIconIds, getLucideIconElement, renderLucideIconInto } from './lucide-icons'
 import { clearSizedIconCache, getCustomIconSvg, sizeCustomIconSvg } from '../../utils/pluginIcon'
 import { sanitizeSvg } from './sanitize-rendered-html'
 import moment from 'moment/min/moment-with-locales'
@@ -750,6 +750,7 @@ export function installObsidianGlobals(): void {
   if (!window.obsidian.addIcon) {
     window.obsidian.addIcon = (iconId: string, svgContent: string): void => {
       customIconsRef.set(iconId, sanitizeSvg(svgContent))
+      forgetResolvedIcon(iconId)
       clearSizedIconCache()
     }
   }

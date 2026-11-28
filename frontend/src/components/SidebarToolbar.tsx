@@ -45,6 +45,8 @@ interface ToolbarItem {
   feature?: string
   /** Marks a plugin ribbon icon — adds Obsidian's own ribbon classes. */
   isPlugin?: boolean
+  /** Plugin scope for its stylesheet, since this button is rendered by Slatebase. */
+  pluginId?: string
 }
 
 interface SidebarToolbarProps {
@@ -149,6 +151,7 @@ export function SidebarToolbar({
         label: entry.title,
         action: (evt) => entry.callback(evt.nativeEvent),
         isPlugin: true,
+        pluginId: entry.pluginId,
       })
     }
   }
@@ -230,7 +233,7 @@ export function SidebarToolbar({
         const color = prefs.colors[id]
         const classes = [
           'toolbar-btn',
-          item.isPlugin ? 'toolbar-btn--plugin side-dock-ribbon-action' : '',
+          item.isPlugin ? 'toolbar-btn--plugin side-dock-ribbon-action clickable-icon' : '',
           dragId === id ? 'toolbar-btn--dragging' : '',
           dragOverId === id && dragId !== null && dragId !== id ? 'toolbar-btn--drag-over' : '',
         ].filter(Boolean).join(' ')
@@ -240,6 +243,7 @@ export function SidebarToolbar({
             key={id}
             type="button"
             className={classes}
+            data-plugin-id={item.pluginId}
             title={item.label}
             aria-label={item.label}
             onClick={disabled ? undefined : item.action}

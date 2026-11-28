@@ -6,6 +6,7 @@
  */
 
 import { createAnchorTracker } from '../../../plugins/heading-anchor'
+import { findMarkdownHeadingLines } from '../../../utils/markdownHeadings'
 
 /** Heading entry for the outline view */
 export interface OutlineHeading {
@@ -13,9 +14,6 @@ export interface OutlineHeading {
   level: 1 | 2 | 3 | 4 | 5 | 6
   anchor: string
 }
-
-/** Regex to match markdown headings (lines starting with 1-6 # followed by space and text) */
-const HEADING_REGEX = /^(#{1,6})[ \t]+(.+)$/gm
 
 /**
  * Strips inline formatting markers from heading text.
@@ -46,14 +44,9 @@ export function extractHeadings(content: string): OutlineHeading[] {
   const headings: OutlineHeading[] = []
   const tracker = createAnchorTracker()
 
-  let match: RegExpExecArray | null
-  while ((match = HEADING_REGEX.exec(content)) !== null) {
-    const hashes = match[1]
-    const rawText = match[2]
-    if (!hashes || !rawText) continue
-
-    const level = hashes.length as 1 | 2 | 3 | 4 | 5 | 6
-    const text = stripInlineFormatting(rawText.trim())
+  for (const heading of findMarkdownHeadingLines(content)) {
+    const level = heading.level as 1 | 2 | 3 | 4 | 5 | 6
+    const text = stripInlineFormatting(heading.text.trim())
     const anchor = tracker.getAnchor(text)
 
     headings.push({ text, level, anchor })

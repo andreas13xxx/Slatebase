@@ -874,6 +874,7 @@ export const en: TranslationShape = {
       sync: 'Sync',
     },
     bucketCount: '{count} events',
+    groupTitle: '{count} × {label}',
     bucketCountOne: '1 event',
     bucket: {
       today: 'Today',

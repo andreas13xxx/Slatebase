@@ -33,7 +33,7 @@ import { Scope } from './obsidian-api-extensions';
 // relied upon transitively, so the namespace is guaranteed complete no matter
 // which entry point reaches the loader first. Idempotent.
 import { installObsidianGlobals } from './install-globals';
-import { withPluginContextAsync } from './plugin-execution-context';
+import { withPluginContextAsync, getScopedCmView } from './plugin-execution-context';
 import { containAsyncUnload, takePendingUnload } from './async-lifecycle';
 import { createBrowserPathShim } from './browser-path-shim';
 import { preloadAllBuiltInIcons } from './lucide-icons';
@@ -144,7 +144,7 @@ export class PluginLoader implements IPluginLoader {
       // preloadAllBuiltInIcons's docs for why that needs the icon cache
       // warmed *before* the bundle's own code runs, not just before onload().
       await preloadAllBuiltInIcons();
-      module = await this.evaluateBundle(bundle);
+      module = await this.evaluateBundle(bundle, pluginId);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       const bundleError = new BundleEvaluationError(pluginId, error);
@@ -510,7 +510,7 @@ export class PluginLoader implements IPluginLoader {
    * @param bundle - The JavaScript source code
    * @returns The imported module object
    */
-  private async evaluateBundle(bundle: string): Promise<Record<string, unknown>> {
+  private async evaluateBundle(bundle: string, pluginId: string): Promise<Record<string, unknown>> {
     if (this.deps.bundleEvaluator) {
       return this.deps.bundleEvaluator(bundle);
     }
@@ -518,7 +518,9 @@ export class PluginLoader implements IPluginLoader {
     // Default: browser-based evaluation via Blob URL + dynamic import()
     // Obsidian plugin bundles are CJS format (esbuild output) with require('obsidian').
     // We wrap the bundle in a CJS-to-ESM adapter that provides require() and module.exports.
+    (window as unknown as { __slatebaseScopedCmView?: unknown }).__slatebaseScopedCmView = getScopedCmView;
     const wrappedBundle = `
+var __slatebasePluginId = ${JSON.stringify(pluginId)};
 if (typeof process === 'undefined') {
   // type: 'renderer' matters, not just cosmetic — real Obsidian desktop *is* an
   // Electron renderer process, and libraries bundled into plugins (e.g. obsidian-git's
@@ -763,7 +765,7 @@ function require(id) {
     return __netStub(id);
   }
   if (id === '@codemirror/state') return window.__codemirrorState || {};
-  if (id === '@codemirror/view') return window.__codemirrorView || {};
+  if (id === '@codemirror/view') return (typeof __slatebasePluginId !== 'undefined' && window.__slatebaseScopedCmView) ? window.__slatebaseScopedCmView(__slatebasePluginId) : (window.__codemirrorView || {});
   if (id === '@codemirror/language') return window.__codemirrorLanguage || {};
   if (id === '@codemirror/commands') return window.__codemirrorCommands || {};
   if (id === '@codemirror/autocomplete') return window.__codemirrorAutocomplete || {};

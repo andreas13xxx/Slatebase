@@ -213,14 +213,14 @@ export class FileManagerShim implements IFileManagerShim {
   async createNewFile(folder: TFolder, name: string, extension: string, data?: string): Promise<TFile> {
     const ext = extension.startsWith('.') ? extension.slice(1) : extension;
     const baseName = name.endsWith(`.${ext}`) ? name.slice(0, -(ext.length + 1)) : name;
-    let filePath = folder.path ? `${folder.path}/${baseName}.${ext}` : `${baseName}.${ext}`;
+    let filePath = folder.path && folder.path !== '/' ? `${folder.path}/${baseName}.${ext}` : `${baseName}.${ext}`;
 
     // Check if file already exists and generate unique name
     let attempt = 0;
     while (this.vault.getAbstractFileByPath(filePath) !== null) {
       attempt++;
       const uniqueName = `${baseName} ${attempt}`;
-      filePath = folder.path ? `${folder.path}/${uniqueName}.${ext}` : `${uniqueName}.${ext}`;
+      filePath = folder.path && folder.path !== '/' ? `${folder.path}/${uniqueName}.${ext}` : `${uniqueName}.${ext}`;
     }
 
     return await this.vault.create(filePath, data ?? '');

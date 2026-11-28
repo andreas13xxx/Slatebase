@@ -55,6 +55,38 @@ export function withPluginContext<T>(pluginId: string | null, fn: () => T): T {
   }
 }
 
+const scopedCmViews = new Map<string, Record<string, unknown>>()
+
+/**
+ * `@codemirror/view` as one plugin sees it: identical, except its `WidgetType` runs `toDOM()` in the
+ * plugin's context. CM6 builds widgets later, from its own update cycle and outside any plugin code,
+ * so without this their elements carry no `data-plugin-id` and the plugin's scoped CSS never matches
+ * (TaskNotes' inline convert button rendered as a bare browser button).
+ */
+export function getScopedCmView(pluginId: string): Record<string, unknown> {
+  const cached = scopedCmViews.get(pluginId)
+  if (cached) return cached
+  const view = (window as unknown as { __codemirrorView?: Record<string, unknown> }).__codemirrorView ?? {}
+  const Base = view['WidgetType'] as (new (...args: unknown[]) => object) | undefined
+  if (typeof Base !== 'function') return view
+  class ScopedWidgetType extends Base {
+    constructor(...args: unknown[]) {
+      super(...args)
+      const own = (this as { toDOM?: (...a: unknown[]) => unknown }).toDOM
+      if (typeof own === 'function') {
+        Object.defineProperty(this, 'toDOM', {
+          value: (...a: unknown[]) => withPluginContext(pluginId, () => own.apply(this, a)),
+          configurable: true,
+          writable: true,
+        })
+      }
+    }
+  }
+  const scoped = { ...view, WidgetType: ScopedWidgetType }
+  scopedCmViews.set(pluginId, scoped)
+  return scoped
+}
+
 /** The plugin currently executing on the call stack, or null outside plugin code. */
 export function getCurrentPluginId(): string | null {
   return currentPluginId

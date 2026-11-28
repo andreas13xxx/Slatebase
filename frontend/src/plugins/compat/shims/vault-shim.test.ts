@@ -175,8 +175,12 @@ describe('VaultShim', () => {
   });
 
   describe('getName()', () => {
-    it('returns the vault name with vault id for unique IndexedDB naming', () => {
-      expect(vault.getName()).toBe('Test Vault-vault-123');
+    it('returns the plain vault name, as Obsidian does', () => {
+      expect(vault.getName()).toBe('Test Vault');
+    });
+
+    it('keeps a vault-id-qualified name for per-vault storage keys', () => {
+      expect(vault.getUniqueName()).toBe('Test Vault-vault-123');
     });
   });
 

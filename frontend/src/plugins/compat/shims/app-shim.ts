@@ -691,7 +691,8 @@ export class AppShim implements IAppShim {
 
   /** Unique app ID (vault identifier). Used by Dataview, Excalidraw for caching. */
   get appId(): string {
-    return `slatebase-${this.vault.getName()}`
+    const vault = this.vault as { getUniqueName?: () => string }
+    return `slatebase-${vault.getUniqueName?.() ?? this.vault.getName()}`
   }
 
   /**

@@ -282,7 +282,11 @@ function scopeSingleSelector(selector: string, scope: string): string {
   // only the elements themselves, tagged at creation time (see
   // plugin-execution-context.ts + the createEl patches in install-globals.ts).
   const { head, rest } = splitLeadingCompound(selector);
-  const selfForm = `${scope}${head}${rest}`;
+  // A type selector (`button`, `*`) has to stay first in its compound: `[attr]button` is invalid CSS,
+  // and one invalid alternative drops the whole rule, descendant form included.
+  const typeMatch = /^(\*|[a-zA-Z][\w-]*)/.exec(head);
+  const typePart = typeMatch ? typeMatch[0] : '';
+  const selfForm = `${typePart}${scope}${head.slice(typePart.length)}${rest}`;
 
   return `${selfForm}, ${descendantForm}`;
 }

@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useContext, useMemo } from 'react'
 import { FolderOpen, Star, Clock, List, Link, Tag, FileText, Search, History, Superscript, Database } from 'lucide-react'
 import { isPluginViewId, getPluginViewType } from '../../state/panelState'
 import type { PanelViewId, BuiltinPanelViewId } from '../../state/panelState'
 import { getCustomIconSvg, sizeCustomIconSvg, useIconResolutionTick } from '../../utils/pluginIcon'
 import { resolveIconMarkupSync } from '../../plugins/compat/lucide-icons'
 import { useTranslation } from '../../i18n'
+import { FeatureContext } from '../../state/featureContext'
 import type { TranslateFn } from '../../i18n'
 import './PanelTabBar.css'
 
@@ -66,11 +67,11 @@ export interface PanelTabBarProps {
  * list. Shows only icons with labels as tooltips on hover.
  */
 export function PanelTabBar({
-  tabs,
+  tabs: allTabs,
   activeTab,
   sectionId,
   onTabClick,
-  onTabReorder,
+  onTabReorder: reportReorder,
   onTabSplit,
   onTabReceive,
   panelWidth: _panelWidth,
@@ -81,6 +82,15 @@ export function PanelTabBar({
   useIconResolutionTick()
   const { t } = useTranslation()
   const tabConfig = getTabConfig(t)
+  // The activity tab only exists while its feature is on. A missing provider (tests) hides nothing.
+  const featureContext = useContext(FeatureContext)
+  const activityHidden = featureContext !== null && !featureContext.isEnabled('activity-timeline')
+  const tabs = useMemo(() => (activityHidden ? allTabs.filter(id => id !== 'activity') : allTabs), [allTabs, activityHidden])
+  // A reorder only names the visible tabs; hidden ones keep their place at the end.
+  const onTabReorder = useCallback(
+    (newOrder: PanelViewId[]) => reportReorder([...newOrder, ...allTabs.filter(id => !newOrder.includes(id))]),
+    [reportReorder, allTabs],
+  )
   const [draggedTab, setDraggedTab] = useState<PanelViewId | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)

@@ -271,10 +271,10 @@ export function tabReducer(state: TabState, action: TabAction): TabState {
             content,
             isBinary,
             // Initial mode: a note opened for the first time follows the vault's `defaultViewMode`
-            // (`source` → the editor in the vault's default editing mode, `livePreview`; anything else
-            // → reading view), but only when it is the note's first load. A reload, and every other
+            // (`preview` → reading view; anything else, an absent key included, → the editor in the
+            // vault's default editing mode, `livePreview`), but only when it is the note's first load. A reload, and every other
             // kind of tab (graph, plugin views, non-Markdown files), keeps the reading view.
-            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') === 'source' ? defaultEditMode() : 'reading',
+            mode: tab.loading && tab.content === '' && isNoteTab(tab.filePath, isBinary) && getAppConfigFileValue('defaultViewMode') !== 'preview' ? defaultEditMode() : 'reading',
             lastEditMode: tab.loading && tab.content === '' ? defaultEditMode() : tab.lastEditMode,
             loading: false,
             error: null,

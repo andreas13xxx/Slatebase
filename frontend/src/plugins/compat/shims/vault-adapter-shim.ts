@@ -193,7 +193,12 @@ export class VaultAdapterShim implements IVaultAdapter {
         const result = await this.apiClient.fetchFileContent(this.vaultId, path)
         const now = Date.now()
         return { type: 'file', size: result.size ?? result.content.length, mtime: now, ctime: now }
-      } catch {
+      } catch (err: unknown) {
+        // The server answers a folder with IS_A_DIRECTORY: it exists, it just is not a file.
+        if ((err as { code?: string } | null)?.code === 'IS_A_DIRECTORY') {
+          const now = Date.now()
+          return { type: 'folder', size: 0, mtime: now, ctime: now }
+        }
         return null
       }
     })()

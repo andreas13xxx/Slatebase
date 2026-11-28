@@ -109,9 +109,13 @@ export function treeNodeToTFile(node: DirectoryTree, parent: TFolder | null): TF
  * Uses the global obsidian.TFolder prototype if available (for instanceof checks).
  */
 export function treeNodeToTFolder(node: DirectoryTree, parent: TFolder | null): TFolder {
+  // Obsidian's vault root is `path: '/'`, `name: ''`. The server names the root after its storage
+  // directory (the vault id), and plugins such as Notebook Navigator test `path === '/'` to show the
+  // vault name instead.
+  const isVaultRoot = parent === null && (node.path === '' || node.path === '/');
   const folder: TFolder = {
-    path: node.path,
-    name: node.name,
+    path: isVaultRoot ? '/' : node.path,
+    name: isVaultRoot ? '' : node.name,
     children: [],
     parent,
     isRoot() {
@@ -757,11 +761,18 @@ export class VaultShim implements IVaultShim {
   }
 
   /**
-   * Get the vault name.
-   * Returns a combination of name and vault-ID to ensure IndexedDB isolation
-   * across vaults (even if they share the same display name).
+   * Get the vault name, as Obsidian does: the plain display name. Plugins show it
+   * (Notebook Navigator's root folder), so it must not carry the vault id.
    */
   getName(): string {
+    return this.vaultName;
+  }
+
+  /**
+   * Name plus vault id. Not part of Obsidian's API: it keeps per-vault storage (IndexedDB names
+   * derived from `app.appId`) apart even when two vaults share a display name.
+   */
+  getUniqueName(): string {
     return `${this.vaultName}-${this.vaultId}`;
   }
 
@@ -1201,6 +1212,7 @@ export class VaultShim implements IVaultShim {
       'getAllFolders',
       'getRoot',
       'getName',
+      'getUniqueName',
       'getConfig',
       'setConfig',
       'on',

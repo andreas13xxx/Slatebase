@@ -348,3 +348,11 @@ describe('scopeCss()', () => {
     });
   });
 });
+
+describe('scopeCss self form with a type selector', () => {
+  it('keeps the type selector in front of the scope attribute', () => {
+    const out = scopeCss('button.nn-icon-button { color: red; }', 'p1')
+    expect(out).toContain('button[data-plugin-id="p1"].nn-icon-button')
+    expect(out).not.toContain('[data-plugin-id="p1"]button')
+  })
+})

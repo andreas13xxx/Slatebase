@@ -19,14 +19,44 @@
  * equivalent and are implemented here directly against `foldEffect`/
  * `unfoldEffect`/`foldedRanges`.
  */
-import type { EditorState } from '@codemirror/state'
+import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { foldService, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language'
+import {
+  foldService, foldEffect, unfoldEffect, foldedRanges, foldable, ensureSyntaxTree, LanguageSupport,
+} from '@codemirror/language'
 import { getAppConfigValue } from '../state/vaultAppConfigStore'
 import { locateFrontmatterBlock } from '../utils/frontmatterWriter'
+import { findMarkdownHeadingLines } from '../utils/markdownHeadings'
 
-const HEADING_LINE_REGEX = /^(#{1,6})\s+(.+?)\s*#*$/
 const LIST_ITEM_REGEX = /^(\s*)(?:[-*+]|\d+[.)])\s+/
+
+/**
+ * `markdown()` registers its own heading foldService, which reads the syntax tree and therefore also
+ * folds headings inside fenced code (a ```markdown block is parsed as nested Markdown) and ignores the
+ * vault's `foldHeading` setting. `markdownFoldService` replaces it, so the stock one is dropped here.
+ * It is found by behaviour (does it fold a heading?) because lang-markdown does not export it.
+ */
+export function withoutNativeHeadingFold(support: LanguageSupport): LanguageSupport {
+  const probeDoc = '# a\nb'
+  const folds = (extension: Extension): boolean => {
+    const state = EditorState.create({ doc: probeDoc, extensions: [support.language, extension] })
+    ensureSyntaxTree(state, probeDoc.length, 1000)
+    return foldable(state, 0, 3) !== null
+  }
+  const parts = Array.isArray(support.support) ? (support.support as Extension[]) : [support.support]
+  return new LanguageSupport(support.language, parts.filter((part) => !folds(part)))
+}
+
+/** The fold gutter asks once per visible line, so the parse is cached per document version. */
+const headingLevelCache = new WeakMap<object, Map<number, number>>()
+
+function headingLevelsByLine(state: EditorState): Map<number, number> {
+  const cached = headingLevelCache.get(state.doc)
+  if (cached) return cached
+  const levels = new Map(findMarkdownHeadingLines(state.doc.toString()).map(({ lineNumber, level }) => [lineNumber, level]))
+  headingLevelCache.set(state.doc, levels)
+  return levels
+}
 
 function lineIndent(text: string): number {
   return /^[ \t]*/.exec(text)![0].length
@@ -45,12 +75,17 @@ export interface HeadingFoldRange {
  * through the end of the last line before the next heading of the same or
  * higher level (or end of document).
  */
-function computeHeadingFoldRange(state: EditorState, headingLineNo: number, level: number): { from: number; to: number } {
+function computeHeadingFoldRange(
+  state: EditorState,
+  headingLineNo: number,
+  level: number,
+  headingLevels: ReadonlyMap<number, number>,
+): { from: number; to: number } {
   const doc = state.doc
   let endLineNo = doc.lines
   for (let lineNo = headingLineNo + 1; lineNo <= doc.lines; lineNo++) {
-    const match = HEADING_LINE_REGEX.exec(doc.line(lineNo).text)
-    if (match && match[1]!.length <= level) {
+    const nextLevel = headingLevels.get(lineNo)
+    if (nextLevel !== undefined && nextLevel <= level) {
       endLineNo = lineNo - 1
       break
     }
@@ -62,11 +97,11 @@ function computeHeadingFoldRange(state: EditorState, headingLineNo: number, leve
 export function findAllHeadingSections(state: EditorState): HeadingFoldRange[] {
   const doc = state.doc
   const sections: HeadingFoldRange[] = []
+  const headingLevels = headingLevelsByLine(state)
   for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
-    const match = HEADING_LINE_REGEX.exec(doc.line(lineNo).text)
-    if (!match) continue
-    const level = match[1]!.length
-    const { from, to } = computeHeadingFoldRange(state, lineNo, level)
+    const level = headingLevels.get(lineNo)
+    if (level === undefined) continue
+    const { from, to } = computeHeadingFoldRange(state, lineNo, level, headingLevels)
     if (to > from) sections.push({ level, from, to })
   }
   return sections
@@ -104,11 +139,12 @@ function computeListFoldRange(state: EditorState, lineNo: number): { from: numbe
  */
 export const markdownFoldService = foldService.of((state, lineStart) => {
   const line = state.doc.lineAt(lineStart)
-  const headingMatch = HEADING_LINE_REGEX.exec(line.text)
-  if (headingMatch) {
+  const headingLevels = headingLevelsByLine(state)
+  const headingLevel = headingLevels.get(line.number)
+  if (headingLevel !== undefined) {
     // app.json `foldHeading` / `foldIndent`: read when asked, so a change applies at once
     if (!getAppConfigValue('foldHeading')) return null
-    const range = computeHeadingFoldRange(state, line.number, headingMatch[1]!.length)
+    const range = computeHeadingFoldRange(state, line.number, headingLevel, headingLevels)
     return range.to > range.from ? range : null
   }
   if (!getAppConfigValue('foldIndent')) return null
@@ -186,16 +222,9 @@ export function foldLess(view: EditorView): void {
 }
 
 /** Matches the lines `extractHeadings` turns into outline entries, so ordinals line up. */
-const OUTLINE_HEADING_REGEX = /^(#{1,6})\s+(.+)$/
-
 /** Line numbers + levels of every outline heading, in document order (same rule as the Outline view). */
 function findOutlineHeadingLines(state: EditorState): Array<{ lineNo: number; level: number }> {
-  const result: Array<{ lineNo: number; level: number }> = []
-  for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
-    const match = OUTLINE_HEADING_REGEX.exec(state.doc.line(lineNo).text)
-    if (match) result.push({ lineNo, level: match[1]!.length })
-  }
-  return result
+  return findMarkdownHeadingLines(state.doc.toString()).map(({ lineNumber, level }) => ({ lineNo: lineNumber, level }))
 }
 
 /**
@@ -221,7 +250,7 @@ export function jumpToOutlineHeading(view: EditorView, index: number): boolean {
 export function setOutlineHeadingFolded(view: EditorView, index: number, folded: boolean): boolean {
   const heading = findOutlineHeadingLines(view.state)[index]
   if (!heading) return false
-  const range = computeHeadingFoldRange(view.state, heading.lineNo, heading.level)
+  const range = computeHeadingFoldRange(view.state, heading.lineNo, heading.level, headingLevelsByLine(view.state))
   if (range.to <= range.from) return false
   if (isRangeFolded(view.state, range.from, range.to) === folded) return true
   view.dispatch({ effects: folded ? foldEffect.of(range) : unfoldEffect.of(range) })

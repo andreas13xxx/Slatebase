@@ -868,6 +868,7 @@ export const de = {
       sync: 'Sync',
     },
     bucketCount: '{count} Ereignisse',
+    groupTitle: '{count} × {label}',
     bucketCountOne: '1 Ereignis',
     bucket: {
       today: 'Heute',

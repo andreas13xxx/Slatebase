@@ -28,6 +28,7 @@ import { loadActivity, loadMoreActivity, refreshRecentActivity } from '../../sta
 import { useVaultSetting, updateVaultSettings } from '../../state/vaultSettingsStore'
 import { groupIntoTimeBuckets } from './time-buckets'
 import { countByType } from './activity-stats'
+import { groupLookAlikeRuns } from './group-runs'
 import {
   ACTIVITY_EVENT_META,
   typesForLane,
@@ -186,6 +187,56 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
   }
   const bucketLabel = (key: string): string => t(`activity.bucket.${key}` as TranslationKey)
 
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const renderEvent = (evt: ActivityEvent): React.ReactElement => {
+    const meta = ACTIVITY_EVENT_META[evt.type]
+    const Icon = meta.icon
+    const openable = evt.type !== 'note.deleted'
+    const originMeta = originBadgeMeta(evt.origin)
+    const OriginIcon = originMeta?.icon
+    return (
+      <li key={evt.id} className="activity-row">
+        <button
+          type="button"
+          className={`activity-row__btn ${openable ? '' : 'activity-row__btn--disabled'}`}
+          onClick={() => handleOpen(evt)}
+          disabled={!openable}
+          title={evt.path}
+        >
+          <span className={`activity-row__icon activity-row__icon--${meta.lane}`}>
+            <Icon size={16} aria-hidden="true" />
+          </span>
+          <span className="activity-row__body">
+            <span className="activity-row__title">
+              {fileName(evt.path)}
+              {evt.type === 'note.moved' && evt.oldPath && (
+                <span className="activity-row__from"> ← {fileName(evt.oldPath)}</span>
+              )}
+              {originMeta && OriginIcon && (
+                <span className="activity-row__origin" title={t(originMeta.labelKey as TranslationKey)}>
+                  <OriginIcon size={11} aria-hidden="true" />
+                  {t(originMeta.labelKey as TranslationKey)}
+                </span>
+              )}
+            </span>
+            <span className="activity-row__meta">
+              {t(meta.labelKey as TranslationKey)} · {evt.user} · {formatRelativeTime(evt.timestamp)}
+            </span>
+          </span>
+        </button>
+      </li>
+    )
+  }
+
   return (
     <div className={`activity-timeline activity-timeline--${variant}`}>
       {/* Filter row: lane chips (when events exist) + folder filter (full variant) */}
@@ -269,42 +320,37 @@ export function ActivityTimelineView({ onOpenFile, variant }: ActivityTimelineVi
                   </h3>
                   {!collapsed.has(bucket.key) && (
                   <ul className="activity-bucket__list">
-                    {bucket.events.map(evt => {
-                      const meta = ACTIVITY_EVENT_META[evt.type]
+                    {groupLookAlikeRuns(bucket.events).map(row => {
+                      if (row.kind === 'single') return renderEvent(row.event)
+                      const first = row.events[0]
+                      const last = row.events[row.events.length - 1]
+                      if (!first || !last) return null
+                      const meta = ACTIVITY_EVENT_META[first.type]
                       const Icon = meta.icon
-                      const openable = evt.type !== 'note.deleted'
-                      const originMeta = originBadgeMeta(evt.origin)
-                      const OriginIcon = originMeta?.icon
+                      const open = expandedGroups.has(row.key)
+                      const label = t(meta.labelKey as TranslationKey)
                       return (
-                        <li key={evt.id} className="activity-row">
+                        <li key={`group-${row.key}`} className="activity-row activity-row--group">
                           <button
                             type="button"
-                            className={`activity-row__btn ${openable ? '' : 'activity-row__btn--disabled'}`}
-                            onClick={() => handleOpen(evt)}
-                            disabled={!openable}
-                            title={evt.path}
+                            className="activity-row__btn"
+                            aria-expanded={open}
+                            onClick={() => toggleGroup(row.key)}
                           >
                             <span className={`activity-row__icon activity-row__icon--${meta.lane}`}>
                               <Icon size={16} aria-hidden="true" />
                             </span>
                             <span className="activity-row__body">
                               <span className="activity-row__title">
-                                {fileName(evt.path)}
-                                {evt.type === 'note.moved' && evt.oldPath && (
-                                  <span className="activity-row__from"> ← {fileName(evt.oldPath)}</span>
-                                )}
-                                {originMeta && OriginIcon && (
-                                  <span className="activity-row__origin" title={t(originMeta.labelKey as TranslationKey)}>
-                                    <OriginIcon size={11} aria-hidden="true" />
-                                    {t(originMeta.labelKey as TranslationKey)}
-                                  </span>
-                                )}
+                                {open ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+                                {' '}{t('activity.groupTitle', { count: row.events.length, label })}
                               </span>
                               <span className="activity-row__meta">
-                                {t(meta.labelKey as TranslationKey)} · {evt.user} · {formatRelativeTime(evt.timestamp)}
+                                {first.user} · {formatRelativeTime(first.timestamp)}
                               </span>
                             </span>
                           </button>
+                          {open && <ul className="activity-bucket__list activity-row__children">{row.events.map(renderEvent)}</ul>}
                         </li>
                       )
                     })}
