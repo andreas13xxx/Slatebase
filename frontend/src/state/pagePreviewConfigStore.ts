@@ -64,8 +64,8 @@ export function pagePreviewRequiresMod(source: string): boolean {
   if (typeof stored === 'boolean') return stored
   const registered = getHoverLinkSources().find((entry) => entry.id === key)
   if (registered) return registered.defaultMod
-  if (PAGE_PREVIEW_SOURCES.some((entry) => entry.id === key)) return false
-  return fileFields[PREVIEW_SOURCE_KEY] === true
+  if (PAGE_PREVIEW_SOURCES.some((entry) => entry.id === key)) return true
+  return fileFields[PREVIEW_SOURCE_KEY] !== false
 }
 
 /** Subscribes a component to the file; the value is a counter that changes whenever the file does. */
