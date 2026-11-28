@@ -52,6 +52,7 @@ import { setActiveWorkspaceShim } from './active-workspace-shim'
 import { MetadataCacheShim } from './shims/metadata-cache-shim'
 import { FileManagerShim } from './shims/file-manager-shim'
 import { registerFileViewMatcher, unregisterAllFileViewMatchersForPlugin, removeActiveFileViewsForPlugin, registerExtensionsForPlugin } from './file-view-registry'
+import { clearProtocolHandlers, unregisterProtocolHandlersForPlugin } from './protocol-handlers'
 import { registerCodeBlockProcessor, registerPostProcessor, unregisterAllForPlugin as unregisterAllCodeBlocksForPlugin } from './code-block-processor-registry'
 import { warnNoOp } from './log'
 import { AppShim, createCommandManager, createHotkeyManager, resetOpeningBehavior, runVaultOpeningBehavior } from './shims/app-shim'
@@ -337,6 +338,7 @@ export function PluginProvider({
     removePluginCompletionSources(pluginId)
     // Remove code block processors and post-processors for this plugin
     unregisterAllCodeBlocksForPlugin(pluginId)
+    unregisterProtocolHandlersForPlugin(pluginId)
     // Remove any Bases view types this plugin registered
     clearBasesViewsForPlugin(pluginId)
   }
@@ -439,6 +441,7 @@ export function PluginProvider({
     }
     // Clear setting tab registry (tabs are plugin-scoped)
     settingTabRegistryRef.current.clear()
+    clearProtocolHandlers()
     // Clear active views and view registry
     await viewRegistryRef.current.clear()
     // Clear ribbon icons (plugin-scoped)

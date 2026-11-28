@@ -566,4 +566,15 @@ describe('AppShim', () => {
       style.remove();
     });
   });
+
+  describe('secretStorage without a vault keychain', () => {
+    it('refuses a write instead of pretending it was stored', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const app = new AppShim({ vault, workspace, metadataCache, pluginId: 'test-plugin' });
+      app.secretStorage.setSecret('token', 'abc');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(app.secretStorage.getSecret('token')).toBeNull();
+      expect(warn).toHaveBeenCalled();
+    });
+  });
 });

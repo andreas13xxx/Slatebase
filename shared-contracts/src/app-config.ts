@@ -64,9 +64,10 @@ export const APP_CONFIG_KEYS = {
   showIndentGuide: cfg.bool(true),
   showInlineTitle: cfg.bool(true),
   rightToLeft: cfg.bool(false),
+  // Vim key bindings in the editor (@replit/codemirror-vim, editor/vim-mode.ts)
+  vimMode: cfg.bool(false),
   // Kept for plugins and for Obsidian; no function in Slatebase
   mobilePullAction: cfg.string('', 256, true, 'passthrough'),
-  vimMode: cfg.bool(false, false, 'passthrough'),
   nativeMenus: cfg.bool(false, false, 'passthrough'),
 } as const satisfies Record<string, ConfigKeyMeta>
 

@@ -122,17 +122,16 @@ describe('installObsidianGlobals', () => {
     // (src/features/VimOBehaviourOverride.ts) checks
     // `window.CodeMirrorAdapter.Vim` and logs `console.error("Vim adapter not
     // found")` when it's missing, instead of skipping the optional feature
-    // silently. Slatebase has no Vim keymap engine, so this is a no-op stub —
-    // same graceful-degradation approach as the other CodeMirrorAdapter/CodeMirror
-    // globals above, not a real Vim implementation.
+    // silently. The adapter is the real Vim engine's API, loaded on demand (vim-adapter.ts, whose
+    // tests cover calling it): here only that the probe finds the methods. Calling them is not done
+    // here because, once an earlier call has loaded the engine, a bare call is the engine's own.
     it.each(['defineAction', 'handleEx', 'enterInsertMode', 'mapCommand'])(
-      'exposes a no-op %s so plugins probing for the Vim adapter do not error',
+      'exposes %s so plugins probing for the Vim adapter find it',
       (method) => {
         const vim = (
           window as unknown as { CodeMirrorAdapter: { Vim: Record<string, unknown> } }
         ).CodeMirrorAdapter.Vim
         expect(vim[method]).toBeTypeOf('function')
-        expect(() => (vim[method] as (...args: unknown[]) => unknown)()).not.toThrow()
       },
     )
   })

@@ -116,6 +116,7 @@ export function BasesPluginViewHost({
         if (view.imageFit !== undefined) forward['imageFit'] = view.imageFit
         if (view.imageAspectRatio !== undefined) forward['imageAspectRatio'] = view.imageAspectRatio
         if (view.cardSize !== undefined) forward['cardSize'] = view.cardSize
+        if (view.columnWidth !== undefined) forward['columnWidth'] = view.columnWidth
         for (const [key, value] of Object.entries(forward)) config.setViewData(key, value)
       }
       ;(queryController as { config?: unknown }).config = config

@@ -21,7 +21,7 @@ import { ColumnDropdown, ColumnOptionText } from './base-column-dropdown'
 import {
   addFormula, addView, availableColumns, columnEntry, columnLabel, deleteView, duplicateView, effectiveColumns, indexAfterMove, isValidFormulaName,
   moveView, removeFormula, renameView, rootGroup, setDisplayName, setLimit, setViewSummary, SUMMARY_GROUPS, SUMMARY_LABELS,
-  CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setBoardSize, setCardImageFit, setCardImageProperty, setCardSize, resetColumnSizes,
+  CARD_RATIO, CARD_SIZE, setCardImageAspectRatio, setBoardSize, setColumnWidth, setCardImageFit, setCardImageProperty, setCardSize, resetColumnSizes,
   setDocFilter, setGroupBy, setGroupOrder, setListIndentProperties, setListMarkers, setListSeparator, setOrder, setRowHeight, setSort, setViewFilter, setViewType, VIEW_TYPES, VIEW_TYPE_LABELS,
   type ColumnChoice,
 } from './base-edit'
@@ -216,23 +216,25 @@ const DisplayPanel = memo(function DisplayPanel({ doc, index, columns, rows, dis
       const n = Number(text.replace(',', '.'))
       return text.trim() !== '' && Number.isFinite(n) ? n : undefined
     }
-    // Kanban and grouped cards are board layouts: cardSize is the column (Kanban) or card width there.
+    // Kanban and grouped cards are board layouts: `columnWidth` is the Kanban column width, `cardSize` the card width of grouped cards.
     const board = view.type === 'kanban' || !!view.groupBy
     const sizeLabel = view.type === 'kanban' ? t('basesToolbar.columnWidth') : t('basesToolbar.cardWidth')
+    const boardSizeValue = view.type === 'kanban' ? view.columnWidth ?? view.cardSize : view.cardSize
     return (
       <div className="bases-tb__section">
         {board ? (
           <div className="bases-tb__row">
             <span>{sizeLabel}</span>
             <CommitInput
-              value={view.cardSize !== undefined ? String(view.cardSize) : ''}
+              value={boardSizeValue !== undefined ? String(boardSizeValue) : ''}
               label={sizeLabel}
               placeholder={t('basesToolbar.automatic')}
               disabled={disabled}
               onCommit={(text) => {
-                if (text.trim() === '') { onChange((d) => setBoardSize(d, index, undefined)); return }
+                const setSize = view.type === 'kanban' ? setColumnWidth : setBoardSize
+                if (text.trim() === '') { onChange((d) => setSize(d, index, undefined)); return }
                 const n = numberOr(text)
-                if (n !== undefined) onChange((d) => setBoardSize(d, index, n))
+                if (n !== undefined) onChange((d) => setSize(d, index, n))
               }}
             />
             <span className="bases-tb__hint">{CARD_SIZE.min}–{CARD_SIZE.max}</span>

@@ -52,7 +52,7 @@ function buildConfig(view: BaseView): ConfigLike {
   const config: ConfigLike = Ctor ? new Ctor() : {}
   config.name = view.name ?? view.type
   const seed: Record<string, unknown> = { ...(view._unknown ?? {}) }
-  for (const key of ['limit', 'image', 'imageFit', 'imageAspectRatio', 'cardSize'] as const) {
+  for (const key of ['limit', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'columnWidth'] as const) {
     if (view[key] !== undefined) seed[key] = view[key]
   }
   for (const [k, v] of Object.entries(seed)) config.setViewData?.(k, v)

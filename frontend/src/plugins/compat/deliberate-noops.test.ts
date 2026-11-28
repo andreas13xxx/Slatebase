@@ -11,12 +11,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { installObsidianGlobals } from './install-globals'
 import { resetLogDedup } from './log'
+import { clearProtocolHandlers, protocolHandlerOwner } from './protocol-handlers'
 
 installObsidianGlobals()
 
 describe('deliberate no-op stubs log rather than fail silently', () => {
   beforeEach(() => {
     resetLogDedup()
+    clearProtocolHandlers()
   })
 
   afterEach(() => {
@@ -42,18 +44,18 @@ describe('deliberate no-op stubs log rather than fail silently', () => {
   })
 
   describe('Vim adapter', () => {
-    it('logs at debug that Vim bindings never fire', () => {
+    it('logs at debug when a call needs a live editor and the engine is not loaded yet', () => {
       const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
       const vim = (window as unknown as { CodeMirrorAdapter: { Vim: Record<string, () => void> } })
         .CodeMirrorAdapter.Vim
-      vim['defineAction']!()
+      vim['handleEx']!()
       expect(debug).toHaveBeenCalledTimes(1)
-      expect(debug.mock.calls[0]?.[0]).toContain('Vim.defineAction()')
+      expect(debug.mock.calls[0]?.[0]).toContain('Vim.handleEx()')
     })
   })
 
   describe('Plugin.registerObsidianProtocolHandler', () => {
-    it('logs at debug, not warn — plugins keep working without obsidian:// links', () => {
+    it('is a real registration now: it is stored, and only noted at debug', () => {
       const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const Plugin = (window as unknown as { obsidian: { Plugin: new (app: unknown, manifest: unknown) => { registerObsidianProtocolHandler(a: string, h: () => void): void } } }).obsidian.Plugin
@@ -61,7 +63,8 @@ describe('deliberate no-op stubs log rather than fail silently', () => {
       plugin.registerObsidianProtocolHandler('demo-auth', () => {})
       plugin.registerObsidianProtocolHandler('demo-auth', () => {})
       expect(debug).toHaveBeenCalledTimes(1)
-      expect(debug.mock.calls[0]?.[0]).toContain('obsidian://demo-auth')
+      expect(debug.mock.calls[0]?.[0]).toContain('/obsidian?action=demo-auth')
+      expect(protocolHandlerOwner('demo-auth')).toBe('demo')
       expect(warn).not.toHaveBeenCalled()
     })
   })
@@ -101,6 +104,16 @@ describe('deliberate no-op stubs log rather than fail silently', () => {
       expect(commands.executeCommand({ id: 'app:reload' })).toBe(false)
       expect(warn).toHaveBeenCalledTimes(1)
       expect(warn.mock.calls[0]?.[0]).toContain('app:reload')
+    })
+  })
+  describe('Plugin base methods that plugin-context.ts overrides per instance', () => {
+    it('warn when a plugin was built outside plugin-context', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const Plugin = (window as unknown as { obsidian: { Plugin: new (app: unknown, manifest: unknown) => { registerEditorExtension(e: unknown): void; registerMarkdownCodeBlockProcessor(l: string, h: () => void): unknown } } }).obsidian.Plugin
+      const plugin = new Plugin({}, { id: 'demo' })
+      plugin.registerEditorExtension({})
+      plugin.registerMarkdownCodeBlockProcessor('demo', () => {})
+      expect(warn).toHaveBeenCalledTimes(2)
     })
   })
 })

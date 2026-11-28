@@ -9,6 +9,7 @@ import { installObsidianGlobals } from './install-globals';
 import { APP_INTERNAL_NAMES, createAppInternals } from './app-internals';
 import { setFoldVault } from '../../editor/foldPersistence';
 import { resetLogDedup } from './log';
+import { _reset as resetAppearance, getAppearanceValue } from '../../state/vaultAppearanceStore';
 
 function makeApp(binary = vi.fn(async (path: string) => ({ path }))) {
   const stub = { on: vi.fn(), off: vi.fn() } as never;
@@ -69,6 +70,37 @@ describe('app internals', () => {
     const { app } = makeApp();
     expect(app.isVimEnabled()).toBe(false);
     expect(typeof app.getBaseFontSize()).toBe('number');
+  });
+
+  it('setBaseFontSize rejects a non-number with a warning and leaves the size alone', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    resetAppearance();
+    const { app } = makeApp();
+    app.setBaseFontSize('big');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(app.getBaseFontSize()).toBe(getAppearanceValue('baseFontSize'));
+  });
+
+  it('setBaseFontSize without a vault says why it could not write', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    resetAppearance();
+    const { app } = makeApp();
+    app.setBaseFontSize(18);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers the spellcheck languages Slatebase has', () => {
+    const { app } = makeApp();
+    expect(app.getSpellcheckLanguages()).toEqual(['de', 'en']);
+  });
+
+  it('update* hooks log once at debug instead of failing silently', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const { app } = makeApp();
+    app.updateTheme();
+    app.updateTheme();
+    expect(debug).toHaveBeenCalledTimes(1);
   });
 
   it('warns for desktop-only methods instead of failing silently', () => {

@@ -26,6 +26,33 @@ describe('view settings round trip', () => {
     expect(v._unknown).toBeUndefined()
   })
 
+  it('keeps the Kanban columnWidth of a real Obsidian base, typed and not as an unknown key', () => {
+    const src = `filters:
+  and:
+    - file.inFolder("Features/Beispiel-Aufgaben")
+views:
+  - type: kanban
+    name: Nach Status
+    groupBy:
+      property: status
+      direction: ASC
+    order:
+      - file.name
+      - priority
+    summaries:
+      file.name: Filled
+      estimate: Sum
+    columnWidth: 360
+`
+    const r = parseBase(src)
+    expect(r.errors ?? []).toEqual([])
+    const doc = (r as { document: import('./types.js').BaseDocument }).document
+    expect(doc.views[0]!.columnWidth).toBe(360)
+    expect(doc.views[0]!._unknown).toBeUndefined()
+    expect(serializeBase(doc)).toContain('columnWidth: 360')
+    expect((parseBase(serializeBase(doc)) as { document: unknown }).document).toEqual(doc)
+  })
+
   it('keeps an empty groupOrder (hides all groups)', () => {
     const r = parseBase('views:\n  - type: cards\n    groupOrder: []\n')
     expect((r as { document: import('./types.js').BaseDocument }).document.views[0]!.groupOrder).toEqual([])

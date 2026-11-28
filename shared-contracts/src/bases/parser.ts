@@ -146,7 +146,7 @@ function parseProperties(raw: unknown, errors: BaseValidationError[]): BasePrope
 
 // ─── View parsing ─────────────────────────────────────────────────────────────
 
-const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'rowHeight', 'markers', 'indentProperties', 'separator']
+const VIEW_KEYS = ['type', 'name', 'order', 'sort', 'groupBy', 'groupOrder', 'filters', 'limit', 'summaries', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'columnWidth', 'rowHeight', 'markers', 'indentProperties', 'separator']
 
 function parseSort(raw: unknown, path: string, errors: BaseValidationError[]): BaseSortClause[] | undefined {
   if (raw === undefined) return undefined
@@ -242,6 +242,7 @@ function parseView(raw: unknown, index: number, errors: BaseValidationError[]): 
   if (isString(raw['imageFit'])) view.imageFit = raw['imageFit']
   if (typeof raw['imageAspectRatio'] === 'number') view.imageAspectRatio = raw['imageAspectRatio']
   if (typeof raw['cardSize'] === 'number') view.cardSize = raw['cardSize']
+  if (typeof raw['columnWidth'] === 'number') view.columnWidth = raw['columnWidth']
   if (isString(raw['rowHeight'])) view.rowHeight = raw['rowHeight']
   if (isString(raw['markers'])) view.markers = raw['markers']
   if (typeof raw['indentProperties'] === 'boolean') view.indentProperties = raw['indentProperties']

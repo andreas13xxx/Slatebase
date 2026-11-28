@@ -49,6 +49,38 @@ describe('registerFallbackShims', () => {
     }
   })
 
+  it('uses the real fuzzy search rather than a matcher that never matches', () => {
+    registerFallbackShims()
+    const search = (window.obsidian as Obs)['prepareFuzzySearch'] as (q: string) => (t: string) => unknown
+    expect(search('abc')('a-b-c')).not.toBeNull()
+  })
+
+  it('stub methods say they did nothing instead of returning quietly', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    registerFallbackShims()
+    const obs = window.obsidian as Obs
+    const Keymap = obs['Keymap'] as new () => { pushScope(): void }
+    new Keymap().pushScope()
+    ;(obs['addIcon'] as () => void)()
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('pushScope')
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('addIcon')
+    warn.mockRestore()
+  })
+
+  it('Events.offref removes the listener its on() returned', () => {
+    registerFallbackShims()
+    const Events = (window.obsidian as Obs)['Events'] as new () => {
+      on(n: string, cb: () => void): unknown; offref(r: unknown): void; trigger(n: string): void
+    }
+    const events = new Events()
+    const cb = vi.fn()
+    const ref = events.on('x', cb)
+    events.trigger('x')
+    events.offref(ref)
+    events.trigger('x')
+    expect(cb).toHaveBeenCalledTimes(1)
+  })
+
   it('never overwrites an already-registered real implementation', () => {
     const real = () => 'real'
     const obs: Obs = { parseYaml: real, normalizePath: real, Notice: real }

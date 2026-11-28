@@ -21,6 +21,11 @@ import {
   getHoverLinkSources,
 } from '../hover-link-bus';
 import { requestPaneSplit } from '../pane-split-bridge';
+import { protocolHandlerMap } from '../protocol-handlers';
+import { getFoldVault } from '../../../editor/foldPersistence';
+import { getActiveVaultShimRef } from './vault-shim';
+import { getRecent as getRecentFiles } from '../../../state/recentFilesStore';
+import { flush as flushWorkspaceState } from '../../../state/workspaceStore';
 import type { PaneTree, SplitDirection } from '../../../state/paneTreeState';
 
 /**
@@ -361,10 +366,6 @@ export class WorkspaceShim implements IWorkspaceShim {
       this.events.trigger('layout-change');
       if (this.activeLeaf) this.events.trigger('active-leaf-change', this.activeLeaf);
     });
-    debugOnce(
-      'WorkspaceShim.protocolHandlers',
-      '[WorkspaceShim] protocolHandlers/protocolHandler: Slatebase is a web app and cannot receive obsidian:// links — registered handlers are stored but never invoked.'
-    );
   }
 
   /**
@@ -1143,16 +1144,21 @@ export class WorkspaceShim implements IWorkspaceShim {
    * Get the filenames of the most recently opened files.
    */
   getLastOpenFiles(): string[] {
-    debugOnce('WorkspaceShim.getLastOpenFiles', '[WorkspaceShim] getLastOpenFiles: Slatebase does not track recently opened files — returning an empty list.');
-    return [];
+    // The open vault is the one whose plugins are running (the active vault shim); the editor's
+    // fold vault is only a fallback, as it is unset until an editor has mounted.
+    const shim = getActiveVaultShimRef() as { getRenderContext?: () => { vaultId?: string } } | null;
+    const vaultId = shim?.getRenderContext?.().vaultId || getFoldVault();
+    if (!vaultId) return [];
+    return getRecentFiles().filter((entry) => entry.vaultId === vaultId).map((entry) => entry.path);
   }
 
   /**
-   * Request saving the workspace layout. No-op in Slatebase (no persistent layout).
+   * Request saving the workspace layout. Slatebase persists the layout (tabs, panes, panel sizes)
+   * in `workspaceStore` on every change, debounced; this writes any pending change out now.
    * Kanban calls this when view settings change.
    */
   requestSaveLayout(): void {
-    debugOnce('WorkspaceShim.requestSaveLayout', '[WorkspaceShim] requestSaveLayout: Slatebase does not persist workspace layout — no-op.');
+    flushWorkspaceState();
   }
 
   /** Re-measure the layout: Obsidian's way to tell views the pane sizes changed. Maps to a window `resize`. */
@@ -1161,12 +1167,21 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * viewStateReceivers — Array of callbacks that receive view state updates.
-   * Kanban registers/removes itself during load/unload.
-   * Obsidian extends Array with a `.remove()` helper; we stub it as a no-op array.
+   * viewStateReceivers — Obsidian's array of callbacks, with its `.remove()` helper.
+   * Nothing in Slatebase calls the entries: Obsidian defines no semantics for them that a
+   * plugin relies on (Kanban keeps its own per-window `viewStateReceivers` and never reads
+   * this one). The array is a faithful container — push/remove behave as in Obsidian — so
+   * a plugin that registers and later removes a receiver leaves nothing behind.
    */
-  readonly viewStateReceivers: unknown[] & { remove: (item: unknown) => void } =
-    Object.assign([] as unknown[], { remove: (_item: unknown) => {} });
+  readonly viewStateReceivers: unknown[] & { remove: (item: unknown) => void } = (() => {
+    const receivers: unknown[] = [];
+    return Object.assign(receivers, {
+      remove: (item: unknown): void => {
+        const idx = receivers.indexOf(item);
+        if (idx !== -1) receivers.splice(idx, 1);
+      },
+    });
+  })();
 
   /**
    * editorSuggest — Manager for registered EditorSuggest instances.
@@ -1301,13 +1316,11 @@ export class WorkspaceShim implements IWorkspaceShim {
   }
 
   /**
-   * `obsidian://` protocol-handler registry. Slatebase is a web app and cannot
-   * receive OS-level obsidian:// links, so nothing ever invokes handlers stored
-   * here — these are present as real, writable containers so plugins that read
-   * or write them directly (bypassing `registerObsidianProtocolHandler`) don't
-   * crash.
+   * `obsidian://` protocol-handler registry: the same map `registerObsidianProtocolHandler`
+   * fills (protocol-handlers.ts). A handler is run for a `/obsidian?action=…` link the user
+   * confirmed; one written straight into this map has no owning plugin and is not run.
    */
-  readonly protocolHandlers = new Map<string, (params: Record<string, string>) => unknown>();
+  readonly protocolHandlers = protocolHandlerMap;
   protocolHandler: ((params: Record<string, string>) => unknown) | null = null;
 
   /**

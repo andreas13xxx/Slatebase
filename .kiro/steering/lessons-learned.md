@@ -153,11 +153,15 @@ AuthProvider → I18nBridge → FeatureProvider → RealtimeBridge → AppProvid
 - **Obsidian liefert den kompletten Lucide-Satz mit**: `setIcon(el, 'chevron-down')` funktioniert dort für jeden Lucide-Namen, nicht nur für per `addIcon()` registrierte. Ohne Auflösung rendern Plugin-Buttons als leere Pillen. `lucide-icons.ts` nutzt die per-Icon-Dynamic-Import-Map von `lucide-react` (schon Dependency) statt ~1500 Icons vorab zu bundeln. Obsidian-Eigennamen mit `-glyph`-Suffix treffen meist nach Strippen den Lucide-Namen; nur wo das fehlschlägt, braucht es einen Eintrag in `EXPLICIT_ALIASES`. Bewusst NICHT gemappt: `logo-crystal` und `switch` (kein ehrliches Lucide-Pendant → lieber leer als irreführend).
 
 #### Shim-Spezifika
+- **Ein Stub, den `plugin-context.ts` je Instanz überschreibt, warnt trotzdem**: Die Basismethoden von `Plugin` (`registerEditorExtension`, `registerMarkdownCodeBlockProcessor`, …) wirken nur für ein Plugin, das ohne `plugin-context` entsteht. Dort sind sie nicht still, sondern `warnNoOp`. Dasselbe gilt für die Fallback-Klassen in `fallback-shims.ts`
+- **„Wir haben das nicht“ vor dem Dokumentieren prüfen**: Mehrere Begründungen für No-Ops waren überholt (`getLastOpenFiles`, `requestSaveLayout`, Appearance-Setter, Vim, `obsidian://`), weil das Feature inzwischen existierte. Bei jedem Stub zuerst suchen, ob es das Ziel schon gibt
+- **`obsidian://` ist `/obsidian?action=…` mit Rückfrage**: Ein Link darf nie von selbst Plugin-Code starten (`protocol-handlers.ts`, `deep-link/protocolAction.ts`, `useProtocolAction`). Der Handler läuft erst nach Bestätigung, als sein Plugin, und nur wenn ein Plugin ihn registriert hat
+- **Bases-Plugin-Ansicht bekommt typisierte Werte** (`bases-query-controller.ts` `toTypedValue`, `bases-value-factory.ts`): `DurationValue.data` bleibt die Länge in ms, damit Plugins weiter rechnen können
 - `requestUrl` Response: MUSS `{ status, headers, text, json, arrayBuffer }` haben — `arrayBuffer` ist Pflicht
 - `loadData()` gibt `null` bei Plugins ohne `data.json` — Plugin-Bug wenn sie das nicht abfangen
 - `modalEl` ist Fenster-Element (nicht `containerEl`). Plugins rufen `this.modalEl.addClass(...)` auf
 - Notice: `noticeEl`, `messageEl`, `setMessage(msg): this`, `hide()` nötig (LiveSync nutzt `setMessage()` wiederholt)
-- `Workspace.viewStateReceivers`: Array-Stub mit `.remove()` No-Op (Kanban)
+- `Workspace.viewStateReceivers`: echter Array mit funktionierendem `.remove()`; die Einträge werden nie aufgerufen (Kanban nutzt eine eigene Liste pro Fenster, nicht diese)
 - `VaultShim.create()` = create-or-get (Calendar erwartet kein Reject bei existierender Datei)
 - `VaultShim.getName()` gibt `"${name}-${vaultId}"` zurück (verhindert IndexedDB-Kollision)
 - `VaultShim.getAbstractFileByPath("")` und `"/"` müssen den Root-TFolder zurückgeben (Dataview PrefixIndex)

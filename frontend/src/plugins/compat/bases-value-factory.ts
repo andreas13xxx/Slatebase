@@ -16,7 +16,7 @@
 import { inferCellType, type BaseCellType } from '../../components/bases/base-cell-type'
 import type { PropertyType } from '../../state/propertyTypes'
 import {
-  Value, NullValue, StringValue, NumberValue, BooleanValue, DateValue, ListValue, TagValue,
+  Value, NullValue, StringValue, NumberValue, BooleanValue, DateValue, ListValue, TagValue, LinkValue,
 } from './bases-values'
 
 /** Parse a raw string to a boolean, or null if it is not a boolean literal. */
@@ -24,6 +24,19 @@ function toBoolean(raw: string): boolean | null {
   if (/^true$/i.test(raw)) return true
   if (/^false$/i.test(raw)) return false
   return null
+}
+
+/** `[[Target]]` / `[[Target|Shown]]` — a text property holding exactly one wikilink is a link, as in Obsidian. */
+const WIKILINK = /^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]$/
+
+/** A string Value: a `LinkValue` for a lone wikilink, otherwise a `StringValue`. */
+function textValue(raw: string): Value {
+  const m = WIKILINK.exec(raw.trim())
+  if (!m) return new StringValue(raw)
+  const link = new LinkValue(m[1]!.trim())
+  link.path = m[1]!.trim()
+  if (m[2]) link.displayText = m[2]
+  return link
 }
 
 /** Build a Value for a declared property type. */
@@ -43,12 +56,12 @@ function fromDeclaredType(type: PropertyType, values: string[]): Value {
       return first === undefined ? NullValue.value : new DateValue(first)
     case 'list':
     case 'aliases':
-      return new ListValue(values.map((v) => new StringValue(v)))
+      return new ListValue(values.map(textValue))
     case 'tags':
       return new ListValue(values.map((v) => new TagValue(v)))
     case 'text':
     default:
-      return first === undefined ? NullValue.value : new StringValue(first)
+      return first === undefined ? NullValue.value : textValue(first)
   }
 }
 
@@ -65,10 +78,10 @@ function fromInferredType(type: BaseCellType, values: string[]): Value {
     case 'date':
       return first === undefined ? NullValue.value : new DateValue(first)
     case 'list':
-      return new ListValue(values.map((v) => new StringValue(v)))
+      return new ListValue(values.map(textValue))
     case 'text':
     default:
-      return first === undefined ? NullValue.value : new StringValue(first)
+      return first === undefined ? NullValue.value : textValue(first)
   }
 }
 

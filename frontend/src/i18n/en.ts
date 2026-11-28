@@ -1161,6 +1161,10 @@ export const en: TranslationShape = {
     shown: 'Link: {link}',
     notFound: 'Could not open the link: target not found or no access',
     invalid: 'The link is invalid',
+    protocolTitle: 'Run plugin action?',
+    protocolMessage: 'The plugin "{plugin}" is about to run the action "{action}".\nParameters:\n{params}\n\nOnly run it if you trust whoever sent the link.',
+    protocolRun: 'Run',
+    protocolNoHandler: 'No active plugin handles this action',
   },
   quickSwitcher: {
     dialogLabel: 'Quick Switcher',
@@ -1234,6 +1238,8 @@ export const en: TranslationShape = {
 
   editorSettings: {
     smartIndentList: 'Continue lists on line break',
+    vimMode: 'Vim key bindings',
+    vimModeHint: 'On: the editor uses Vim modes (normal, insert, visual). Applies to everyone who opens the vault (Obsidian\'s "Vim key bindings" setting).',
     smartIndentListHint: 'On: Enter in a list or quote starts the next line with a new marker. Off: Enter keeps only the indentation.',
     showIndentGuide: 'Indent guides',
     showIndentGuideHint: 'Thin vertical lines at every indentation level in the editor.',

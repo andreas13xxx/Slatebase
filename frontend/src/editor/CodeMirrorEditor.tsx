@@ -54,6 +54,7 @@ import { revealInExplorer } from '../state/fileNavigation'
 import { useAppConfigValue, getAppConfigValue } from '../state/vaultAppConfigStore'
 import { htmlToMarkdown } from '../utils/htmlToMarkdown'
 import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
+import { loadVimExtension, vimExtensionIfLoaded } from './vim-mode'
 import { useLongPress } from '../hooks/useLongPress'
 import { codeFolding, foldGutter } from '@codemirror/language'
 import { markdownFoldService } from './folding'
@@ -112,8 +113,6 @@ export interface CodeMirrorEditorProps {
   spellcheckLanguage?: SpellcheckLanguage
   /** Inline title (file name) shown as an editable first line of the document; omit for none. */
   inlineTitle?: InlineTitleOptions | null
-  /** Whether Vim mode is enabled. */
-  vimMode?: boolean
   /** Whether bracket auto-close is enabled. */
   bracketAutoClose?: boolean
   /** Plugin extensions to apply (from registerEditorExtension). */
@@ -144,7 +143,6 @@ export function CodeMirrorEditor({
   spellcheck = true,
   spellcheckLanguage = DEFAULT_SPELLCHECK_LANGUAGE,
   inlineTitle = null,
-  vimMode: _vimMode,
   bracketAutoClose: _bracketAutoClose,
   pluginExtensions: _pluginExtensions,
   pluginCompletions: _pluginCompletions,
@@ -205,6 +203,10 @@ export function CodeMirrorEditor({
   const lineNumbersCompartment = useRef(new Compartment())
   const livePreviewCompartment = useRef(new Compartment())
   const spellcheckCompartment = useRef(new Compartment())
+  // Vim key bindings (app.json `vimMode`). First in the extension list so they see keys before the other key maps.
+  const vimCompartment = useRef(new Compartment())
+  const vimMode = useAppConfigValue('vimMode')
+  const vimModeRef = useRef(vimMode)
   const editorPrefsCompartment = useRef(new Compartment())
   const inlineTitleCompartment = useRef(new Compartment())
 
@@ -341,6 +343,7 @@ export function CodeMirrorEditor({
     const pluginCompletionSources = getActivePluginCompletions()
 
     const extensions: Extension[] = [
+      vimCompartment.current.of(vimModeRef.current ? vimExtensionIfLoaded() : []),
       // Obsidian-compatible StateFields — MUST be before plugin extensions
       // so that plugins can access them via view.state.field() during initialization.
       // Use .init() to provide correct initial values so ViewPlugins that read
@@ -743,6 +746,26 @@ export function CodeMirrorEditor({
       ),
     })
   }, [showLineNumbers])
+
+  // Turn Vim key bindings on or off with `vimMode`. The engine loads on first use; a vault that never
+  // enables Vim does not fetch it. A failed load leaves the editor in normal mode and says so.
+  useEffect(() => {
+    vimModeRef.current = vimMode
+    const view = viewRef.current
+    if (!view) return
+    if (!vimMode) {
+      view.dispatch({ effects: vimCompartment.current.reconfigure([]) })
+      return
+    }
+    let cancelled = false
+    loadVimExtension().then((extension) => {
+      if (cancelled || !vimModeRef.current || viewRef.current !== view) return
+      view.dispatch({ effects: vimCompartment.current.reconfigure(extension) })
+    }).catch((error: unknown) => {
+      warnOnce('editor.vim.load', '[Editor] Vim mode could not be loaded; the editor stays in normal mode.', error)
+    })
+    return () => { cancelled = true }
+  }, [vimMode])
 
   // Add/remove the spellcheck extension on prop change.
   //

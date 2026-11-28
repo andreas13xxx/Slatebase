@@ -29,9 +29,9 @@ import { getCsrfToken } from '../../state/authContext'
 import DOMPurify from 'dompurify'
 import { recordGapRead } from './api-gap-registry'
 import { containAsyncLoad, containAsyncUnload } from './async-lifecycle'
-import { debugLog, warnNoOp } from './log'
+import { debugLog, debugOnce, warnNoOp } from './log'
 import { MenuItem, MenuSeparator } from './menu'
-import { OBSIDIAN_API_VERSION, compareApiVersions } from './obsidian-api-extensions'
+import { OBSIDIAN_API_VERSION, compareApiVersions, prepareFuzzySearch, prepareSimpleSearch } from './obsidian-api-extensions'
 
 type Obs = Record<string, unknown>
 
@@ -69,20 +69,22 @@ class FallbackEditorSuggest {
 
 class FallbackEvents {
   private _e: Record<string, Array<(...args: unknown[]) => void>> = {}
-  on(name: string, cb: (...args: unknown[]) => void): { id: number } {
+  on(name: string, cb: (...args: unknown[]) => void): { name: string; cb: (...args: unknown[]) => void } {
     ;(this._e[name] ??= []).push(cb)
-    return { id: 0 }
+    return { name, cb }
   }
   off(name: string, cb: (...args: unknown[]) => void): void {
     if (this._e[name]) this._e[name] = this._e[name]!.filter((f) => f !== cb)
   }
-  offref(): void {}
+  offref(ref: { name?: string; cb?: (...args: unknown[]) => void }): void {
+    if (ref?.name && ref.cb) this.off(ref.name, ref.cb)
+  }
   trigger(name: string, ...args: unknown[]): void {
     this._e[name]?.forEach((cb) => {
       try { cb(...args) } catch (e) { console.error(e) }
     })
   }
-  tryTrigger(): void {}
+  tryTrigger(name: string, ...args: unknown[]): void { this.trigger(name, ...args) }
 }
 
 class FallbackScope {
@@ -107,8 +109,8 @@ class FallbackKeymap {
     if (!evt) return false
     return evt.metaKey || evt.ctrlKey ? 'tab' : false
   }
-  pushScope(): void {}
-  popScope(): void {}
+  pushScope(): void { warnNoOp('FallbackKeymap', 'pushScope') }
+  popScope(): void { warnNoOp('FallbackKeymap', 'popScope') }
 }
 
 class FallbackSettingPage {
@@ -140,13 +142,13 @@ class FallbackSettingPage {
 
 class FallbackBaseComponent {
   then(cb: (self: this) => void): this { cb(this); return this }
-  setDisabled(): this { return this }
+  setDisabled(): this { debugOnce('FallbackBaseComponent::setDisabled', '[PluginCompat] FallbackBaseComponent.setDisabled() has no effect on the minimal fallback component.'); return this }
 }
 
 class FallbackValueComponent extends FallbackBaseComponent {
   getValue(): unknown { return undefined }
-  setValue(): this { return this }
-  registerOptionListener(): this { return this }
+  setValue(): this { warnNoOp('FallbackValueComponent', 'setValue'); return this }
+  registerOptionListener(): this { debugOnce('FallbackValueComponent::registerOptionListener', '[PluginCompat] FallbackValueComponent.registerOptionListener() has no effect on the minimal fallback component.'); return this }
 }
 
 // ─── Utility functions ───────────────────────────────────────────────────────────
@@ -275,11 +277,6 @@ function fallbackDebounce(
     return undefined
   }
   return debounced
-}
-
-/** Fuzzy/simple search fallbacks never match — real ones live in obsidian-api-extensions. */
-function fallbackPrepareSearch(): () => null {
-  return () => null
 }
 
 // ─── Network ─────────────────────────────────────────────────────────────────────
@@ -411,9 +408,9 @@ class FallbackMarkdownView {
   getDisplayText(): string { return this.file?.basename ?? 'Markdown' }
   getMode(): string { return 'source' }
   getViewData(): string { return this.editor?.getValue() ?? '' }
-  clear(): void {}
+  clear(): void { warnNoOp('FallbackMarkdownView', 'clear') }
   setViewData(d: string): void { this.editor?.setValue(d) }
-  showSearch(): void {}
+  showSearch(): void { warnNoOp('FallbackMarkdownView', 'showSearch') }
 }
 
 class FallbackFileSystemAdapter {
@@ -430,26 +427,26 @@ class FallbackAbstractInputSuggest {
     this.app = app
     this.textInputEl = textInputEl
   }
-  open(): void {}
-  close(): void {}
+  open(): void { warnNoOp('FallbackAbstractInputSuggest', 'open') }
+  close(): void { warnNoOp('FallbackAbstractInputSuggest', 'close') }
   setValue(v: string): void { if (this.textInputEl) this.textInputEl.value = v }
   getValue(): string { return this.textInputEl?.value ?? '' }
-  onSelect(): this { return this }
+  onSelect(): this { warnNoOp('FallbackAbstractInputSuggest', 'onSelect'); return this }
 }
 
 /** Shared no-op chainable helpers for the UI component fallbacks. */
 abstract class FallbackChainable {
   then(cb: (self: this) => void): this { cb(this); return this }
-  setDisabled(): this { return this }
-  onChange(): this { return this }
+  setDisabled(): this { debugOnce('FallbackChainable::setDisabled', '[PluginCompat] FallbackChainable.setDisabled() has no effect on the minimal fallback component.'); return this }
+  onChange(): this { debugOnce('FallbackChainable::onChange', '[PluginCompat] FallbackChainable.onChange() never fires on the minimal fallback component.'); return this }
 }
 
 class FallbackExtraButtonComponent extends FallbackChainable {
   extraSettingsEl = document.createElement('div')
   constructor(el: HTMLElement) { super(); el.appendChild(this.extraSettingsEl) }
-  setIcon(): this { return this }
-  setTooltip(): this { return this }
-  onClick(): this { return this }
+  setIcon(): this { warnNoOp('FallbackExtraButtonComponent', 'setIcon'); return this }
+  setTooltip(): this { warnNoOp('FallbackExtraButtonComponent', 'setTooltip'); return this }
+  onClick(): this { warnNoOp('FallbackExtraButtonComponent', 'onClick'); return this }
 }
 
 class FallbackColorComponent extends FallbackChainable {
@@ -476,8 +473,8 @@ class FallbackMomentFormatComponent extends FallbackChainable {
   inputEl = document.createElement('input')
   sampleEl = document.createElement('span')
   constructor(el: HTMLElement) { super(); el.appendChild(this.inputEl) }
-  setDefaultFormat(): this { return this }
-  setSampleEl(): this { return this }
+  setDefaultFormat(): this { debugOnce('FallbackMomentFormatComponent::setDefaultFormat', '[PluginCompat] FallbackMomentFormatComponent.setDefaultFormat() has no effect on the minimal fallback component.'); return this }
+  setSampleEl(): this { debugOnce('FallbackMomentFormatComponent::setSampleEl', '[PluginCompat] FallbackMomentFormatComponent.setSampleEl() has no effect on the minimal fallback component.'); return this }
   getValue(): string { return this.inputEl.value }
   setValue(v: string): this { this.inputEl.value = v; return this }
 }
@@ -563,19 +560,19 @@ export function registerFallbackShims(): void {
     private _children: unknown[] = []
     app: unknown
     constructor(app?: unknown) { super(); this.app = app }
-    loadData(): Promise<unknown> { return Promise.resolve(null) }
-    saveData(): Promise<void> { return Promise.resolve() }
-    addCommand(): void {}
-    addSettingTab(): void {}
-    registerView(): void {}
-    registerEditorSuggest(): void {}
-    registerHoverLinkSource(): void {}
+    loadData(): Promise<unknown> { warnNoOp('Plugin', 'loadData', 'No plugin data is read.'); return Promise.resolve(null) }
+    saveData(): Promise<void> { warnNoOp('Plugin', 'saveData', 'The data is not stored.'); return Promise.resolve() }
+    addCommand(): void { warnNoOp('Plugin', 'addCommand', 'This is the minimal fallback Plugin; nothing is registered.') }
+    addSettingTab(): void { warnNoOp('Plugin', 'addSettingTab', 'This is the minimal fallback Plugin; nothing is registered.') }
+    registerView(): void { warnNoOp('Plugin', 'registerView', 'This is the minimal fallback Plugin; nothing is registered.') }
+    registerEditorSuggest(): void { warnNoOp('Plugin', 'registerEditorSuggest', 'This is the minimal fallback Plugin; nothing is registered.') }
+    registerHoverLinkSource(): void { warnNoOp('Plugin', 'registerHoverLinkSource', 'This is the minimal fallback Plugin; nothing is registered.') }
     override registerDomEvent(...args: unknown[]): void {
       const [el, ev, h] = args as [HTMLElement, string, EventListener]
       el?.addEventListener?.(ev, h)
     }
-    addRibbonIcon(): HTMLElement { return document.createElement('div') }
-    addStatusBarItem(): HTMLElement { return document.createElement('div') }
+    addRibbonIcon(): HTMLElement { warnNoOp('Plugin', 'addRibbonIcon', 'No ribbon icon is shown.'); return document.createElement('div') }
+    addStatusBarItem(): HTMLElement { warnNoOp('Plugin', 'addStatusBarItem', 'No status bar item is shown.'); return document.createElement('div') }
     override addChild<T>(c: T): T {
       this._children.push(c)
       ;(c as { load?: () => void })?.load?.()
@@ -587,13 +584,13 @@ export function registerFallbackShims(): void {
       ;(c as { unload?: () => void })?.unload?.()
       return c
     }
-    registerMarkdownPostProcessor<T>(p: T): T { return p }
-    registerMarkdownCodeBlockProcessor(): Record<string, unknown> { return {} }
-    registerEditorExtension(): void {}
-    registerExtensions(): void {}
-    registerObsidianProtocolHandler(): void {}
-    removeCommand(): void {}
-    registerCliHandler(): void {}
+    registerMarkdownPostProcessor<T>(p: T): T { warnNoOp('Plugin', 'registerMarkdownPostProcessor', 'The processor never runs.'); return p }
+    registerMarkdownCodeBlockProcessor(): Record<string, unknown> { warnNoOp('Plugin', 'registerMarkdownCodeBlockProcessor', 'The processor never runs.'); return {} }
+    registerEditorExtension(): void { warnNoOp('Plugin', 'registerEditorExtension', 'This is the minimal fallback Plugin; nothing is registered.') }
+    registerExtensions(): void { warnNoOp('Plugin', 'registerExtensions', 'This is the minimal fallback Plugin; nothing is registered.') }
+    registerObsidianProtocolHandler(): void { warnNoOp('Plugin', 'registerObsidianProtocolHandler', 'This is the minimal fallback Plugin; nothing is registered.') }
+    removeCommand(): void { warnNoOp('Plugin', 'removeCommand', 'This is the minimal fallback Plugin; nothing is registered.') }
+    registerCliHandler(): void { warnNoOp('Plugin', 'registerCliHandler', 'This is the minimal fallback Plugin; nothing is registered.') }
   })
 
   set('MarkdownRenderChild', class FallbackMarkdownRenderChild extends Component {
@@ -614,11 +611,11 @@ export function registerFallbackShims(): void {
   set('ValueComponent', FallbackValueComponent)
 
   // Icons
-  set('addIcon', () => {})
-  set('setIcon', (el: unknown) => el)
-  set('getIcon', () => null)
-  set('getIconIds', () => [])
-  set('removeIcon', () => {})
+  set('addIcon', () => { warnNoOp('obsidian', 'addIcon', 'The icon is not registered.') })
+  set('setIcon', (el: unknown) => { warnNoOp('obsidian', 'setIcon', 'No icon is drawn.'); return el })
+  set('getIcon', () => { warnNoOp('obsidian', 'getIcon', 'No icon is looked up; returning null.'); return null })
+  set('getIconIds', () => { warnNoOp('obsidian', 'getIconIds', 'No icon list is available; returning an empty list.'); return [] })
+  set('removeIcon', () => { warnNoOp('obsidian', 'removeIcon', 'Nothing was registered to remove.') })
 
   // Version. Answering against the version we claim rather than always `true`,
   // for the same reason as the real implementation — see install-globals.
@@ -637,14 +634,14 @@ export function registerFallbackShims(): void {
   set('getFrontMatterInfo', fallbackGetFrontMatterInfo)
   set('getLanguage', fallbackGetLanguage)
   set('debounce', fallbackDebounce)
-  set('prepareFuzzySearch', fallbackPrepareSearch)
-  set('prepareSimpleSearch', fallbackPrepareSearch)
+  set('prepareFuzzySearch', prepareFuzzySearch)
+  set('prepareSimpleSearch', prepareSimpleSearch)
 
   // Rendering
   set('MarkdownPreviewRenderer', {
-    registerPostProcessor(): void {},
-    unregisterPostProcessor(): void {},
-    createCodeBlockPostProcessor(): () => void { return () => {} },
+    registerPostProcessor(): void { warnNoOp('MarkdownPreviewRenderer', 'registerPostProcessor', 'The processor never runs.') },
+    unregisterPostProcessor(): void { warnNoOp('MarkdownPreviewRenderer', 'unregisterPostProcessor', 'Nothing was registered.') },
+    createCodeBlockPostProcessor(): () => void { warnNoOp('MarkdownPreviewRenderer', 'createCodeBlockPostProcessor', 'The processor never runs.'); return () => {} },
   })
   const escapeToEl = async (md: string, el: HTMLElement): Promise<void> => {
     el.textContent = md
@@ -681,9 +678,8 @@ export function registerFallbackShims(): void {
   //
   // A missing name is not a silent gap here — `x instanceof undefined` is a
   // TypeError that takes the plugin down at an unrelated line. Declaring them
-  // turns that into `false`, which is also the honest answer for the layout
-  // classes: Slatebase's workspace is a flat set of tabs with no split/sidedock
-  // object model, so nothing is an instance of them. `AbstractTextComponent`
+  // turns that into `false`. (The layout classes are real in the normal path —
+  // see the list below — so this only matters when this layer runs alone.) `AbstractTextComponent`
   // and `PopoverSuggest` extend the concrete classes already registered above,
   // so for those the test answers correctly rather than just safely.
   //
@@ -748,18 +744,14 @@ export function registerFallbackShims(): void {
   set('MarkdownPreviewView', MarkdownPreviewViewFallback)
   set('MenuItem', MenuItem)
   set('MenuSeparator', MenuSeparator)
-  // WorkspaceSplit/WorkspaceRibbon are deliberately not in this list — they're
-  // registered as real classes by installObsidianGlobals() (see
-  // install-globals.ts) before this function ever runs, so `set()`'s guard
-  // always skips them here. The remaining layout-item classes below have no
-  // real counterpart anywhere in Slatebase (flat tab model, no split tree),
-  // so they stay generic empty stubs.
+  // The layout classes are real, in view-registry.ts, and installObsidianGlobals()
+  // registers them (the pane tree is mirrored into them, see pane-layout.ts), so
+  // `set()`'s guard skips every name below. These empty classes only fill a name
+  // when this function runs on its own, without the real registration.
   for (const name of [
     'WorkspaceItem', 'WorkspaceParent', 'WorkspaceContainer',
     'WorkspaceTabs', 'WorkspaceRoot', 'WorkspaceSidedock', 'WorkspaceMobileDrawer',
     'WorkspaceWindow', 'WorkspaceFloating',
-    // (All real classes from view-registry.ts; these only fill in if
-    // installObsidianGlobals() has not registered them.)
   ]) {
     set(name, class WorkspaceLayoutItem {})
   }

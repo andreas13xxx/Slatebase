@@ -1155,6 +1155,10 @@ export const de = {
     shown: 'Link: {link}',
     notFound: 'Link konnte nicht geöffnet werden: Ziel nicht gefunden oder kein Zugriff',
     invalid: 'Der Link ist ungültig',
+    protocolTitle: 'Plugin-Aktion ausführen?',
+    protocolMessage: 'Das Plugin „{plugin}“ soll die Aktion „{action}“ ausführen.\nParameter:\n{params}\n\nFühre sie nur aus, wenn du dem Absender des Links vertraust.',
+    protocolRun: 'Ausführen',
+    protocolNoHandler: 'Kein aktives Plugin behandelt diese Aktion',
   },
   quickSwitcher: {
     dialogLabel: 'Schnellwechsler',
@@ -1228,6 +1232,8 @@ export const de = {
 
   editorSettings: {
     smartIndentList: 'Listen beim Zeilenumbruch fortsetzen',
+    vimMode: 'Vim-Tastenbelegung',
+    vimModeHint: 'An: Der Editor nutzt Vim-Modi (Normal, Einfügen, Visuell). Gilt für alle, die den Vault öffnen (Obsidian-Einstellung „Vim-Tastenbelegung“).',
     smartIndentListHint: 'An: Enter in einer Liste oder einem Zitat beginnt die nächste Zeile mit einem neuen Aufzählungszeichen. Aus: Enter behält nur die Einrückung.',
     showIndentGuide: 'Einrückungslinien',
     showIndentGuideHint: 'Dünne senkrechte Linien an jeder Einrückungsebene im Editor.',

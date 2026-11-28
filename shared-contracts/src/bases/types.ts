@@ -126,6 +126,8 @@ export interface BaseView {
   imageAspectRatio?: number
   /** Cards: card width in px (default 200). */
   cardSize?: number
+  /** Kanban: width of each column (and its cards) in px; unset is automatic. Written by Obsidian (`columnWidth: 360`). */
+  columnWidth?: number
   /** Column id → named summary aggregation. */
   summaries?: BaseSummaries
   /** Table: column id → column width in px (Obsidian's `columnSize`). A column without an entry sizes itself. */

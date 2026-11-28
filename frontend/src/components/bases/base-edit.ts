@@ -73,7 +73,7 @@ export function setViewType(doc: BaseDocument, index: number, type: string): Bas
 }
 
 /** View fields that have a typed slot in the model; every other option key lives in `_unknown`. */
-const TYPED_VIEW_OPTION_KEYS = new Set(['limit', 'image', 'imageFit', 'imageAspectRatio', 'cardSize'])
+const TYPED_VIEW_OPTION_KEYS = new Set(['limit', 'image', 'imageFit', 'imageAspectRatio', 'cardSize', 'columnWidth'])
 
 /** The stored value of a plugin-defined view option (typed slot first, then the passthrough bucket). */
 export function getViewOption(view: BaseView, key: string): unknown {
@@ -289,7 +289,19 @@ export function setCardSize(doc: BaseDocument, index: number, size: number | und
   })
 }
 
-/** Board layouts (Kanban, grouped cards) take the width from `cardSize` too, but unset means "automatic". */
+/**
+ * A Kanban board's column width is `columnWidth` (what Obsidian writes), unset meaning "automatic".
+ * `cardSize`, which older Slatebase versions wrote for Kanban, is dropped so the two cannot disagree.
+ */
+export function setColumnWidth(doc: BaseDocument, index: number, size: number | undefined): BaseDocument {
+  const clamped = size === undefined ? undefined : clampTo(size, CARD_SIZE.min, CARD_SIZE.max)
+  return withView(doc, index, (v) => {
+    const { cardSize: _legacy, columnWidth: _old, ...rest } = v
+    return clamped !== undefined ? { ...rest, columnWidth: Math.round(clamped) } : rest
+  })
+}
+
+/** Grouped cards (a board of rows) take the card width from `cardSize`, but unset means "automatic". */
 export function setBoardSize(doc: BaseDocument, index: number, size: number | undefined): BaseDocument {
   const clamped = size === undefined ? undefined : clampTo(size, CARD_SIZE.min, CARD_SIZE.max)
   return withView(doc, index, (v) => {
