@@ -114,7 +114,7 @@ export function EditorFilesSection() {
   const spellcheck = useAppConfigValue('spellcheck')
   // Subscribes to the key; the value shown is the file's own, since an absent key reads here (see the tab reducer)
   useAppConfigValue('defaultViewMode')
-  const defaultViewMode = getAppConfigFileValue('defaultViewMode') === 'source' ? 'source' : 'preview'
+  const defaultViewMode = getAppConfigFileValue('defaultViewMode') === 'preview' ? 'preview' : 'source'
   const livePreview = useAppConfigValue('livePreview')
   const strictLineBreaks = useAppConfigValue('strictLineBreaks')
   const propertiesInDocument = useAppConfigValue('propertiesInDocument')

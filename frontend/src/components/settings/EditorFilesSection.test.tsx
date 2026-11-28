@@ -89,12 +89,12 @@ describe('EditorFilesSection', () => {
     expect(screen.getByLabelText('Mit Tabulator einrücken')).not.toBeChecked()
     expect(screen.getByLabelText('Tabulatorbreite')).toHaveValue(2)
     expect(screen.getByLabelText('Strikte Zeilenumbrüche')).toBeChecked()
-    expect(screen.getByLabelText('Notizen öffnen in')).toHaveValue('preview') // an absent key reads, as in the tab reducer
+    expect(screen.getByLabelText('Notizen öffnen in')).toHaveValue('source') // an absent key counts as source, as in the tab reducer
     expect(screen.getByLabelText('Ordner für neue Notizen')).toHaveValue('Inbox')
     expect(screen.getByLabelText('Vor dem Löschen nachfragen')).toBeChecked()
 
-    fireEvent.change(screen.getByLabelText('Notizen öffnen in'), { target: { value: 'source' } })
-    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { defaultViewMode: 'source' }))
+    fireEvent.change(screen.getByLabelText('Notizen öffnen in'), { target: { value: 'preview' } })
+    await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { defaultViewMode: 'preview' }))
     fireEvent.click(screen.getByLabelText('Vor dem Löschen nachfragen'))
     await waitFor(() => expect(client.patchAppConfig).toHaveBeenCalledWith('v1', { promptDelete: false }))
     fireEvent.click(screen.getByLabelText('Überschriften falten'))

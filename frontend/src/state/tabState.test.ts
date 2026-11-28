@@ -358,7 +358,7 @@ describe('tabReducer', () => {
 
       expect(state.tabs[0].content).toBe('# Hello')
       expect(state.tabs[0].isBinary).toBe(false)
-      expect(state.tabs[0].mode).toBe('reading')
+      expect(state.tabs[0].mode).toBe('live-preview')
       expect(state.tabs[0].loading).toBe(false)
       expect(state.tabs[0].error).toBeNull()
     })
@@ -399,7 +399,7 @@ describe('tabReducer', () => {
       resetAppConfig()
     })
 
-    it('opens notes in the reading view when app.json has no defaultViewMode, though Obsidian\'s default is source', async () => {
+    it('opens notes in the editor when app.json has no defaultViewMode (Obsidian\'s default is source)', async () => {
       resetAppConfig()
       initializeAppConfig({ getAppConfig: async () => ({}) } as unknown as IApiClient)
       await setActiveVault('v1')
@@ -407,7 +407,7 @@ describe('tabReducer', () => {
         { tabs: [createTab('v1', 'a.md', 'a.md', { loading: true })], activeTabId: 'v1::a.md' },
         { type: 'TAB_CONTENT_LOADED', payload: { tabId: 'v1::a.md', content: 'x', isBinary: false } },
       )
-      expect(tabs[0]!.mode).toBe('reading')
+      expect(tabs[0]!.mode).not.toBe('reading')
       resetAppConfig()
     })
 
