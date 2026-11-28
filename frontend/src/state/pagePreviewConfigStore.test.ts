@@ -22,10 +22,19 @@ describe('pagePreviewConfigStore', () => {
     resetHoverLinkBus()
   })
 
-  it('shows previews on hover alone where the file says nothing', async () => {
+  it('requires Ctrl (Cmd) where the file says nothing', async () => {
     client({})
     await setActiveVault('v1')
+    expect(pagePreviewRequiresMod('internal-link')).toBe(true)
+    expect(pagePreviewRequiresMod('file-explorer')).toBe(true)
+    expect(pagePreviewRequiresMod('some-plugin')).toBe(true)
+  })
+
+  it('shows previews on hover alone where the file turns Ctrl off', async () => {
+    client({ preview: false, 'file-explorer': false })
+    await setActiveVault('v1')
     expect(pagePreviewRequiresMod('internal-link')).toBe(false)
+    expect(pagePreviewRequiresMod('file-explorer')).toBe(false)
     expect(pagePreviewRequiresMod('some-plugin')).toBe(false)
   })
 
@@ -51,7 +60,7 @@ describe('pagePreviewConfigStore', () => {
     client({ preview: true })
     await setActiveVault('v1')
     expect(pagePreviewRequiresMod('tasknotes-task-card')).toBe(true)
-    expect(pagePreviewRequiresMod('file-explorer')).toBe(false)
+    expect(pagePreviewRequiresMod('file-explorer')).toBe(true)
 
     _reset()
     client({ preview: true, 'tasknotes-task-card': false })

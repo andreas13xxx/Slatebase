@@ -1253,7 +1253,7 @@ export class VaultShim implements IVaultShim {
 
         if (isObjectPrototypeMember(prop)) {
           const value = Reflect.get(target, prop, target);
-          return typeof value === 'function' ? value.bind(target) : value;
+          return typeof value === 'function' && prop !== 'constructor' ? value.bind(target) : value;
         }
 
         if (recordGapRead('Vault', prop)) {

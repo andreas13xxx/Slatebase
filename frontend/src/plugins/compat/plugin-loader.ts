@@ -717,6 +717,35 @@ function __unknownModuleStub(id) {
     }
   });
 }
+function __netStub(id) {
+  function warnOnce(what) {
+    var key = id + '::' + what;
+    if (__requireWarnedModules.has(key)) return;
+    __requireWarnedModules.add(key);
+    console.warn('[PluginLoader] A plugin uses "' + id + '.' + what + '" — browsers cannot open ports or make raw HTTP calls. This plugin feature will NOT work (local server / API stays inactive).');
+  }
+  function inertServer() {
+    warnOnce('createServer');
+    var s = { listening: false };
+    s.on = s.once = s.off = s.removeListener = function() { return s; };
+    s.listen = function() { warnOnce('listen'); return s; };
+    s.close = function(cb) { if (typeof cb === 'function') cb(); return s; };
+    s.address = function() { return null; };
+    return s;
+  }
+  function unsupported(name) {
+    return function() { warnOnce(name); throw new Error('[PluginLoader] ' + id + '.' + name + ' is not available in the browser'); };
+  }
+  return {
+    createServer: inertServer,
+    request: unsupported('request'),
+    get: unsupported('get'),
+    Agent: function Agent() {},
+    globalAgent: {},
+    STATUS_CODES: {},
+    METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+  };
+}
 function require(id) {
   if (id === 'obsidian') {
     // The namespace is fully populated by the compat layer before any plugin
@@ -727,6 +756,12 @@ function require(id) {
   if (id === 'moment') return window.moment;
   if (id === 'path' || id === 'node:path') return window.__slatebasePath || {};
   if (id === 'buffer' || id === 'node:buffer') return { Buffer: window.Buffer };
+  // A browser cannot listen on a port. esbuild's __toESM copies OWN keys only, so the
+  // Proxy stub below would leave \`http.createServer\` undefined (Omnisearch's API server).
+  // Real own keys, inert server, and a warning so the gap is never silent.
+  if (id === 'http' || id === 'https' || id === 'node:http' || id === 'node:https') {
+    return __netStub(id);
+  }
   if (id === '@codemirror/state') return window.__codemirrorState || {};
   if (id === '@codemirror/view') return window.__codemirrorView || {};
   if (id === '@codemirror/language') return window.__codemirrorLanguage || {};

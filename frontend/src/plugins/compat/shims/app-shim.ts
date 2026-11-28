@@ -855,6 +855,12 @@ export class AppShim implements IAppShim {
    * replaces the default handler.
    */
   readonly viewRegistry = {
+    /**
+     * View type -> view creator. Slatebase renders its views itself, so this stays empty;
+     * plugins such as Advanced Canvas wrap entries of it (`around(viewByType, { canvas })`)
+     * and crash at startup when the map is missing.
+     */
+    viewByType: {} as Record<string, unknown>,
     get typeByExtension(): Record<string, string> {
       const map: Record<string, string> = { md: 'markdown', canvas: 'canvas', base: 'bases' }
       const addAll = (exts: readonly string[], viewType: string): void => {
@@ -1034,7 +1040,7 @@ export class AppShim implements IAppShim {
         // must pass through untouched — see isObjectPrototypeMember's doc comment.
         if (isObjectPrototypeMember(prop)) {
           const value = Reflect.get(target, prop, target);
-          return typeof value === 'function' ? value.bind(target) : value;
+          return typeof value === 'function' && prop !== 'constructor' ? value.bind(target) : value;
         }
 
         // Own data properties a plugin assigned itself (`app.nvOrig_showReleaseNotes = …`, a
