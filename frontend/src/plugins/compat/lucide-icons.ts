@@ -320,6 +320,12 @@ async function loadLucideIcon(name: string): Promise<IconNode | null> {
   }
 }
 
+/** Drops a cached resolution, e.g. a placeholder cached before the plugin's addIcon() registered the id. */
+export function forgetResolvedIcon(iconId: string): void {
+  nodeCache.delete(iconId)
+  notifyIconResolved()
+}
+
 /** Resolve and cache a Lucide icon by name. Returns null if there's no such icon. */
 export async function resolveLucideIconNode(iconId: string): Promise<ResolvedIcon | null> {
   const cached = nodeCache.get(iconId)
@@ -351,6 +357,10 @@ async function resolveLucideIconNodeUncached(iconId: string): Promise<ResolvedIc
     notifyIconResolved()
     return brand
   }
+  // A plugin's own addIcon() icon is no Lucide miss: callers draw it from the custom registry.
+  // Neither warn nor cache a placeholder, or an icon asked for before addIcon() ran stays wrong.
+  const custom = (window as unknown as { __obsidianCustomIcons?: Map<string, string> }).__obsidianCustomIcons
+  if (custom?.has(iconId)) return null
   // An unresolved icon rendering as blank space looks like a styling bug
   // rather than a missing mapping, so it falls back to a visible placeholder
   // instead. Candidates are included because the fix is usually a new
