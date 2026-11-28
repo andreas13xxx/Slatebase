@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.98.1](https://github.com/andreas13xxx/Slatebase/compare/v0.98.0...v0.98.1) (2026-11-28)
+
+
+### Bugfixes
+
+* **plugin-compat:** Advanced Canvas, Omnisearch, .mjs MIME, page preview default ([#472](https://github.com/andreas13xxx/Slatebase/issues/472)) ([12974a0](https://github.com/andreas13xxx/Slatebase/commit/12974a0b8291436154756925e465cb7ffd6a441a))
+* **plugin-compat:** replace fake stubs with real behaviour; obsidian://, Vim, Kanban columnWidth ([#469](https://github.com/andreas13xxx/Slatebase/issues/469)) ([55fa541](https://github.com/andreas13xxx/Slatebase/commit/55fa54127ee4c99f2832277de7cd659654a32295))
+* **plugin-compat:** setting tab name/id and app.setting.pluginTabs ([#471](https://github.com/andreas13xxx/Slatebase/issues/471)) ([5543ebf](https://github.com/andreas13xxx/Slatebase/commit/5543ebf4131e302cb55b6b6330bbcd63bbff891b))
+
 ## [0.98.0](https://github.com/andreas13xxx/Slatebase/compare/v0.97.0...v0.98.0) (2026-11-27)
 
 
