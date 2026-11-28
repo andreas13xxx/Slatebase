@@ -33,6 +33,65 @@ const URL_PAINT_ATTRS = new Set(['fill', 'stroke', 'filter', 'mask', 'clip-path'
 /** `url(#id)` (optionally quoted) with an optional plain fallback colour/keyword. */
 const LOCAL_URL_RE = /^url\(\s*(['"]?)#[\w.:-]+\1\s*\)(?:\s+[#\w.%-]+)?$/
 
+const SVG_STYLE_PROPERTIES = new Set([
+  'fill', 'stroke', 'stroke-width', 'fill-opacity', 'stroke-opacity', 'opacity',
+  'fill-rule', 'clip-rule', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
+])
+const SVG_COLOR_RE = /^(?:#[\da-f]{3,8}|currentcolor|none|black|white|red|green|blue|gray|grey|transparent)$/i
+const SVG_STYLE_VALUE_RE = /^[\w.#%(),\s+-]+$/
+
+/** Copy only simple class-based SVG paint rules into safe presentation attributes. */
+function applySafeSvgStyleRules(markup: string, root: Element): void {
+  const styleBlocks = markup.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)
+  for (const [, css] of styleBlocks) {
+    if (!css || /[\\]|\/\*|url\s*\(/i.test(css)) continue
+    for (const [, selectors, declarations] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!selectors || !declarations) continue
+      const classSelectors = selectors.split(',').map((selector) => selector.trim())
+      if (classSelectors.some((selector) => !/^\.[a-z_][\w-]*$/i.test(selector))) continue
+      const classes = classSelectors.map((selector) => selector.slice(1))
+
+      const safeDeclarations: Array<[string, string]> = []
+      for (const declaration of declarations.split(';')) {
+        const colon = declaration.indexOf(':')
+        if (colon < 0) continue
+        const property = declaration.slice(0, colon).trim().toLowerCase()
+        const value = declaration.slice(colon + 1).trim()
+        if (!SVG_STYLE_PROPERTIES.has(property) || !SVG_STYLE_VALUE_RE.test(value)) continue
+        const normalized = value.toLowerCase()
+        const isColor = property === 'fill' || property === 'stroke'
+        const isOpacity = property === 'opacity' || property.endsWith('-opacity')
+        const isKeyword = property === 'fill-rule' || property === 'clip-rule'
+        const isLineStyle = property === 'stroke-linecap' || property === 'stroke-linejoin'
+        const isMiter = property === 'stroke-miterlimit'
+        const isWidth = property === 'stroke-width'
+        const valid = isColor
+          ? SVG_COLOR_RE.test(value) || /^rgba?\(\s*[\d.%,\s]+\)$/.test(value)
+          : isOpacity
+            ? /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(value)
+            : isKeyword
+              ? /^(?:nonzero|evenodd)$/.test(normalized)
+              : isLineStyle
+                ? /^(?:butt|round|square|miter|bevel)$/.test(normalized)
+                : isMiter
+                  ? /^\d+(?:\.\d+)?$/.test(value)
+                  : isWidth
+                    ? /^\d+(?:\.\d+)?(?:px)?$/.test(value)
+                    : false
+        if (valid) safeDeclarations.push([property, value])
+      }
+
+      for (const className of classes) {
+        const matched = Array.from(root.getElementsByClassName(className))
+        if (root.classList.contains(className)) matched.push(root)
+        for (const element of matched) {
+          for (const [property, value] of safeDeclarations) element.setAttribute(property, value)
+        }
+      }
+    }
+  }
+}
+
 /** Icons are small; larger input is refused rather than parsed. shortcut: 64 KB cap, raise if real icons need it. */
 export const MAX_ICON_SVG_LENGTH = 64 * 1024
 
@@ -69,9 +128,8 @@ const SVG_WRAPPER_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">'
  * every `href`/`xlink:href` or `url(...)` paint reference that is not a
  * same-document `#fragment`.
  *
- * shortcut: `<style>` elements are dropped too, so Inkscape/Illustrator icons
- * that colour shapes via a `<style>.cls-1{...}</style>` block lose their
- * colours; upgrade by scoping and filtering CSS properly if that matters.
+ * Safe, simple class-based paint rules from `<style>` blocks become SVG
+ * presentation attributes. Other CSS is dropped.
  */
 export function sanitizeSvgElement(markup: string, wrapperOpen = SVG_WRAPPER_OPEN): Element | null {
   if (markup.length > MAX_ICON_SVG_LENGTH) return null
@@ -85,6 +143,7 @@ export function sanitizeSvgElement(markup: string, wrapperOpen = SVG_WRAPPER_OPE
     ADD_TAGS: ['use'], // safe: non-fragment hrefs are stripped below
     RETURN_DOM: true,
   }) as unknown as Element
+  applySafeSvgStyleRules(isFull ? body : `${wrapperOpen}${body}</svg>`, clean)
   for (const el of Array.from(clean.querySelectorAll('*'))) {
     for (const attr of ['href', 'xlink:href']) {
       const v = el.getAttribute(attr)
