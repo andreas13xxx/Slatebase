@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { codeFolding, foldAll, unfoldAll, toggleFold, foldedRanges } from '@codemirror/language'
+import { codeFolding, foldAll, unfoldAll, toggleFold, foldedRanges, foldable, ensureSyntaxTree } from '@codemirror/language'
+import { markdown } from '@codemirror/lang-markdown'
+import { languages } from '@codemirror/language-data'
 import {
   markdownFoldService,
   findAllHeadingSections,
   toggleFoldProperties,
   foldMore,
   foldLess,
+  withoutNativeHeadingFold,
 } from './folding'
 
 function makeView(doc: string, cursorPos?: number): EditorView {
@@ -33,6 +36,19 @@ describe('findAllHeadingSections', () => {
     const sections = findAllHeadingSections(view.state)
 
     expect(sections.map((s) => s.level)).toEqual([1, 2, 2])
+    view.destroy()
+  })
+
+  it('ignores headings inside fenced code blocks', () => {
+    const doc = '```markdown\n# H1\n\ntext\n## H2\n```\n\n# Real\n\nBody'
+    const view = makeView(doc)
+
+    expect(findAllHeadingSections(view.state).map((s) => s.level)).toEqual([1])
+    const fenceLine = view.state.doc.line(2)
+    expect(foldedRangeList(view)).toEqual([])
+    view.dispatch({ selection: { anchor: fenceLine.from } })
+    toggleFold(view)
+    expect(foldedRangeList(view)).toEqual([])
     view.destroy()
   })
 })
@@ -191,5 +207,22 @@ describe('foldMore / foldLess', () => {
     expect(() => foldMore(view)).not.toThrow()
     expect(foldedRangeList(view)).toHaveLength(0)
     view.destroy()
+  })
+})
+
+describe('withoutNativeHeadingFold', () => {
+  it('does not fold headings inside a nested ```markdown block, but still folds real ones', async () => {
+    const doc = '```markdown\n# H1\n\ntext\n## H2\nmore\n```\n\n# Real\n\nBody'
+    await Promise.all(languages.filter((l) => l.name === 'Markdown').map((l) => l.load()))
+    const state = EditorState.create({
+      doc,
+      extensions: [withoutNativeHeadingFold(markdown({ codeLanguages: languages })), markdownFoldService],
+    })
+    ensureSyntaxTree(state, doc.length, 5000)
+    const foldAt = (n: number) => foldable(state, state.doc.line(n).from, state.doc.line(n).to)
+
+    expect(foldAt(2)).toBeNull()
+    expect(foldAt(5)).toBeNull()
+    expect(foldAt(9)).not.toBeNull()
   })
 })

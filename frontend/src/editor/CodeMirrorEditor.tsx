@@ -57,7 +57,7 @@ import { editorPrefsExtension, type EditorPrefs } from './editor-prefs'
 import { loadVimExtension, vimExtensionIfLoaded } from './vim-mode'
 import { useLongPress } from '../hooks/useLongPress'
 import { codeFolding, foldGutter } from '@codemirror/language'
-import { markdownFoldService } from './folding'
+import { markdownFoldService, withoutNativeHeadingFold } from './folding'
 import { foldPersistence, loadFileFolds, restoreFolds, setFoldVault } from './foldPersistence'
 import { isEmbeddableFile } from '../utils/internalLink'
 import { openExternalUrl } from '../utils/externalUrl'
@@ -362,11 +362,11 @@ export function CodeMirrorEditor({
       editorLivePreviewField.init(() => livePreview),
       // Obsidian's `livePreviewState` plus the pointer tracking that fills it.
       livePreviewStateTracker,
-      markdown({
+      withoutNativeHeadingFold(markdown({
         base: markdownLanguageWithProps,
         codeLanguages: languages,
         extensions: GFM,
-      }),
+      })),
       createSlatebaseTheme(),
       createSlatebaseHighlightStyle(),
       // Obsidian's marker class on the editor root (`.cm-editor.cm-s-obsidian`); themes key rules on it.
