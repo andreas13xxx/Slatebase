@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.98.2](https://github.com/andreas13xxx/Slatebase/compare/v0.98.1...v0.98.2) (2026-11-28)
+
+
+### Bugfixes
+
+* plugin icon rendering, vault name, heading folds, update list ([#474](https://github.com/andreas13xxx/Slatebase/issues/474)) ([f6f13c1](https://github.com/andreas13xxx/Slatebase/commit/f6f13c1db858614fc76c36c1bfff7fd4a7b89963))
+* preserve safe SVG icon style colors ([#473](https://github.com/andreas13xxx/Slatebase/issues/473)) ([214c3d3](https://github.com/andreas13xxx/Slatebase/commit/214c3d3c3f9f8f9d474655bb716146523884cc2e))
+
 ## [0.98.1](https://github.com/andreas13xxx/Slatebase/compare/v0.98.0...v0.98.1) (2026-11-28)
 
 
