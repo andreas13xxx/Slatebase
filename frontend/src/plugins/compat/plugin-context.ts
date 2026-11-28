@@ -921,8 +921,6 @@ export function PluginProvider({
         instance.addSettingTab = (tab: unknown) => {
           if (pluginSystemVaultIdRef.current !== newVaultId || pluginRegistryRef.current !== newRegistry) return
           settingTabRegistryRef.current.register(pluginId, tab as import('./setting-tab').PluginSettingTab)
-          const pluginTabs = (window as unknown as { app?: { setting?: { pluginTabs?: unknown[] } } }).app?.setting?.pluginTabs
-          if (Array.isArray(pluginTabs) && !pluginTabs.includes(tab)) pluginTabs.push(tab)
         }
         // Wire addRibbonIcon to route to the shared RibbonIconRegistry
         instance.addRibbonIcon = (icon: string, title: string, callback: (evt: MouseEvent) => unknown) => {

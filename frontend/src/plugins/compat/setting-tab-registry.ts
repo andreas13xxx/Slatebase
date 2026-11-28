@@ -27,16 +27,32 @@ export interface ISettingTabRegistry {
 }
 
 /**
+ * Obsidian's `app.setting.pluginTabs`: the tabs of all loaded plugins, which plugins `find()` in.
+ * One array for every `AppShim` (each plugin has its own shim, but Obsidian has one app), mutated
+ * in place by `SettingTabRegistry` so a reference a shim holds never goes stale.
+ */
+export const pluginSettingTabs: unknown[] = []
+
+function dropPluginSettingTab(tab: unknown): void {
+  const index = pluginSettingTabs.indexOf(tab)
+  if (index !== -1) pluginSettingTabs.splice(index, 1)
+}
+
+/**
  * SettingTabRegistry — Simple Map-based registry for plugin setting tabs.
+ * Keeps the shared `pluginSettingTabs` array in step with its own entries.
  */
 export class SettingTabRegistry implements ISettingTabRegistry {
   private readonly tabs: Map<string, PluginSettingTab> = new Map()
 
   register(pluginId: string, tab: PluginSettingTab): void {
+    dropPluginSettingTab(this.tabs.get(pluginId))
     this.tabs.set(pluginId, tab)
+    pluginSettingTabs.push(tab)
   }
 
   remove(pluginId: string): void {
+    dropPluginSettingTab(this.tabs.get(pluginId))
     this.tabs.delete(pluginId)
   }
 
@@ -49,6 +65,7 @@ export class SettingTabRegistry implements ISettingTabRegistry {
   }
 
   clear(): void {
+    for (const tab of this.tabs.values()) dropPluginSettingTab(tab)
     this.tabs.clear()
   }
 }

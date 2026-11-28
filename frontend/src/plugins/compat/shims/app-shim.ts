@@ -18,6 +18,7 @@ import { debugOnce, warnNoOp, warnOnce } from '../log';
 import { Keymap, Scope, SecretStorage, getVaultSecretStorage } from '../obsidian-api-extensions';
 import type { KeychainApiClient } from '../obsidian-api-extensions';
 import { createEmbedRegistryShim } from '../embed-registry';
+import { pluginSettingTabs } from '../setting-tab-registry';
 import { createAppInternals } from '../app-internals';
 import { getMetadataTypeManager } from '../metadata-type-manager';
 import { resolveActiveTheme } from '../body-classes';
@@ -610,9 +611,9 @@ export class AppShim implements IAppShim {
   readonly setting = {
     /** No settings tab is ever open from a plugin's point of view. */
     activeTab: null as unknown,
-    /** Tabs of installed community plugins (Obsidian: `app.setting.pluginTabs`). Plugins `find()` in it. */
-    pluginTabs: [] as unknown[],
-    /** Core settings tabs (Obsidian: `app.setting.settingTabs`). */
+    /** Tabs of loaded community plugins (Obsidian: `app.setting.pluginTabs`), shared by every shim and kept by `SettingTabRegistry`. */
+    pluginTabs: pluginSettingTabs,
+    /** Core settings tabs (Obsidian: `app.setting.settingTabs`). Slatebase has none, so plugins always see an empty list. */
     settingTabs: [] as unknown[],
     open: (): void => { warnNoOp('app.setting', 'open', 'The settings dialog cannot be opened from a plugin; use Settings in the app.') },
     close: (): void => { warnNoOp('app.setting', 'close') },
